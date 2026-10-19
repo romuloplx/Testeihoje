@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DubAI PRO — Estúdio de vídeos com IA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#090914;
+  --card:#151527;
+  --card2:#1b1b30;
+  --border:#292945;
+  --border2:#37375a;
+  --muted:#9999b5;
+  --muted2:#bbbbd0;
+  --accent:#7c3aed;
+  --accent2:#06b6d4;
+  --success:#00d4ff;
+}
+body{
+  margin:0;
+  background: radial-gradient(1200px 600px at 20% -10%, #1e1b4b 0%, transparent 60%), radial-gradient(1000px 500px at 90% 0%, #0e7490 0%, transparent 60%), var(--bg);
+  color:white;
+  font-family: Inter, Arial, sans-serif;
+  min-height:100vh;
+}
+header{
+  position:sticky;top:0;z-index:20;
+  padding:18px 22px;
+  text-align:center;
+  background: rgba(18,18,37,0.85);
+  backdrop-filter: blur(12px);
+  border-bottom:1px solid var(--border);
+}
+.logo{
+  font-family:"Space Grotesk", Inter, sans-serif;
+  font-size:28px;font-weight:800;letter-spacing:-0.5px;
+  background:linear-gradient(90deg,#8b5cf6,#00d4ff);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  display:inline-flex;align-items:center;gap:8px;
+}
+.logo span{font-size:20px}
+.subtitle{color:var(--muted);font-size:12px;margin-top:4px;letter-spacing:0.3px}
+.badge{
+  display:inline-flex;align-items:center;gap:6px;
+  background:#1e1b4b;color:#a5b4fc;border:1px solid #3730a3;
+  padding:6px 10px;border-radius:999px;font-size:11px;margin-top:10px;
+}
+.badge i{width:8px;height:8px;background:#22c55e;border-radius:999px;display:inline-block;box-shadow:0 0 8px #22c55e}
+
+main{max-width:720px;margin:auto;padding:20px;padding-bottom:100px}
+.tabs{
+  display:flex;gap:8px;margin-bottom:18px;
+  background:#121225;padding:6px;border-radius:16px;border:1px solid var(--border);
+}
+.tabs button{
+  flex:1;background:transparent;border:1px solid transparent;
+  padding:12px 10px;border-radius:12px;
+  color:var(--muted);font-weight:700;font-size:12.5px;cursor:pointer;
+  transition:.2s;
+}
+.tabs button.active{
+  background:linear-gradient(90deg,#7c3aed,#06b6d4);
+  color:white;box-shadow:0 6px 20px rgba(124,58,237,.35);
+  border-color:transparent;
+}
+.card{
+  background: linear-gradient(180deg, #1a1a30 0%, #151527 100%);
+  padding:20px;border-radius:18px;margin-bottom:16px;
+  border:1px solid var(--border);
+  box-shadow: 0 10px 30px rgba(0,0,0,.25);
+}
+h2{font-size:19px;margin:0 0 6px 0;font-weight:800;letter-spacing:-0.3px}
+h3{font-size:15px;margin:0 0 6px 0}
+p{color:#aaaac5;font-size:13px;line-height:1.6;margin:8px 0}
+button{
+  border:none;border-radius:12px;padding:14px;color:white;font-weight:800;cursor:pointer;transition:.15s;
+}
+button:active{transform:scale(.98)}
+.primary{
+  width:100%;
+  background:linear-gradient(90deg,#7c3aed,#06b6d4);
+  margin-top:12px;box-shadow:0 8px 20px rgba(124,58,237,.3);
+  font-size:14px;
+}
+.primary:disabled{opacity:.6;cursor:not-allowed;transform:none}
+.secondary{width:100%;background:#292945;margin-top:10px}
+.ghost{background:transparent;border:1px solid var(--border);color:var(--muted2);padding:10px 14px;font-size:12px}
+.ghost:hover{border-color:#5b5bd0;color:white;background:#1e1e3a}
+textarea,select,input{
+  width:100%;background:#222239;color:white;border:1px solid var(--border2);
+  padding:14px;border-radius:12px;margin-top:8px;font-size:14px;outline:none;transition:.2s;
+}
+textarea:focus,select:focus,input:focus{border-color:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.2)}
+textarea{min-height:130px;resize:vertical;line-height:1.5}
+label{display:block;margin-top:14px;font-size:12px;color:var(--muted2);font-weight:600;letter-spacing:.2px}
+.hidden{display:none !important}
+video{width:100%;border-radius:12px;margin-top:12px;background:black}
+.status{
+  margin-top:12px;padding:12px 14px;border-radius:12px;
+  font-size:13px;text-align:center;line-height:1.5;
+  border:1px solid transparent;display:none;
+}
+.status.show{display:block}
+.status.info{background:#0e749022;border-color:#0e749055;color:#7dd3fc}
+.status.success{background:#14532d33;border-color:#22c55e44;color:#86efac}
+.status.error{background:#7f1d1d33;border-color:#ef444444;color:#fca5a5}
+.status.warn{background:#854d0e22;border-color:#eab30844;color:#fde68a}
+
+/* Progress */
+.progress-wrap{margin-top:14px;display:none}
+.progress-wrap.show{display:block}
+.progress-bar{height:8px;background:#222239;border-radius:999px;overflow:hidden;border:1px solid var(--border)}
+.progress-fill{height:100%;width:0%;background:linear-gradient(90deg,#7c3aed,#06b6d4);transition:width .4s}
+.progress-steps{display:flex;justify-content:space-between;margin-top:8px;gap:4px}
+.progress-steps span{font-size:10px;color:var(--muted);text-align:center;flex:1}
+.progress-steps span.active{color:#a78bfa;font-weight:700}
+
+/* Projects */
+.project{
+  background: var(--card2);
+  border:1px solid var(--border);
+  border-radius:16px;overflow:hidden;margin-bottom:14px;
+}
+.project-head{
+  display:flex;gap:12px;padding:14px;
+}
+.thumb{
+  width:96px;height:64px;border-radius:10px;object-fit:cover;background:#0f0f1e;border:1px solid var(--border);flex-shrink:0;
+}
+.project-meta{flex:1;min-width:0}
+.project-title{font-weight:800;font-size:13.5px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.project-sub{font-size:11px;color:var(--muted);margin-top:4px;display:flex;gap:8px;flex-wrap:wrap}
+.tag{padding:4px 8px;border-radius:999px;background:#23234a;border:1px solid var(--border);font-size:10px;color:#a5b4fc}
+.tag.success{background:#052e1677;border-color:#14532d;color:#86efac}
+.project-body{padding:0 14px 14px 14px}
+.project-script{
+  background:#0f0f1e;border:1px solid var(--border);border-radius:12px;
+  padding:12px;max-height:180px;overflow:auto;white-space:pre-wrap;
+  font-size:12px;line-height:1.6;color:#d1d5ff;
+}
+.project-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.project-actions button{flex:1;padding:10px;font-size:12px}
+.empty{
+  text-align:center;padding:30px 20px;border:1px dashed var(--border2);border-radius:16px;background:#111125;
+}
+.empty-ico{font-size:28px;margin-bottom:8px}
+.toast{
+  position:fixed;left:50%;bottom:20px;transform:translateX(-50%) translateY(100px);
+  background:#1e1b4b;border:1px solid #4338ca;color:white;
+  padding:12px 16px;border-radius:999px;font-size:13px;font-weight:600;
+  box-shadow:0 10px 30px rgba(0,0,0,.4);opacity:0;transition:.3s;z-index:100;
+  display:flex;align-items:center;gap:8px;max-width:90vw;
+}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+.row{display:flex;gap:10px}
+.row > *{flex:1}
+.hint{font-size:11px;color:#7c7ca8;margin-top:6px}
+.kbd{font-family:monospace;background:#23234a;padding:2px 6px;border-radius:6px;border:1px solid var(--border);font-size:11px}
+.footer{text-align:center;color:#6b7280;font-size:11px;margin-top:14px;line-height:1.6}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><span>⚡</span> DubAI PRO</div>
+  <div class="subtitle">Estúdio de vídeos com Inteligência Artificial</div>
+  <div class="badge"><i></i> <span id="modeBadge">Carregando...</span> • Backend conectado</div>
+</header>
+
+<main>
+
+<div class="tabs">
+  <button class="active" onclick="openTab('create',this)">🎬 Criar</button>
+  <button onclick="openTab('dub',this)">🌍 Dublar</button>
+  <button onclick="openTab('projects',this)">📁 Projetos <span id="projCount" class="kbd" style="margin-left:6px">0</span></button>
+</div>
+
+<!-- CREATE -->
+<section id="create">
+  <div class="card">
+    <h2>🎥 Criar vídeo com IA</h2>
+    <p>Descreva o vídeo que deseja produzir. A IA cria roteiro, cenas e narração prontas para virar vídeo.</p>
+
+    <label>Descrição do vídeo</label>
+    <textarea id="prompt" placeholder="Exemplo: Crie um documentário realista sobre dinossauros, com narração masculina em português brasileiro."></textarea>
+    <div class="hint">Dica: seja específico. Ex: “vídeo de 10min sobre buracos negros para iniciantes, tom divertido + exemplos”</div>
+
+    <div class="row">
+      <div>
+        <label>Duração</label>
+        <select id="duration">
+          <option value="5">5 minutos</option>
+          <option value="10" selected>10 minutos</option>
+          <option value="15">15 minutos</option>
+          <option value="20">20 minutos</option>
+        </select>
+      </div>
+      <div>
+        <label>Estilo visual</label>
+        <select id="style">
+          <option value="realistic">Pessoas realistas</option>
+          <option value="cinematic">Cinematográfico</option>
+          <option value="animation">Animação</option>
+          <option value="documentary">Documentário</option>
+          <option value="images">Imagens com narração</option>
+        </select>
+      </div>
+    </div>
+
+    <label>Voz</label>
+    <select id="voice">
+      <option value="onyx">Masculina grave — Onyx</option>
+      <option value="nova">Feminina natural — Nova</option>
+      <option value="alloy">Neutra — Alloy</option>
+    </select>
+
+    <button class="primary" id="createBtn" onclick="createVideo()">✨ Criar vídeo com IA</button>
+    <button class="ghost" onclick="fillExample()" style="width:100%;margin-top:8px">💡 Usar exemplo pronto</button>
+
+    <div class="progress-wrap" id="createProgress">
+      <div class="progress-bar"><div class="progress-fill" id="createProgressFill"></div></div>
+      <div class="progress-steps">
+        <span id="s1" class="active">Roteiro</span>
+        <span id="s2">Cenas</span>
+        <span id="s3">Narração</span>
+        <span id="s4">Finalizando</span>
+      </div>
+    </div>
+
+    <div class="status" id="createStatus"></div>
+    <div id="createResult" class="hidden" style="margin-top:14px">
+      <div style="background:#0f0f1e;border:1px solid var(--border);border-radius:12px;padding:14px">
+        <div style="font-weight:800;font-size:13px;margin-bottom:8px">📝 Roteiro gerado</div>
+        <div id="createScript" style="white-space:pre-wrap;font-size:12.5px;line-height:1.7;color:#d1d5ff;max-height:300px;overflow:auto"></div>
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+          <button class="ghost" onclick="copyText(document.getElementById('createScript').innerText)">📋 Copiar roteiro</button>
+          <button class="ghost" onclick="speakText(document.getElementById('createScript').innerText)">🔊 Ouvir narração</button>
+          <button class="ghost" onclick="openTab('projects', document.querySelectorAll('.tabs button')[2])">📁 Ver nos projetos</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="background:#111125">
+    <h3 style="margin:0">Como funciona?</h3>
+    <p style="margin:8px 0 0 0">1️⃣ Você descreve a ideia → 2️⃣ IA gera roteiro com timestamps → 3️⃣ Vira projeto salvo → 4️⃣ Você narra com TTS ou exporta.</p>
+    <p class="hint">Sem <span class="kbd">OPENAI_API_KEY</span> o app roda em modo MOCK (roteiros locais realistas). Com a chave, usa GPT-4o de verdade.</p>
+  </div>
+</section>
+
+<!-- DUB -->
+<section id="dub" class="hidden">
+  <div class="card">
+    <h2>🌍 Dublar vídeo</h2>
+    <p>Envie um vídeo em outro idioma para traduzir e dublar em português brasileiro com sincronia.</p>
+
+    <label>Selecionar vídeo ou áudio</label>
+    <input type="file" id="videoFile" accept="video/*,audio/*" onchange="previewVideo()">
+    <div class="hint">MP4, MOV, MP3, M4A até 200MB • Funciona mesmo sem backend de voz (modo simulação).</div>
+
+    <video id="preview" controls hidden></video>
+    <audio id="audioPreview" controls hidden style="width:100%;margin-top:12px"></audio>
+
+    <div class="row">
+      <div>
+        <label>Idioma original</label>
+        <select id="language">
+          <option value="">Detectar automaticamente</option>
+          <option value="en">Inglês</option>
+          <option value="es">Espanhol</option>
+          <option value="fr">Francês</option>
+          <option value="ja">Japonês</option>
+          <option value="ko">Coreano</option>
+          <option value="de">Alemão</option>
+          <option value="it">Italiano</option>
+        </select>
+      </div>
+      <div>
+        <label>Voz da dublagem</label>
+        <select id="dubVoice">
+          <option value="onyx">Masculina</option>
+          <option value="nova">Feminina</option>
+          <option value="alloy">Neutra</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="primary" id="dubBtn" onclick="dubVideo()">🎙️ Dublar para português</button>
+
+    <div class="progress-wrap" id="dubProgress">
+      <div class="progress-bar"><div class="progress-fill" id="dubProgressFill"></div></div>
+      <div class="progress-steps">
+        <span id="d1" class="active">Upload</span>
+        <span id="d2">Transcrição</span>
+        <span id="d3">Tradução</span>
+        <span id="d4">Dublagem</span>
+      </div>
+    </div>
+
+    <div class="status" id="dubStatus"></div>
+    <div id="dubResult" class="hidden" style="margin-top:14px">
+      <div style="background:#0f0f1e;border:1px solid var(--border);border-radius:12px;padding:14px">
+        <div style="font-weight:800;font-size:13px;margin-bottom:8px">✅ Dublagem concluída (simulação)</div>
+        <div id="dubScript" style="white-space:pre-wrap;font-size:12.5px;line-height:1.7;color:#d1d5ff;max-height:300px;overflow:auto"></div>
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+          <button class="ghost" onclick="copyText(document.getElementById('dubScript').innerText)">📋 Copiar</button>
+          <button class="ghost" onclick="speakText(document.getElementById('dubScript').innerText)">🔊 Ouvir PT-BR</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PROJECTS -->
+<section id="projects" class="hidden">
+  <div class="card">
+    <h2>📁 Meus projetos</h2>
+    <p>Seus vídeos gerados e dublados. Clique para expandir, ouvir ou copiar o roteiro.</p>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="ghost" onclick="loadProjects()">🔄 Atualizar</button>
+      <button class="ghost" onclick="clearAll()" style="color:#fca5a5;border-color:#7f1d1d">🗑️ Limpar tudo</button>
+    </div>
+  </div>
+
+  <div id="projectList"></div>
+  <div id="emptyState" class="empty">
+    <div class="empty-ico">📭</div>
+    <div style="font-weight:800">Nenhum projeto ainda</div>
+    <p style="margin:6px 0 0 0">Crie seu primeiro vídeo na aba <b>Criar</b> ou duble um vídeo em <b>Dublar</b>.</p>
+  </div>
+
+  <div class="footer">
+    DubAI PRO • Feito com 💜 para criadores<br>
+    <span class="kbd">MOCK</span> = simulação local • Adicione <span class="kbd">OPENAI_API_KEY</span> no servidor para IA real (GPT-4o / Whisper / TTS)
+  </div>
+</section>
+
+</main>
+
+<div class="toast" id="toast">✅ Feito</div>
+
+<script>
+const $ = s => document.querySelector(s);
+let previewUrl=null;
+let currentProjects=[];
+
+function toast(msg, type='ok'){
+  const el=$('#toast');
+  el.textContent=msg;
+  el.style.background = type==='error'?'#7f1d1d': type==='warn'?'#854d0e':'#1e1b4b';
+  el.style.borderColor = type==='error'?'#ef4444': type==='warn'?'#eab308':'#4338ca';
+  el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'), 2400);
+}
+
+function showStatus(id, msg, kind='info'){
+  const el=document.getElementById(id);
+  if(!msg){ el.classList.remove('show'); el.textContent=''; return; }
+  el.textContent=msg;
+  el.className='status show '+kind;
+}
+function setProgress(fillId, percent){ document.getElementById(fillId).style.width = percent+'%'; }
+function setStep(ids, activeIndex){
+  ids.forEach((id,i)=>{
+    const el=document.getElementById(id);
+    if(el) el.classList.toggle('active', i===activeIndex);
+  });
+}
+
+async function checkHealth(){
+  try{
+    const r=await fetch('/api/health');
+    const j=await r.json();
+    $('#modeBadge').textContent = j.mode==='openai' ? 'IA REAL (OpenAI)' : 'MODO MOCK (local)';
+    $('#modeBadge').parentElement.style.borderColor = j.mode==='openai' ? '#22c55e' : '#3730a3';
+  }catch{
+    $('#modeBadge').textContent='offline — iniciando...';
+  }
+}
+
+function openTab(id, button){
+  document.querySelectorAll('main section').forEach(s=>s.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+  document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('active'));
+  if(button) button.classList.add('active');
+  if(id==='projects') loadProjects();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+function fillExample(){
+  $('#prompt').value = "Crie um documentário realista sobre dinossauros para YouTube, 10 minutos, com narração masculina em português brasileiro. Comece com um hook curioso, explique as 5 espécies mais fascinantes e termine com um convite para se inscrever. Tom empolgante e educativo.";
+  toast('💡 Exemplo preenchido — agora clique em Criar');
+}
+
+function previewVideo(){
+  const file=$('#videoFile').files[0];
+  if(!file) return;
+  if(previewUrl) URL.revokeObjectURL(previewUrl);
+  previewUrl=URL.createObjectURL(file);
+  const isAudio = file.type.startsWith('audio/');
+  const v=$('#preview'), a=$('#audioPreview');
+  if(isAudio){
+    v.hidden=true; v.src='';
+    a.src=previewUrl; a.hidden=false;
+  }else{
+    a.hidden=true; a.src='';
+    v.src=previewUrl; v.hidden=false;
+  }
+  toast('📎 ' + file.name);
+}
+
+// --- Create ---
+async function createVideo(){
+  const prompt=$('#prompt').value.trim();
+  const duration=$('#duration').value;
+  const style=$('#style').value;
+  const voice=$('#voice').value;
+  const btn=$('#createBtn');
+
+  if(!prompt){ showStatus('createStatus','⚠️ Descreva o vídeo primeiro.','warn'); toast('Descreva sua ideia primeiro','warn'); return; }
+  if(prompt.length < 10){ showStatus('createStatus','⚠️ Descrição muito curta — detalhe melhor sua ideia.','warn'); return; }
+
+  btn.disabled=true; btn.textContent='⏳ Gerando...';
+  showStatus('createStatus','🤖 Solicitando criação do roteiro...','info');
+  $('#createProgress').classList.add('show');
+  $('#createResult').classList.add('hidden');
+  setProgress('createProgressFill', 15);
+  setStep(['s1','s2','s3','s4'],0);
+
+  let p1=setInterval(()=> setProgress('createProgressFill', 35), 400);
+  setTimeout(()=>{ clearInterval(p1); setStep(['s1','s2','s3','s4'],1); setProgress('createProgressFill',55); }, 700);
+  setTimeout(()=>{ setStep(['s1','s2','s3','s4'],2); setProgress('createProgressFill',80); }, 1200);
+  setTimeout(()=>{ setStep(['s1','s2','s3','s4'],3); setProgress('createProgressFill',92); }, 1700);
+
+  try{
+    const response=await fetch('/api/create',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ prompt, duration, style, voice })
+    });
+    const data=await response.json();
+    if(!response.ok) throw new Error(data.error||'Erro ao criar projeto');
+
+    setProgress('createProgressFill',100);
+    showStatus('createStatus','✅ Roteiro criado com sucesso! Salvo nos projetos.','success');
+    $('#createScript').textContent = data.script || 'Roteiro criado';
+    $('#createResult').classList.remove('hidden');
+    toast('✅ Roteiro criado!');
+    await loadProjects();
+  }catch(error){
+    showStatus('createStatus','❌ '+error.message,'error');
+    toast(error.message,'error');
+    setProgress('createProgressFill',0);
+  }finally{
+    btn.disabled=false; btn.textContent='✨ Criar vídeo com IA';
+    setTimeout(()=>{ $('#createProgress').classList.remove('show'); setProgress('createProgressFill',0); }, 1200);
+  }
+}
+
+// --- Dub ---
+async function dubVideo(){
+  const file=$('#videoFile').files[0];
+  const language=$('#language').value;
+  const dubVoice=$('#dubVoice').value;
+  const btn=$('#dubBtn');
+
+  if(!file){ showStatus('dubStatus','⚠️ Selecione um vídeo ou áudio.','warn'); toast('Selecione um arquivo','warn'); return; }
+
+  btn.disabled=true; btn.textContent='⏳ Processando...';
+  showStatus('dubStatus','📤 Enviando arquivo para o servidor...','info');
+  $('#dubProgress').classList.add('show');
+  $('#dubResult').classList.add('hidden');
+  setProgress('dubProgressFill', 10);
+  setStep(['d1','d2','d3','d4'],0);
+
+  const fd=new FormData();
+  fd.append('video', file);
+  fd.append('language', language);
+  fd.append('dubVoice', dubVoice);
+
+  // fake steps while uploading
+  let iv=setInterval(()=> setProgress('dubProgressFill', 25), 300);
+  setTimeout(()=>{ clearInterval(iv); setStep(['d1','d2','d3','d4'],1); setProgress('dubProgressFill',45); showStatus('dubStatus','🎧 Transcrevendo áudio...','info'); }, 600);
+  setTimeout(()=>{ setStep(['d1','d2','d3','d4'],2); setProgress('dubProgressFill',70); showStatus('dubStatus','🌍 Traduzindo para PT-BR...','info'); }, 1100);
+  setTimeout(()=>{ setStep(['d1','d2','d3','d4'],3); setProgress('dubProgressFill',85); showStatus('dubStatus','🎙️ Gerando dublagem...','info'); }, 1600);
+
+  try{
+    const res=await fetch('/api/dub',{ method:'POST', body: fd });
+    const data=await res.json();
+    if(!res.ok) throw new Error(data.error||'Erro na dublagem');
+
+    setProgress('dubProgressFill',100);
+    showStatus('dubStatus','✅ Dublagem concluída! Projeto salvo.','success');
+    const txt = `${data.project.transcription}\n\n${data.project.translation}\n\n${data.project.dubInfo}`;
+    $('#dubScript').textContent = txt;
+    $('#dubResult').classList.remove('hidden');
+    toast('✅ Dublado para PT-BR!');
+    await loadProjects();
+  }catch(e){
+    showStatus('dubStatus','❌ '+e.message,'error');
+    toast(e.message,'error');
+    setProgress('dubProgressFill',0);
+  }finally{
+    btn.disabled=false; btn.textContent='🎙️ Dublar para português';
+    setTimeout(()=>{ $('#dubProgress').classList.remove('show'); setProgress('dubProgressFill',0); }, 1200);
+  }
+}
+
+// --- Projects ---
+async function loadProjects(){
+  try{
+    const r=await fetch('/api/projects');
+    const list=await r.json();
+    currentProjects=list;
+    renderProjects(list);
+  }catch(e){
+    showStatus('createStatus','⚠️ Não foi possível carregar projetos','warn');
+  }
+}
+function renderProjects(list){
+  const container=$('#projectList');
+  const empty=$('#emptyState');
+  const countEl=$('#projCount');
+  countEl.textContent = list.length;
+  container.innerHTML='';
+
+  if(!list.length){
+    empty.style.display='block';
+    return;
+  }
+  empty.style.display='none';
+
+  list.forEach(p=>{
+    const isCreate = p.type==='create';
+    const date = new Date(p.createdAt).toLocaleString('pt-BR');
+    const card=document.createElement('div');
+    card.className='project';
+    card.innerHTML=`
+      <div class="project-head">
+        <img class="thumb" src="${p.thumbnail || `https://picsum.photos/seed/${p.id}/96/64`}" onerror="this.src='https://picsum.photos/seed/fallback/96/64'">
+        <div class="project-meta">
+          <div class="project-title">${escapeHtml(p.title || p.prompt?.slice(0,60) || 'Projeto sem título')}</div>
+          <div class="project-sub">
+            <span class="tag ${p.mode==='openai'?'success':''}">${p.mode==='openai'?'GPT-4o':'MOCK'}</span>
+            <span class="tag">${isCreate ? '🎬 Criação' : '🌍 Dublagem'}</span>
+            <span class="tag">${escapeHtml(p.duration ? p.duration+' min' : (p.fileName||''))}</span>
+          </div>
+          <div class="project-sub" style="margin-top:6px;color:var(--muted)">${date} • ${escapeHtml(p.status||'pronto')}</div>
+        </div>
+      </div>
+      <div class="project-body">
+        ${p.prompt ? `<div style="font-size:12px;color:var(--muted2);margin-bottom:8px"><b>Prompt:</b> ${escapeHtml(p.prompt)}</div>` : ''}
+        ${p.fileName ? `<div style="font-size:12px;color:var(--muted2);margin-bottom:8px">📎 ${escapeHtml(p.fileName)} • ${(p.fileSize/1024/1024).toFixed(2)} MB</div>` : ''}
+        <details>
+          <summary style="cursor:pointer;font-weight:700;font-size:13px;color:#a78bfa">📝 Ver roteiro / transcrição</summary>
+          <div class="project-script" style="margin-top:10px">${escapeHtml(p.script || p.transcription || '—')}</div>
+        </details>
+        <div class="project-actions">
+          <button class="ghost" onclick="copyText(\`${escapeForJs(p.script||'')}\`)">📋 Copiar</button>
+          <button class="ghost" onclick="speakText(\`${escapeForJs((p.script||'').slice(0,2000))}\`)">🔊 Ouvir</button>
+          <button class="ghost" onclick="downloadText('${p.id}')">⬇️ Baixar .txt</button>
+          <button class="ghost" style="color:#fca5a5;border-color:#7f1d1d44" onclick="deleteProject('${p.id}')">🗑️ Excluir</button>
+        </div>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+function escapeHtml(s){
+  if(!s) return '';
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escapeForJs(s){
+  return (s||'').replace(/\\/g,'\\\\').replace(/`/g,'\\`').replace(/\$/g,'\\$').replace(/\n/g,'\\n').replace(/"/g,'\\"');
+}
+async function deleteProject(id){
+  if(!confirm('Excluir este projeto?')) return;
+  const r=await fetch('/api/projects/'+id,{method:'DELETE'});
+  if(r.ok){ toast('🗑️ Projeto excluído'); loadProjects(); } else toast('Erro ao excluir','error');
+}
+async function clearAll(){
+  if(!currentProjects.length) return toast('Nada para limpar','warn');
+  if(!confirm(`Excluir todos os ${currentProjects.length} projetos?`)) return;
+  for(const p of [...currentProjects]){
+    await fetch('/api/projects/'+p.id,{method:'DELETE'});
+  }
+  toast('🗑️ Todos os projetos removidos');
+  loadProjects();
+}
+function copyText(text){
+  if(!text) return toast('Nada para copiar','warn');
+  navigator.clipboard.writeText(text).then(()=>toast('📋 Copiado!')).catch(()=>{
+    const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('📋 Copiado!');
+  });
+}
+function downloadText(id){
+  const p=currentProjects.find(x=>x.id===id);
+  if(!p) return;
+  const blob=new Blob([p.script||p.transcription||''],{type:'text/plain;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=`DubAI-${p.id}.txt`; a.click(); URL.revokeObjectURL(url);
+  toast('⬇️ Download iniciado');
+}
+function speakText(text){
+  if(!text || !text.trim()) return toast('Nada para narrar','warn');
+  if('speechSynthesis' in window){
+    speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(text.slice(0,4000));
+    u.lang='pt-BR'; u.rate=1; u.pitch=1;
+    // try pick pt-BR voice
+    const voices=speechSynthesis.getVoices();
+    const pt=voices.find(v=>v.lang.toLowerCase().includes('pt-br')) || voices.find(v=>v.lang.toLowerCase().includes('pt'));
+    if(pt) u.voice=pt;
+    speechSynthesis.speak(u);
+    toast('🔊 Reproduzindo narração (voz do navegador)');
+  }else{
+    toast('TTS não suportado neste navegador','error');
+  }
+}
+
+// Init
+checkHealth();
+loadProjects();
+if('speechSynthesis' in window) speechSynthesis.getVoices();
+setTimeout(checkHealth, 2000);
+</script>
+</body>
+</html>
