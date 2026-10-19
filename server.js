@@ -310,7 +310,7 @@ app.post('/api/create', async (req, res) => {
   let mode = 'mock';
   let aiError = null;
 
-  const gen = await generateCreateFull({ prompt, duration, style, voice });
+  const gen = await require('./vercel/api/lib/ai').generateCreateFull({ prompt, duration, style, voice });
   if (gen && gen.data) {
     data = gen.data;
     mode = 'openai';
@@ -364,7 +364,7 @@ app.post('/api/scene-image', async (req, res) => {
     if (!process.env.OPENAI_API_KEY) {
       return res.json({ imageBase64: null, mock: true, message: 'Sem OPENAI_API_KEY: imagem placeholder será usada.' });
     }
-    const img = await generateSceneImage({ prompt, style });
+    const img = await require('./vercel/api/lib/ai').generateSceneImage({ prompt, style });
     if (!img || !img.imageBase64) {
       return res.json({ imageBase64: null, mock: true, error: img && img.error, message: 'Geração de imagem falhou' + (img && img.error ? ` (${img.error})` : '') + ' — placeholder será usado.' });
     }
@@ -387,7 +387,7 @@ app.post('/api/dub', async (req, res) => {
       if (!process.env.OPENAI_API_KEY) {
         return res.status(400).json({ error: 'Configure OPENAI_API_KEY no servidor para dublagem real.' });
       }
-      result = await dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage });
+      result = await require('./vercel/api/lib/ai').dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage });
       if (!result || result.error) {
         return res.status(502).json({ error: 'Falha ao dublar com a OpenAI' + (result && result.error ? `: ${result.error}` : ' (transcrição/tradução/voz)') + '. Tente com um arquivo menor ou tente novamente.' });
       }
@@ -429,36 +429,23 @@ app.post('/api/dub', async (req, res) => {
   }
 });
 
-// TTS endpoint — tenta OpenAI, senão instrui frontend a usar Web Speech API
+// TTS endpoint — cadeia de provedores (OpenAI → Google → StreamElements)
 app.post('/api/tts', async (req, res) => {
-  const { text, voice = 'onyx' } = req.body;
+  const { text, voice = 'onyx', lang = 'pt-BR' } = req.body;
   if (!text) return res.status(400).json({ error: 'Texto vazio' });
 
-  if (!process.env.OPENAI_API_KEY) {
-    return res.json({
-      mode: 'browser',
-      message: 'Modo browser: use speechSynthesis no frontend. Defina OPENAI_API_KEY para TTS em MP3 real.',
-      useBrowserTTS: true
-    });
-  }
-
   try {
-    const OpenAI = require('openai');
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const voiceMap = TTS_VOICES;
-    const mp3 = await openai.audio.speech.create({
-      model: 'tts-1',
-      voice: voiceMap[voice] || 'onyx',
-      input: text.slice(0, 4096),
-      response_format: 'mp3'
-    });
-    const buffer = Buffer.from(await mp3.arrayBuffer());
+    const out = await require('./vercel/api/lib/ai').ttsWithFallback({ text, voice, lang });
+    if (out.error) {
+      return res.status(502).json({ error: 'Voz falhou em todos os provedores: ' + out.error, fallback: 'browser' });
+    }
     res.set({
       'Content-Type': 'audio/mpeg',
+      'X-Audio-Provider': out.provider,
       'Content-Disposition': 'inline; filename="narracao.mp3"',
-      'Content-Length': buffer.length
+      'Content-Length': out.buffer.length
     });
-    res.send(buffer);
+    res.send(out.buffer);
   } catch (e) {
     console.error('TTS error', e);
     res.status(500).json({ error: 'Erro TTS: ' + e.message, fallback: 'browser' });

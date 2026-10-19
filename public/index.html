@@ -673,7 +673,7 @@ async function previewVoice(voice){
     const ct=r.headers.get('content-type')||'';
     if(ct.includes('audio')){
       new Audio(URL.createObjectURL(await r.blob())).play();
-      toast('▶️ Tocando prévia');
+      toast('▶️ Tocando prévia ('+(r.headers.get('x-audio-provider')||'voz')+')');
     }else{
       let msg='prévia indisponível';
       try{ const j=await r.json(); msg=j.error||j.message||msg; }catch(e){}
@@ -801,7 +801,7 @@ async function fetchSceneAudio(text,voice){
   try{
     const r=await fetch('/api/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,voice})});
     const ct=r.headers.get('content-type')||'';
-    if(r.ok&&ct.includes('audio')) return { blob: await r.blob() };
+    if(r.ok&&ct.includes('audio')) return { blob: await r.blob(), provider: r.headers.get('x-audio-provider')||'' };
     let msg='resposta inválida do servidor';
     try{ const j=await r.json(); msg=j.error||j.message||msg; }catch(e){}
     return { error: msg };
@@ -819,7 +819,7 @@ async function buildCreateVideo(){
   prog.classList.remove('hidden');
   document.getElementById('createdVideoWrap').classList.add('hidden');
   try{
-    const scenes=[]; const audioParts=[]; const ttsErrors=[];
+    const scenes=[]; const audioParts=[]; const ttsErrors=[]; const voiceProviders=new Set();
     for(let i=0;i<d.scenes.length;i++){
       const s=d.scenes[i];
       document.getElementById('videoBuildFill').style.width=Math.round((i/d.scenes.length)*55)+'%';
@@ -827,7 +827,7 @@ async function buildCreateVideo(){
       const img=(await fetchSceneImage(s,style))||await placeholderBitmap(s,i);
       document.getElementById('videoBuildMsg').textContent=`🎙️ Gerando narração ${i+1}/${d.scenes.length}`;
       const a=await fetchSceneAudio(s.narration,voice);
-      if(a&&a.blob) audioParts.push(a.blob);
+      if(a&&a.blob){ audioParts.push(a.blob); if(a.provider) voiceProviders.add(a.provider); }
       else ttsErrors.push((a&&a.error)||'falha desconhecida');
       scenes.push({i:s.i||i+1,title:s.title,narration:s.narration,imgBitmap:img,start:s.start,end:s.end});
     }
@@ -871,8 +871,8 @@ async function buildCreateVideo(){
     sceneAssets=scenes.map(s=>({title:s.title,imgBitmap:s.imgBitmap}));
     document.getElementById('createdVideoWrap').classList.remove('hidden');
     document.getElementById('videoBuildMsg').textContent=allAudio
-      ? '✅ Vídeo pronto! Baixe abaixo e suba no YouTube.'
-      : '⚠️ Vídeo montado SEM narração: a API de voz falhou — '+(ttsErrors[0]||'erro desconhecido')+'. O texto está em legenda. Corrija a chave da OpenAI e monte de novo para ter voz.';
+      ? '✅ Vídeo pronto! (voz: '+(voiceProviders.size?[...voiceProviders].join(', '):'nativa')+') Baixe abaixo e suba no YouTube.'
+      : '⚠️ Vídeo montado SEM narração: todos os provedores de voz falharam — '+(ttsErrors[0]||'erro desconhecido')+'. O texto está em legenda.';
     toast(allAudio?'🎬 Vídeo pronto!':'⚠️ Vídeo sem narração — ver o aviso','warn');
   }catch(e){
     document.getElementById('videoBuildMsg').textContent='❌ '+e.message;
