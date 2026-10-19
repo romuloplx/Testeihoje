@@ -450,7 +450,7 @@ async function probeOpenAI() {
   if (process.env.UNOROUTER_API_KEY) {
     try {
       const models = await unorouterModels();
-      const first = models[0] || 'gpt-4o-mini';
+      const first = uniPickModels(models)[0] || 'gpt-4o-mini';
       const t = await unorouterChat({ user: 'responda apenas: ok', model: first });
       report.unorouter = { ok: true, model: first, models: models.length, reply: t.slice(0, 20) };
     } catch (e) { report.unorouter = { ok: false, error: e.message }; }
@@ -487,10 +487,24 @@ function uniHeaders() {
   };
 }
 
-// Probe curto do Unorouter (diagnóstico ?check=5)
+// Probe curto do Unorouter (diagnóstico ?check=5) — chat ANTES da descoberta de modelos
+// (para o GET /models não "gastar" o slot de 1 req/min do tier grátis)
 async function unorouterProbe() {
   const out = {};
   if (!process.env.UNOROUTER_API_KEY) return { ok: false, error: 'sem UNOROUTER_API_KEY' };
+  // 1) chat primeiro, com modelos conhecidos do catálogo (2026-10)
+  try {
+    const list = ['agnes-2.5-flash:free', 'cohere-command-a:free', 'gemini-3.1-flash-lite:free', 'deepseek-r1-distill-qwen-32b:free'];
+    let done = null; const errs = [];
+    for (const model of list) {
+      try {
+        const t = await unorouterChat({ user: 'responda apenas: ok', model, maxTokens: 20 });
+        done = { ok: true, model, reply: t.slice(0, 20) }; break;
+      } catch (e) { errs.push(model + ': ' + e.message.slice(0, 90)); }
+    }
+    out.chat = done || { ok: false, error: errs.join(' | ').slice(0, 240) };
+  } catch (e) { out.chat = { ok: false, error: e.message }; }
+  // 2) descoberta do catálogo
   try {
     const r = await fetch(uniBase() + '/models', { headers: uniHeaders(), signal: AbortSignal.timeout(10000) });
     const body = await r.text();
@@ -500,18 +514,6 @@ async function unorouterProbe() {
     out.detected = { chat: uniPickModels(ids).slice(0, 5), image: uniImageModels(ids), tts: uniTtsModels(ids) };
     out.modelList = ids;
   } catch (e) { out.models = { ok: false, error: e.message }; }
-  try {
-    const list = uniPickModels(out.modelList || []).slice(0, 3);
-    delete out.modelList;
-    let done = null; const errs = [];
-    for (const model of list) {
-      try {
-        const t = await unorouterChat({ user: 'responda apenas: ok', model, maxTokens: 20 });
-        done = { ok: true, model, reply: t.slice(0, 20) }; break;
-      } catch (e) { errs.push(model + ': ' + e.message); }
-    }
-    out.chat = done || { ok: false, error: errs.join(' | ').slice(0, 240) };
-  } catch (e) { delete out.modelList; out.chat = { ok: false, error: e.message }; }
   try {
     const ttsIds = (out.detected && out.detected.tts) || [];
     if (!ttsIds.length) out.tts = { ok: false, status: 0, error: 'sem modelo de fala no catálogo do router' };
@@ -549,6 +551,7 @@ async function unorouterProbe() {
 
 let _uniModels = null;
 let _uniCursor = 0;
+let _uniCooldownUntil = 0;
 async function unorouterModels() {
   if (_uniModels) return _uniModels;
   _uniModels = [];
@@ -695,21 +698,27 @@ async function chatWithFallback({ system, user, json = false, maxTokens = 8000 }
     }
   } else errors.push('openai: sem OPENAI_API_KEY');
   // Unorouter (rota de modelos do usuário) — modelos de chat descobertos, ROTACIONANDO
-  // (o tier grátis do router limita 1 req/min por modelo; girar evita colisão)
-  if (process.env.UNOROUTER_API_KEY) {
+  // (o tier grátis do router limita 1 req/min por conta/modelo; cooldown evita rajadas inúteis)
+  if (process.env.UNOROUTER_API_KEY && Date.now() > _uniCooldownUntil) {
     const models = await unorouterModels();
     const list = uniPickModels(models);
     const start = (_uniCursor++) % list.length;
     const rotated = [...list.slice(start), ...list.slice(0, start)];
+    let sawQuota = false;
     for (const model of rotated) {
       try {
         const text = await unorouterChat({ system, user, json, model, maxTokens });
+        _uniCooldownUntil = 0;
         return { text, provider: 'unorouter/' + model };
       } catch (e) {
         errors.push(`unorouter/${model}: ${(e.status ? 'HTTP ' + e.status + ' — ' : '')}${e.message}`);
         if (e.status === 401) break;
+        if (e.status === 429) sawQuota = true; // cota: tenta o próximo modelo
       }
     }
+    if (sawQuota) _uniCooldownUntil = Date.now() + 65000; // cota apertada: não insiste por 1 min
+  } else if (process.env.UNOROUTER_API_KEY) {
+    errors.push('unorouter: em pausa de cota (libera em instantes)');
   } else errors.push('unorouter: sem UNOROUTER_API_KEY');
   try {
     const text = await chatViaPollinations({ system, user, json });
