@@ -477,19 +477,18 @@ async function dubVideo(){
   setProgress('dubProgressFill', 10);
   setStep(['d1','d2','d3','d4'],0);
 
-  const fd=new FormData();
-  fd.append('video', file);
-  fd.append('language', language);
-  fd.append('dubVoice', dubVoice);
-
-  // fake steps while uploading
+  // fake steps while "uploading"
   let iv=setInterval(()=> setProgress('dubProgressFill', 25), 300);
   setTimeout(()=>{ clearInterval(iv); setStep(['d1','d2','d3','d4'],1); setProgress('dubProgressFill',45); showStatus('dubStatus','🎧 Transcrevendo áudio...','info'); }, 600);
   setTimeout(()=>{ setStep(['d1','d2','d3','d4'],2); setProgress('dubProgressFill',70); showStatus('dubStatus','🌍 Traduzindo para PT-BR...','info'); }, 1100);
   setTimeout(()=>{ setStep(['d1','d2','d3','d4'],3); setProgress('dubProgressFill',85); showStatus('dubStatus','🎙️ Gerando dublagem...','info'); }, 1600);
 
   try{
-    const res=await fetch('/api/dub',{ method:'POST', body: fd });
+    const res=await fetch('/api/dub',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ fileName: file.name, fileSize: file.size, language, dubVoice })
+    });
     const data=await res.json();
     if(!res.ok) throw new Error(data.error||'Erro na dublagem');
 

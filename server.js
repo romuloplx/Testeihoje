@@ -1,7 +1,6 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
@@ -10,9 +9,7 @@ const PORT = process.env.PORT || 3000;
 
 // --- Storage setup ---
 const DATA_DIR = path.join(__dirname, 'data');
-const UPLOADS_DIR = path.join(__dirname, 'uploads');
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
 const PROJECTS_FILE = path.join(DATA_DIR, 'projects.json');
 
@@ -34,24 +31,6 @@ let projects = loadProjects();
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true }));
-
-// Multer for dub uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, UPLOADS_DIR),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname) || '.mp4';
-    cb(null, `dub-${Date.now()}${ext}`);
-  }
-});
-const upload = multer({
-  storage,
-  limits: { fileSize: 200 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    // accept video/audio
-    if (file.mimetype.startsWith('video/') || file.mimetype.startsWith('audio/') || file.mimetype === 'application/octet-stream') cb(null, true);
-    else cb(null, true); // allow anyway for demo
-  }
-});
 
 // --- Helpers: Mock AI ---
 function mockScript({ prompt, duration, style, voice }) {
@@ -149,10 +128,6 @@ app.delete('/api/projects/:id', (req, res) => {
   if (idx === -1) return res.status(404).json({ error: 'Projeto não encontrado' });
   const removed = projects.splice(idx, 1)[0];
   saveProjects(projects);
-  // try delete upload file if exists
-  if (removed.filePath && fs.existsSync(removed.filePath)) {
-    try { fs.unlinkSync(removed.filePath); } catch {}
-  }
   res.json({ ok: true, removed });
 });
 
@@ -209,24 +184,23 @@ app.post('/api/create', async (req, res) => {
   });
 });
 
-app.post('/api/dub', upload.single('video'), async (req, res) => {
+app.post('/api/dub', async (req, res) => {
   try {
-    if (!req.file) {
+    const { fileName, fileSize, language = '', dubVoice = 'onyx' } = req.body || {};
+    if (!fileName) {
       return res.status(400).json({ error: 'Selecione um vídeo.' });
     }
-    const { language = '', dubVoice = 'onyx' } = req.body;
 
-    const mock = mockDubResult({ originalName: req.file.originalname, language, dubVoice });
+    const mock = mockDubResult({ originalName: fileName, language, dubVoice });
 
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
     const project = {
       id,
       type: 'dub',
-      title: `Dublagem: ${req.file.originalname}`,
-      prompt: `Dublagem de ${req.file.originalname} para PT-BR`,
-      fileName: req.file.originalname,
-      filePath: req.file.path,
-      fileSize: req.file.size,
+      title: `Dublagem: ${fileName}`,
+      prompt: `Dublagem de ${fileName} para PT-BR`,
+      fileName,
+      fileSize: Number(fileSize) || 0,
       language: language || 'auto',
       dubVoice,
       transcription: mock.transcription,

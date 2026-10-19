@@ -1,0 +1,9 @@
+{
+  "name": "dubai-pro-vercel",
+  "version": "1.0.0",
+  "private": true,
+  "description": "DubAI PRO — deploy Vercel (serverless)",
+  "dependencies": {
+    "openai": "^4.104.0"
+  }
+}
