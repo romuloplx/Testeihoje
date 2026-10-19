@@ -174,24 +174,32 @@ async function generateSceneImage({ prompt, style }) {
       }
     }
   } else errors.push('openai: sem OPENAI_API_KEY');
-  // Fallback gratuito: Pollinations (Flux → Turbo, com retentativa)
-  for (const model of ['flux', 'turbo']) {
+  // Fallback gratuito: Pollinations — escada de tamanhos (só o menor tier é grátis agora)
+  const ladder = [
+    { model: 'flux', w: 1280, h: 720 },
+    { model: '', w: 1024, h: 576 },
+    { model: '', w: 768, h: 432 },
+    { model: '', w: 512, h: 288 },
+    { model: '', w: 256, h: 256 }
+  ];
+  for (const opt of ladder) {
     for (let tent = 0; tent < 2; tent++) {
       try {
-        const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=1280&height=720&nologo=true&seed=${Math.floor(Math.random() * 100000)}&model=${model}`;
+        const seed = Math.floor(Math.random() * 100000);
+        const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=${opt.w}&height=${opt.h}&nologo=true&seed=${seed}` + (opt.model ? `&model=${opt.model}` : '');
         const r = await fetch(url, { signal: AbortSignal.timeout(60000) });
-        if (r.status === 429) { errors.push(`pollinations/${model}: HTTP 429 (limite de uso)`); await sleep(3000); continue; }
-        if (!r.ok) { errors.push(`pollinations/${model}: HTTP ${r.status}`); break; }
+        if (r.status === 429 || r.status === 402) { await sleep(2000); continue; }
+        if (!r.ok) { errors.push(`pollinations ${opt.w}x${opt.h}: HTTP ${r.status}`); break; }
         const buf = Buffer.from(await r.arrayBuffer());
-        if (!buf.length) { errors.push(`pollinations/${model}: imagem vazia`); continue; }
-        return { imageBase64: buf.toString('base64'), mime: r.headers.get('content-type') || 'image/jpeg', model: `pollinations-${model}(free)` };
+        if (!buf.length) { await sleep(1000); continue; }
+        return { imageBase64: buf.toString('base64'), mime: r.headers.get('content-type') || 'image/jpeg', model: `pollinations-${opt.w}x${opt.h}(free)` };
       } catch (e) {
-        errors.push(`pollinations/${model}: ${e.message}`);
+        errors.push(`pollinations ${opt.w}x${opt.h}: ${e.message}`);
         await sleep(1500);
       }
     }
   }
-  return { error: errors.join(' | ') };
+  return { error: errors.join(' | ') || 'nenhum provedor de imagem respondeu' };
 }
 
 // Dublagem real: Whisper (transcrição) + GPT (tradução) + TTS (voz)
@@ -376,26 +384,40 @@ function extractJson(text) {
   return null;
 }
 
-// Texto gratuito (sem chave): Pollinations (com retentativas e modelos alternativos)
+// Texto gratuito (sem chave): Pollinations — POST primeiro (sem limite de URL), GET como reserva
 async function chatViaPollinations({ system, user, json }) {
   const prompt = (system ? system + '\n\n' : '') + user + (json ? '\n\nResponda APENAS JSON válido, sem comentários nem markdown.' : '');
-  const urls = [
-    'https://text.pollinations.ai/' + encodeURIComponent(prompt) + '?model=openai',
-    'https://text.pollinations.ai/' + encodeURIComponent(prompt) + '?model=mistral',
-    'https://text.pollinations.ai/' + encodeURIComponent(prompt)
-  ];
   let lastErr = new Error('pollinations indisponível');
-  for (const url of urls) {
-    for (let tent = 0; tent < 2; tent++) {
-      try {
-        const r = await fetch(url, { signal: AbortSignal.timeout(45000) });
-        if (r.status === 429) { lastErr = new Error('HTTP 429 (limite de uso)'); await sleep(3000); continue; }
-        if (!r.ok) { lastErr = new Error('HTTP ' + r.status); break; }
-        const text = (await r.text()).trim();
-        if (!text) { lastErr = new Error('resposta vazia'); continue; }
-        return text;
-      } catch (e) { lastErr = e; await sleep(1500); }
-    }
+  // POST (OpenAI-compatible) — suporta prompts longos
+  for (let tent = 0; tent < 3; tent++) {
+    try {
+      const r = await fetch('https://text.pollinations.ai/openai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'openai', messages: [{ role: 'user', content: prompt }] }),
+        signal: AbortSignal.timeout(45000)
+      });
+      if (r.status === 429) { lastErr = new Error('HTTP 429 (limite de uso)'); await sleep(3000); continue; }
+      if (!r.ok) { lastErr = new Error('HTTP ' + r.status); break; }
+      const j = await r.json().catch(() => null);
+      const text = j && j.choices && j.choices[0] && j.choices[0].message ? String(j.choices[0].message.content || '').trim() : '';
+      if (!text) { lastErr = new Error('resposta vazia'); continue; }
+      return text;
+    } catch (e) { lastErr = e; await sleep(1500); }
+  }
+  // GET (só para prompts curtos)
+  const short = prompt.slice(0, 900);
+  for (const url of [
+    'https://text.pollinations.ai/' + encodeURIComponent(short) + '?model=openai',
+    'https://text.pollinations.ai/' + encodeURIComponent(short)
+  ]) {
+    try {
+      const r = await fetch(url, { signal: AbortSignal.timeout(30000) });
+      if (!r.ok) { lastErr = new Error('HTTP ' + r.status); continue; }
+      const text = (await r.text()).trim();
+      if (!text) { lastErr = new Error('resposta vazia'); continue; }
+      return text;
+    } catch (e) { lastErr = e; }
   }
   throw lastErr;
 }
