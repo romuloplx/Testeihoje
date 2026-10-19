@@ -466,7 +466,52 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // --- Unorouter (rota de modelos fornecida pelo usuário) ---
 function uniBase() { return (process.env.UNOROUTER_BASE_URL || 'https://api.unorouter.com/v1').replace(/\/$/, ''); }
-function uniHeaders() { return { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (process.env.UNOROUTER_API_KEY || '') }; }
+function uniHeaders() {
+  return {
+    'Content-Type': 'application/json',
+    Authorization: 'Bearer ' + (process.env.UNOROUTER_API_KEY || ''),
+    'x-api-key': String(process.env.UNOROUTER_API_KEY || ''),
+    'HTTP-Referer': 'https://dubai-pro.vercel.app',
+    'X-Title': 'DubAI PRO'
+  };
+}
+
+// Probe curto do Unorouter (diagnóstico ?check=5)
+async function unorouterProbe() {
+  const out = {};
+  if (!process.env.UNOROUTER_API_KEY) return { ok: false, error: 'sem UNOROUTER_API_KEY' };
+  try {
+    const r = await fetch(uniBase() + '/models', { headers: uniHeaders(), signal: AbortSignal.timeout(10000) });
+    const body = await r.text();
+    let ids = [];
+    try { ids = (JSON.parse(body).data || []).map(m => m.id).filter(Boolean); } catch (_) {}
+    out.models = { ok: r.ok && ids.length > 0, status: r.status, count: ids.length, sample: ids.slice(0, 8), body: r.ok ? undefined : body.slice(0, 160) };
+    out.modelList = ids;
+  } catch (e) { out.models = { ok: false, error: e.message }; }
+  try {
+    const model = (out.modelList || [])[0] || 'gpt-4o-mini';
+    delete out.modelList;
+    const t = await unorouterChat({ user: 'responda apenas: ok', model, maxTokens: 20 });
+    out.chat = { ok: true, model, reply: t.slice(0, 20) };
+  } catch (e) { delete out.modelList; out.chat = { ok: false, error: e.message }; }
+  try {
+    const r = await fetch(uniBase() + '/audio/speech', {
+      method: 'POST', headers: uniHeaders(),
+      body: JSON.stringify({ model: 'gpt-4o-mini-tts', voice: 'alloy', input: 'olá', response_format: 'mp3' }),
+      signal: AbortSignal.timeout(15000)
+    });
+    out.tts = { ok: r.ok, status: r.status, bytes: r.ok ? (await r.arrayBuffer()).byteLength : (await r.text()).slice(0, 120) };
+  } catch (e) { out.tts = { ok: false, error: e.message }; }
+  try {
+    const r = await fetch(uniBase() + '/images/generations', {
+      method: 'POST', headers: uniHeaders(),
+      body: JSON.stringify({ model: 'dall-e-3', prompt: 'gato laranja', n: 1, size: '256x256' }),
+      signal: AbortSignal.timeout(15000)
+    });
+    out.image = { ok: r.ok, status: r.status, info: r.ok ? 'suportado' : (await r.text()).slice(0, 120) };
+  } catch (e) { out.image = { ok: false, error: e.message }; }
+  return out;
+}
 
 let _uniModels = null;
 async function unorouterModels() {
@@ -499,7 +544,11 @@ async function unorouterChat({ system, user, json, model = 'gpt-4o-mini', maxTok
     delete body.response_format; // nem todo modelo suporta JSON mode
     r = await call(body);
   }
-  if (!r.ok) throw Object.assign(new Error('HTTP ' + r.status), { status: r.status });
+  if (!r.ok && r.status === 429) {
+    await new Promise(s => setTimeout(s, 4000)); // limite de uso: espera e tenta 1x
+    r = await call(body);
+  }
+  if (!r.ok) throw Object.assign(new Error('HTTP ' + r.status + ' ' + (await r.text().catch(() => '')).slice(0, 120)), { status: r.status });
   const j = await r.json();
   const text = j && j.choices && j.choices[0] && j.choices[0].message ? String(j.choices[0].message.content || '').trim() : '';
   if (!text) throw new Error('resposta vazia');
@@ -722,5 +771,5 @@ module.exports = {
   TTS_VOICES, mockScript, mockCreateFull, mockDubResult,
   generateWithOpenAI, generateCreateFull, generateSceneImage, dubWithOpenAI,
   chatWithFallback, ttsWithFallback, chatViaPollinations, ttsGoogle, ttsStreamElements,
-  probeOpenAI, fullPipelineProbe, candidatesProbe, getBody, send
+  probeOpenAI, fullPipelineProbe, candidatesProbe, unorouterProbe, getBody, send
 };
