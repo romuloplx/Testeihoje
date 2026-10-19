@@ -122,18 +122,27 @@ async function generateCreateFull({ prompt, duration, style, voice }) {
   const scenesPlan = outline.scenes.slice(0, nScenes);
   const providers = new Set([res.provider]);
 
-  // Fase 2: narração completa de cada cena (chamadas menores = modelos grátis aguentam)
-  const narrations = [];
-  for (let i = 0; i < scenesPlan.length; i++) {
-    const s = scenesPlan[i];
-    const nres = await withRetries(() => chatWithFallback({
-      system: 'Você é narrador profissional de vídeos. Escreva APENAS o texto da narração, sem título, sem aspas, sem comentários.',
-      user: `Vídeo sobre: "${prompt}". Cena ${i + 1} de ${scenesPlan.length}: "${s.title}" (${s.visual || ''}). Escreva a narração desta cena em português brasileiro, com aproximadamente ${wordsPerScene} palavras, em tom envolvente.`
-    }), 2);
-    if (nres.error) return { error: `Narração da cena ${i + 1} falhou: ${nres.error}` };
-    providers.add(nres.provider);
-    narrations.push((nres.text || '').trim().replace(/^["'\s]+|["'\s]+$/g, ''));
+  // Fase 2: narrações em lotes de 3 em paralelo (rápido e sem estourar limites)
+  const narrations = new Array(scenesPlan.length).fill('');
+  let fatal = null;
+  for (let i = 0; i < scenesPlan.length && !fatal; i += 3) {
+    const batch = scenesPlan.slice(i, i + 3);
+    const results = await Promise.all(batch.map((s, j) => {
+      const idx = i + j;
+      return withRetries(() => chatWithFallback({
+        system: 'Você é narrador profissional de vídeos. Escreva APENAS o texto da narração, sem título, sem aspas, sem comentários.',
+        user: `Vídeo sobre: "${prompt}". Cena ${idx + 1} de ${scenesPlan.length}: "${s.title}" (${s.visual || ''}). Escreva a narração desta cena em português brasileiro, com aproximadamente ${wordsPerScene} palavras, em tom envolvente.`
+      }), 2);
+    }));
+    for (let j = 0; j < results.length; j++) {
+      const r = results[j];
+      if (r.error) { if (!fatal) fatal = `Narração da cena ${i + j + 1} falhou: ${r.error}`; continue; }
+      providers.add(r.provider);
+      narrations[i + j] = (r.text || '').trim().replace(/^["'\s]+|["'\s]+$/g, '');
+    }
   }
+  if (fatal) return { error: fatal };
+  if (narrations.some(n => !n)) return { error: 'Faltou narração em alguma cena — tente novamente.' };
 
   const per = (dur * 60) / scenesPlan.length;
   const scenes = scenesPlan.map((s, idx) => ({
