@@ -67,6 +67,66 @@ async function generateWithOpenAI(prompt, duration, style, voice) {
   }
 }
 
+// Dublagem real: Whisper (transcrição) + GPT (tradução PT-BR) + TTS (voz)
+async function dubWithOpenAI({ audioBase64, language, dubVoice }) {
+  if (!process.env.OPENAI_API_KEY) return null;
+  try {
+    const OpenAI = require('openai');
+    const { toFile } = OpenAI;
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+    const audioBuf = Buffer.from(audioBase64, 'base64');
+    const file = await toFile(audioBuf, 'audio.wav', { type: 'audio/wav' });
+    const transcription = await openai.audio.transcriptions.create({
+      file,
+      model: 'whisper-1',
+      language: language || undefined
+    });
+    const originalText = (transcription.text || '').trim();
+    if (!originalText) throw new Error('Não foi possível transcrever o áudio.');
+
+    const chat = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: 'Você é um tradutor profissional de dublagem. Traduza a fala para português brasileiro natural, pronto para locução (TTS). Não adicione comentários nem explicações — devolva APENAS a tradução.' },
+        { role: 'user', content: `Traduza para português brasileiro:\n\n${originalText}` }
+      ],
+      temperature: 0.3,
+      max_tokens: 4000
+    });
+    const translatedText = (chat.choices[0].message.content || '').trim();
+
+    const parts = [];
+    let current = '';
+    for (const sentence of translatedText.split(/(?<=[.!?…])\s+/)) {
+      if (current && (current + ' ' + sentence).length > 3900) { parts.push(current); current = sentence; }
+      else current = current ? current + ' ' + sentence : sentence;
+    }
+    if (current) parts.push(current);
+
+    const mp3Parts = [];
+    for (const part of parts) {
+      const speech = await openai.audio.speech.create({
+        model: 'tts-1',
+        voice: ['onyx', 'nova', 'alloy'].includes(dubVoice) ? dubVoice : 'onyx',
+        input: part,
+        response_format: 'mp3'
+      });
+      mp3Parts.push(Buffer.from(await speech.arrayBuffer()));
+    }
+
+    return {
+      transcription: originalText,
+      translation: translatedText,
+      dubInfo: `Dublagem em PT-BR gerada com IA (Whisper + GPT + TTS) • Voz: ${dubVoice} • Áudio pronto para download.`,
+      audioMp3Base64: Buffer.concat(mp3Parts).toString('base64')
+    };
+  } catch (e) {
+    console.error('OpenAI dub error:', e.message);
+    return null;
+  }
+}
+
 // Leitura compatível do body (runtime antigo e novo do Vercel)
 async function getBody(req) {
   if (req.body && typeof req.body === 'object' && Object.keys(req.body).length > 0) return req.body;
@@ -90,4 +150,4 @@ function send(res, status, obj) {
   res.end(JSON.stringify(obj));
 }
 
-module.exports = { mockScript, mockDubResult, generateWithOpenAI, getBody, send };
+module.exports = { mockScript, mockDubResult, generateWithOpenAI, dubWithOpenAI, getBody, send };

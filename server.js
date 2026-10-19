@@ -83,6 +83,65 @@ function mockDubResult({ originalName, language, dubVoice }) {
   };
 }
 
+async function dubWithOpenAI({ audioBase64, language, dubVoice }) {
+  if (!process.env.OPENAI_API_KEY) return null;
+  try {
+    const OpenAI = require('openai');
+    const { toFile } = OpenAI;
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+    const audioBuf = Buffer.from(audioBase64, 'base64');
+    const file = await toFile(audioBuf, 'audio.wav', { type: 'audio/wav' });
+    const transcription = await openai.audio.transcriptions.create({
+      file,
+      model: 'whisper-1',
+      language: language || undefined
+    });
+    const originalText = (transcription.text || '').trim();
+    if (!originalText) throw new Error('Não foi possível transcrever o áudio.');
+
+    const chat = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: 'Você é um tradutor profissional de dublagem. Traduza a fala para português brasileiro natural, pronto para locução (TTS). Não adicione comentários nem explicações — devolva APENAS a tradução.' },
+        { role: 'user', content: `Traduza para português brasileiro:\n\n${originalText}` }
+      ],
+      temperature: 0.3,
+      max_tokens: 4000
+    });
+    const translatedText = (chat.choices[0].message.content || '').trim();
+
+    const parts = [];
+    let current = '';
+    for (const sentence of translatedText.split(/(?<=[.!?…])\s+/)) {
+      if (current && (current + ' ' + sentence).length > 3900) { parts.push(current); current = sentence; }
+      else current = current ? current + ' ' + sentence : sentence;
+    }
+    if (current) parts.push(current);
+
+    const mp3Parts = [];
+    for (const part of parts) {
+      const speech = await openai.audio.speech.create({
+        model: 'tts-1',
+        voice: ['onyx', 'nova', 'alloy'].includes(dubVoice) ? dubVoice : 'onyx',
+        input: part,
+        response_format: 'mp3'
+      });
+      mp3Parts.push(Buffer.from(await speech.arrayBuffer()));
+    }
+
+    return {
+      transcription: originalText,
+      translation: translatedText,
+      dubInfo: `Dublagem em PT-BR gerada com IA (Whisper + GPT + TTS) • Voz: ${dubVoice} • Áudio pronto para download.`,
+      audioMp3Base64: Buffer.concat(mp3Parts).toString('base64')
+    };
+  } catch (e) {
+    console.error('OpenAI dub error:', e.message);
+    return null;
+  }
+}
+
 async function generateWithOpenAI(prompt, duration, style, voice) {
   if (!process.env.OPENAI_API_KEY) return null;
   try {
@@ -186,12 +245,22 @@ app.post('/api/create', async (req, res) => {
 
 app.post('/api/dub', async (req, res) => {
   try {
-    const { fileName, fileSize, language = '', dubVoice = 'onyx' } = req.body || {};
+    const { fileName, fileSize, language = '', dubVoice = 'onyx', audioBase64 } = req.body || {};
     if (!fileName) {
       return res.status(400).json({ error: 'Selecione um vídeo.' });
     }
 
-    const mock = mockDubResult({ originalName: fileName, language, dubVoice });
+    let result = null;
+    if (audioBase64) {
+      if (!process.env.OPENAI_API_KEY) {
+        return res.status(400).json({ error: 'Configure OPENAI_API_KEY no servidor para dublagem real.' });
+      }
+      result = await dubWithOpenAI({ audioBase64, language, dubVoice });
+      if (!result) {
+        return res.status(502).json({ error: 'Falha ao dublar com a OpenAI (transcrição/tradução/voz). Tente com um arquivo menor ou tente novamente.' });
+      }
+    }
+    const mock = result ? null : mockDubResult({ originalName: fileName, language, dubVoice });
 
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
     const project = {
@@ -203,12 +272,12 @@ app.post('/api/dub', async (req, res) => {
       fileSize: Number(fileSize) || 0,
       language: language || 'auto',
       dubVoice,
-      transcription: mock.transcription,
-      translation: mock.translation,
-      dubInfo: mock.dubInfo,
-      script: `${mock.transcription}\n\n${mock.translation}\n\n${mock.dubInfo}`,
+      transcription: result ? result.transcription : mock.transcription,
+      translation: result ? result.translation : mock.translation,
+      dubInfo: result ? result.dubInfo : mock.dubInfo,
+      script: result ? `${result.transcription}\n\n${result.translation}\n\n${result.dubInfo}` : `${mock.transcription}\n\n${mock.translation}\n\n${mock.dubInfo}`,
       status: 'dublado',
-      mode: process.env.OPENAI_API_KEY ? 'openai' : 'mock',
+      mode: result ? 'openai' : 'mock',
       createdAt: new Date().toISOString(),
       thumbnail: `https://picsum.photos/seed/dub-${id}/640/360`
     };
@@ -219,7 +288,8 @@ app.post('/api/dub', async (req, res) => {
     res.json({
       id: project.id,
       project,
-      message: 'Vídeo recebido e dublado (MOCK). Configure OPENAI_API_KEY para Whisper+TTS real.'
+      audioBase64: result ? result.audioMp3Base64 : null,
+      message: result ? 'Vídeo traduzido e dublado em PT-BR (Whisper + GPT + TTS).' : 'Modo simulação (sem áudio real).'
     });
   } catch (e) {
     console.error(e);

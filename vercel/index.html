@@ -304,11 +304,19 @@ video{width:100%;border-radius:12px;margin-top:12px;background:black}
     <div class="status" id="dubStatus"></div>
     <div id="dubResult" class="hidden" style="margin-top:14px">
       <div style="background:#0f0f1e;border:1px solid var(--border);border-radius:12px;padding:14px">
-        <div style="font-weight:800;font-size:13px;margin-bottom:8px">✅ Dublagem concluída (simulação)</div>
+        <div id="dubTitle" style="font-weight:800;font-size:13px;margin-bottom:8px">✅ Dublagem concluída</div>
+        <div id="dubPlayerWrap" class="hidden" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
+          <audio id="dubAudio" controls style="width:100%"></audio>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="primary" onclick="playDubbed()" style="padding:8px 14px">▶️ Assistir vídeo dublado</button>
+            <a id="dubDownload" class="ghost" download="dublagem-pt-br.mp3" style="padding:8px 14px;text-decoration:none">⬇️ Baixar áudio dublado</a>
+          </div>
+        </div>
+        <div style="font-weight:800;font-size:12px;margin-bottom:6px">📝 Tradução PT-BR</div>
         <div id="dubScript" style="white-space:pre-wrap;font-size:12.5px;line-height:1.7;color:#d1d5ff;max-height:300px;overflow:auto"></div>
         <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
           <button class="ghost" onclick="copyText(document.getElementById('dubScript').innerText)">📋 Copiar</button>
-          <button class="ghost" onclick="speakText(document.getElementById('dubScript').innerText)">🔊 Ouvir PT-BR</button>
+          <button class="ghost" onclick="speakText(document.getElementById('dubScript').innerText)">🔊 Ouvir (voz do navegador)</button>
         </div>
       </div>
     </div>
@@ -463,6 +471,71 @@ async function createVideo(){
 }
 
 // --- Dub ---
+function encodeWavMono(samples, sampleRate){
+  const buffer=new ArrayBuffer(44+samples.length*2);
+  const view=new DataView(buffer);
+  const writeStr=(off,s)=>{for(let i=0;i<s.length;i++)view.setUint8(off+i,s.charCodeAt(i));};
+  writeStr(0,'RIFF');view.setUint32(4,36+samples.length*2,true);writeStr(8,'WAVE');
+  writeStr(12,'fmt ');view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,1,true);
+  view.setUint32(24,sampleRate,true);view.setUint32(28,sampleRate*2,true);
+  view.setUint16(32,2,true);view.setUint16(34,16,true);
+  writeStr(36,'data');view.setUint32(40,samples.length*2,true);
+  let off=44;
+  for(let i=0;i<samples.length;i++,off+=2){
+    let s=Math.max(-1,Math.min(1,samples[i]));
+    view.setInt16(off,s<0?s*0x8000:s*0x7FFF,true);
+  }
+  return new Uint8Array(buffer);
+}
+function bytesToBase64(bytes){
+  let bin='';
+  const chunk=0x8000;
+  for(let i=0;i<bytes.length;i+=chunk)bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+chunk));
+  return btoa(bin);
+}
+async function extractAudioBase64(file){
+  const ac=new (window.AudioContext||window.webkitAudioContext)();
+  const buf=await file.arrayBuffer();
+  const decoded=await ac.decodeAudioData(buf.slice(0));
+  const rate0=16000;
+  const off=new OfflineAudioContext(1,Math.max(1,Math.ceil(decoded.duration*rate0)),rate0);
+  const src=off.createBufferSource();
+  src.buffer=decoded;
+  src.connect(off.destination);
+  src.start();
+  const rendered=await off.startRendering();
+  let data=rendered.getChannelData(0);
+  let rate=16000;
+  const MAX_B64=3.8*1024*1024;
+  if((44+data.length*2)*4/3>MAX_B64){
+    const half=new Float32Array(Math.floor(data.length/2));
+    for(let i=0;i<half.length;i++)half[i]=(data[i*2]+(data[i*2+1]||0))/2;
+    data=half;
+    rate=8000;
+  }
+  let truncated=false;
+  const maxSamples=Math.floor((MAX_B64*3/4-44)/2);
+  if(data.length>maxSamples){data=data.subarray(0,maxSamples);truncated=true;}
+  const wav=encodeWavMono(data,rate);
+  return {base64:bytesToBase64(wav),truncated,seconds:data.length/rate};
+}
+let dubAudioURL=null;
+function playDubbed(){
+  const v=document.getElementById('preview');
+  const a=document.getElementById('dubAudio');
+  if(!dubAudioURL)return;
+  if(v&&!v.hidden&&v.src){
+    v.muted=true;
+    v.currentTime=0;
+    a.currentTime=0;
+    v.play();
+    a.play();
+    v.ontimeupdate=()=>{if(Math.abs(a.currentTime-v.currentTime)>0.4){a.currentTime=v.currentTime;}};
+  }else{
+    a.currentTime=0;
+    a.play();
+  }
+}
 async function dubVideo(){
   const file=$('#videoFile').files[0];
   const language=$('#language').value;
@@ -472,33 +545,49 @@ async function dubVideo(){
   if(!file){ showStatus('dubStatus','⚠️ Selecione um vídeo ou áudio.','warn'); toast('Selecione um arquivo','warn'); return; }
 
   btn.disabled=true; btn.textContent='⏳ Processando...';
-  showStatus('dubStatus','📤 Enviando arquivo para o servidor...','info');
+  showStatus('dubStatus','🎵 Extraindo áudio do arquivo...','info');
   $('#dubProgress').classList.add('show');
   $('#dubResult').classList.add('hidden');
   setProgress('dubProgressFill', 10);
   setStep(['d1','d2','d3','d4'],0);
 
-  // fake steps while "uploading"
-  let iv=setInterval(()=> setProgress('dubProgressFill', 25), 300);
-  setTimeout(()=>{ clearInterval(iv); setStep(['d1','d2','d3','d4'],1); setProgress('dubProgressFill',45); showStatus('dubStatus','🎧 Transcrevendo áudio...','info'); }, 600);
-  setTimeout(()=>{ setStep(['d1','d2','d3','d4'],2); setProgress('dubProgressFill',70); showStatus('dubStatus','🌍 Traduzindo para PT-BR...','info'); }, 1100);
-  setTimeout(()=>{ setStep(['d1','d2','d3','d4'],3); setProgress('dubProgressFill',85); showStatus('dubStatus','🎙️ Gerando dublagem...','info'); }, 1600);
-
   try{
+    const audio=await extractAudioBase64(file);
+    setStep(['d1','d2','d3','d4'],1);
+    setProgress('dubProgressFill',35);
+    showStatus('dubStatus','🎧 Transcrevendo (Whisper), traduzindo e gerando voz...','info');
+
     const res=await fetch('/api/dub',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ fileName: file.name, fileSize: file.size, language, dubVoice })
+      body: JSON.stringify({ fileName: file.name, fileSize: file.size, language, dubVoice, audioBase64: audio.base64 })
     });
     const data=await res.json();
     if(!res.ok) throw new Error(data.error||'Erro na dublagem');
 
     setProgress('dubProgressFill',100);
-    showStatus('dubStatus','✅ Dublagem concluída! Projeto salvo.','success');
-    const txt = `${data.project.transcription}\n\n${data.project.translation}\n\n${data.project.dubInfo}`;
+    setStep(['d1','d2','d3','d4'],3);
+    showStatus('dubStatus','✅ Dublagem concluída!','success');
+
+    if(dubAudioURL){URL.revokeObjectURL(dubAudioURL);dubAudioURL=null;}
+    const wrap=document.getElementById('dubPlayerWrap');
+    if(data.audioBase64){
+      const blob=await (await fetch('data:audio/mpeg;base64,'+data.audioBase64)).blob();
+      dubAudioURL=URL.createObjectURL(blob);
+      document.getElementById('dubAudio').src=dubAudioURL;
+      document.getElementById('dubDownload').href=dubAudioURL;
+      wrap.classList.remove('hidden');
+      document.getElementById('dubTitle').textContent='✅ Vídeo traduzido — ouça a dublagem em PT-BR';
+    }else{
+      wrap.classList.add('hidden');
+      document.getElementById('dubTitle').textContent='⚠️ Simulação (sem áudio real)';
+    }
+
+    let txt = `${data.project.transcription}\n\n${data.project.translation}\n\n${data.project.dubInfo}`;
+    if(audio.truncated) txt += `\n\n⚠️ Processamos apenas os primeiros ${Math.round(audio.seconds)}s do arquivo (limite de tamanho).`;
     $('#dubScript').textContent = txt;
     $('#dubResult').classList.remove('hidden');
-    toast('✅ Dublado para PT-BR!');
+    toast(data.audioBase64?'✅ Vídeo dublado em PT-BR!':'⚠️ Simulação sem áudio','info');
     if(data.project) saveProject(data.project);
     await loadProjects();
   }catch(e){
