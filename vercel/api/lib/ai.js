@@ -509,6 +509,7 @@ async function unorouterProbe() {
       } catch (e) { errs.push(model + ': ' + e.message.slice(0, 90)); }
     }
     out.chat = done || { ok: false, error: errs.join(' | ').slice(0, 240) };
+    out.lastSuccess = _lastUniChatOk; // evidência de sucesso em outra invocação (prova de vida)
   } catch (e) { out.chat = { ok: false, error: e.message }; }
   // 2) descoberta do catálogo
   try {
@@ -559,6 +560,7 @@ async function unorouterProbe() {
 let _uniModels = null;
 let _uniCursor = 0;
 let _uniCooldownUntil = 0;
+let _lastUniChatOk = null;
 async function unorouterModels() {
   if (_uniModels) return _uniModels;
   _uniModels = [];
@@ -598,6 +600,7 @@ async function unorouterChat({ system, user, json, model = 'gpt-4o-mini', maxTok
   const j = await r.json();
   const text = j && j.choices && j.choices[0] && j.choices[0].message ? String(j.choices[0].message.content || '').trim() : '';
   if (!text) throw new Error('resposta vazia');
+  _lastUniChatOk = { model, at: new Date().toISOString() };
   return text;
 }
 
