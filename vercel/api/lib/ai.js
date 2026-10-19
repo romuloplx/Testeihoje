@@ -501,32 +501,48 @@ async function unorouterProbe() {
     out.modelList = ids;
   } catch (e) { out.models = { ok: false, error: e.message }; }
   try {
-    const model = uniPickModels(out.modelList || [])[0] || 'gpt-4o-mini';
+    const list = uniPickModels(out.modelList || []).slice(0, 3);
     delete out.modelList;
-    const t = await unorouterChat({ user: 'responda apenas: ok', model, maxTokens: 20 });
-    out.chat = { ok: true, model, reply: t.slice(0, 20) };
+    let done = null; const errs = [];
+    for (const model of list) {
+      try {
+        const t = await unorouterChat({ user: 'responda apenas: ok', model, maxTokens: 20 });
+        done = { ok: true, model, reply: t.slice(0, 20) }; break;
+      } catch (e) { errs.push(model + ': ' + e.message); }
+    }
+    out.chat = done || { ok: false, error: errs.join(' | ').slice(0, 240) };
   } catch (e) { delete out.modelList; out.chat = { ok: false, error: e.message }; }
   try {
     const ttsIds = (out.detected && out.detected.tts) || [];
     if (!ttsIds.length) out.tts = { ok: false, status: 0, error: 'sem modelo de fala no catálogo do router' };
     else {
-      const r = await fetch(uniBase() + '/audio/speech', {
-        method: 'POST', headers: uniHeaders(),
-        body: JSON.stringify({ model: ttsIds[0], voice: 'alloy', input: 'olá', response_format: 'mp3' }),
-        signal: AbortSignal.timeout(15000)
-      });
-      out.tts = { ok: r.ok, status: r.status, model: ttsIds[0], bytes: r.ok ? (await r.arrayBuffer()).byteLength : (await r.text()).slice(0, 120) };
+      let done = null; const errs = [];
+      for (const model of ttsIds.slice(0, 2)) {
+        const r = await fetch(uniBase() + '/audio/speech', {
+          method: 'POST', headers: uniHeaders(),
+          body: JSON.stringify({ model, voice: 'alloy', input: 'olá', response_format: 'mp3' }),
+          signal: AbortSignal.timeout(15000)
+        });
+        if (r.ok) { done = { ok: true, status: 200, model, bytes: (await r.arrayBuffer()).byteLength }; break; }
+        errs.push(model + ': HTTP ' + r.status + ' ' + (await r.text().catch(() => '')).slice(0, 90));
+      }
+      out.tts = done || { ok: false, error: errs.join(' | ').slice(0, 240) };
     }
   } catch (e) { out.tts = { ok: false, error: e.message }; }
   try {
     const imgIds = (out.detected && out.detected.image) || [];
-    const model = imgIds[0] || 'dall-e-3';
-    const r = await fetch(uniBase() + '/images/generations', {
-      method: 'POST', headers: uniHeaders(),
-      body: JSON.stringify({ model, prompt: 'gato laranja', n: 1, size: '256x256' }),
-      signal: AbortSignal.timeout(30000)
-    });
-    out.image = { ok: r.ok, status: r.status, model, info: r.ok ? 'suportado' : (await r.text()).slice(0, 120) };
+    const tries = imgIds.slice(0, 2);
+    let done = null; const errs = [];
+    for (const model of tries) {
+      const r = await fetch(uniBase() + '/images/generations', {
+        method: 'POST', headers: uniHeaders(),
+        body: JSON.stringify({ model, prompt: 'gato laranja', n: 1, size: '256x256' }),
+        signal: AbortSignal.timeout(30000)
+      });
+      if (r.ok) { done = { ok: true, status: 200, model, info: 'suportado' }; break; }
+      errs.push(model + ': HTTP ' + r.status + ' ' + (await r.text().catch(() => '')).slice(0, 90));
+    }
+    out.image = done || { ok: false, error: errs.join(' | ').slice(0, 240) };
   } catch (e) { out.image = { ok: false, error: e.message }; }
   return out;
 }
@@ -564,8 +580,9 @@ async function unorouterChat({ system, user, json, model = 'gpt-4o-mini', maxTok
     r = await call(body);
   }
   if (!r.ok && r.status === 429) {
-    // limite do tier grátis é por modelo (1 req/min): não adianta repetir já — pula pro próximo
-    throw Object.assign(new Error('HTTP 429 (limite de uso do router)'), { status: 429 });
+    // limite do tier grátis é por modelo — não repete já; pula pro próximo e mostra a janela real
+    const body429 = (await r.text().catch(() => '')).slice(0, 160);
+    throw Object.assign(new Error('HTTP 429 ' + body429), { status: 429 });
   }
   if (!r.ok) throw Object.assign(new Error('HTTP ' + r.status + ' ' + (await r.text().catch(() => '')).slice(0, 120)), { status: r.status });
   const j = await r.json();
@@ -574,20 +591,25 @@ async function unorouterChat({ system, user, json, model = 'gpt-4o-mini', maxTok
   return text;
 }
 
-// Escolhe modelos de CHAT do catálogo (muitos modelos são de imagem/difusão)
+// Escolhe modelos de CHAT do catálogo (muitos modelos são de imagem/difusão). Prioriza :free.
 function uniPickModels(ids) {
   const bad = /xl|sdxl|diffusion|stable|flux|dall|image|img2img|albedo|anything|ampony|absolutereality|realisticvision|dreamshaper|midjourney|kandinsky|cogview|playground|kling|sora|lcm|inpaint|controlnet|lora|vae|upscal|esrgan|gfpgan|face|restore/i;
   const chat = ids.filter(id => !bad.test(id));
-  const prefer = chat.filter(id => /chat|instruct|gpt|llama|deepseek|qwen|mistral|gemini|claude|kimi|phi|command|grok|nova|sonnet|flash|thinking|reason|turbo|hermes|nous/i.test(id));
+  const free = chat.filter(id => /free/i.test(id));
+  const prefer = free.filter(id => /chat|instruct|gpt|llama|deepseek|qwen|mistral|gemini|claude|kimi|phi|command|grok|nova|flash|thinking|reason|turbo|hermes|nous|agnes/i.test(id));
   const out = [];
-  for (const id of [...prefer, ...chat]) { if (!out.includes(id)) out.push(id); if (out.length >= 5) break; }
+  for (const id of [...prefer, ...free, ...chat]) { if (!out.includes(id)) out.push(id); if (out.length >= 6) break; }
   return out.length ? out : ['gpt-4o-mini'];
 }
 function uniImageModels(ids) {
-  return ids.filter(id => /xl|sdxl|diffusion|stable|flux|dall|image|albedo|anything|ampony|dreamshaper|kandinsky|cogview|playground|realistic/i.test(id)).slice(0, 3);
+  const imgs = ids.filter(id => /xl|sdxl|diffusion|stable|flux|dall|image|albedo|anything|ampony|dreamshaper|kandinsky|cogview|playground|realistic/i.test(id));
+  const free = imgs.filter(id => /free/i.test(id));
+  return [...free, ...imgs.filter(id => !/free/i.test(id))].slice(0, 6);
 }
 function uniTtsModels(ids) {
-  return ids.filter(id => /tts|speech|voice|audio|bark|kokoro|orpheus/i.test(id)).slice(0, 3);
+  const tts = ids.filter(id => /tts|speech|voice|audio|bark|kokoro|orpheus/i.test(id));
+  const free = tts.filter(id => /free/i.test(id));
+  return [...free, ...tts.filter(id => !/free/i.test(id))].slice(0, 4);
 }
 
 // Repete a cadeia em caso de falha (provedores gratuitos limitam rajadas)
