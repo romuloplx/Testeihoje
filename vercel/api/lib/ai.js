@@ -251,6 +251,7 @@ async function dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage =
     // Transcrição com cadeia: Whisper OpenAI → Whisper via Unorouter
     let originalText = '';
     let whisperErr = '';
+    let whisperInfo = '';
     try {
       const file = await toFile(audioBuf, 'audio.wav', { type: 'audio/wav' });
       const transcription = await openai.audio.transcriptions.create({
@@ -263,22 +264,27 @@ async function dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage =
       whisperErr = 'openai: ' + e.message;
     }
     if (!originalText && process.env.UNOROUTER_API_KEY) {
-      try {
-        const fd = new FormData();
-        fd.append('file', new Blob([audioBuf], { type: 'audio/wav' }), 'audio.wav');
-        fd.append('model', 'whisper-1');
-        if (language) fd.append('language', language);
-        const r = await fetch(uniBase() + '/audio/transcriptions', {
-          method: 'POST',
-          headers: { Authorization: uniHeaders().Authorization },
-          body: fd,
-          signal: AbortSignal.timeout(120000)
-        });
-        if (r.ok) {
-          const j = await r.json();
-          originalText = (j.text || '').trim();
-        } else whisperErr += ' | unorouter: HTTP ' + r.status;
-      } catch (e) { whisperErr += ' | unorouter: ' + e.message; }
+      // Whisper do catálogo do router (grátis) → whisper-1 como último recurso
+      for (const model of ['whisper-large-v3-turbo:free', 'whisper:free', 'whisper-large-v3:free', 'whisper-1']) {
+        if (originalText) break;
+        try {
+          const fd = new FormData();
+          fd.append('file', new Blob([audioBuf], { type: 'audio/wav' }), 'audio.wav');
+          fd.append('model', model);
+          if (language) fd.append('language', language);
+          const r = await fetch(uniBase() + '/audio/transcriptions', {
+            method: 'POST',
+            headers: { Authorization: uniHeaders().Authorization },
+            body: fd,
+            signal: AbortSignal.timeout(120000)
+          });
+          if (r.ok) {
+            const j = await r.json();
+            originalText = (j.text || '').trim();
+            if (originalText) whisperInfo = 'unorouter/' + model;
+          } else whisperErr += ` | unorouter/${model}: HTTP ${r.status} ${(await r.text().catch(() => '')).slice(0, 80)}`;
+        } catch (e) { whisperErr += ` | unorouter/${model}: ${e.message}`; }
+      }
     }
     if (!originalText) throw new Error('Não foi possível transcrever o áudio. ' + whisperErr);
 
@@ -311,7 +317,7 @@ async function dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage =
     return {
       transcription: originalText,
       translation: translatedText,
-      dubInfo: `Dublagem em ${targetLanguage} gerada com IA • Voz: ${dubVoice} • Provedores: ${[...usedProviders].join(', ')} • Áudio pronto para download.`,
+      dubInfo: `Dublagem em ${targetLanguage} gerada com IA • Transcrição: ${whisperInfo || 'openai/whisper-1'} • Tradução: ${tr.provider || 'IA'} • Voz: ${dubVoice} (${[...usedProviders].join(', ')}) • Áudio pronto para download.`,
       audioMp3Base64: Buffer.concat(mp3Parts).toString('base64')
     };
   } catch (e) {
@@ -546,6 +552,7 @@ async function unorouterProbe() {
     }
     out.image = done || { ok: false, error: errs.join(' | ').slice(0, 240) };
   } catch (e) { out.image = { ok: false, error: e.message }; }
+  delete out.modelList;
   return out;
 }
 
