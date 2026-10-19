@@ -169,6 +169,8 @@ video{width:100%;border-radius:12px;margin-top:12px;background:black}
   <div class="logo"><span>⚡</span> DubAI PRO</div>
   <div class="subtitle">Estúdio de vídeos com Inteligência Artificial</div>
   <div class="badge"><i></i> <span id="modeBadge">Carregando...</span> • Backend conectado</div>
+  <button class="ghost" onclick="runDiag()" style="margin-top:8px;padding:6px 14px;font-size:12px">🩺 Testar IA</button>
+  <div id="diagBox" class="hidden" style="margin:10px auto 0;max-width:520px;background:#0f0f1e;border:1px solid var(--border);border-radius:12px;padding:12px;font-size:12px;text-align:left"></div>
 </header>
 
 <main>
@@ -651,7 +653,8 @@ async function dubVideo(){
     toast(data.audioBase64?'✅ Dublagem pronta — baixe o vídeo com o áudio trocado!':'⚠️ Simulação sem áudio','info');
     await loadProjects();
   }catch(e){
-    showStatus('dubStatus','❌ '+e.message,'error');
+    const hint=e.message&&e.message.includes('401')?' → A chave OpenAI está inválida: gere uma nova em platform.openai.com/account/api-keys e atualize na Vercel.':'';
+    showStatus('dubStatus','❌ '+e.message+hint,'error');
     toast(e.message,'error');
     setProgress('dubProgressFill',0);
   }finally{
@@ -680,6 +683,23 @@ async function previewVoice(voice){
       toast('⚠️ '+msg,'warn');
     }
   }catch(e){ toast('Erro na prévia','error'); }
+}
+
+async function runDiag(){
+  const box=document.getElementById('diagBox');
+  box.classList.remove('hidden');
+  box.innerHTML='⏳ Testando os provedores de IA...';
+  try{
+    const j=await (await fetch('/api/health?check=1')).json();
+    const c=j.openaiCheck||{};
+    const err=v=>v&&v.error?String(v.error).slice(0,90):'sem resposta';
+    const row=(ok,label,detail)=>`<div style="margin:4px 0">${ok?'✅':'❌'} <b>${label}</b>${detail?' <span style="opacity:.75">— '+detail+'</span>':''}</div>`;
+    box.innerHTML=
+      row(!!(c.models&&c.models.ok),'OpenAI (chave paga)',c.models&&c.models.ok?c.models.count+' modelos':err(c.models))+
+      row(!!(c.pollinationsText&&c.pollinationsText.ok),'IA de texto grátis',c.pollinationsText&&c.pollinationsText.ok?'respondendo':err(c.pollinationsText))+
+      row(!!(c.pollinationsImage&&c.pollinationsImage.ok),'Imagens grátis',c.pollinationsImage&&c.pollinationsImage.ok?c.pollinationsImage.bytes+' bytes':err(c.pollinationsImage))+
+      row(!!(c.googleTts&&c.googleTts.ok),'Voz grátis',c.googleTts&&c.googleTts.ok?c.googleTts.bytes+' bytes de áudio':err(c.googleTts));
+  }catch(e){ box.innerHTML='❌ Erro no teste: '+e.message; }
 }
 
 function pickRecorderMime(){

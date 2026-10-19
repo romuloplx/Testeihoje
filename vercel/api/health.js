@@ -1,4 +1,4 @@
-const { send, probeOpenAI } = require('./lib/ai');
+const { send, probeOpenAI, fullPipelineProbe } = require('./lib/ai');
 module.exports = async (req, res) => {
   const out = {
     ok: true,
@@ -6,9 +6,9 @@ module.exports = async (req, res) => {
     projects: 'browser-localstorage',
     uptime: process.uptime()
   };
-  // Diagnóstico: /api/health?check=1 testa a OpenAI de verdade (modelos, chat, TTS, imagem)
-  if (req.query && String(req.query.check) === '1') {
-    out.openaiCheck = await probeOpenAI();
-  }
+  const check = req.query ? String(req.query.check) : '';
+  // ?check=1 → testa cada provedor isolado | ?check=2 → testa o pipeline REAL (roteiro+voz+imagem)
+  if (check === '1') out.openaiCheck = await probeOpenAI();
+  if (check === '2') out.pipeline = await fullPipelineProbe();
   send(res, 200, out);
 };

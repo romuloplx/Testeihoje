@@ -104,30 +104,48 @@ async function generateWithOpenAI(prompt, duration, style, voice) {
   }
 }
 
-// Roteiro estruturado + cenas + SEO em uma chamada (JSON) — com cadeia de provedores
+// Roteiro estruturado + cenas + SEO em 2 fases (plano → narração por cena) — robusto em qualquer modelo
 async function generateCreateFull({ prompt, duration, style, voice }) {
   const dur = parseInt(duration) || 10;
   const nScenes = Math.max(5, Math.min(10, Math.round(dur / 1.5)));
-  const system = 'Você é roteirista e diretor de vídeos para YouTube. Responda APENAS JSON válido neste formato: {"script":"roteiro completo em markdown","scenes":[{"title":"título da cena","narration":"texto falado da cena","visual":"descrição visual detalhada para gerar uma imagem da cena"}],"seo":{"title":"título para YouTube (até 70 caracteres)","description":"descrição com hashtags","tags":"tag1, tag2, tag3"}}. O array scenes deve ter exatamente o número de cenas pedido. As narrações somadas devem ter a quantidade de palavras indicada.';
-  const user = `Crie o roteiro de um vídeo de ${dur} minutos sobre: "${prompt}".\nEstilo visual: ${style}\nNúmero de cenas: ${nScenes} (uma imagem será gerada por cena).\nNarração total: ~${dur * 130} palavras (${Math.round(dur * 130 / nScenes)} palavras por cena).\nIdioma: português brasileiro.`;
-  const res = await chatWithFallback({ system, user, json: true, maxTokens: 8000 });
+  const wordsPerScene = Math.round((dur * 130) / nScenes);
+
+  // Fase 1: plano (título + SEO + cenas com descrição visual)
+  const outlineSystem = 'Você é roteirista de vídeos para YouTube. Responda APENAS JSON válido neste formato: {"title":"título do vídeo","seo":{"title":"título para YouTube (até 70 caracteres)","description":"descrição com hashtags","tags":"tag1, tag2, tag3"},"scenes":[{"title":"título curto da cena","visual":"descrição visual detalhada para gerar uma imagem da cena"}]}.';
+  const outlineUser = `Crie o plano de um vídeo de ${dur} minutos sobre "${prompt}". Estilo visual: ${style}. Exatamente ${nScenes} cenas em ordem cronológica. Idioma: português brasileiro.`;
+  const res = await withRetries(() => chatWithFallback({ system: outlineSystem, user: outlineUser, json: true, maxTokens: 3000 }), 2);
   if (res.error) return { error: res.error };
+  const outline = extractJson(res.text);
+  if (!outline || !Array.isArray(outline.scenes) || !outline.scenes.length) {
+    return { error: `IA (${res.provider}) não retornou o plano de cenas válido.` };
+  }
+  const scenesPlan = outline.scenes.slice(0, nScenes);
+  const providers = new Set([res.provider]);
 
-  const parsed = extractJson(res.text);
-  if (!parsed || !Array.isArray(parsed.scenes) || !parsed.scenes.length) return { error: `IA (${res.provider}) não retornou cenas válidas.` };
+  // Fase 2: narração completa de cada cena (chamadas menores = modelos grátis aguentam)
+  const narrations = [];
+  for (let i = 0; i < scenesPlan.length; i++) {
+    const s = scenesPlan[i];
+    const nres = await withRetries(() => chatWithFallback({
+      system: 'Você é narrador profissional de vídeos. Escreva APENAS o texto da narração, sem título, sem aspas, sem comentários.',
+      user: `Vídeo sobre: "${prompt}". Cena ${i + 1} de ${scenesPlan.length}: "${s.title}" (${s.visual || ''}). Escreva a narração desta cena em português brasileiro, com aproximadamente ${wordsPerScene} palavras, em tom envolvente.`
+    }), 2);
+    if (nres.error) return { error: `Narração da cena ${i + 1} falhou: ${nres.error}` };
+    providers.add(nres.provider);
+    narrations.push((nres.text || '').trim().replace(/^["'\s]+|["'\s]+$/g, ''));
+  }
 
-  const per = (dur * 60) / parsed.scenes.length;
-  parsed.scenes = parsed.scenes.map((s, idx) => ({
+  const per = (dur * 60) / scenesPlan.length;
+  const scenes = scenesPlan.map((s, idx) => ({
     i: idx + 1,
     title: String(s.title || `Cena ${idx + 1}`),
-    narration: String(s.narration || ''),
+    narration: narrations[idx],
     visual: String(s.visual || s.title || prompt),
     start: Math.round(idx * per),
     end: Math.round((idx + 1) * per)
   }));
-  parsed.script = String(parsed.script || parsed.scenes.map(s => `**CENA ${s.i} — ${s.title}**\n${s.narration}`).join('\n\n'));
-  parsed.seo = parsed.seo || {};
-  return { data: parsed, provider: res.provider };
+  const script = (outline.title ? `**TÍTULO:** ${outline.title}\n\n` : '') + scenes.map(s => `**CENA ${s.i} — ${s.title}**\n${s.narration}`).join('\n\n');
+  return { data: { script, scenes, seo: outline.seo || {}, title: outline.title || '' }, provider: [...providers].join(' + ') };
 }
 
 // Imagem de uma cena: gpt-image-1 (jpeg → png) com fallback para DALL·E 3
@@ -156,16 +174,22 @@ async function generateSceneImage({ prompt, style }) {
       }
     }
   } else errors.push('openai: sem OPENAI_API_KEY');
-  // Fallback gratuito: Pollinations (Flux)
-  try {
-    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=1280&height=720&nologo=true&seed=${Math.floor(Math.random() * 100000)}&model=flux`;
-    const r = await fetch(url, { signal: AbortSignal.timeout(60000) });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const buf = Buffer.from(await r.arrayBuffer());
-    if (!buf.length) throw new Error('imagem vazia');
-    return { imageBase64: buf.toString('base64'), mime: r.headers.get('content-type') || 'image/jpeg', model: 'pollinations-flux(free)' };
-  } catch (e) {
-    errors.push('pollinations: ' + e.message);
+  // Fallback gratuito: Pollinations (Flux → Turbo, com retentativa)
+  for (const model of ['flux', 'turbo']) {
+    for (let tent = 0; tent < 2; tent++) {
+      try {
+        const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=1280&height=720&nologo=true&seed=${Math.floor(Math.random() * 100000)}&model=${model}`;
+        const r = await fetch(url, { signal: AbortSignal.timeout(60000) });
+        if (r.status === 429) { errors.push(`pollinations/${model}: HTTP 429 (limite de uso)`); await sleep(3000); continue; }
+        if (!r.ok) { errors.push(`pollinations/${model}: HTTP ${r.status}`); break; }
+        const buf = Buffer.from(await r.arrayBuffer());
+        if (!buf.length) { errors.push(`pollinations/${model}: imagem vazia`); continue; }
+        return { imageBase64: buf.toString('base64'), mime: r.headers.get('content-type') || 'image/jpeg', model: `pollinations-${model}(free)` };
+      } catch (e) {
+        errors.push(`pollinations/${model}: ${e.message}`);
+        await sleep(1500);
+      }
+    }
   }
   return { error: errors.join(' | ') };
 }
@@ -226,6 +250,24 @@ async function dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage =
   }
 }
 
+// Teste do pipeline REAL (roteiro 5 min + voz + imagem) — igual à produção
+async function fullPipelineProbe() {
+  const out = {};
+  try {
+    const c = await generateCreateFull({ prompt: 'a história dos gatos', duration: 5, style: 'cinematic', voice: 'nova' });
+    out.create = c.error ? { ok: false, error: c.error } : { ok: true, provider: c.provider, scenes: c.data.scenes.length, palavras: c.data.scenes.reduce((n, s) => n + String(s.narration || '').split(/\s+/).length, 0) };
+  } catch (e) { out.create = { ok: false, error: e.message }; }
+  try {
+    const t = await ttsWithFallback({ text: 'Esta é uma prova de narração do DubAI PRO com tamanho realista para validar a voz em produção, com várias palavras para simular uma cena inteira.', voice: 'nova', lang: 'pt-BR' });
+    out.tts = t.error ? { ok: false, error: t.error } : { ok: true, provider: t.provider, bytes: t.buffer.length };
+  } catch (e) { out.tts = { ok: false, error: e.message }; }
+  try {
+    const img = await generateSceneImage({ prompt: 'um gato astronauta na lua, cinematográfico', style: 'cinematic' });
+    out.image = img.error ? { ok: false, error: img.error } : { ok: true, model: img.model, kb: Math.round((img.imageBase64 || '').length * 0.75 / 1024) };
+  } catch (e) { out.image = { ok: false, error: e.message }; }
+  return out;
+}
+
 // Sonda de diagnóstico: testa modelos, chat e TTS e devolve o resultado de cada um
 async function probeOpenAI() {
   const report = { keyPresent: !!process.env.OPENAI_API_KEY };
@@ -273,6 +315,17 @@ async function probeOpenAI() {
 // ============ CADEIA DE PROVEDORES (fallback automático) ============
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+// Repete a cadeia em caso de falha (provedores gratuitos limitam rajadas)
+async function withRetries(fn, times = 2) {
+  let last = { error: 'sem tentativas' };
+  for (let i = 0; i < times; i++) {
+    last = await fn();
+    if (!last.error) return last;
+    if (i < times - 1) await sleep(2500);
+  }
+  return last;
+}
+
 function extractJson(text) {
   if (!text) return null;
   try { return JSON.parse(text); } catch (e) {}
@@ -281,22 +334,26 @@ function extractJson(text) {
   return null;
 }
 
-// Texto gratuito (sem chave): Pollinations
+// Texto gratuito (sem chave): Pollinations (com retentativas e modelos alternativos)
 async function chatViaPollinations({ system, user, json }) {
   const prompt = (system ? system + '\n\n' : '') + user + (json ? '\n\nResponda APENAS JSON válido, sem comentários nem markdown.' : '');
   const urls = [
     'https://text.pollinations.ai/' + encodeURIComponent(prompt) + '?model=openai',
+    'https://text.pollinations.ai/' + encodeURIComponent(prompt) + '?model=mistral',
     'https://text.pollinations.ai/' + encodeURIComponent(prompt)
   ];
   let lastErr = new Error('pollinations indisponível');
   for (const url of urls) {
-    try {
-      const r = await fetch(url, { signal: AbortSignal.timeout(30000) });
-      if (!r.ok) { lastErr = new Error('HTTP ' + r.status); continue; }
-      const text = (await r.text()).trim();
-      if (!text) { lastErr = new Error('resposta vazia'); continue; }
-      return text;
-    } catch (e) { lastErr = e; }
+    for (let tent = 0; tent < 2; tent++) {
+      try {
+        const r = await fetch(url, { signal: AbortSignal.timeout(45000) });
+        if (r.status === 429) { lastErr = new Error('HTTP 429 (limite de uso)'); await sleep(3000); continue; }
+        if (!r.ok) { lastErr = new Error('HTTP ' + r.status); break; }
+        const text = (await r.text()).trim();
+        if (!text) { lastErr = new Error('resposta vazia'); continue; }
+        return text;
+      } catch (e) { lastErr = e; await sleep(1500); }
+    }
   }
   throw lastErr;
 }
@@ -347,12 +404,19 @@ async function ttsGoogle({ text, lang = 'pt' }) {
   const parts = [];
   for (const ch of chunks.slice(0, 40)) {
     const url = 'https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=' + encodeURIComponent(lang) + '&q=' + encodeURIComponent(ch);
-    const r = await fetch(url, { signal: AbortSignal.timeout(15000), headers: { 'User-Agent': 'Mozilla/5.0' } });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const b = Buffer.from(await r.arrayBuffer());
-    if (!b.length) throw new Error('áudio vazio');
-    parts.push(b);
-    await sleep(120);
+    let ok = false, lastErr = new Error('google-tts indisponível');
+    for (let tent = 0; tent < 3 && !ok; tent++) {
+      try {
+        const r = await fetch(url, { signal: AbortSignal.timeout(15000), headers: { 'User-Agent': 'Mozilla/5.0' } });
+        if (r.status === 429) { lastErr = new Error('HTTP 429 (limite de uso)'); await sleep(2500); continue; }
+        if (!r.ok) { lastErr = new Error('HTTP ' + r.status); break; }
+        const b = Buffer.from(await r.arrayBuffer());
+        if (!b.length) { lastErr = new Error('áudio vazio'); continue; }
+        parts.push(b); ok = true;
+      } catch (e) { lastErr = e; await sleep(1200); }
+    }
+    if (!ok) throw lastErr;
+    await sleep(350);
   }
   return Buffer.concat(parts);
 }
@@ -425,5 +489,5 @@ module.exports = {
   TTS_VOICES, mockScript, mockCreateFull, mockDubResult,
   generateWithOpenAI, generateCreateFull, generateSceneImage, dubWithOpenAI,
   chatWithFallback, ttsWithFallback, chatViaPollinations, ttsGoogle, ttsStreamElements,
-  probeOpenAI, getBody, send
+  probeOpenAI, fullPipelineProbe, getBody, send
 };

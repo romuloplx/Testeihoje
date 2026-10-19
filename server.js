@@ -270,9 +270,11 @@ async function generateWithOpenAI(prompt, duration, style, voice) {
 
 app.get('/api/health', async (req, res) => {
   const out = { ok: true, mode: process.env.OPENAI_API_KEY ? 'openai' : 'mock', projects: projects.length, uptime: process.uptime() };
-  if (String(req.query.check) === '1') {
-    const { probeOpenAI } = require('./vercel/api/lib/ai');
-    out.openaiCheck = await probeOpenAI();
+  const check = String(req.query.check || '');
+  if (check === '1' || check === '2') {
+    const shared = require('./vercel/api/lib/ai');
+    if (check === '1') out.openaiCheck = await shared.probeOpenAI();
+    if (check === '2') out.pipeline = await shared.fullPipelineProbe();
   }
   res.json(out);
 });
