@@ -7,8 +7,8 @@ module.exports = async (req, res) => {
     return send(res, 200, { imageBase64: null, mock: true, message: 'Sem OPENAI_API_KEY: imagem placeholder será usada.' });
   }
   const img = await generateSceneImage({ prompt, style });
-  if (!img) {
-    return send(res, 200, { imageBase64: null, mock: true, message: 'Geração de imagem falhou — placeholder será usado.' });
+  if (!img || !img.imageBase64) {
+    return send(res, 200, { imageBase64: null, mock: true, error: img && img.error, message: 'Geração de imagem falhou' + (img && img.error ? ` (${img.error})` : '') + ' — placeholder será usado.' });
   }
   send(res, 200, { imageBase64: img.imageBase64, mime: img.mime, model: img.model });
 };

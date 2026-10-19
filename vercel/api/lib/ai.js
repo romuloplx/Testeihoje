@@ -125,7 +125,7 @@ async function generateCreateFull({ prompt, duration, style, voice }) {
     });
 
     const parsed = JSON.parse(completion.choices[0].message.content);
-    if (!Array.isArray(parsed.scenes) || !parsed.scenes.length) return null;
+    if (!Array.isArray(parsed.scenes) || !parsed.scenes.length) return { error: 'GPT não retornou cenas válidas.' };
 
     const per = (dur * 60) / parsed.scenes.length;
     parsed.scenes = parsed.scenes.map((s, idx) => ({
@@ -138,16 +138,16 @@ async function generateCreateFull({ prompt, duration, style, voice }) {
     }));
     parsed.script = String(parsed.script || parsed.scenes.map(s => `**CENA ${s.i} — ${s.title}**\n${s.narration}`).join('\n\n'));
     parsed.seo = parsed.seo || {};
-    return parsed;
+    return { data: parsed };
   } catch (e) {
     console.error('OpenAI create error:', e.message);
-    return null;
+    return { error: (e.status ? `HTTP ${e.status} — ` : '') + e.message };
   }
 }
 
 // Imagem de uma cena: gpt-image-1 (jpeg → png) com fallback para DALL·E 3
 async function generateSceneImage({ prompt, style }) {
-  if (!process.env.OPENAI_API_KEY) return null;
+  if (!process.env.OPENAI_API_KEY) return { error: 'OPENAI_API_KEY não definida.' };
   const OpenAI = require('openai');
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const fullPrompt = `${style || 'cinematográfico'}, ${prompt}, 16:9 video scene, high quality, detailed, no text, no watermark, no captions`;
@@ -156,18 +156,20 @@ async function generateSceneImage({ prompt, style }) {
     { model: 'gpt-image-1', size: '1536x1024', quality: 'medium', n: 1 },
     { model: 'dall-e-3', size: '1792x1024', quality: 'standard', n: 1, response_format: 'b64_json' }
   ];
+  let lastError = 'sem resposta';
   for (const opts of attempts) {
     try {
       const img = await openai.images.generate({ prompt: fullPrompt, ...opts });
       const b64 = img.data[0].b64_json;
-      if (!b64) continue;
+      if (!b64) { lastError = `${opts.model}: resposta sem imagem`; continue; }
       const mime = opts.output_format === 'jpeg' ? 'image/jpeg' : 'image/png';
       return { imageBase64: b64, mime, model: opts.model };
     } catch (e) {
       console.error(`Image error (${opts.model}):`, e.message);
+      lastError = `${opts.model}: ${(e.status ? 'HTTP ' + e.status + ' — ' : '')}${e.message}`;
     }
   }
-  return null;
+  return { error: lastError };
 }
 
 // Dublagem real: Whisper (transcrição) + GPT (tradução) + TTS (voz)
@@ -226,8 +228,38 @@ async function dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage =
     };
   } catch (e) {
     console.error('OpenAI dub error:', e.message);
-    return null;
+    return { error: (e.status ? `HTTP ${e.status} — ` : '') + e.message };
   }
+}
+
+// Sonda de diagnóstico: testa modelos, chat e TTS e devolve o resultado de cada um
+async function probeOpenAI() {
+  const report = { keyPresent: !!process.env.OPENAI_API_KEY };
+  if (!report.keyPresent) return report;
+  try {
+    const OpenAI = require('openai');
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    try {
+      const models = await openai.models.list();
+      report.models = { ok: true, count: (models.data || []).length };
+    } catch (e) { report.models = { ok: false, status: e.status, error: e.message }; }
+    try {
+      const c = await openai.chat.completions.create({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: 'responda apenas: ok' }], max_tokens: 5 });
+      report.chat = { ok: true, reply: (c.choices[0].message.content || '').slice(0, 30) };
+    } catch (e) { report.chat = { ok: false, status: e.status, error: e.message }; }
+    try {
+      const s = await openai.audio.speech.create({ model: 'tts-1', voice: 'onyx', input: 'olá', response_format: 'mp3' });
+      const b = Buffer.from(await s.arrayBuffer());
+      report.tts = { ok: true, bytes: b.length };
+    } catch (e) { report.tts = { ok: false, status: e.status, error: e.message }; }
+    try {
+      const img = await openai.images.generate({ model: 'dall-e-3', prompt: 'um gato astronauta, cartoon', n: 1, size: '1024x1024', response_format: 'b64_json' });
+      report.image = { ok: true, bytes: img.data[0].b64_json ? img.data[0].b64_json.length : 0 };
+    } catch (e) { report.image = { ok: false, status: e.status, error: e.message }; }
+  } catch (e) {
+    report.sdk = { ok: false, error: e.message };
+  }
+  return report;
 }
 
 // Leitura compatível do body (runtime antigo e novo do Vercel)
@@ -256,5 +288,5 @@ function send(res, status, obj) {
 module.exports = {
   TTS_VOICES, mockScript, mockCreateFull, mockDubResult,
   generateWithOpenAI, generateCreateFull, generateSceneImage, dubWithOpenAI,
-  getBody, send
+  probeOpenAI, getBody, send
 };

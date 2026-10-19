@@ -502,7 +502,11 @@ async function createVideo(){
     if(!response.ok) throw new Error(data.error||'Erro ao criar projeto');
 
     setProgress('createProgressFill',100);
-    showStatus('createStatus','✅ Roteiro pronto! Agora monte o vídeo com imagens e voz.','success');
+    if(data.warning){
+      showStatus('createStatus','⚠️ '+data.warning,'warn');
+    }else{
+      showStatus('createStatus','✅ Roteiro pronto! Agora monte o vídeo com imagens e voz.','success');
+    }
     $('#createScript').textContent = data.script || 'Roteiro criado';
     currentCreateData={script:data.script||'',scenes:data.scenes||[],seo:data.seo||{},duration:duration};
     document.getElementById('createdVideoWrap').classList.add('hidden');
@@ -671,7 +675,9 @@ async function previewVoice(voice){
       new Audio(URL.createObjectURL(await r.blob())).play();
       toast('▶️ Tocando prévia');
     }else{
-      toast('⚠️ Prévia real só no Vercel (com OPENAI_API_KEY)','warn');
+      let msg='prévia indisponível';
+      try{ const j=await r.json(); msg=j.error||j.message||msg; }catch(e){}
+      toast('⚠️ '+msg,'warn');
     }
   }catch(e){ toast('Erro na prévia','error'); }
 }
@@ -747,7 +753,7 @@ async function placeholderBitmap(scene,i){
   try{ return await createImageBitmap(c); }catch(e){ return null; }
 }
 
-function makeKenBurnsDrawer(scenes){
+function makeKenBurnsDrawer(scenes, opts={}){
   return (ctx,t)=>{
     const W=ctx.canvas.width,H=ctx.canvas.height;
     let sc=scenes.find(s=>t>=s.start&&t<s.end);
@@ -764,11 +770,17 @@ function makeKenBurnsDrawer(scenes){
       if(ir>cr){ dh=H*zoom; dw=dh*ir; } else { dw=W*zoom; dh=dw/ir; }
       ctx.drawImage(img,(W-dw)/2+dir*dw*0.035*(p-0.5),(H-dh)/2,dw,dh);
     }
-    if((t-sc.start)<5&&sc.title){
-      const a=1-(t-sc.start)/5;
-      ctx.fillStyle=`rgba(0,0,0,${0.6*a})`; ctx.fillRect(0,H-96,W,96);
+    if(sc.title&&(t-sc.start)<5){
+      const a=Math.min(1,1-(t-sc.start)/5+0.15);
+      const ty=opts.withNarration?64:H-96;
+      ctx.fillStyle=`rgba(0,0,0,${0.6*a})`; ctx.fillRect(0,ty-52,W,86);
       ctx.fillStyle=`rgba(255,255,255,${a})`; ctx.font='bold 34px sans-serif';
-      wrapText(ctx,sc.title,40,H-42,W-80,42);
+      wrapText(ctx,sc.title,40,ty,W-80,42);
+    }
+    if(opts.withNarration&&sc.narration){
+      ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(0,H-176,W,168);
+      ctx.fillStyle='#fff'; ctx.font='30px sans-serif';
+      wrapText(ctx,sc.narration.slice(0,260),40,H-124,W-80,38);
     }
   };
 }
@@ -789,9 +801,11 @@ async function fetchSceneAudio(text,voice){
   try{
     const r=await fetch('/api/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,voice})});
     const ct=r.headers.get('content-type')||'';
-    if(ct.includes('audio')) return await r.blob();
-  }catch(e){ console.warn('tts da cena falhou',e); }
-  return null;
+    if(r.ok&&ct.includes('audio')) return { blob: await r.blob() };
+    let msg='resposta inválida do servidor';
+    try{ const j=await r.json(); msg=j.error||j.message||msg; }catch(e){}
+    return { error: msg };
+  }catch(e){ return { error: e.message }; }
 }
 
 async function buildCreateVideo(){
@@ -805,26 +819,36 @@ async function buildCreateVideo(){
   prog.classList.remove('hidden');
   document.getElementById('createdVideoWrap').classList.add('hidden');
   try{
-    const scenes=[]; const audioParts=[];
+    const scenes=[]; const audioParts=[]; const ttsErrors=[];
     for(let i=0;i<d.scenes.length;i++){
       const s=d.scenes[i];
       document.getElementById('videoBuildFill').style.width=Math.round((i/d.scenes.length)*55)+'%';
       document.getElementById('videoBuildMsg').textContent=`🎨 Gerando imagem ${i+1}/${d.scenes.length} — “${s.title}”`;
       const img=(await fetchSceneImage(s,style))||await placeholderBitmap(s,i);
       document.getElementById('videoBuildMsg').textContent=`🎙️ Gerando narração ${i+1}/${d.scenes.length}`;
-      const audio=await fetchSceneAudio(s.narration,voice);
-      if(audio) audioParts.push(audio);
-      scenes.push({i:s.i||i+1,title:s.title,imgBitmap:img,start:s.start,end:s.end});
+      const a=await fetchSceneAudio(s.narration,voice);
+      if(a&&a.blob) audioParts.push(a.blob);
+      else ttsErrors.push((a&&a.error)||'falha desconhecida');
+      scenes.push({i:s.i||i+1,title:s.title,narration:s.narration,imgBitmap:img,start:s.start,end:s.end});
     }
-    if(!audioParts.length) throw new Error('Não foi possível gerar a narração (TTS). Teste no link do Vercel.');
-    const audioBlob=new Blob(audioParts,{type:'audio/mpeg'});
-    const audioEl=new Audio(URL.createObjectURL(audioBlob));
-    await new Promise(r=>{ audioEl.onloadedmetadata=r; setTimeout(r,2500); });
-    const total=audioEl.duration||d.duration*60;
-    const planned=scenes[scenes.length-1].end||total;
+    const allAudio=audioParts.length===scenes.length&&scenes.length>0;
+    if(!allAudio&&ttsErrors.length) console.warn('TTS indisponível:',ttsErrors[0]);
+    const withNarration=!allAudio;
+    document.getElementById('videoBuildMsg').textContent=withNarration
+      ? '🎬 Renderizando SEM narração (API de voz falhou) — o texto entra em legenda...'
+      : '🎬 Renderizando vídeo (tempo real — não feche a aba; ~1 min por minuto de vídeo)';
+    let audioEl=null, audioBlob=null, total;
+    const planned=scenes[scenes.length-1].end||d.duration*60;
+    if(allAudio){
+      audioBlob=new Blob(audioParts,{type:'audio/mpeg'});
+      audioEl=new Audio(URL.createObjectURL(audioBlob));
+      await new Promise(r=>{ audioEl.onloadedmetadata=r; setTimeout(r,2500); });
+      total=audioEl.duration||planned;
+    }else{
+      total=planned;
+    }
     scenes.forEach(s=>{ s.start=s.start/planned*total; s.end=s.end/planned*total; });
-    document.getElementById('videoBuildMsg').textContent='🎬 Renderizando vídeo (tempo real — não feche a aba; ~1 min por minuto de vídeo)';
-    const draw=makeKenBurnsDrawer(scenes);
+    const draw=makeKenBurnsDrawer(scenes,{withNarration});
     const videoBlob=await recordCanvasVideo({
       drawFn:draw, audioEl, durationSec:total,
       onProgress:p=>{ document.getElementById('videoBuildFill').style.width=(55+p*45)+'%'; }
@@ -832,16 +856,24 @@ async function buildCreateVideo(){
     if(createdVideoURL) URL.revokeObjectURL(createdVideoURL);
     if(createdAudioURL) URL.revokeObjectURL(createdAudioURL);
     createdVideoURL=URL.createObjectURL(videoBlob);
-    createdAudioURL=URL.createObjectURL(audioBlob);
     document.getElementById('createdVideo').src=createdVideoURL;
     const vDl=document.getElementById('createdVideoDl');
     vDl.href=createdVideoURL;
     vDl.download=videoBlob.type.includes('mp4')?'video-dubai-pro.mp4':'video-dubai-pro.webm';
-    document.getElementById('createdAudioDl').href=createdAudioURL;
+    const aDl=document.getElementById('createdAudioDl');
+    if(allAudio&&audioBlob){
+      createdAudioURL=URL.createObjectURL(audioBlob);
+      aDl.href=createdAudioURL;
+      aDl.classList.remove('hidden');
+    }else{
+      aDl.classList.add('hidden');
+    }
     sceneAssets=scenes.map(s=>({title:s.title,imgBitmap:s.imgBitmap}));
     document.getElementById('createdVideoWrap').classList.remove('hidden');
-    document.getElementById('videoBuildMsg').textContent='✅ Vídeo pronto! Baixe abaixo e suba no YouTube.';
-    toast('🎬 Vídeo pronto!');
+    document.getElementById('videoBuildMsg').textContent=allAudio
+      ? '✅ Vídeo pronto! Baixe abaixo e suba no YouTube.'
+      : '⚠️ Vídeo montado SEM narração: a API de voz falhou — '+(ttsErrors[0]||'erro desconhecido')+'. O texto está em legenda. Corrija a chave da OpenAI e monte de novo para ter voz.';
+    toast(allAudio?'🎬 Vídeo pronto!':'⚠️ Vídeo sem narração — ver o aviso','warn');
   }catch(e){
     document.getElementById('videoBuildMsg').textContent='❌ '+e.message;
     toast(e.message,'error');

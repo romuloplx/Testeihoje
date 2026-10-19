@@ -10,8 +10,8 @@ module.exports = async (req, res) => {
       return send(res, 400, { error: 'Configure OPENAI_API_KEY no servidor para dublagem real.' });
     }
     result = await dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage });
-    if (!result) {
-      return send(res, 502, { error: 'Falha ao dublar com a OpenAI (transcrição/tradução/voz). Tente com um arquivo menor ou tente novamente.' });
+    if (!result || result.error) {
+      return send(res, 502, { error: 'Falha ao dublar com a OpenAI' + (result && result.error ? `: ${result.error}` : ' (transcrição/tradução/voz)') + '. Tente com um arquivo menor ou tente novamente.' });
     }
   }
   const mock = result ? null : mockDubResult({ originalName: fileName, language, dubVoice });
