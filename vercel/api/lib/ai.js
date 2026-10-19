@@ -250,6 +250,48 @@ async function dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage =
   }
 }
 
+// Testa candidatos de provedores gratuitos (texto/imagem/voz) — para plugar só o que funciona
+async function candidatesProbe() {
+  const out = { text: {}, image: {}, tts: {} };
+  const t = async (name, fn) => { try { out.text[name] = await fn(); } catch (e) { out.text[name] = { ok: false, error: e.message }; } };
+  await t('pollinationsBare', async () => {
+    const r = await fetch('https://text.pollinations.ai/' + encodeURIComponent('responda apenas: ok'), { signal: AbortSignal.timeout(20000) });
+    return { ok: r.ok, status: r.status, sample: r.ok ? (await r.text()).slice(0, 20) : '' };
+  });
+  await t('pollinationsOpenai', async () => {
+    const r = await fetch('https://text.pollinations.ai/' + encodeURIComponent('responda apenas: ok') + '?model=openai', { signal: AbortSignal.timeout(20000) });
+    return { ok: r.ok, status: r.status, sample: r.ok ? (await r.text()).slice(0, 20) : '' };
+  });
+  await t('pollinationsPost', async () => {
+    const r = await fetch('https://text.pollinations.ai/openai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'openai', messages: [{ role: 'user', content: 'responda apenas: ok' }] }), signal: AbortSignal.timeout(25000) });
+    let sample = ''; try { const j = await r.json(); sample = j.choices ? (j.choices[0].message.content || '').slice(0, 20) : JSON.stringify(j).slice(0, 60); } catch (e) {}
+    return { ok: r.ok, status: r.status, sample };
+  });
+  await t('hackclub', async () => {
+    const r = await fetch('https://ai.hackclub.com/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: [{ role: 'user', content: 'responda apenas: ok' }] }), signal: AbortSignal.timeout(25000) });
+    let sample = ''; try { const j = await r.json(); sample = j.choices ? (j.choices[0].message.content || '').slice(0, 20) : JSON.stringify(j).slice(0, 60); } catch (e) {}
+    return { ok: r.ok && !!sample, status: r.status, sample };
+  });
+  for (const [name, url] of [
+    ['pollinations256', 'https://image.pollinations.ai/prompt/a%20red%20apple?width=256&height=256&nologo=true&seed=1'],
+    ['pollinations1024', 'https://image.pollinations.ai/prompt/a%20red%20apple?width=1024&height=576&nologo=true&seed=2'],
+    ['loremflickr', 'https://loremflickr.com/640/360/cat'],
+    ['picsum', 'https://picsum.photos/seed/abc/640/360']
+  ]) {
+    try {
+      const r = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(40000) });
+      const b = r.ok ? Buffer.from(await r.arrayBuffer()) : Buffer.alloc(0);
+      out.image[name] = { ok: r.ok && b.length > 1000, status: r.status, bytes: b.length };
+    } catch (e) { out.image[name] = { ok: false, error: e.message }; }
+  }
+  try {
+    const r = await fetch('https://api.streamelements.com/kappa/v2/speech?voice=Brian&text=hello%20world', { signal: AbortSignal.timeout(15000) });
+    const b = r.ok ? Buffer.from(await r.arrayBuffer()) : Buffer.alloc(0);
+    out.tts.streamelements = { ok: r.ok && b.length > 0, status: r.status, bytes: b.length };
+  } catch (e) { out.tts.streamelements = { ok: false, error: e.message }; }
+  return out;
+}
+
 // Teste do pipeline REAL (roteiro 5 min + voz + imagem) — igual à produção
 async function fullPipelineProbe() {
   const out = {};
@@ -489,5 +531,5 @@ module.exports = {
   TTS_VOICES, mockScript, mockCreateFull, mockDubResult,
   generateWithOpenAI, generateCreateFull, generateSceneImage, dubWithOpenAI,
   chatWithFallback, ttsWithFallback, chatViaPollinations, ttsGoogle, ttsStreamElements,
-  probeOpenAI, fullPipelineProbe, getBody, send
+  probeOpenAI, fullPipelineProbe, candidatesProbe, getBody, send
 };
