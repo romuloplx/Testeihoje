@@ -183,6 +183,23 @@ async function generateSceneImage({ prompt, style }) {
       }
     }
   } else errors.push('openai: sem OPENAI_API_KEY');
+  // Unorouter images (se a rota suportar)
+  if (process.env.UNOROUTER_API_KEY) {
+    for (const model of ['dall-e-3', 'gpt-image-1']) {
+      try {
+        const r = await fetch(uniBase() + '/images/generations', {
+          method: 'POST', headers: uniHeaders(),
+          body: JSON.stringify({ model, prompt: fullPrompt, n: 1, size: '1024x1024', response_format: 'b64_json' }),
+          signal: AbortSignal.timeout(60000)
+        });
+        if (r.ok) {
+          const j = await r.json();
+          const b64 = j && j.data && j.data[0] && j.data[0].b64_json;
+          if (b64) return { imageBase64: b64, mime: 'image/png', model: 'unorouter/' + model };
+        } else errors.push(`unorouter/${model}: HTTP ${r.status}`);
+      } catch (e) { errors.push(`unorouter/${model}: ${e.message}`); }
+    }
+  }
   // Fallback gratuito: Pollinations — escada de tamanhos (só o menor tier é grátis agora)
   const ladder = [
     { model: 'flux', w: 1280, h: 720 },
@@ -220,14 +237,39 @@ async function dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage =
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
     const audioBuf = Buffer.from(audioBase64, 'base64');
-    const file = await toFile(audioBuf, 'audio.wav', { type: 'audio/wav' });
-    const transcription = await openai.audio.transcriptions.create({
-      file,
-      model: 'whisper-1',
-      language: language || undefined
-    });
-    const originalText = (transcription.text || '').trim();
-    if (!originalText) throw new Error('Não foi possível transcrever o áudio.');
+    // Transcrição com cadeia: Whisper OpenAI → Whisper via Unorouter
+    let originalText = '';
+    let whisperErr = '';
+    try {
+      const file = await toFile(audioBuf, 'audio.wav', { type: 'audio/wav' });
+      const transcription = await openai.audio.transcriptions.create({
+        file,
+        model: 'whisper-1',
+        language: language || undefined
+      });
+      originalText = (transcription.text || '').trim();
+    } catch (e) {
+      whisperErr = 'openai: ' + e.message;
+    }
+    if (!originalText && process.env.UNOROUTER_API_KEY) {
+      try {
+        const fd = new FormData();
+        fd.append('file', new Blob([audioBuf], { type: 'audio/wav' }), 'audio.wav');
+        fd.append('model', 'whisper-1');
+        if (language) fd.append('language', language);
+        const r = await fetch(uniBase() + '/audio/transcriptions', {
+          method: 'POST',
+          headers: { Authorization: uniHeaders().Authorization },
+          body: fd,
+          signal: AbortSignal.timeout(120000)
+        });
+        if (r.ok) {
+          const j = await r.json();
+          originalText = (j.text || '').trim();
+        } else whisperErr += ' | unorouter: HTTP ' + r.status;
+      } catch (e) { whisperErr += ' | unorouter: ' + e.message; }
+    }
+    if (!originalText) throw new Error('Não foi possível transcrever o áudio. ' + whisperErr);
 
     // Tradução com cadeia de provedores (GPT → IA gratuita)
     const tr = await chatWithFallback({
@@ -306,6 +348,45 @@ async function candidatesProbe() {
     const b = r.ok ? Buffer.from(await r.arrayBuffer()) : Buffer.alloc(0);
     out.tts.streamelements = { ok: r.ok && b.length > 0, status: r.status, bytes: b.length };
   } catch (e) { out.tts.streamelements = { ok: false, error: e.message }; }
+  // Unorouter — o que a rota do usuário suporta
+  out.unorouter = {};
+  if (!process.env.UNOROUTER_API_KEY) {
+    out.unorouter = { ok: false, error: 'sem UNOROUTER_API_KEY' };
+  } else {
+    try {
+      const r = await fetch(uniBase() + '/models', { headers: { Authorization: uniHeaders().Authorization }, signal: AbortSignal.timeout(15000) });
+      let models = []; try { const j = await r.json(); models = (j.data || []).map(m => m.id).filter(Boolean); } catch (e) {}
+      out.unorouter.models = { ok: r.ok && models.length > 0, status: r.status, count: models.length, sample: models.slice(0, 6) };
+      const first = models[0] || 'gpt-4o-mini';
+      try {
+        const r2 = await fetch(uniBase() + '/chat/completions', {
+          method: 'POST', headers: uniHeaders(),
+          body: JSON.stringify({ model: first, messages: [{ role: 'user', content: 'responda apenas: ok' }] }),
+          signal: AbortSignal.timeout(25000)
+        });
+        let sample = ''; try { const j = await r2.json(); sample = j.choices ? (j.choices[0].message.content || '').slice(0, 20) : JSON.stringify(j).slice(0, 80); } catch (e) {}
+        out.unorouter.chat = { ok: r2.ok && !!sample, status: r2.status, model: first, sample };
+      } catch (e) { out.unorouter.chat = { ok: false, error: e.message }; }
+      try {
+        const r3 = await fetch(uniBase() + '/audio/speech', {
+          method: 'POST', headers: uniHeaders(),
+          body: JSON.stringify({ model: 'tts-1', voice: 'alloy', input: 'olá' }),
+          signal: AbortSignal.timeout(30000)
+        });
+        const b = r3.ok ? Buffer.from(await r3.arrayBuffer()) : Buffer.alloc(0);
+        out.unorouter.tts = { ok: r3.ok && b.length > 200, status: r3.status, bytes: b.length };
+      } catch (e) { out.unorouter.tts = { ok: false, error: e.message }; }
+      try {
+        const r4 = await fetch(uniBase() + '/images/generations', {
+          method: 'POST', headers: uniHeaders(),
+          body: JSON.stringify({ model: 'dall-e-3', prompt: 'a red apple', n: 1, size: '1024x1024', response_format: 'b64_json' }),
+          signal: AbortSignal.timeout(60000)
+        });
+        let kb = 0; try { const j = await r4.json(); kb = j && j.data && j.data[0] && j.data[0].b64_json ? Math.round(j.data[0].b64_json.length * 0.75 / 1024) : 0; } catch (e) {}
+        out.unorouter.image = { ok: r4.ok && kb > 0, status: r4.status, kb };
+      } catch (e) { out.unorouter.image = { ok: false, error: e.message }; }
+    } catch (e) { out.unorouter.error = e.message; }
+  }
   return out;
 }
 
@@ -354,6 +435,15 @@ async function probeOpenAI() {
   } catch (e) {
     report.sdk = { ok: false, error: e.message };
   }
+  // Unorouter (rota do usuário)
+  if (process.env.UNOROUTER_API_KEY) {
+    try {
+      const models = await unorouterModels();
+      const first = models[0] || 'gpt-4o-mini';
+      const t = await unorouterChat({ user: 'responda apenas: ok', model: first });
+      report.unorouter = { ok: true, model: first, models: models.length, reply: t.slice(0, 20) };
+    } catch (e) { report.unorouter = { ok: false, error: e.message }; }
+  } else report.unorouter = { ok: false, error: 'sem UNOROUTER_API_KEY' };
   // Teste dos provedores gratuitos (fallback)
   try {
     const t = await chatViaPollinations({ user: 'responda apenas: ok', json: false });
@@ -373,6 +463,48 @@ async function probeOpenAI() {
 
 // ============ CADEIA DE PROVEDORES (fallback automático) ============
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// --- Unorouter (rota de modelos fornecida pelo usuário) ---
+function uniBase() { return (process.env.UNOROUTER_BASE_URL || 'https://api.unorouter.com/v1').replace(/\/$/, ''); }
+function uniHeaders() { return { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (process.env.UNOROUTER_API_KEY || '') }; }
+
+let _uniModels = null;
+async function unorouterModels() {
+  if (_uniModels) return _uniModels;
+  _uniModels = [];
+  if (!process.env.UNOROUTER_API_KEY) return _uniModels;
+  try {
+    const r = await fetch(uniBase() + '/models', { headers: { Authorization: uniHeaders().Authorization }, signal: AbortSignal.timeout(15000) });
+    if (r.ok) {
+      const j = await r.json();
+      _uniModels = (j.data || []).map(m => m.id).filter(Boolean);
+    }
+  } catch (e) { console.warn('unorouter models:', e.message); }
+  return _uniModels;
+}
+
+// Chat via Unorouter (compatível com OpenAI) — descobre os modelos sozinho
+async function unorouterChat({ system, user, json, model = 'gpt-4o-mini', maxTokens = 4000 }) {
+  const body = {
+    model,
+    messages: [...(system ? [{ role: 'system', content: system }] : []), { role: 'user', content: user }],
+    temperature: 0.8,
+    max_tokens: maxTokens
+  };
+  const call = async (b) => fetch(uniBase() + '/chat/completions', {
+    method: 'POST', headers: uniHeaders(), body: JSON.stringify(b), signal: AbortSignal.timeout(45000)
+  });
+  let r = await call(body);
+  if (!r.ok && json && (r.status === 400 || r.status === 422)) {
+    delete body.response_format; // nem todo modelo suporta JSON mode
+    r = await call(body);
+  }
+  if (!r.ok) throw Object.assign(new Error('HTTP ' + r.status), { status: r.status });
+  const j = await r.json();
+  const text = j && j.choices && j.choices[0] && j.choices[0].message ? String(j.choices[0].message.content || '').trim() : '';
+  if (!text) throw new Error('resposta vazia');
+  return text;
+}
 
 // Repete a cadeia em caso de falha (provedores gratuitos limitam rajadas)
 async function withRetries(fn, times = 2) {
@@ -456,6 +588,20 @@ async function chatWithFallback({ system, user, json = false, maxTokens = 8000 }
       }
     }
   } else errors.push('openai: sem OPENAI_API_KEY');
+  // Unorouter (rota de modelos do usuário) — tenta os modelos disponíveis
+  if (process.env.UNOROUTER_API_KEY) {
+    const models = await unorouterModels();
+    const list = (models.length ? models.slice(0, 3) : ['gpt-4o-mini']);
+    for (const model of list) {
+      try {
+        const text = await unorouterChat({ system, user, json, model, maxTokens });
+        return { text, provider: 'unorouter/' + model };
+      } catch (e) {
+        errors.push(`unorouter/${model}: ${(e.status ? 'HTTP ' + e.status + ' — ' : '')}${e.message}`);
+        if (e.status === 401) break;
+      }
+    }
+  } else errors.push('unorouter: sem UNOROUTER_API_KEY');
   try {
     const text = await chatViaPollinations({ system, user, json });
     return { text, provider: 'pollinations(free)' };
@@ -524,6 +670,20 @@ async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR' }) {
       }
     }
   } else errors.push('openai: sem OPENAI_API_KEY');
+  // Unorouter TTS (se a rota suportar)
+  if (process.env.UNOROUTER_API_KEY) {
+    try {
+      const r = await fetch(uniBase() + '/audio/speech', {
+        method: 'POST', headers: uniHeaders(),
+        body: JSON.stringify({ model: 'tts-1', voice: TTS_VOICES[voice] || 'onyx', input: String(text).slice(0, 4096), response_format: 'mp3' }),
+        signal: AbortSignal.timeout(30000)
+      });
+      if (r.ok) {
+        const b = Buffer.from(await r.arrayBuffer());
+        if (b.length > 500) return { buffer: b, provider: 'unorouter/tts' };
+      } else errors.push('unorouter/tts: HTTP ' + r.status);
+    } catch (e) { errors.push('unorouter/tts: ' + e.message); }
+  }
   try {
     const b = await ttsGoogle({ text, lang: TTS_LANGS[lang] || 'pt-BR' });
     return { buffer: b, provider: 'google-tts(free)' };
