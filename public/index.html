@@ -212,11 +212,20 @@ video{width:100%;border-radius:12px;margin-top:12px;background:black}
     </div>
 
     <label>Voz</label>
-    <select id="voice">
-      <option value="onyx">Masculina grave — Onyx</option>
-      <option value="nova">Feminina natural — Nova</option>
-      <option value="alloy">Neutra — Alloy</option>
-    </select>
+    <div style="display:flex;gap:8px">
+      <select id="voice" style="flex:1">
+        <option value="onyx">Onyx — Masculina grave</option>
+        <option value="nova">Nova — Feminina natural</option>
+        <option value="alloy">Alloy — Neutra</option>
+        <option value="echo">Echo — Masculina</option>
+        <option value="fable">Fable — Masculina expressiva</option>
+        <option value="shimmer">Shimmer — Feminina suave</option>
+        <option value="ash">Ash — Neutra firme</option>
+        <option value="coral">Coral — Feminina clara</option>
+        <option value="sage">Sage — Neutra calma</option>
+      </select>
+      <button class="ghost" type="button" onclick="previewVoice(document.getElementById('voice').value)">🔊 Testar</button>
+    </div>
 
     <button class="primary" id="createBtn" onclick="createVideo()">✨ Criar vídeo com IA</button>
     <button class="ghost" onclick="fillExample()" style="width:100%;margin-top:8px">💡 Usar exemplo pronto</button>
@@ -240,6 +249,24 @@ video{width:100%;border-radius:12px;margin-top:12px;background:black}
           <button class="ghost" onclick="copyText(document.getElementById('createScript').innerText)">📋 Copiar roteiro</button>
           <button class="ghost" onclick="speakText(document.getElementById('createScript').innerText)">🔊 Ouvir narração</button>
           <button class="ghost" onclick="openTab('projects', document.querySelectorAll('.tabs button')[2])">📁 Ver nos projetos</button>
+        </div>
+        <button class="primary" id="buildVideoBtn" onclick="buildCreateVideo()" style="width:100%;margin-top:12px">🎬 Montar vídeo (imagens em movimento + voz)</button>
+        <div id="videoBuildProgress" class="hidden" style="margin-top:10px">
+          <div class="progress-bar"><div class="progress-fill" id="videoBuildFill" style="width:0%"></div></div>
+          <div id="videoBuildMsg" class="hint" style="margin-top:6px"></div>
+        </div>
+        <div id="createdVideoWrap" class="hidden" style="margin-top:12px">
+          <video id="createdVideo" controls style="width:100%;border-radius:10px;background:#000"></video>
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+            <a id="createdVideoDl" class="ghost" download="video-dubai-pro.webm" style="padding:8px 14px;text-decoration:none">⬇️ Baixar vídeo (YouTube)</a>
+            <a id="createdAudioDl" class="ghost" download="narracao.mp3" style="padding:8px 14px;text-decoration:none">🎙️ Baixar narração</a>
+            <button class="ghost" onclick="downloadSceneImages()">🖼️ Baixar imagens das cenas</button>
+          </div>
+        </div>
+        <div id="seoBox" class="hidden" style="margin-top:12px;background:#111125;border:1px solid var(--border);border-radius:10px;padding:12px">
+          <div style="font-weight:800;font-size:12px;margin-bottom:6px">🚀 Pacote YouTube (título + descrição + tags)</div>
+          <div id="seoText" style="white-space:pre-wrap;font-size:12px;line-height:1.6;color:#d1d5ff"></div>
+          <button class="ghost" style="margin-top:8px" onclick="copyText(document.getElementById('seoText').innerText)">📋 Copiar pacote</button>
         </div>
       </div>
     </div>
@@ -281,15 +308,35 @@ video{width:100%;border-radius:12px;margin-top:12px;background:black}
       </div>
       <div>
         <label>Voz da dublagem</label>
-        <select id="dubVoice">
-          <option value="onyx">Masculina</option>
-          <option value="nova">Feminina</option>
-          <option value="alloy">Neutra</option>
+        <div style="display:flex;gap:8px">
+          <select id="dubVoice" style="flex:1">
+            <option value="onyx">Onyx — Masculina grave</option>
+            <option value="nova">Nova — Feminina natural</option>
+            <option value="alloy">Alloy — Neutra</option>
+            <option value="echo">Echo — Masculina</option>
+            <option value="fable">Fable — Masculina expressiva</option>
+            <option value="shimmer">Shimmer — Feminina suave</option>
+            <option value="ash">Ash — Neutra firme</option>
+            <option value="coral">Coral — Feminina clara</option>
+            <option value="sage">Sage — Neutra calma</option>
+          </select>
+          <button class="ghost" type="button" onclick="previewVoice(document.getElementById('dubVoice').value)">🔊</button>
+        </div>
+      </div>
+      <div>
+        <label>Traduzir para</label>
+        <select id="targetLanguage">
+          <option value="pt-BR" selected>Português (BR)</option>
+          <option value="en">Inglês</option>
+          <option value="es">Espanhol</option>
+          <option value="fr">Francês</option>
+          <option value="de">Alemão</option>
+          <option value="it">Italiano</option>
         </select>
       </div>
     </div>
 
-    <button class="primary" id="dubBtn" onclick="dubVideo()">🎙️ Dublar para português</button>
+    <button class="primary" id="dubBtn" onclick="dubVideo()">🎙️ Dublar (trocar o áudio do vídeo)</button>
 
     <div class="progress-wrap" id="dubProgress">
       <div class="progress-bar"><div class="progress-fill" id="dubProgressFill"></div></div>
@@ -309,7 +356,8 @@ video{width:100%;border-radius:12px;margin-top:12px;background:black}
           <audio id="dubAudio" controls style="width:100%"></audio>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="primary" onclick="playDubbed()" style="padding:8px 14px">▶️ Assistir vídeo dublado</button>
-            <a id="dubDownload" class="ghost" download="dublagem-pt-br.mp3" style="padding:8px 14px;text-decoration:none">⬇️ Baixar áudio dublado</a>
+            <button class="ghost" onclick="downloadDubVideo()">📼 Baixar VÍDEO dublado (áudio trocado)</button>
+            <a id="dubDownload" class="ghost" download="dublagem.mp3" style="padding:8px 14px;text-decoration:none">⬇️ Baixar só o áudio</a>
           </div>
         </div>
         <div style="font-weight:800;font-size:12px;margin-bottom:6px">📝 Tradução PT-BR</div>
@@ -454,8 +502,16 @@ async function createVideo(){
     if(!response.ok) throw new Error(data.error||'Erro ao criar projeto');
 
     setProgress('createProgressFill',100);
-    showStatus('createStatus','✅ Roteiro criado com sucesso! Salvo nos projetos.','success');
+    showStatus('createStatus','✅ Roteiro pronto! Agora monte o vídeo com imagens e voz.','success');
     $('#createScript').textContent = data.script || 'Roteiro criado';
+    currentCreateData={script:data.script||'',scenes:data.scenes||[],seo:data.seo||{},duration:duration};
+    document.getElementById('createdVideoWrap').classList.add('hidden');
+    document.getElementById('videoBuildProgress').classList.add('hidden');
+    const seo=data.seo||{};
+    if(seo.title||seo.description||seo.tags){
+      document.getElementById('seoText').textContent=`TÍTULO:\n${seo.title||''}\n\nDESCRIÇÃO:\n${seo.description||''}\n\nTAGS:\n${seo.tags||''}`;
+      document.getElementById('seoBox').classList.remove('hidden');
+    }
     $('#createResult').classList.remove('hidden');
     toast('✅ Roteiro criado!');
     await loadProjects();
@@ -539,6 +595,7 @@ async function dubVideo(){
   const file=$('#videoFile').files[0];
   const language=$('#language').value;
   const dubVoice=$('#dubVoice').value;
+  const targetLanguage=$('#targetLanguage').value;
   const btn=$('#dubBtn');
 
   if(!file){ showStatus('dubStatus','⚠️ Selecione um vídeo ou áudio.','warn'); toast('Selecione um arquivo','warn'); return; }
@@ -559,7 +616,7 @@ async function dubVideo(){
     const res=await fetch('/api/dub',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ fileName: file.name, fileSize: file.size, language, dubVoice, audioBase64: audio.base64 })
+      body: JSON.stringify({ fileName: file.name, fileSize: file.size, language, dubVoice, targetLanguage, audioBase64: audio.base64 })
     });
     const data=await res.json();
     if(!res.ok) throw new Error(data.error||'Erro na dublagem');
@@ -572,11 +629,12 @@ async function dubVideo(){
     const wrap=document.getElementById('dubPlayerWrap');
     if(data.audioBase64){
       const blob=await (await fetch('data:audio/mpeg;base64,'+data.audioBase64)).blob();
+      lastDubAudioBlob=blob;
       dubAudioURL=URL.createObjectURL(blob);
       document.getElementById('dubAudio').src=dubAudioURL;
       document.getElementById('dubDownload').href=dubAudioURL;
       wrap.classList.remove('hidden');
-      document.getElementById('dubTitle').textContent='✅ Vídeo traduzido — ouça a dublagem em PT-BR';
+      document.getElementById('dubTitle').textContent='✅ Áudio dublado pronto — baixe o VÍDEO com o áudio trocado abaixo';
     }else{
       wrap.classList.add('hidden');
       document.getElementById('dubTitle').textContent='⚠️ Simulação (sem áudio real)';
@@ -586,15 +644,265 @@ async function dubVideo(){
     if(audio.truncated) txt += `\n\n⚠️ Processamos apenas os primeiros ${Math.round(audio.seconds)}s do arquivo (limite de tamanho).`;
     $('#dubScript').textContent = txt;
     $('#dubResult').classList.remove('hidden');
-    toast(data.audioBase64?'✅ Vídeo dublado em PT-BR!':'⚠️ Simulação sem áudio','info');
+    toast(data.audioBase64?'✅ Dublagem pronta — baixe o vídeo com o áudio trocado!':'⚠️ Simulação sem áudio','info');
     await loadProjects();
   }catch(e){
     showStatus('dubStatus','❌ '+e.message,'error');
     toast(e.message,'error');
     setProgress('dubProgressFill',0);
   }finally{
-    btn.disabled=false; btn.textContent='🎙️ Dublar para português';
+    btn.disabled=false; btn.textContent='🎙️ Dublar (trocar o áudio do vídeo)';
     setTimeout(()=>{ $('#dubProgress').classList.remove('show'); setProgress('dubProgressFill',0); }, 1200);
+  }
+}
+
+// --- Vozes + montagem de vídeo (imagens em movimento) + vídeo dublado ---
+let lastDubAudioBlob=null;
+let currentCreateData=null;
+let sceneAssets=[];
+let createdAudioURL=null, createdVideoURL=null;
+
+async function previewVoice(voice){
+  toast('🔊 Gerando prévia da voz...');
+  try{
+    const r=await fetch('/api/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:'Olá! Esta é a minha voz no DubAI PRO. Escolha a que mais combina com o seu vídeo.',voice})});
+    const ct=r.headers.get('content-type')||'';
+    if(ct.includes('audio')){
+      new Audio(URL.createObjectURL(await r.blob())).play();
+      toast('▶️ Tocando prévia');
+    }else{
+      toast('⚠️ Prévia real só no Vercel (com OPENAI_API_KEY)','warn');
+    }
+  }catch(e){ toast('Erro na prévia','error'); }
+}
+
+function pickRecorderMime(){
+  const c=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4'];
+  for(const m of c){ if(window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return m; }
+  return '';
+}
+
+async function recordCanvasVideo({drawFn, audioEl, durationSec, alsoPlay=[], onProgress}){
+  const canvas=document.createElement('canvas');
+  canvas.width=1280; canvas.height=720;
+  const ctx=canvas.getContext('2d');
+  drawFn(ctx,0);
+  const stream=canvas.captureStream(30);
+  if(audioEl){
+    const as=(audioEl.captureStream||audioEl.mozCaptureStream).call(audioEl);
+    as.getAudioTracks().forEach(t=>stream.addTrack(t));
+    if(!durationSec||!isFinite(durationSec)) durationSec=audioEl.duration||10;
+    if(audioEl.duration&&isFinite(audioEl.duration)) durationSec=Math.min(durationSec,audioEl.duration);
+  }
+  const mime=pickRecorderMime();
+  if(!mime) throw new Error('Seu navegador não grava vídeo (MediaRecorder). Use o Chrome.');
+  const rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:4500000});
+  const chunks=[];
+  rec.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
+  const stopped=new Promise(r=>rec.onstop=r);
+  rec.start(1000);
+  alsoPlay.forEach(m=>{ try{ m.muted=true; m.currentTime=0; m.play(); }catch(e){} });
+  if(audioEl){ audioEl.currentTime=0; try{ await audioEl.play(); }catch(e){} }
+  const t0=performance.now();
+  await new Promise(resolve=>{
+    function frame(){
+      const t=audioEl&&!audioEl.paused?audioEl.currentTime:audioEl?audioEl.currentTime:(performance.now()-t0)/1000;
+      drawFn(ctx,t);
+      if(onProgress) onProgress(Math.min(1,t/Math.max(1,durationSec)));
+      if(t>=durationSec-0.05||(audioEl&&audioEl.ended)) return resolve();
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  });
+  await new Promise(r=>setTimeout(r,350));
+  rec.stop();
+  alsoPlay.forEach(m=>{ try{m.pause();}catch(e){} });
+  await stopped;
+  return new Blob(chunks,{type:mime.split(';')[0]});
+}
+
+function wrapText(ctx,text,x,y,maxW,lh){
+  const words=String(text).split(' '); let line='';
+  for(const w of words){
+    const test=line?line+' '+w:w;
+    if(ctx.measureText(test).width>maxW){ ctx.fillText(line,x,y); y+=lh; line=w; }
+    else line=test;
+  }
+  if(line) ctx.fillText(line,x,y);
+  return y;
+}
+
+async function placeholderBitmap(scene,i){
+  const c=document.createElement('canvas'); c.width=1280; c.height=720;
+  const x=c.getContext('2d');
+  const hues=[[265,38],[200,48],[330,42],[28,58],[150,46],[230,50]];
+  const [h,s]=hues[i%hues.length];
+  const g=x.createLinearGradient(0,0,1280,720);
+  g.addColorStop(0,`hsl(${h},${s}%,26%)`); g.addColorStop(1,`hsl(${h+45},${s}%,11%)`);
+  x.fillStyle=g; x.fillRect(0,0,1280,720);
+  x.fillStyle='rgba(255,255,255,0.92)'; x.font='bold 46px sans-serif';
+  wrapText(x,scene.title||`Cena ${i+1}`,60,280,1160,60);
+  x.fillStyle='rgba(255,255,255,0.55)'; x.font='26px sans-serif';
+  x.fillText('Imagem simulada — configure OPENAI_API_KEY para arte real',60,520);
+  try{ return await createImageBitmap(c); }catch(e){ return null; }
+}
+
+function makeKenBurnsDrawer(scenes){
+  return (ctx,t)=>{
+    const W=ctx.canvas.width,H=ctx.canvas.height;
+    let sc=scenes.find(s=>t>=s.start&&t<s.end);
+    if(!sc) sc=t<scenes[0].start?scenes[0]:scenes[scenes.length-1];
+    const span=Math.max(1,sc.end-sc.start);
+    const p=Math.max(0,Math.min(1,(t-sc.start)/span));
+    const dir=((sc.i||0)%2===0)?1:-1;
+    const zoom=1+0.12*p;
+    ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
+    const img=sc.imgBitmap;
+    if(img){
+      const ir=img.width/img.height, cr=W/H;
+      let dw,dh;
+      if(ir>cr){ dh=H*zoom; dw=dh*ir; } else { dw=W*zoom; dh=dw/ir; }
+      ctx.drawImage(img,(W-dw)/2+dir*dw*0.035*(p-0.5),(H-dh)/2,dw,dh);
+    }
+    if((t-sc.start)<5&&sc.title){
+      const a=1-(t-sc.start)/5;
+      ctx.fillStyle=`rgba(0,0,0,${0.6*a})`; ctx.fillRect(0,H-96,W,96);
+      ctx.fillStyle=`rgba(255,255,255,${a})`; ctx.font='bold 34px sans-serif';
+      wrapText(ctx,sc.title,40,H-42,W-80,42);
+    }
+  };
+}
+
+async function fetchSceneImage(scene,style){
+  try{
+    const r=await fetch('/api/scene-image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:scene.visual||scene.title,style})});
+    const j=await r.json();
+    if(j&&j.imageBase64){
+      const blob=await (await fetch(`data:${j.mime||'image/png'};base64,${j.imageBase64}`)).blob();
+      return await createImageBitmap(blob);
+    }
+  }catch(e){ console.warn('imagem da cena falhou',e); }
+  return null;
+}
+
+async function fetchSceneAudio(text,voice){
+  try{
+    const r=await fetch('/api/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,voice})});
+    const ct=r.headers.get('content-type')||'';
+    if(ct.includes('audio')) return await r.blob();
+  }catch(e){ console.warn('tts da cena falhou',e); }
+  return null;
+}
+
+async function buildCreateVideo(){
+  const d=currentCreateData;
+  if(!d||!d.scenes||!d.scenes.length){ toast('Gere o roteiro primeiro','warn'); return; }
+  const btn=document.getElementById('buildVideoBtn');
+  const voice=document.getElementById('voice').value;
+  const style=document.getElementById('style').value;
+  btn.disabled=true; btn.textContent='⏳ Montando vídeo...';
+  const prog=document.getElementById('videoBuildProgress');
+  prog.classList.remove('hidden');
+  document.getElementById('createdVideoWrap').classList.add('hidden');
+  try{
+    const scenes=[]; const audioParts=[];
+    for(let i=0;i<d.scenes.length;i++){
+      const s=d.scenes[i];
+      document.getElementById('videoBuildFill').style.width=Math.round((i/d.scenes.length)*55)+'%';
+      document.getElementById('videoBuildMsg').textContent=`🎨 Gerando imagem ${i+1}/${d.scenes.length} — “${s.title}”`;
+      const img=(await fetchSceneImage(s,style))||await placeholderBitmap(s,i);
+      document.getElementById('videoBuildMsg').textContent=`🎙️ Gerando narração ${i+1}/${d.scenes.length}`;
+      const audio=await fetchSceneAudio(s.narration,voice);
+      if(audio) audioParts.push(audio);
+      scenes.push({i:s.i||i+1,title:s.title,imgBitmap:img,start:s.start,end:s.end});
+    }
+    if(!audioParts.length) throw new Error('Não foi possível gerar a narração (TTS). Teste no link do Vercel.');
+    const audioBlob=new Blob(audioParts,{type:'audio/mpeg'});
+    const audioEl=new Audio(URL.createObjectURL(audioBlob));
+    await new Promise(r=>{ audioEl.onloadedmetadata=r; setTimeout(r,2500); });
+    const total=audioEl.duration||d.duration*60;
+    const planned=scenes[scenes.length-1].end||total;
+    scenes.forEach(s=>{ s.start=s.start/planned*total; s.end=s.end/planned*total; });
+    document.getElementById('videoBuildMsg').textContent='🎬 Renderizando vídeo (tempo real — não feche a aba; ~1 min por minuto de vídeo)';
+    const draw=makeKenBurnsDrawer(scenes);
+    const videoBlob=await recordCanvasVideo({
+      drawFn:draw, audioEl, durationSec:total,
+      onProgress:p=>{ document.getElementById('videoBuildFill').style.width=(55+p*45)+'%'; }
+    });
+    if(createdVideoURL) URL.revokeObjectURL(createdVideoURL);
+    if(createdAudioURL) URL.revokeObjectURL(createdAudioURL);
+    createdVideoURL=URL.createObjectURL(videoBlob);
+    createdAudioURL=URL.createObjectURL(audioBlob);
+    document.getElementById('createdVideo').src=createdVideoURL;
+    const vDl=document.getElementById('createdVideoDl');
+    vDl.href=createdVideoURL;
+    vDl.download=videoBlob.type.includes('mp4')?'video-dubai-pro.mp4':'video-dubai-pro.webm';
+    document.getElementById('createdAudioDl').href=createdAudioURL;
+    sceneAssets=scenes.map(s=>({title:s.title,imgBitmap:s.imgBitmap}));
+    document.getElementById('createdVideoWrap').classList.remove('hidden');
+    document.getElementById('videoBuildMsg').textContent='✅ Vídeo pronto! Baixe abaixo e suba no YouTube.';
+    toast('🎬 Vídeo pronto!');
+  }catch(e){
+    document.getElementById('videoBuildMsg').textContent='❌ '+e.message;
+    toast(e.message,'error');
+  }finally{
+    btn.disabled=false; btn.textContent='🎬 Montar vídeo (imagens em movimento + voz)';
+  }
+}
+
+function downloadSceneImages(){
+  if(!sceneAssets.length){ toast('Monte o vídeo primeiro','warn'); return; }
+  sceneAssets.forEach((s,idx)=>{
+    if(!s.imgBitmap) return;
+    const c=document.createElement('canvas'); c.width=s.imgBitmap.width; c.height=s.imgBitmap.height;
+    c.getContext('2d').drawImage(s.imgBitmap,0,0);
+    c.toBlob(b=>{
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(b);
+      a.download=`cena-${String(idx+1).padStart(2,'0')}.png`;
+      a.click();
+    },'image/png');
+  });
+  toast('🖼️ Baixando imagens...');
+}
+
+async function downloadDubVideo(){
+  const v=document.getElementById('preview');
+  if(!lastDubAudioBlob){ toast('Faça a dublagem primeiro','warn'); return; }
+  if(v.hidden||!v.src||!v.videoWidth){ toast('⚠️ Escolha um arquivo de VÍDEO para gerar o vídeo dublado','warn'); return; }
+  const btn=event?.target; if(btn){btn.disabled=true;}
+  showStatus('dubStatus','📼 Montando o vídeo com o áudio novo (tempo real — não feche a aba)...','loading');
+  try{
+    const audioEl=new Audio(URL.createObjectURL(lastDubAudioBlob));
+    await new Promise(r=>{ audioEl.onloadedmetadata=r; setTimeout(r,2500); });
+    const W=v.videoWidth||1280,H=v.videoHeight||720;
+    const draw=(ctx,t)=>{
+      const cw=ctx.canvas.width,ch=ctx.canvas.height;
+      if(Math.abs(v.currentTime-t)>0.4){ try{v.currentTime=t;}catch(e){} }
+      ctx.fillStyle='#000'; ctx.fillRect(0,0,cw,ch);
+      const ir=(W/H), cr=cw/ch;
+      let dw,dh;
+      if(ir>cr){ dh=ch; dw=dh*ir; } else { dw=cw; dh=dw/ir; }
+      try{ ctx.drawImage(v,(cw-dw)/2,(ch-dh)/2,dw,dh); }catch(e){}
+    };
+    const mime=pickRecorderMime();
+    const blob=await recordCanvasVideo({
+      drawFn:draw, audioEl, alsoPlay:[v],
+      durationSec:Math.min(v.duration||audioEl.duration,audioEl.duration||v.duration),
+      onProgress:p=>{ setProgress('dubProgressFill',Math.round(p*100)); }
+    });
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=mime.includes('mp4')?'video-dublado.mp4':'video-dublado.webm';
+    a.click();
+    showStatus('dubStatus','✅ Vídeo dublado baixado (áudio original trocado pelo novo)!','success');
+    toast('📼 Vídeo dublado baixado!');
+  }catch(e){
+    showStatus('dubStatus','❌ '+e.message,'error');
+    toast(e.message,'error');
+  }finally{
+    if(btn){btn.disabled=false;}
+    setTimeout(()=>{ $('#dubProgress').classList.remove('show'); setProgress('dubProgressFill',0); },1500);
   }
 }
 

@@ -1,7 +1,7 @@
 const { mockDubResult, dubWithOpenAI, getBody, send } = require('./lib/ai');
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return send(res, 405, { error: 'Método não permitido. Use POST.' });
-  const { fileName, fileSize, language = '', dubVoice = 'onyx', audioBase64 } = await getBody(req);
+  const { fileName, fileSize, language = '', dubVoice = 'onyx', targetLanguage = 'pt-BR', audioBase64 } = await getBody(req);
   if (!fileName) return send(res, 400, { error: 'Selecione um vídeo.' });
 
   let result = null;
@@ -9,7 +9,7 @@ module.exports = async (req, res) => {
     if (!process.env.OPENAI_API_KEY) {
       return send(res, 400, { error: 'Configure OPENAI_API_KEY no servidor para dublagem real.' });
     }
-    result = await dubWithOpenAI({ audioBase64, language, dubVoice });
+    result = await dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage });
     if (!result) {
       return send(res, 502, { error: 'Falha ao dublar com a OpenAI (transcrição/tradução/voz). Tente com um arquivo menor ou tente novamente.' });
     }
@@ -19,9 +19,9 @@ module.exports = async (req, res) => {
   const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const project = {
     id, type: 'dub', title: `Dublagem: ${fileName}`,
-    prompt: `Dublagem de ${fileName} para PT-BR`,
+    prompt: `Dublagem de ${fileName} para ${targetLanguage}`,
     fileName, fileSize: Number(fileSize) || 0,
-    language: language || 'auto', dubVoice,
+    language: language || 'auto', targetLanguage, dubVoice,
     transcription: result ? result.transcription : mock.transcription,
     translation: result ? result.translation : mock.translation,
     dubInfo: result ? result.dubInfo : mock.dubInfo,
@@ -33,6 +33,6 @@ module.exports = async (req, res) => {
   send(res, 200, {
     id, project,
     audioBase64: result ? result.audioMp3Base64 : null,
-    message: result ? 'Vídeo traduzido e dublado em PT-BR (Whisper + GPT + TTS).' : 'Modo simulação (sem áudio real).'
+    message: result ? `Vídeo traduzido e dublado (${targetLanguage}).` : 'Modo simulação (sem áudio real).'
   });
 };

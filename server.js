@@ -142,6 +142,104 @@ async function dubWithOpenAI({ audioBase64, language, dubVoice }) {
   }
 }
 
+const TTS_VOICES = { onyx: 'onyx', nova: 'nova', alloy: 'alloy', echo: 'echo', fable: 'fable', shimmer: 'shimmer', ash: 'ash', coral: 'coral', sage: 'sage' };
+
+function mockCreateFull({ prompt, duration, style, voice }) {
+  const m = mockScript({ prompt, duration, style, voice });
+  const dur = parseInt(duration) || 10;
+  const per = (dur * 60) / 5;
+  const titles = ['Abertura', 'Contexto', 'Desenvolvimento', 'Clímax', 'Encerramento'];
+  const narrations = [
+    `Bem-vindos a uma jornada fascinante sobre ${prompt.toLowerCase()}. Prepare-se para descobrir o que ninguém te contou.`,
+    `Tudo começou quando cientistas perceberam que ${prompt.toLowerCase()} escondia segredos que mudariam nossa visão de mundo. Vamos voltar no tempo para entender o porquê.`,
+    `Com evidências impressionantes e relatos exclusivos, mergulhamos no coração do tema. Cada detalhe revela uma nova camada desta história.`,
+    `E então, a grande revelação: o que parecia impossível se torna claro. ${prompt} nunca mais será visto da mesma forma.`,
+    `Se você gostou, deixe seu like e comente o que achou. Esta foi mais uma produção DubAI PRO — onde sua ideia vira cinema.`
+  ];
+  const scenes = titles.map((t, i) => ({
+    i: i + 1,
+    title: t,
+    narration: narrations[i],
+    visual: `${style} — cena ${i + 1} sobre ${prompt}, cinematográfica, alta qualidade, sem texto`,
+    start: Math.round(i * per),
+    end: Math.round((i + 1) * per)
+  }));
+  return {
+    script: m.script,
+    scenes,
+    seo: {
+      title: `${prompt.slice(0, 70)} | DubAI PRO`,
+      description: `Neste vídeo exploramos ${prompt}. Roteiro, imagens e narração gerados com IA pelo DubAI PRO.\n\n#ia #inteligenciaartificial #youtube`,
+      tags: prompt.split(/\s+/).slice(0, 6).join(', ') + ', ia, inteligência artificial, youtube'
+    },
+    meta: m.meta
+  };
+}
+
+async function generateCreateFull({ prompt, duration, style, voice }) {
+  if (!process.env.OPENAI_API_KEY) return null;
+  try {
+    const OpenAI = require('openai');
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const dur = parseInt(duration) || 10;
+    const nScenes = Math.max(5, Math.min(10, Math.round(dur / 1.5)));
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: 'Você é roteirista e diretor de vídeos para YouTube. Responda APENAS JSON válido neste formato: {"script":"roteiro completo em markdown","scenes":[{"title":"título da cena","narration":"texto falado da cena","visual":"descrição visual detalhada para gerar uma imagem da cena"}],"seo":{"title":"título para YouTube (até 70 caracteres)","description":"descrição com hashtags","tags":"tag1, tag2, tag3"}}. O array scenes deve ter exatamente o número de cenas pedido. As narrações somadas devem ter a quantidade de palavras indicada.' },
+        { role: 'user', content: `Crie o roteiro de um vídeo de ${dur} minutos sobre: "${prompt}".\nEstilo visual: ${style}\nNúmero de cenas: ${nScenes} (uma imagem será gerada por cena).\nNarração total: ~${dur * 130} palavras (${Math.round(dur * 130 / nScenes)} palavras por cena).\nIdioma: português brasileiro.` }
+      ],
+      temperature: 0.8,
+      max_tokens: 8000
+    });
+
+    const parsed = JSON.parse(completion.choices[0].message.content);
+    if (!Array.isArray(parsed.scenes) || !parsed.scenes.length) return null;
+
+    const per = (dur * 60) / parsed.scenes.length;
+    parsed.scenes = parsed.scenes.map((s, idx) => ({
+      i: idx + 1,
+      title: String(s.title || `Cena ${idx + 1}`),
+      narration: String(s.narration || ''),
+      visual: String(s.visual || s.title || prompt),
+      start: Math.round(idx * per),
+      end: Math.round((idx + 1) * per)
+    }));
+    parsed.script = String(parsed.script || parsed.scenes.map(s => `**CENA ${s.i} — ${s.title}**\n${s.narration}`).join('\n\n'));
+    parsed.seo = parsed.seo || {};
+    return parsed;
+  } catch (e) {
+    console.error('OpenAI create error:', e.message);
+    return null;
+  }
+}
+
+async function generateSceneImage({ prompt, style }) {
+  if (!process.env.OPENAI_API_KEY) return null;
+  const OpenAI = require('openai');
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const fullPrompt = `${style || 'cinematográfico'}, ${prompt}, 16:9 video scene, high quality, detailed, no text, no watermark, no captions`;
+  const attempts = [
+    { model: 'gpt-image-1', size: '1536x1024', quality: 'medium', n: 1, output_format: 'jpeg' },
+    { model: 'gpt-image-1', size: '1536x1024', quality: 'medium', n: 1 },
+    { model: 'dall-e-3', size: '1792x1024', quality: 'standard', n: 1, response_format: 'b64_json' }
+  ];
+  for (const opts of attempts) {
+    try {
+      const img = await openai.images.generate({ prompt: fullPrompt, ...opts });
+      const b64 = img.data[0].b64_json;
+      if (!b64) continue;
+      const mime = opts.output_format === 'jpeg' ? 'image/jpeg' : 'image/png';
+      return { imageBase64: b64, mime, model: opts.model };
+    } catch (e) {
+      console.error(`Image error (${opts.model}):`, e.message);
+    }
+  }
+  return null;
+}
+
 async function generateWithOpenAI(prompt, duration, style, voice) {
   if (!process.env.OPENAI_API_KEY) return null;
   try {
@@ -201,19 +299,17 @@ app.post('/api/create', async (req, res) => {
   }
 
   // Try OpenAI first, fallback to mock
-  let scriptText = null;
-  let scriptMeta = null;
+  let data = null;
   let mode = 'mock';
 
-  const openaiScript = await generateWithOpenAI(prompt, duration, style, voice);
-  if (openaiScript) {
-    scriptText = openaiScript;
+  data = await generateCreateFull({ prompt, duration, style, voice });
+  if (data) {
     mode = 'openai';
   } else {
-    const mocked = mockScript({ prompt, duration, style, voice });
-    scriptText = mocked.script;
-    scriptMeta = mocked.meta;
+    data = mockCreateFull({ prompt, duration, style, voice });
   }
+  const scriptText = data.script;
+  const scriptMeta = data.meta || null;
 
   const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const project = {
@@ -225,6 +321,8 @@ app.post('/api/create', async (req, res) => {
     style: style || 'realistic',
     voice: voice || 'onyx',
     script: scriptText,
+    scenes: data.scenes,
+    seo: data.seo,
     meta: scriptMeta,
     mode,
     status: 'roteiro_pronto',
@@ -238,14 +336,36 @@ app.post('/api/create', async (req, res) => {
   res.json({
     id: project.id,
     script: project.script,
+    scenes: data.scenes,
+    seo: data.seo,
     project,
-    message: mode === 'openai' ? 'Roteiro gerado com GPT-4o' : 'Roteiro MOCK gerado localmente (defina OPENAI_API_KEY para IA real)'
+    message: mode === 'openai' ? 'Roteiro + cenas + SEO gerados com GPT-4o' : 'Roteiro MOCK gerado localmente (defina OPENAI_API_KEY para IA real)'
   });
+});
+
+app.post('/api/scene-image', async (req, res) => {
+  try {
+    const { prompt, style } = req.body || {};
+    if (!prompt || !prompt.trim()) {
+      return res.status(400).json({ error: 'Descreva a cena.' });
+    }
+    if (!process.env.OPENAI_API_KEY) {
+      return res.json({ imageBase64: null, mock: true, message: 'Sem OPENAI_API_KEY: imagem placeholder será usada.' });
+    }
+    const img = await generateSceneImage({ prompt, style });
+    if (!img) {
+      return res.json({ imageBase64: null, mock: true, message: 'Geração de imagem falhou — placeholder será usado.' });
+    }
+    res.json({ imageBase64: img.imageBase64, mime: img.mime, model: img.model });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Erro ao gerar imagem: ' + e.message });
+  }
 });
 
 app.post('/api/dub', async (req, res) => {
   try {
-    const { fileName, fileSize, language = '', dubVoice = 'onyx', audioBase64 } = req.body || {};
+    const { fileName, fileSize, language = '', dubVoice = 'onyx', targetLanguage = 'pt-BR', audioBase64 } = req.body || {};
     if (!fileName) {
       return res.status(400).json({ error: 'Selecione um vídeo.' });
     }
@@ -255,7 +375,7 @@ app.post('/api/dub', async (req, res) => {
       if (!process.env.OPENAI_API_KEY) {
         return res.status(400).json({ error: 'Configure OPENAI_API_KEY no servidor para dublagem real.' });
       }
-      result = await dubWithOpenAI({ audioBase64, language, dubVoice });
+      result = await dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage });
       if (!result) {
         return res.status(502).json({ error: 'Falha ao dublar com a OpenAI (transcrição/tradução/voz). Tente com um arquivo menor ou tente novamente.' });
       }
@@ -313,7 +433,7 @@ app.post('/api/tts', async (req, res) => {
   try {
     const OpenAI = require('openai');
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const voiceMap = { onyx: 'onyx', nova: 'nova', alloy: 'alloy', echo: 'echo', fable: 'fable', shimmer: 'shimmer' };
+    const voiceMap = TTS_VOICES;
     const mp3 = await openai.audio.speech.create({
       model: 'tts-1',
       voice: voiceMap[voice] || 'onyx',
