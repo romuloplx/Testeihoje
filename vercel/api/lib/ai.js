@@ -183,9 +183,11 @@ async function generateSceneImage({ prompt, style }) {
       }
     }
   } else errors.push('openai: sem OPENAI_API_KEY');
-  // Unorouter images (se a rota suportar)
+  // Unorouter images (modelos de imagem DO CATÁLOGO da rota, senão nomes OpenAI)
   if (process.env.UNOROUTER_API_KEY) {
-    for (const model of ['dall-e-3', 'gpt-image-1']) {
+    const ids = await unorouterModels();
+    const imgList = [...uniImageModels(ids), 'dall-e-3', 'gpt-image-1'].slice(0, 4);
+    for (const model of imgList) {
       try {
         const r = await fetch(uniBase() + '/images/generations', {
           method: 'POST', headers: uniHeaders(),
@@ -195,7 +197,16 @@ async function generateSceneImage({ prompt, style }) {
         if (r.ok) {
           const j = await r.json();
           const b64 = j && j.data && j.data[0] && j.data[0].b64_json;
+          const url = j && j.data && j.data[0] && j.data[0].url;
           if (b64) return { imageBase64: b64, mime: 'image/png', model: 'unorouter/' + model };
+          if (url) {
+            const fr = await fetch(url, { signal: AbortSignal.timeout(30000) });
+            if (fr.ok) {
+              const buf = Buffer.from(await fr.arrayBuffer());
+              if (buf.length > 100) return { imageBase64: buf.toString('base64'), mime: fr.headers.get('content-type') || 'image/png', model: 'unorouter/' + model };
+            }
+          }
+          errors.push(`unorouter/${model}: resposta sem imagem`);
         } else errors.push(`unorouter/${model}: HTTP ${r.status}`);
       } catch (e) { errors.push(`unorouter/${model}: ${e.message}`); }
     }
@@ -486,34 +497,42 @@ async function unorouterProbe() {
     let ids = [];
     try { ids = (JSON.parse(body).data || []).map(m => m.id).filter(Boolean); } catch (_) {}
     out.models = { ok: r.ok && ids.length > 0, status: r.status, count: ids.length, sample: ids.slice(0, 8), body: r.ok ? undefined : body.slice(0, 160) };
+    out.detected = { chat: uniPickModels(ids).slice(0, 5), image: uniImageModels(ids), tts: uniTtsModels(ids) };
     out.modelList = ids;
   } catch (e) { out.models = { ok: false, error: e.message }; }
   try {
-    const model = (out.modelList || [])[0] || 'gpt-4o-mini';
+    const model = uniPickModels(out.modelList || [])[0] || 'gpt-4o-mini';
     delete out.modelList;
     const t = await unorouterChat({ user: 'responda apenas: ok', model, maxTokens: 20 });
     out.chat = { ok: true, model, reply: t.slice(0, 20) };
   } catch (e) { delete out.modelList; out.chat = { ok: false, error: e.message }; }
   try {
-    const r = await fetch(uniBase() + '/audio/speech', {
-      method: 'POST', headers: uniHeaders(),
-      body: JSON.stringify({ model: 'gpt-4o-mini-tts', voice: 'alloy', input: 'olá', response_format: 'mp3' }),
-      signal: AbortSignal.timeout(15000)
-    });
-    out.tts = { ok: r.ok, status: r.status, bytes: r.ok ? (await r.arrayBuffer()).byteLength : (await r.text()).slice(0, 120) };
+    const ttsIds = (out.detected && out.detected.tts) || [];
+    if (!ttsIds.length) out.tts = { ok: false, status: 0, error: 'sem modelo de fala no catálogo do router' };
+    else {
+      const r = await fetch(uniBase() + '/audio/speech', {
+        method: 'POST', headers: uniHeaders(),
+        body: JSON.stringify({ model: ttsIds[0], voice: 'alloy', input: 'olá', response_format: 'mp3' }),
+        signal: AbortSignal.timeout(15000)
+      });
+      out.tts = { ok: r.ok, status: r.status, model: ttsIds[0], bytes: r.ok ? (await r.arrayBuffer()).byteLength : (await r.text()).slice(0, 120) };
+    }
   } catch (e) { out.tts = { ok: false, error: e.message }; }
   try {
+    const imgIds = (out.detected && out.detected.image) || [];
+    const model = imgIds[0] || 'dall-e-3';
     const r = await fetch(uniBase() + '/images/generations', {
       method: 'POST', headers: uniHeaders(),
-      body: JSON.stringify({ model: 'dall-e-3', prompt: 'gato laranja', n: 1, size: '256x256' }),
-      signal: AbortSignal.timeout(15000)
+      body: JSON.stringify({ model, prompt: 'gato laranja', n: 1, size: '256x256' }),
+      signal: AbortSignal.timeout(30000)
     });
-    out.image = { ok: r.ok, status: r.status, info: r.ok ? 'suportado' : (await r.text()).slice(0, 120) };
+    out.image = { ok: r.ok, status: r.status, model, info: r.ok ? 'suportado' : (await r.text()).slice(0, 120) };
   } catch (e) { out.image = { ok: false, error: e.message }; }
   return out;
 }
 
 let _uniModels = null;
+let _uniCursor = 0;
 async function unorouterModels() {
   if (_uniModels) return _uniModels;
   _uniModels = [];
@@ -545,14 +564,30 @@ async function unorouterChat({ system, user, json, model = 'gpt-4o-mini', maxTok
     r = await call(body);
   }
   if (!r.ok && r.status === 429) {
-    await new Promise(s => setTimeout(s, 4000)); // limite de uso: espera e tenta 1x
-    r = await call(body);
+    // limite do tier grátis é por modelo (1 req/min): não adianta repetir já — pula pro próximo
+    throw Object.assign(new Error('HTTP 429 (limite de uso do router)'), { status: 429 });
   }
   if (!r.ok) throw Object.assign(new Error('HTTP ' + r.status + ' ' + (await r.text().catch(() => '')).slice(0, 120)), { status: r.status });
   const j = await r.json();
   const text = j && j.choices && j.choices[0] && j.choices[0].message ? String(j.choices[0].message.content || '').trim() : '';
   if (!text) throw new Error('resposta vazia');
   return text;
+}
+
+// Escolhe modelos de CHAT do catálogo (muitos modelos são de imagem/difusão)
+function uniPickModels(ids) {
+  const bad = /xl|sdxl|diffusion|stable|flux|dall|image|img2img|albedo|anything|ampony|absolutereality|realisticvision|dreamshaper|midjourney|kandinsky|cogview|playground|kling|sora|lcm|inpaint|controlnet|lora|vae|upscal|esrgan|gfpgan|face|restore/i;
+  const chat = ids.filter(id => !bad.test(id));
+  const prefer = chat.filter(id => /chat|instruct|gpt|llama|deepseek|qwen|mistral|gemini|claude|kimi|phi|command|grok|nova|sonnet|flash|thinking|reason|turbo|hermes|nous/i.test(id));
+  const out = [];
+  for (const id of [...prefer, ...chat]) { if (!out.includes(id)) out.push(id); if (out.length >= 5) break; }
+  return out.length ? out : ['gpt-4o-mini'];
+}
+function uniImageModels(ids) {
+  return ids.filter(id => /xl|sdxl|diffusion|stable|flux|dall|image|albedo|anything|ampony|dreamshaper|kandinsky|cogview|playground|realistic/i.test(id)).slice(0, 3);
+}
+function uniTtsModels(ids) {
+  return ids.filter(id => /tts|speech|voice|audio|bark|kokoro|orpheus/i.test(id)).slice(0, 3);
 }
 
 // Repete a cadeia em caso de falha (provedores gratuitos limitam rajadas)
@@ -637,11 +672,14 @@ async function chatWithFallback({ system, user, json = false, maxTokens = 8000 }
       }
     }
   } else errors.push('openai: sem OPENAI_API_KEY');
-  // Unorouter (rota de modelos do usuário) — tenta os modelos disponíveis
+  // Unorouter (rota de modelos do usuário) — modelos de chat descobertos, ROTACIONANDO
+  // (o tier grátis do router limita 1 req/min por modelo; girar evita colisão)
   if (process.env.UNOROUTER_API_KEY) {
     const models = await unorouterModels();
-    const list = (models.length ? models.slice(0, 3) : ['gpt-4o-mini']);
-    for (const model of list) {
+    const list = uniPickModels(models);
+    const start = (_uniCursor++) % list.length;
+    const rotated = [...list.slice(start), ...list.slice(0, start)];
+    for (const model of rotated) {
       try {
         const text = await unorouterChat({ system, user, json, model, maxTokens });
         return { text, provider: 'unorouter/' + model };
@@ -719,19 +757,25 @@ async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR' }) {
       }
     }
   } else errors.push('openai: sem OPENAI_API_KEY');
-  // Unorouter TTS (se a rota suportar)
+  // Unorouter TTS (só se o catálogo tiver modelos de fala)
   if (process.env.UNOROUTER_API_KEY) {
-    try {
-      const r = await fetch(uniBase() + '/audio/speech', {
-        method: 'POST', headers: uniHeaders(),
-        body: JSON.stringify({ model: 'tts-1', voice: TTS_VOICES[voice] || 'onyx', input: String(text).slice(0, 4096), response_format: 'mp3' }),
-        signal: AbortSignal.timeout(30000)
-      });
-      if (r.ok) {
-        const b = Buffer.from(await r.arrayBuffer());
-        if (b.length > 500) return { buffer: b, provider: 'unorouter/tts' };
-      } else errors.push('unorouter/tts: HTTP ' + r.status);
-    } catch (e) { errors.push('unorouter/tts: ' + e.message); }
+    const ttsIds = uniTtsModels(await unorouterModels());
+    if (!ttsIds.length) {
+      errors.push('unorouter/tts: sem modelo de fala no catálogo do router');
+    }
+    for (const model of [...ttsIds, 'tts-1'].slice(0, 2)) {
+      try {
+        const r = await fetch(uniBase() + '/audio/speech', {
+          method: 'POST', headers: uniHeaders(),
+          body: JSON.stringify({ model, voice: TTS_VOICES[voice] || 'onyx', input: String(text).slice(0, 4096), response_format: 'mp3' }),
+          signal: AbortSignal.timeout(30000)
+        });
+        if (r.ok) {
+          const b = Buffer.from(await r.arrayBuffer());
+          if (b.length > 500) return { buffer: b, provider: 'unorouter/' + model };
+        } else errors.push(`unorouter/${model}: HTTP ${r.status}`);
+      } catch (e) { errors.push(`unorouter/${model}: ${e.message}`); }
+    }
   }
   try {
     const b = await ttsGoogle({ text, lang: TTS_LANGS[lang] || 'pt-BR' });
