@@ -7,9 +7,10 @@ module.exports = async (req, res) => {
   if (out.error) {
     return send(res, 502, { error: 'Voz falhou em todos os provedores: ' + out.error, fallback: 'browser' });
   }
+  const isWav = out.buffer && out.buffer.length >= 4 && out.buffer.subarray(0, 4).toString('ascii') === 'RIFF';
   res.statusCode = 200;
-  res.setHeader('Content-Type', 'audio/mpeg');
+  res.setHeader('Content-Type', isWav ? 'audio/wav' : 'audio/mpeg');
   res.setHeader('X-Audio-Provider', out.provider);
-  res.setHeader('Content-Disposition', 'inline; filename="narracao.mp3"');
+  res.setHeader('Content-Disposition', isWav ? 'inline; filename="narracao.wav"' : 'inline; filename="narracao.mp3"');
   res.end(out.buffer);
 };

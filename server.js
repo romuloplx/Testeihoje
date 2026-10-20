@@ -269,7 +269,8 @@ async function generateWithOpenAI(prompt, duration, style, voice) {
 // --- API Routes ---
 
 app.get('/api/health', async (req, res) => {
-  const out = { ok: true, mode: process.env.OPENAI_API_KEY ? 'openai' : 'mock', projects: projects.length, uptime: process.uptime() };
+  const hasAiKey = !!(process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY || process.env.UNOROUTER_API_KEY);
+  const out = { ok: true, mode: hasAiKey ? 'openai' : 'mock', projects: projects.length, uptime: process.uptime() };
   const check = String(req.query.check || '');
   if (check === '1' || check === '2' || check === '3' || check === '5' || check === '6') {
     const shared = require('./vercel/api/lib/ai');
@@ -366,9 +367,6 @@ app.post('/api/scene-image', async (req, res) => {
     if (!prompt || !prompt.trim()) {
       return res.status(400).json({ error: 'Descreva a cena.' });
     }
-    if (!process.env.OPENAI_API_KEY) {
-      return res.json({ imageBase64: null, mock: true, message: 'Sem OPENAI_API_KEY: imagem placeholder será usada.' });
-    }
     const img = await require('./vercel/api/lib/ai').generateSceneImage({ prompt, style });
     if (!img || !img.imageBase64) {
       return res.json({ imageBase64: null, mock: true, error: img && img.error, message: 'Geração de imagem falhou' + (img && img.error ? ` (${img.error})` : '') + ' — placeholder será usado.' });
@@ -382,19 +380,16 @@ app.post('/api/scene-image', async (req, res) => {
 
 app.post('/api/dub', async (req, res) => {
   try {
-    const { fileName, fileSize, language = '', dubVoice = 'onyx', targetLanguage = 'pt-BR', audioBase64 } = req.body || {};
+    const { fileName, fileSize, language = '', dubVoice = 'onyx', targetLanguage = 'pt-BR', audioBase64, transcription } = req.body || {};
     if (!fileName) {
       return res.status(400).json({ error: 'Selecione um vídeo.' });
     }
 
     let result = null;
     if (audioBase64) {
-      if (!process.env.OPENAI_API_KEY) {
-        return res.status(400).json({ error: 'Configure OPENAI_API_KEY no servidor para dublagem real.' });
-      }
-      result = await require('./vercel/api/lib/ai').dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage });
+      result = await require('./vercel/api/lib/ai').dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage, transcription });
       if (!result || result.error) {
-        return res.status(502).json({ error: 'Falha ao dublar com a OpenAI' + (result && result.error ? `: ${result.error}` : ' (transcrição/tradução/voz)') + '. Tente com um arquivo menor ou tente novamente.' });
+        return res.status(502).json({ error: 'Falha na dublagem' + (result && result.error ? `: ${result.error}` : ' (transcrição/tradução/voz)') + '. Tente novamente em instantes.' });
       }
     }
     const mock = result ? null : mockDubResult({ originalName: fileName, language, dubVoice });
@@ -455,10 +450,11 @@ app.post('/api/tts', async (req, res) => {
     if (out.error) {
       return res.status(502).json({ error: 'Voz falhou em todos os provedores: ' + out.error, fallback: 'browser' });
     }
+    const isWav = out.buffer && out.buffer.length >= 4 && out.buffer.subarray(0, 4).toString('ascii') === 'RIFF';
     res.set({
-      'Content-Type': 'audio/mpeg',
+      'Content-Type': isWav ? 'audio/wav' : 'audio/mpeg',
       'X-Audio-Provider': out.provider,
-      'Content-Disposition': 'inline; filename="narracao.mp3"',
+      'Content-Disposition': isWav ? 'inline; filename="narracao.wav"' : 'inline; filename="narracao.mp3"',
       'Content-Length': out.buffer.length
     });
     res.send(out.buffer);

@@ -1,8 +1,9 @@
 const { send, probeOpenAI, fullPipelineProbe, candidatesProbe, unorouterProbe, unorouterVideoProbe } = require('./lib/ai');
 module.exports = async (req, res) => {
+  const hasAiKey = !!(process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY || process.env.UNOROUTER_API_KEY);
   const out = {
     ok: true,
-    mode: process.env.OPENAI_API_KEY ? 'openai' : 'mock',
+    mode: hasAiKey ? 'openai' : 'mock',
     projects: 'browser-localstorage',
     uptime: process.uptime()
   };
