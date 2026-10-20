@@ -122,21 +122,32 @@ async function generateCreateFull({ prompt, duration, style, voice }) {
   const scenesPlan = outline.scenes.slice(0, nScenes);
   const providers = new Set([res.provider]);
 
-  // Fase 2: narrações em lotes de 3 em paralelo (rápido e sem estourar limites)
+  // Fase 2: narrações em lotes de 2 (menos colisão de limite) com retries profundos
   const narrations = new Array(scenesPlan.length).fill('');
   let fatal = null;
-  for (let i = 0; i < scenesPlan.length && !fatal; i += 3) {
-    const batch = scenesPlan.slice(i, i + 3);
-    const results = await Promise.all(batch.map((s, j) => {
+  for (let i = 0; i < scenesPlan.length && !fatal; i += 2) {
+    const batch = scenesPlan.slice(i, i + 2);
+    const results = await Promise.all(batch.map(async (s, j) => {
       const idx = i + j;
+      if (j > 0) await new Promise(r => setTimeout(r, 1200)); // desloca o lote
       return withRetries(() => chatWithFallback({
         system: 'Você é narrador profissional de vídeos. Escreva APENAS o texto da narração, sem título, sem aspas, sem comentários.',
         user: `Vídeo sobre: "${prompt}". Cena ${idx + 1} de ${scenesPlan.length}: "${s.title}" (${s.visual || ''}). Escreva a narração desta cena em português brasileiro, com aproximadamente ${wordsPerScene} palavras, em tom envolvente.`
-      }), 2);
+      }), 3);
     }));
     for (let j = 0; j < results.length; j++) {
       const r = results[j];
-      if (r.error) { if (!fatal) fatal = `Narração da cena ${i + j + 1} falhou: ${r.error}`; continue; }
+      if (r.error) {
+        // segunda chance individual, depois do lote, com prompt mais curto
+        const retry = await withRetries(() => chatWithFallback({
+          system: 'Escreva APENAS a narração da cena, sem comentários.',
+          user: `Narre em português (~${Math.round(wordsPerScene * 0.7)} palavras) a cena "${scenesPlan[i + j].title}" do vídeo sobre "${prompt}".`
+        }), 2);
+        if (retry.error) { if (!fatal) fatal = `Narração da cena ${i + j + 1} falhou: ${retry.error}`; continue; }
+        providers.add(retry.provider);
+        narrations[i + j] = (retry.text || '').trim().replace(/^["'\s]+|["'\s]+$/g, '');
+        continue;
+      }
       providers.add(r.provider);
       narrations[i + j] = (r.text || '').trim().replace(/^["'\s]+|["'\s]+$/g, '');
     }
@@ -264,26 +275,41 @@ async function dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage =
       whisperErr = 'openai: ' + e.message;
     }
     if (!originalText && process.env.UNOROUTER_API_KEY) {
-      // Whisper do catálogo do router (grátis) → whisper-1 como último recurso
-      for (const model of ['whisper-large-v3-turbo:free', 'whisper:free', 'whisper-large-v3:free', 'whisper-1']) {
-        if (originalText) break;
-        try {
-          const fd = new FormData();
-          fd.append('file', new Blob([audioBuf], { type: 'audio/wav' }), 'audio.wav');
-          fd.append('model', model);
-          if (language) fd.append('language', language);
-          const r = await fetch(uniBase() + '/audio/transcriptions', {
-            method: 'POST',
-            headers: { Authorization: uniHeaders().Authorization },
-            body: fd,
-            signal: AbortSignal.timeout(120000)
-          });
-          if (r.ok) {
-            const j = await r.json();
-            originalText = (j.text || '').trim();
-            if (originalText) whisperInfo = 'unorouter/' + model;
-          } else whisperErr += ` | unorouter/${model}: HTTP ${r.status} ${(await r.text().catch(() => '')).slice(0, 80)}`;
-        } catch (e) { whisperErr += ` | unorouter/${model}: ${e.message}`; }
+      // Whisper do catálogo do router — TODOS os modelos de transcrição, com retentativa.
+      // A regra é intercala: se um modelo está limitado, o outro faz a mesma função.
+      const ids = await unorouterModels();
+      const cat = ids.filter(id => /whisper/i.test(id));
+      const rank = (id) => (id.includes('turbo') ? 0 : id.includes(':free') ? 1 : id.includes('large') ? 2 : 3);
+      cat.sort((a, b) => rank(a) - rank(b));
+      const tries = [...new Set([...cat.slice(0, 5), 'whisper-large-v3-turbo:free', 'whisper-1'])];
+      for (let pass = 0; pass < 2 && !originalText; pass++) {
+        for (const model of tries) {
+          if (originalText) break;
+          try {
+            const fd = new FormData();
+            fd.append('file', new Blob([audioBuf], { type: 'audio/wav' }), 'audio.wav');
+            fd.append('model', model);
+            if (language) fd.append('language', language);
+            const r = await fetch(uniBase() + '/audio/transcriptions', {
+              method: 'POST',
+              headers: { Authorization: uniHeaders().Authorization },
+              body: fd,
+              signal: AbortSignal.timeout(60000)
+            });
+            if (r.ok) {
+              const j = await r.json();
+              originalText = (j.text || '').trim();
+              if (originalText) whisperInfo = 'unorouter/' + model;
+            } else {
+              whisperErr += ` | unorouter/${model}: HTTP ${r.status} ${(await r.text().catch(() => '')).slice(0, 80)}`;
+              if (r.status === 429) await sleep(2500); // cota: respira antes do próximo
+            }
+          } catch (e) {
+            whisperErr += ` | unorouter/${model}: ${e.message}`;
+            await sleep(1500);
+          }
+        }
+        if (!originalText) await sleep(4000); // 2ª rodada: cotas curtas podem ter liberado
       }
     }
     if (!originalText) throw new Error('Não foi possível transcrever o áudio. ' + whisperErr);
@@ -673,7 +699,7 @@ async function withRetries(fn, times = 2) {
   for (let i = 0; i < times; i++) {
     last = await fn();
     if (!last.error) return last;
-    if (i < times - 1) await sleep(2500);
+    if (i < times - 1) await sleep(3500 + i * 2500); // 3.5s, 6s... — cotas curtas liberam
   }
   return last;
 }
@@ -690,22 +716,25 @@ function extractJson(text) {
 async function chatViaPollinations({ system, user, json }) {
   const prompt = (system ? system + '\n\n' : '') + user + (json ? '\n\nResponda APENAS JSON válido, sem comentários nem markdown.' : '');
   let lastErr = new Error('pollinations indisponível');
-  // POST (OpenAI-compatible) — suporta prompts longos
-  for (let tent = 0; tent < 3; tent++) {
-    try {
-      const r = await fetch('https://text.pollinations.ai/openai', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'openai', messages: [{ role: 'user', content: prompt }] }),
-        signal: AbortSignal.timeout(45000)
-      });
-      if (r.status === 429) { lastErr = new Error('HTTP 429 (limite de uso)'); await sleep(3000); continue; }
-      if (!r.ok) { lastErr = new Error('HTTP ' + r.status); break; }
-      const j = await r.json().catch(() => null);
-      const text = j && j.choices && j.choices[0] && j.choices[0].message ? String(j.choices[0].message.content || '').trim() : '';
-      if (!text) { lastErr = new Error('resposta vazia'); continue; }
-      return text;
-    } catch (e) { lastErr = e; await sleep(1500); }
+  // POST (OpenAI-compatible) — vários modelos do próprio Pollinations (se um limita, outro faz)
+  const polModels = ['openai', 'mistral', 'llama'];
+  for (let pass = 0; pass < 2; pass++) {
+    for (const model of polModels) {
+      try {
+        const r = await fetch('https://text.pollinations.ai/openai', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }] }),
+          signal: AbortSignal.timeout(45000)
+        });
+        if (r.status === 429) { lastErr = new Error('HTTP 429 (limite de uso)'); await sleep(2500); continue; }
+        if (!r.ok) { lastErr = new Error('HTTP ' + r.status); continue; }
+        const j = await r.json().catch(() => null);
+        const text = j && j.choices && j.choices[0] && j.choices[0].message ? String(j.choices[0].message.content || '').trim() : '';
+        if (!text) { lastErr = new Error('resposta vazia'); continue; }
+        return text;
+      } catch (e) { lastErr = e; await sleep(1500); }
+    }
   }
   // GET (só para prompts curtos)
   const short = prompt.slice(0, 900);
@@ -749,15 +778,18 @@ async function chatWithFallback({ system, user, json = false, maxTokens = 8000 }
       }
     }
   } else errors.push('openai: sem OPENAI_API_KEY');
-  // Unorouter (rota de modelos do usuário) — modelos de chat descobertos, ROTACIONANDO
-  // (o tier grátis do router limita 1 req/min por conta/modelo; cooldown evita rajadas inúteis)
-  if (process.env.UNOROUTER_API_KEY && Date.now() > _uniCooldownUntil) {
+  // Unorouter (rota de modelos do usuário) — modelos de chat descobertos, ROTACIONANDO.
+  // Regra "intercala": SEMPRE dá uma chance ao router — mesmo em pausa de cota,
+  // testa 1 modelo; se responder, a pausa termina na hora.
+  if (process.env.UNOROUTER_API_KEY) {
     const models = await unorouterModels();
     const list = uniPickModels(models);
     const start = (_uniCursor++) % list.length;
     const rotated = [...list.slice(start), ...list.slice(0, start)];
+    const inCooldown = Date.now() < _uniCooldownUntil;
+    const tries = inCooldown ? rotated.slice(0, 1) : rotated; // em pausa: 1 tentativa só
     let sawQuota = false;
-    for (const model of rotated) {
+    for (const model of tries) {
       try {
         const text = await unorouterChat({ system, user, json, model, maxTokens });
         _uniCooldownUntil = 0;
@@ -768,9 +800,7 @@ async function chatWithFallback({ system, user, json = false, maxTokens = 8000 }
         if (e.status === 429) sawQuota = true; // cota: tenta o próximo modelo
       }
     }
-    if (sawQuota) _uniCooldownUntil = Date.now() + 65000; // cota apertada: não insiste por 1 min
-  } else if (process.env.UNOROUTER_API_KEY) {
-    errors.push('unorouter: em pausa de cota (libera em instantes)');
+    if (sawQuota && !inCooldown) _uniCooldownUntil = Date.now() + 45000; // cota apertada: reduz insistência por 45s
   } else errors.push('unorouter: sem UNOROUTER_API_KEY');
   try {
     const text = await chatViaPollinations({ system, user, json });
@@ -846,18 +876,24 @@ async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR' }) {
     if (!ttsIds.length) {
       errors.push('unorouter/tts: sem modelo de fala no catálogo do router');
     }
-    for (const model of [...ttsIds, 'tts-1'].slice(0, 2)) {
-      try {
-        const r = await fetch(uniBase() + '/audio/speech', {
-          method: 'POST', headers: uniHeaders(),
-          body: JSON.stringify({ model, voice: TTS_VOICES[voice] || 'onyx', input: String(text).slice(0, 4096), response_format: 'mp3' }),
-          signal: AbortSignal.timeout(30000)
-        });
-        if (r.ok) {
-          const b = Buffer.from(await r.arrayBuffer());
-          if (b.length > 500) return { buffer: b, provider: 'unorouter/' + model };
-        } else errors.push(`unorouter/${model}: HTTP ${r.status}`);
-      } catch (e) { errors.push(`unorouter/${model}: ${e.message}`); }
+    for (const model of [...ttsIds, 'tts-1'].slice(0, 3)) {
+      for (let tent = 0; tent < 2; tent++) {
+        try {
+          const r = await fetch(uniBase() + '/audio/speech', {
+            method: 'POST', headers: uniHeaders(),
+            body: JSON.stringify({ model, voice: TTS_VOICES[voice] || 'onyx', input: String(text).slice(0, 4096), response_format: 'mp3' }),
+            signal: AbortSignal.timeout(30000)
+          });
+          if (r.ok) {
+            const b = Buffer.from(await r.arrayBuffer());
+            if (b.length > 500) return { buffer: b, provider: 'unorouter/' + model };
+          } else {
+            errors.push(`unorouter/${model}: HTTP ${r.status}`);
+            if (r.status === 429) { await sleep(3000); continue; } // cota: espera e repete
+            break; // erro real do modelo: passa pro próximo
+          }
+        } catch (e) { errors.push(`unorouter/${model}: ${e.message}`); break; }
+      }
     }
   }
   try {

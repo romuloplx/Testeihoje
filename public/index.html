@@ -611,8 +611,8 @@ async function createVideo(){
     toast('✅ Roteiro criado!');
     await loadProjects();
   }catch(error){
-    showStatus('createStatus','❌ '+error.message,'error');
-    toast(error.message,'error');
+    showStatus('createStatus','❌ Todas as IAs da cadeia foram tentadas e nenhuma respondeu nesta rodada — costuma ser limite temporário dos provedores (erros 429 = cota do plano grátis). Tente de novo em ~1 min, é só clicar de novo.\n\nDetalhes técnicos: '+error.message,'error');
+    toast('⏳ Nenhuma IA respondeu agora — tente de novo em instantes','error');
     setProgress('createProgressFill',0);
   }finally{
     btn.disabled=false; btn.textContent='✨ Criar vídeo com IA';
@@ -743,8 +743,8 @@ async function dubVideo(){
     await loadProjects();
   }catch(e){
     const hint=e.message&&e.message.includes('401')?' → A chave OpenAI está inválida: gere uma nova em platform.openai.com/account/api-keys e atualize na Vercel.':'';
-    showStatus('dubStatus','❌ '+e.message+hint,'error');
-    toast(e.message,'error');
+    showStatus('dubStatus','❌ '+e.message+hint+'\n\n💡 A dublagem testou TODAS as IAs da cadeia (OpenAI → Whisper do Unorouter → próxima disponível). Erro 429 = cota do plano grátis — tente de novo em alguns minutos.','error');
+    toast('⏳ A dublagem testou todas as IAs — tente de novo em instantes','error');
     setProgress('dubProgressFill',0);
   }finally{
     btn.disabled=false; btn.textContent='🎙️ Dublar (trocar o áudio do vídeo)';
