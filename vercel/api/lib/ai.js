@@ -133,7 +133,7 @@ async function generateCreateFull({ prompt, duration, style, voice }) {
       return withRetries(() => chatWithFallback({
         system: 'Você é narrador profissional de vídeos. Escreva APENAS o texto da narração, sem título, sem aspas, sem comentários.',
         user: `Vídeo sobre: "${prompt}". Cena ${idx + 1} de ${scenesPlan.length}: "${s.title}" (${s.visual || ''}). Escreva a narração desta cena em português brasileiro, com aproximadamente ${wordsPerScene} palavras, em tom envolvente.`
-      }), 3);
+      }), 2);
     }));
     for (let j = 0; j < results.length; j++) {
       const r = results[j];
@@ -142,7 +142,7 @@ async function generateCreateFull({ prompt, duration, style, voice }) {
         const retry = await withRetries(() => chatWithFallback({
           system: 'Escreva APENAS a narração da cena, sem comentários.',
           user: `Narre em português (~${Math.round(wordsPerScene * 0.7)} palavras) a cena "${scenesPlan[i + j].title}" do vídeo sobre "${prompt}".`
-        }), 2);
+        }), 1);
         if (retry.error) { if (!fatal) fatal = `Narração da cena ${i + j + 1} falhou: ${retry.error}`; continue; }
         providers.add(retry.provider);
         narrations[i + j] = (retry.text || '').trim().replace(/^["'\s]+|["'\s]+$/g, '');
@@ -313,7 +313,7 @@ async function dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage =
               method: 'POST',
               headers: { Authorization: uniHeaders().Authorization },
               body: fd,
-              signal: AbortSignal.timeout(60000)
+              signal: AbortSignal.timeout(30000)
             });
             if (r.ok) {
               const j = await r.json();
@@ -348,7 +348,7 @@ async function dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage =
               ] }],
               max_tokens: 4000
             }),
-            signal: AbortSignal.timeout(90000)
+            signal: AbortSignal.timeout(30000)
           });
           if (r.ok) {
             const j = await r.json();
@@ -363,7 +363,7 @@ async function dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage =
     }
     // Última chance: se tudo foi429 (cota), espera a janela ("retry in 60s") e tenta 1x no melhor modelo
     if (!originalText && /429/.test(whisperErr) && process.env.UNOROUTER_API_KEY) {
-      await sleep(50000);
+      await sleep(30000);
       const ids = await unorouterModels();
       const best = (ids.find(id => /whisper-large-v3-turbo/i.test(id)) || ids.find(id => /whisper/i.test(id)) || 'whisper-large-v3-turbo:free');
       try {
@@ -551,15 +551,15 @@ async function probeOpenAI() {
   // Gemini (Google) — texto + transcrição de áudio
   if (process.env.GEMINI_API_KEY) {
     try {
-      const g = await geminiChat({ user: 'responda apenas: ok', maxTokens: 20, timeout: 15000 });
+      const g = await geminiChat({ user: 'responda apenas: ok', maxTokens: 20, timeout: 10000 });
       report.gemini = g ? { ok: true, model: g.provider, reply: g.text.slice(0, 20) } : { ok: false, error: 'chave rejeitada (401/403)' };
     } catch (e) { report.gemini = { ok: false, error: e.message }; }
     try {
-      const t = await geminiTranscribe(makeTestWav(), '', 15000);
+      const t = await geminiTranscribe(makeTestWav(), '', 10000);
       report.geminiAudio = { ok: true, info: 'endpoint de áudio OK' + (t ? ` (“${String(t).slice(0, 20)}”)` : ' (áudio de teste sem fala)') };
     } catch (e) { report.geminiAudio = { ok: false, error: e.message }; }
     try {
-      const v = await geminiTTS('olá', 'nova', 15000);
+      const v = await geminiTTS('olá', 'nova', 10000);
       report.geminiTts = v && v.buffer ? { ok: true, provider: v.provider, bytes: v.buffer.length } : { ok: false, error: (v && v.error) || 'sem áudio' };
     } catch (e) { report.geminiTts = { ok: false, error: e.message }; }
   } else {
@@ -817,12 +817,12 @@ function gemModel() { return process.env.GEMINI_MODEL || 'gemini-flash-latest'; 
 function gemHeaders() {
   return { 'Content-Type': 'application/json', 'x-goog-api-key': String(process.env.GEMINI_API_KEY || '') };
 }
-async function geminiGenerate({ model, body, timeout = 45000 }) {
+async function geminiGenerate({ model, body, timeout = 20000 }) {
   const call = () => fetch(`${gemBase()}/models/${model}:generateContent`, {
     method: 'POST', headers: gemHeaders(), body: JSON.stringify(body), signal: AbortSignal.timeout(timeout)
   });
   let r = await call();
-  if (r.status === 429) { await sleep(4000); r = await call(); } // cota: espera curta e repete 1x
+  if (r.status === 429) { await sleep(2000); r = await call(); } // cota: espera curta e repete 1x
   const raw = await r.text().catch(() => '');
   if (!r.ok) throw Object.assign(new Error(`HTTP ${r.status} ${raw.slice(0, 220)}`), { status: r.status });
   return JSON.parse(raw || '{}');
@@ -849,7 +849,7 @@ function gemText(j) {
 const GEM_MODEL_CANDIDATES = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
 let _gemBestModel = null;
 let _gemBest = null;
-async function geminiGenerateTried({ body, timeout = 45000, kind = 'chat' }) {
+async function geminiGenerateTried({ body, timeout = 20000, kind = 'chat' }) {
   const discovered = await geminiListModels();
   const usable = discovered.filter(id => {
     if (kind === 'image') return /image/i.test(id);
@@ -865,8 +865,8 @@ async function geminiGenerateTried({ body, timeout = 45000, kind = 'chat' }) {
   // "melhor modelo" guardado POR TIPO (chat não pode herdar um modelo de voz!)
   _gemBest = _gemBest || {};
   const list = kind === 'chat'
-    ? [...new Set([_gemBest[kind], gemModel(), ...ordered].filter(Boolean))]
-    : [...new Set(ordered)];
+    ? [...new Set([_gemBest[kind], gemModel(), ...ordered].filter(Boolean))].slice(0, 3)
+    : [...new Set(ordered)].slice(0, 3);
   const errs = [];
   for (const model of list) {
     try {
@@ -883,7 +883,7 @@ async function geminiGenerateTried({ body, timeout = 45000, kind = 'chat' }) {
   throw new Error(errs.join(' | ') || 'nenhum modelo Gemini respondeu');
 }
 // Texto/JSON (roteiro, tradução, SEO)
-async function geminiChat({ system, user, json, maxTokens = 8000, timeout = 45000 }) {
+async function geminiChat({ system, user, json, maxTokens = 8000, timeout = 20000 }) {
   if (!process.env.GEMINI_API_KEY) return null;
   try {
     const body = {
@@ -902,7 +902,7 @@ async function geminiChat({ system, user, json, maxTokens = 8000, timeout = 4500
   }
 }
 // Transcrição de áudio (multimodal) — mesma função do Whisper
-async function geminiTranscribe(audioBuf, language, timeout = 90000) {
+async function geminiTranscribe(audioBuf, language, timeout = 30000) {
   if (!process.env.GEMINI_API_KEY) return null;
   const body = {
     contents: [{ role: 'user', parts: [
@@ -964,7 +964,7 @@ function pcmToMp3(pcmBuf) {
   } catch (e) { return null; }
 }
 const GEM_TTS_VOICES = { onyx: 'Charon', nova: 'Aoede', alloy: 'Kore', echo: 'Puck', fable: 'Fenrir', shimmer: 'Leda', ash: 'Orus', coral: 'Zephyr', sage: 'Enceladus' };
-async function geminiTTS(text, voice = 'onyx', timeout = 45000) {
+async function geminiTTS(text, voice = 'onyx', timeout = 20000) {
   if (!process.env.GEMINI_API_KEY) return null;
   await _loadLame();
   const voiceName = GEM_TTS_VOICES[voice] || 'Aoede';
@@ -1011,7 +1011,7 @@ async function withRetries(fn, times = 2) {
   for (let i = 0; i < times; i++) {
     last = await fn();
     if (!last.error) return last;
-    if (i < times - 1) await sleep(3500 + i * 2500); // 3.5s, 6s... — cotas curtas liberam
+    if (i < times - 1) await sleep(2500);
   }
   return last;
 }
@@ -1037,9 +1037,9 @@ async function chatViaPollinations({ system, user, json }) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }] }),
-          signal: AbortSignal.timeout(45000)
+          signal: AbortSignal.timeout(25000)
         });
-        if (r.status === 429) { lastErr = new Error('HTTP 429 (limite de uso)'); await sleep(2500); continue; }
+        if (r.status === 429) { lastErr = new Error('HTTP 429 (limite de uso)'); await sleep(2000); continue; }
         if (!r.ok) { lastErr = new Error('HTTP ' + r.status); continue; }
         const j = await r.json().catch(() => null);
         const text = j && j.choices && j.choices[0] && j.choices[0].message ? String(j.choices[0].message.content || '').trim() : '';
@@ -1107,7 +1107,7 @@ async function chatWithFallback({ system, user, json = false, maxTokens = 8000 }
     const start = (_uniCursor++) % list.length;
     const rotated = [...list.slice(start), ...list.slice(0, start)];
     const inCooldown = Date.now() < _uniCooldownUntil;
-    const tries = inCooldown ? rotated.slice(0, 1) : rotated; // em pausa: 1 tentativa só
+    const tries = inCooldown ? rotated.slice(0, 1) : rotated.slice(0, 4); // em pausa: 1 tentativa; senão, 4 modelos
     let sawQuota = false;
     for (const model of tries) {
       try {
@@ -1202,7 +1202,7 @@ async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR' }) {
           const r = await fetch(uniBase() + '/audio/speech', {
             method: 'POST', headers: uniHeaders(),
             body: JSON.stringify({ model, voice: TTS_VOICES[voice] || 'onyx', input: String(text).slice(0, 4096), response_format: 'mp3' }),
-            signal: AbortSignal.timeout(30000)
+            signal: AbortSignal.timeout(15000)
           });
           if (r.ok) {
             const b = Buffer.from(await r.arrayBuffer());
