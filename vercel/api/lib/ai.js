@@ -194,6 +194,14 @@ async function generateSceneImage({ prompt, style }) {
       }
     }
   } else errors.push('openai: sem OPENAI_API_KEY');
+  // Gemini (Google) — imagem da cena
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      const g = await geminiImage(fullPrompt);
+      if (g) return g;
+      errors.push('gemini/image: sem imagem retornada');
+    } catch (e) { errors.push('gemini/image: ' + e.message); }
+  }
   // Unorouter images (modelos de imagem DO CATÁLOGO da rota, senão nomes OpenAI)
   if (process.env.UNOROUTER_API_KEY) {
     const ids = await unorouterModels();
@@ -276,6 +284,14 @@ async function dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage =
       }
     } catch (e) {
       whisperErr = 'openai: ' + e.message;
+    }
+    // Gemini (multimodal) transcreve áudio também — mesma função do Whisper
+    if (!originalText && process.env.GEMINI_API_KEY) {
+      try {
+        const t = await geminiTranscribe(audioBuf, language);
+        if (t) { originalText = t; whisperInfo = 'gemini/' + gemModel(); }
+        else whisperErr += ' | gemini: resposta vazia';
+      } catch (e) { whisperErr += ' | gemini: ' + e.message; }
     }
     if (!originalText && process.env.UNOROUTER_API_KEY) {
       // Whisper do catálogo do router — TODOS os modelos de transcrição, com retentativa.
@@ -532,6 +548,20 @@ async function probeOpenAI() {
   } catch (e) {
     report.sdk = { ok: false, error: e.message };
   }
+  // Gemini (Google) — texto + transcrição de áudio
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      const g = await geminiChat({ user: 'responda apenas: ok', maxTokens: 20 });
+      report.gemini = g ? { ok: true, model: g.provider, reply: g.text.slice(0, 20) } : { ok: false, error: 'chave rejeitada (401/403)' };
+    } catch (e) { report.gemini = { ok: false, error: e.message }; }
+    try {
+      const t = await geminiTranscribe(makeTestWav(), '');
+      report.geminiAudio = { ok: true, info: 'endpoint de áudio OK' + (t ? ` (“${String(t).slice(0, 20)}”)` : ' (áudio de teste sem fala)') };
+    } catch (e) { report.geminiAudio = { ok: false, error: e.message }; }
+  } else {
+    report.gemini = { ok: false, error: 'sem GEMINI_API_KEY' };
+    report.geminiAudio = { ok: false, error: 'sem GEMINI_API_KEY' };
+  }
   // Unorouter (rota do usuário)
   if (process.env.UNOROUTER_API_KEY) {
     try {
@@ -775,6 +805,78 @@ async function unorouterVideoProbe() {
   return out;
 }
 
+// --- Google Gemini (generativelanguage.googleapis.com) — mais uma IA em todas as cadeias ---
+function gemBase() { return (process.env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta'); }
+function gemModel() { return process.env.GEMINI_MODEL || 'gemini-flash-latest'; }
+function gemHeaders() {
+  return { 'Content-Type': 'application/json', 'x-goog-api-key': String(process.env.GEMINI_API_KEY || '') };
+}
+async function geminiGenerate({ model, body, timeout = 45000 }) {
+  const call = () => fetch(`${gemBase()}/models/${model}:generateContent`, {
+    method: 'POST', headers: gemHeaders(), body: JSON.stringify(body), signal: AbortSignal.timeout(timeout)
+  });
+  let r = await call();
+  if (r.status === 429) { await sleep(4000); r = await call(); } // cota: espera curta e repete 1x
+  const raw = await r.text().catch(() => '');
+  if (!r.ok) throw Object.assign(new Error(`HTTP ${r.status} ${raw.slice(0, 140)}`), { status: r.status });
+  return JSON.parse(raw || '{}');
+}
+function gemText(j) {
+  const parts = (j && j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts) || [];
+  return parts.map(p => p.text || '').join('').trim();
+}
+// Texto/JSON (roteiro, tradução, SEO)
+async function geminiChat({ system, user, json, maxTokens = 8000 }) {
+  if (!process.env.GEMINI_API_KEY) return null;
+  try {
+    const body = {
+      contents: [{ role: 'user', parts: [{ text: user }] }],
+      generationConfig: { temperature: 0.8, maxOutputTokens: Math.min(maxTokens || 8000, 8192) }
+    };
+    if (system) body.systemInstruction = { parts: [{ text: system }] };
+    if (json) body.generationConfig.responseMimeType = 'application/json';
+    const j = await geminiGenerate({ model: gemModel(), body });
+    const text = gemText(j);
+    if (!text) throw new Error('resposta vazia');
+    return { text, provider: 'gemini/' + gemModel() };
+  } catch (e) {
+    if (e.status === 401 || e.status === 403) return null; // chave: não adianta insistir
+    throw new Error(`gemini: ${(e.status ? 'HTTP ' + e.status + ' — ' : '')}${e.message}`);
+  }
+}
+// Transcrição de áudio (multimodal) — mesma função do Whisper
+async function geminiTranscribe(audioBuf, language) {
+  if (!process.env.GEMINI_API_KEY) return null;
+  const body = {
+    contents: [{ role: 'user', parts: [
+      { inlineData: { mimeType: 'audio/wav', data: Buffer.from(audioBuf).toString('base64') } },
+      { text: 'Transcreva este áudio. Responda APENAS com o texto falado' + (language ? `, no idioma ${language}` : '') + ', sem comentários.' }
+    ] }],
+    generationConfig: { temperature: 0 }
+  };
+  const j = await geminiGenerate({ model: gemModel(), body, timeout: 90000 });
+  const text = gemText(j);
+  return text || null;
+}
+// Imagem da cena (nano-banana / image generation)
+async function geminiImage(prompt) {
+  if (!process.env.GEMINI_API_KEY) return null;
+  for (const model of ['gemini-2.5-flash-image', 'gemini-2.0-flash-preview-image-generation']) {
+    try {
+      const body = {
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: { responseModalities: ['IMAGE', 'TEXT'] }
+      };
+      const j = await geminiGenerate({ model, body, timeout: 60000 });
+      const parts = (j && j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts) || [];
+      for (const p of parts) {
+        if (p.inlineData && p.inlineData.data) return { imageBase64: p.inlineData.data, mime: p.inlineData.mimeType || 'image/png', model: 'gemini/' + model };
+      }
+    } catch (e) { /* próximo modelo */ }
+  }
+  return null;
+}
+
 // Repete a cadeia em caso de falha (provedores gratuitos limitam rajadas)
 async function withRetries(fn, times = 2) {
   let last = { error: 'sem tentativas' };
@@ -860,6 +962,14 @@ async function chatWithFallback({ system, user, json = false, maxTokens = 8000 }
       }
     }
   } else errors.push('openai: sem OPENAI_API_KEY');
+  // Gemini (Google) — cota generosa e rápido
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      const g = await geminiChat({ system, user, json, maxTokens });
+      if (g) return g;
+      errors.push('gemini: chave rejeitada (401/403)');
+    } catch (e) { errors.push(e.message); }
+  } else errors.push('gemini: sem GEMINI_API_KEY');
   // Unorouter (rota de modelos do usuário) — modelos de chat descobertos, ROTACIONANDO.
   // Regra "intercala": SEMPRE dá uma chance ao router — mesmo em pausa de cota,
   // testa 1 modelo; se responder, a pausa termina na hora.

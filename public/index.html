@@ -834,6 +834,8 @@ async function runDiag(){
     box.innerHTML=
       row(!!(c.models&&c.models.ok),'OpenAI (chave paga)',c.models&&c.models.ok?c.models.count+' modelos':err(c.models))+
       row(!!(c.unorouter&&c.unorouter.ok),'Unorouter (sua API)',c.unorouter&&c.unorouter.ok?((c.unorouter.models||0)+' modelos • '+c.unorouter.model):err(c.unorouter))+
+      row(!!(c.gemini&&c.gemini.ok),'Gemini (Google IA)',c.gemini&&c.gemini.ok?c.gemini.model+' • respondendo':err(c.gemini))+
+      row(!!(c.geminiAudio&&c.geminiAudio.ok),'Gemini transcreve áudio',c.geminiAudio&&c.geminiAudio.ok?c.geminiAudio.info:err(c.geminiAudio))+
       row(!!(c.pollinationsText&&c.pollinationsText.ok),'IA de texto grátis',c.pollinationsText&&c.pollinationsText.ok?'respondendo':err(c.pollinationsText))+
       row(!!(c.pollinationsImage&&c.pollinationsImage.ok),'Imagens grátis',c.pollinationsImage&&c.pollinationsImage.ok?c.pollinationsImage.bytes+' bytes':err(c.pollinationsImage))+
       row(!!(c.googleTts&&c.googleTts.ok),'Voz grátis',c.googleTts&&c.googleTts.ok?c.googleTts.bytes+' bytes de áudio':err(c.googleTts));
