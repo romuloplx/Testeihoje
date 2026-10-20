@@ -824,8 +824,22 @@ async function geminiGenerate({ model, body, timeout = 45000 }) {
   let r = await call();
   if (r.status === 429) { await sleep(4000); r = await call(); } // cota: espera curta e repete 1x
   const raw = await r.text().catch(() => '');
-  if (!r.ok) throw Object.assign(new Error(`HTTP ${r.status} ${raw.slice(0, 140)}`), { status: r.status });
+  if (!r.ok) throw Object.assign(new Error(`HTTP ${r.status} ${raw.slice(0, 220)}`), { status: r.status });
   return JSON.parse(raw || '{}');
+}
+// Descobre os modelos que ESTA chave realmente tem (nomes mudam com o tempo)
+let _gemList = null;
+async function geminiListModels() {
+  if (_gemList) return _gemList;
+  _gemList = [];
+  try {
+    const r = await fetch(`${gemBase()}/models?pageSize=200`, { headers: gemHeaders(), signal: AbortSignal.timeout(12000) });
+    if (r.ok) {
+      const j = await r.json();
+      _gemList = (j.models || []).map(m => String(m.name || '').replace(/^models\//, '')).filter(Boolean);
+    }
+  } catch (e) { /* fica vazio e usa a lista padrão */ }
+  return _gemList;
 }
 function gemText(j) {
   const parts = (j && j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts) || [];
@@ -834,21 +848,33 @@ function gemText(j) {
 // Cada modelo tem cota própria — testa vários e guarda o que responder
 const GEM_MODEL_CANDIDATES = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
 let _gemBestModel = null;
-async function geminiGenerateTried({ body, timeout = 45000 }) {
-  const list = [...new Set([_gemBestModel, gemModel(), ...GEM_MODEL_CANDIDATES].filter(Boolean))];
-  let lastErr = null;
+async function geminiGenerateTried({ body, timeout = 45000, kind = 'chat' }) {
+  const discovered = await geminiListModels();
+  const usable = discovered.filter(id => {
+    if (kind === 'image') return /image/i.test(id);
+    if (kind === 'tts') return /tts/i.test(id);
+    return /^gemini-/i.test(id) && !/image|tts|embedding|aegis|exp/i.test(id);
+  });
+  const prefer = kind === 'image'
+    ? ['gemini-2.5-flash-image', 'gemini-2.0-flash-preview-image-generation']
+    : kind === 'tts'
+      ? ['gemini-2.5-flash-preview-tts', 'gemini-2.5-pro-preview-tts']
+      : GEM_MODEL_CANDIDATES;
+  const ordered = [...prefer.filter(p => !usable.length || usable.includes(p)), ...usable, ...(usable.length ? [] : prefer)];
+  const list = [...new Set([_gemBestModel, gemModel(), ...ordered].filter(Boolean))];
+  const errs = [];
   for (const model of list) {
     try {
       const j = await geminiGenerate({ model, body, timeout });
       _gemBestModel = model;
       return j;
     } catch (e) {
-      lastErr = e;
-      if (e.status === 429 || e.status === 404) continue; // cota/rota do modelo: tenta o próximo
+      errs.push(model + ': ' + (e.status ? 'HTTP ' + e.status : e.message).slice(0, 90));
+      if (e.status === 429 || e.status === 404) continue; // cota/modelo desconhecido: tenta o próximo
       throw e;
     }
   }
-  throw lastErr || new Error('nenhum modelo Gemini respondeu');
+  throw new Error(errs.join(' | ') || 'nenhum modelo Gemini respondeu');
 }
 // Texto/JSON (roteiro, tradução, SEO)
 async function geminiChat({ system, user, json, maxTokens = 8000 }) {
@@ -886,7 +912,10 @@ async function geminiTranscribe(audioBuf, language) {
 // Imagem da cena (nano-banana / image generation)
 async function geminiImage(prompt) {
   if (!process.env.GEMINI_API_KEY) return null;
-  for (const model of ['gemini-2.5-flash-image', 'gemini-2.0-flash-preview-image-generation']) {
+  const discovered = await geminiListModels();
+  const imgIds = discovered.filter(id => /image/i.test(id) && !/understand|caption/i.test(id)).slice(0, 3);
+  const tries = [...new Set([...imgIds, 'gemini-2.5-flash-image', 'gemini-2.0-flash-preview-image-generation'])];
+  for (const model of tries) {
     try {
       const body = {
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
@@ -928,39 +957,28 @@ function pcmToMp3(pcmBuf) {
     return Buffer.concat(chunks);
   } catch (e) { return null; }
 }
-const GEM_TTS_MODELS = ['gemini-2.5-flash-preview-tts', 'gemini-2.5-pro-preview-tts'];
 const GEM_TTS_VOICES = { onyx: 'Charon', nova: 'Aoede', alloy: 'Kore', echo: 'Puck', fable: 'Fenrir', shimmer: 'Leda', ash: 'Orus', coral: 'Zephyr', sage: 'Enceladus' };
 async function geminiTTS(text, voice = 'onyx') {
   if (!process.env.GEMINI_API_KEY) return null;
   await _loadLame();
   const voiceName = GEM_TTS_VOICES[voice] || 'Aoede';
-  const errs = [];
-  for (const model of GEM_TTS_MODELS) {
-    try {
-      const body = {
-        contents: [{ role: 'user', parts: [{ text: String(text).slice(0, 4000) }] }],
-        generationConfig: {
-          responseModalities: ['AUDIO'],
-          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } }
-        }
-      };
-      const j = await geminiGenerate({ model, body, timeout: 45000 });
-      const parts = (j && j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts) || [];
-      for (const p of parts) {
-        if (p.inlineData && p.inlineData.data) {
-          const pcm = Buffer.from(p.inlineData.data, 'base64');
-          if (pcm.length < 1000) continue;
-          const mp3 = pcmToMp3(pcm);
-          if (mp3 && mp3.length > 500) return { buffer: mp3, provider: 'gemini/' + model };
-        }
-      }
-      errs.push(model + ': sem áudio na resposta');
-    } catch (e) {
-      errs.push(model + ': ' + (e.status ? 'HTTP ' + e.status : e.message));
-      if (e.status === 429) await sleep(2500);
+  const body = {
+    contents: [{ role: 'user', parts: [{ text: String(text).slice(0, 4000) }] }],
+    generationConfig: {
+      responseModalities: ['AUDIO'],
+      speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } }
+    }
+  };
+  const j = await geminiGenerateTried({ body, timeout: 45000, kind: 'tts' });
+  const parts = (j && j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts) || [];
+  for (const p of parts) {
+    if (p.inlineData && p.inlineData.data) {
+      const pcm = Buffer.from(p.inlineData.data, 'base64');
+      if (pcm.length < 1000) continue;
+      const mp3 = pcmToMp3(pcm);
+      if (mp3 && mp3.length > 500) return { buffer: mp3, provider: 'gemini/' + (_gemBestModel || 'tts') };
     }
   }
-  if (errs.length) throw new Error('gemini/tts: ' + errs.join(' | '));
   return null;
 }
 
