@@ -966,7 +966,8 @@ async function geminiTTS(text, voice = 'onyx', timeout = 45000) {
   await _loadLame();
   const voiceName = GEM_TTS_VOICES[voice] || 'Aoede';
   const body = {
-    contents: [{ role: 'user', parts: [{ text: String(text).slice(0, 4000) }] }],
+    // o modelo de voz do Gemini espera um comando de locução — texto cru ele tenta "responder"
+    contents: [{ role: 'user', parts: [{ text: 'Say in a natural narrator tone: ' + String(text).slice(0, 4000) }] }],
     generationConfig: {
       responseModalities: ['AUDIO'],
       speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } }
