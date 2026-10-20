@@ -861,7 +861,10 @@ async function geminiGenerateTried({ body, timeout = 45000, kind = 'chat' }) {
       ? ['gemini-2.5-flash-preview-tts', 'gemini-2.5-pro-preview-tts']
       : GEM_MODEL_CANDIDATES;
   const ordered = [...prefer.filter(p => !usable.length || usable.includes(p)), ...usable, ...(usable.length ? [] : prefer)];
-  const list = [...new Set([_gemBestModel, gemModel(), ...ordered].filter(Boolean))];
+  // modelos de chat guardam o "melhor"; tts/imagem só usam modelos do tipo certo
+  const list = kind === 'chat'
+    ? [...new Set([_gemBestModel, gemModel(), ...ordered].filter(Boolean))]
+    : [...new Set(ordered)];
   const errs = [];
   for (const model of list) {
     try {
