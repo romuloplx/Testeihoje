@@ -1,17 +1,14 @@
 const { mockDubResult, dubWithOpenAI, getBody, send } = require('./lib/ai');
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return send(res, 405, { error: 'Método não permitido. Use POST.' });
-  const { fileName, fileSize, language = '', dubVoice = 'onyx', targetLanguage = 'pt-BR', audioBase64 } = await getBody(req);
+  const { fileName, fileSize, language = '', dubVoice = 'onyx', targetLanguage = 'pt-BR', audioBase64, transcription } = await getBody(req);
   if (!fileName) return send(res, 400, { error: 'Selecione um vídeo.' });
 
   let result = null;
   if (audioBase64) {
-    if (!process.env.OPENAI_API_KEY) {
-      return send(res, 400, { error: 'Configure OPENAI_API_KEY no servidor para dublagem real.' });
-    }
-    result = await dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage });
+    result = await dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage, transcription });
     if (!result || result.error) {
-      return send(res, 502, { error: 'Falha ao dublar com a OpenAI' + (result && result.error ? `: ${result.error}` : ' (transcrição/tradução/voz)') + '. Tente com um arquivo menor ou tente novamente.' });
+      return send(res, 502, { error: 'Falha na dublagem' + (result && result.error ? `: ${result.error}` : ' (transcrição/tradução/voz)') + '. Tente novamente em instantes.' });
     }
   }
   const mock = result ? null : mockDubResult({ originalName: fileName, language, dubVoice });

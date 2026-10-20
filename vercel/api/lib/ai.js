@@ -251,26 +251,29 @@ async function generateSceneImage({ prompt, style }) {
 }
 
 // Dublagem real: Whisper (transcrição) + GPT (tradução) + TTS (voz)
-async function dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage = 'pt-BR' }) {
-  if (!process.env.OPENAI_API_KEY) return null;
+async function dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage = 'pt-BR', transcription: givenText = '' }) {
   try {
-    const OpenAI = require('openai');
-    const { toFile } = OpenAI;
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
     const audioBuf = Buffer.from(audioBase64, 'base64');
-    // Transcrição com cadeia: Whisper OpenAI → Whisper via Unorouter
-    let originalText = '';
+    // Transcrição com cadeia: Whisper OpenAI → Whisper/omni via Unorouter → (ou texto já pronto do navegador)
+    let originalText = String(givenText || '').trim();
     let whisperErr = '';
-    let whisperInfo = '';
+    let whisperInfo = originalText ? 'navegador (Whisper local)' : '';
+    if (originalText) {
+      // transcrição já veio pronta (fallback local do navegador) — pula direto pra tradução
+    }
     try {
-      const file = await toFile(audioBuf, 'audio.wav', { type: 'audio/wav' });
-      const transcription = await openai.audio.transcriptions.create({
-        file,
-        model: 'whisper-1',
-        language: language || undefined
-      });
-      originalText = (transcription.text || '').trim();
+      if (!originalText && process.env.OPENAI_API_KEY) {
+        const OpenAI = require('openai');
+        const { toFile } = OpenAI;
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+        const file = await toFile(audioBuf, 'audio.wav', { type: 'audio/wav' });
+        const transcription = await openai.audio.transcriptions.create({
+          file,
+          model: 'whisper-1',
+          language: language || undefined
+        });
+        originalText = (transcription.text || '').trim();
+      }
     } catch (e) {
       whisperErr = 'openai: ' + e.message;
     }

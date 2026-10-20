@@ -643,6 +643,33 @@ function bytesToBase64(bytes){
   for(let i=0;i<bytes.length;i+=chunk)bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+chunk));
   return btoa(bin);
 }
+// Whisper LOCAL no navegador (sem cota de API) — reserva automática da dublagem
+async function transcribeInBrowser(file,onMsg){
+  const msg=typeof onMsg==='function'?onMsg:()=>{};
+  msg('🧠 Preparando transcrição local (na 1ª vez baixa o modelo Whisper, ~50MB)...');
+  const { pipeline } = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
+  if(!window._whisperPipe){
+    msg('⬇️ Baixando modelo Whisper para o seu navegador (só acontece uma vez)...');
+    window._whisperPipe = await pipeline('automatic-speech-recognition','Xenova/whisper-base',{quantized:true});
+  }
+  msg('🎧 Decodificando o áudio do arquivo...');
+  const AC = window.AudioContext||window.webkitAudioContext;
+  const ctx = new AC({sampleRate:16000});
+  const arr = await file.arrayBuffer();
+  const decoded = await ctx.decodeAudioData(arr.slice(0));
+  const len = decoded.length;
+  const mono = new Float32Array(len);
+  for(let ch=0; ch<decoded.numberOfChannels; ch++){
+    const d = decoded.getChannelData(ch);
+    for(let i=0;i<len;i++) mono[i]+=d[i]/decoded.numberOfChannels;
+  }
+  msg('🎙️ Transcrevendo no navegador — sem cota de API (pode levar alguns minutos em aparelhos lentos)...');
+  const out = await window._whisperPipe(mono, { chunk_length_s: 30, stride_length_s: 5 });
+  const text = String((out && out.text) || '').trim();
+  if(!text) throw new Error('a transcrição local voltou vazia');
+  return text;
+}
+
 async function extractAudioBase64(file){
   const ac=new (window.AudioContext||window.webkitAudioContext)();
   const buf=await file.arrayBuffer();
@@ -708,13 +735,34 @@ async function dubVideo(){
     setProgress('dubProgressFill',35);
     showStatus('dubStatus','🎧 Transcrevendo (Whisper), traduzindo e gerando voz...','info');
 
-    const res=await fetch('/api/dub',{
+    let res=await fetch('/api/dub',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ fileName: file.name, fileSize: file.size, language, dubVoice, targetLanguage, audioBase64: audio.base64 })
     });
-    const data=await res.json();
-    if(!res.ok) throw new Error(data.error||'Erro na dublagem');
+    let data=await res.json();
+    if(!res.ok){
+      const errTxt=String(data.error||'Erro na dublagem');
+      if(/transcrev|whisper|429|cota|limite/i.test(errTxt)){
+        // Intercala: se as IAs do servidor estão sem cota, o Whisper LOCAL do navegador faz a MESMA função
+        try{
+          showStatus('dubStatus','🧠 IAs do servidor sem cota neste instante — ativando Whisper LOCAL do navegador (sem limite de API)...','info');
+          const txt=await transcribeInBrowser(file,(m)=>showStatus('dubStatus',m,'info'));
+          showStatus('dubStatus','✅ Transcrito no navegador! Agora traduzindo e gerando voz...','info');
+          res=await fetch('/api/dub',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ fileName: file.name, fileSize: file.size, language, dubVoice, targetLanguage, audioBase64: audio.base64, transcription: txt })
+          });
+          data=await res.json();
+          if(!res.ok) throw new Error(data.error||'Erro na dublagem');
+        }catch(localErr){
+          throw new Error(errTxt + ' || Whisper local: ' + (localErr.message||localErr));
+        }
+      }else{
+        throw new Error(errTxt);
+      }
+    }
 
     setProgress('dubProgressFill',100);
     setStep(['d1','d2','d3','d4'],3);
