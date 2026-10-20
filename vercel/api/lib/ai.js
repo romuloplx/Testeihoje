@@ -825,6 +825,25 @@ function gemText(j) {
   const parts = (j && j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts) || [];
   return parts.map(p => p.text || '').join('').trim();
 }
+// Cada modelo tem cota própria — testa vários e guarda o que responder
+const GEM_MODEL_CANDIDATES = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+let _gemBestModel = null;
+async function geminiGenerateTried({ body, timeout = 45000 }) {
+  const list = [...new Set([_gemBestModel, gemModel(), ...GEM_MODEL_CANDIDATES].filter(Boolean))];
+  let lastErr = null;
+  for (const model of list) {
+    try {
+      const j = await geminiGenerate({ model, body, timeout });
+      _gemBestModel = model;
+      return j;
+    } catch (e) {
+      lastErr = e;
+      if (e.status === 429 || e.status === 404) continue; // cota/rota do modelo: tenta o próximo
+      throw e;
+    }
+  }
+  throw lastErr || new Error('nenhum modelo Gemini respondeu');
+}
 // Texto/JSON (roteiro, tradução, SEO)
 async function geminiChat({ system, user, json, maxTokens = 8000 }) {
   if (!process.env.GEMINI_API_KEY) return null;
@@ -835,10 +854,10 @@ async function geminiChat({ system, user, json, maxTokens = 8000 }) {
     };
     if (system) body.systemInstruction = { parts: [{ text: system }] };
     if (json) body.generationConfig.responseMimeType = 'application/json';
-    const j = await geminiGenerate({ model: gemModel(), body });
+    const j = await geminiGenerateTried({ body });
     const text = gemText(j);
     if (!text) throw new Error('resposta vazia');
-    return { text, provider: 'gemini/' + gemModel() };
+    return { text, provider: 'gemini/' + (_gemBestModel || gemModel()) };
   } catch (e) {
     if (e.status === 401 || e.status === 403) return null; // chave: não adianta insistir
     throw new Error(`gemini: ${(e.status ? 'HTTP ' + e.status + ' — ' : '')}${e.message}`);
@@ -854,7 +873,7 @@ async function geminiTranscribe(audioBuf, language) {
     ] }],
     generationConfig: { temperature: 0 }
   };
-  const j = await geminiGenerate({ model: gemModel(), body, timeout: 90000 });
+  const j = await geminiGenerateTried({ body, timeout: 90000 });
   const text = gemText(j);
   return text || null;
 }
