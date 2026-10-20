@@ -1,4 +1,4 @@
-const { send, probeOpenAI, fullPipelineProbe, candidatesProbe, unorouterProbe } = require('./lib/ai');
+const { send, probeOpenAI, fullPipelineProbe, candidatesProbe, unorouterProbe, unorouterVideoProbe } = require('./lib/ai');
 module.exports = async (req, res) => {
   const out = {
     ok: true,
