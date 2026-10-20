@@ -558,9 +558,14 @@ async function probeOpenAI() {
       const t = await geminiTranscribe(makeTestWav(), '');
       report.geminiAudio = { ok: true, info: 'endpoint de áudio OK' + (t ? ` (“${String(t).slice(0, 20)}”)` : ' (áudio de teste sem fala)') };
     } catch (e) { report.geminiAudio = { ok: false, error: e.message }; }
+    try {
+      const v = await geminiTTS('olá', 'nova');
+      report.geminiTts = v && v.buffer ? { ok: true, provider: v.provider, bytes: v.buffer.length } : { ok: false, error: 'sem áudio' };
+    } catch (e) { report.geminiTts = { ok: false, error: e.message }; }
   } else {
     report.gemini = { ok: false, error: 'sem GEMINI_API_KEY' };
     report.geminiAudio = { ok: false, error: 'sem GEMINI_API_KEY' };
+    report.geminiTts = { ok: false, error: 'sem GEMINI_API_KEY' };
   }
   // Unorouter (rota do usuário)
   if (process.env.UNOROUTER_API_KEY) {
@@ -897,6 +902,68 @@ async function geminiImage(prompt) {
   return null;
 }
 
+// --- TTS via Gemini (o que faltava na cadeia de voz) ---
+// O Gemini devolve PCM 24kHz; convertemos pra MP3 (lamejs) pra caber junto
+// com os demais provedores de voz.
+let _lameMod = undefined;
+async function _loadLame() {
+  if (_lameMod === undefined) {
+    try { _lameMod = await import('@breezystack/lamejs'); } catch (e) { _lameMod = null; }
+  }
+  return _lameMod;
+}
+function pcmToMp3(pcmBuf) {
+  const lame = _lameMod;
+  if (!lame || !lame.Mp3Encoder) return null;
+  try {
+    const enc = new lame.Mp3Encoder(1, 24000, 128);
+    const samples = new Int16Array(pcmBuf.buffer, pcmBuf.byteOffset, Math.floor(pcmBuf.length / 2));
+    const chunks = [];
+    for (let i = 0; i < samples.length; i += 1152) {
+      const b = enc.encodeBuffer(samples.subarray(i, Math.min(i + 1152, samples.length)));
+      if (b.length) chunks.push(Buffer.from(b));
+    }
+    const end = enc.flush();
+    if (end.length) chunks.push(Buffer.from(end));
+    return Buffer.concat(chunks);
+  } catch (e) { return null; }
+}
+const GEM_TTS_MODELS = ['gemini-2.5-flash-preview-tts', 'gemini-2.5-pro-preview-tts'];
+const GEM_TTS_VOICES = { onyx: 'Charon', nova: 'Aoede', alloy: 'Kore', echo: 'Puck', fable: 'Fenrir', shimmer: 'Leda', ash: 'Orus', coral: 'Zephyr', sage: 'Enceladus' };
+async function geminiTTS(text, voice = 'onyx') {
+  if (!process.env.GEMINI_API_KEY) return null;
+  await _loadLame();
+  const voiceName = GEM_TTS_VOICES[voice] || 'Aoede';
+  const errs = [];
+  for (const model of GEM_TTS_MODELS) {
+    try {
+      const body = {
+        contents: [{ role: 'user', parts: [{ text: String(text).slice(0, 4000) }] }],
+        generationConfig: {
+          responseModalities: ['AUDIO'],
+          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } }
+        }
+      };
+      const j = await geminiGenerate({ model, body, timeout: 45000 });
+      const parts = (j && j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts) || [];
+      for (const p of parts) {
+        if (p.inlineData && p.inlineData.data) {
+          const pcm = Buffer.from(p.inlineData.data, 'base64');
+          if (pcm.length < 1000) continue;
+          const mp3 = pcmToMp3(pcm);
+          if (mp3 && mp3.length > 500) return { buffer: mp3, provider: 'gemini/' + model };
+        }
+      }
+      errs.push(model + ': sem áudio na resposta');
+    } catch (e) {
+      errs.push(model + ': ' + (e.status ? 'HTTP ' + e.status : e.message));
+      if (e.status === 429) await sleep(2500);
+    }
+  }
+  if (errs.length) throw new Error('gemini/tts: ' + errs.join(' | '));
+  return null;
+}
+
 // Repete a cadeia em caso de falha (provedores gratuitos limitam rajadas)
 async function withRetries(fn, times = 2) {
   let last = { error: 'sem tentativas' };
@@ -1108,6 +1175,14 @@ async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR' }) {
       }
     }
   }
+  // Gemini TTS (Google) — PCM convertido pra MP3, entra antes das vozes gratuitas
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      const g = await geminiTTS(text, voice);
+      if (g && g.buffer) return g;
+      errors.push('gemini/tts: sem áudio');
+    } catch (e) { errors.push(e.message); }
+  } else errors.push('gemini/tts: sem GEMINI_API_KEY');
   try {
     const b = await ttsGoogle({ text, lang: TTS_LANGS[lang] || 'pt-BR' });
     return { buffer: b, provider: 'google-tts(free)' };

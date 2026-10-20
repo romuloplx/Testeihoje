@@ -4,6 +4,7 @@
   "private": true,
   "description": "DubAI PRO — deploy Vercel (serverless)",
   "dependencies": {
+    "@breezystack/lamejs": "^1.2.7",
     "openai": "^4.104.0"
   }
 }
