@@ -143,8 +143,9 @@ Legenda: ✅ pronto · 🟡 possível agora (versão parcial) · 🔴 precisa de
 - **Não anima a boca**, mas entrega o fluxo de uso do Photo Avatar (e serve de base para plugar lip-sync depois)
 - Tudo client-side (canvas) + nossas APIs de TTS/roteiro existentes
 
-### Fase 3 — Lip-sync (o verdadeiro HeyGen) — requer infra nova
-Opções open-source para rodar em servidor com GPU (RunPod/Modal/Vast ~US$0,2–0,5/h):
+### Fase 3 — Lip-sync (o verdadeiro HeyGen) — 2 caminhos
+**Atalho A (por API, recomendado primeiro):** Unorouter `/v1/video/generations` com `hy4-preview`/`hy3` (imagem→vídeo) — ver §9. Com ~US$5 de crédito testamos avatar animado sem infra.
+**Caminho B (self-hosted, paridade total):** modelos open-source em GPU (RunPod/Modal/Vast ~US$0,2–0,5/h):
 | Modelo | O que faz | Obs |
 |---|---|---|
 | **MuseTalk** (Tencent) | rosto falante em tempo real | ótimo custo-benefício |
@@ -162,7 +163,23 @@ Arquitetura: `DubAI PRO (Vercel) → fila (webhook) → worker GPU (FastAPI) →
 
 ---
 
-## 9. Custos comparativos (para decidir)
+## 9. Evidência de campo — probe no Unorouter (2026-10-20, `?check=6`)
+
+Testamos o router de modelos que já usamos (api.unorouter.com, 265 modelos) para ver o que dá para usar SEM infra própria:
+
+| Descoberta | Resultado | Impacto |
+|---|---|---|
+| Modelos de vídeo no catálogo | **`hy3`, `hy4-preview`** (classe Hunyuan Video) | Existe modelo gerador de vídeo na rota |
+| `POST /v1/video/generations` | **403 "balance empty"** (NÃO é 404!) | **O endpoint de geração de vídeo FUNCIONA — só exige saldo** |
+| Voz/áudio avançado | `gpt-4o-mini-tts:free`, `gemini-2.5-pro-tts` (pago), `aura-1:free`, `qwen3.8-omni-flash` | TTS + modelos omni (áudio) disponíveis |
+| Whisper gratuito | `whisper-large-v3-turbo:free`, `whisper:free` | Transcrição da dublagem sem OpenAI (já plugado) |
+| Imagem | SDXL `:free` (1 req/h) + `gpt-image-2.5`/`flux.2` pagos | Cenas e avatares estáticos |
+
+**Conclusão prática:** a Fase 3 do roadmap tem um atalho — em vez de subir worker de GPU, **colocar ~US$5 de crédito no Unorouter** e chamar `/v1/video/generations` com `hy4-preview` (imagem→vídeo animado = "foto que se mexe"). Lip-sync de boca ainda pede MuseTalk/Wav2Lip (worker GPU), mas o "avatar em movimento" fica viável por API.
+
+---
+
+## 10. Custos comparativos (para decidir)
 
 | Cenário | HeyGen (API) | DubAI PRO (nosso caminho) |
 |---|---|---|
@@ -172,7 +189,7 @@ Arquitetura: `DubAI PRO (Vercel) → fila (webhook) → worker GPU (FastAPI) →
 
 ---
 
-## 10. Conclusão
+## 11. Conclusão
 
 O HeyGen é, em engenharia, **um bom editor de vídeo com 3 modelos neurais no centro**: gerador de rosto (Avatar V), sintetizador de voz com clonagem e reanimador facial (lip-sync). Todo o resto é produto (templates, editor, API, webhooks).
 
