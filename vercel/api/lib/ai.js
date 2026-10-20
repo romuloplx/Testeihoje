@@ -566,7 +566,7 @@ async function probeOpenAI() {
   if (process.env.UNOROUTER_API_KEY) {
     try {
       const models = await unorouterModels();
-      const first = uniPickModels(models)[0] || 'gpt-4o-mini';
+      const first = uniPickModels(models)[0];
       const t = await unorouterChat({ user: 'responda apenas: ok', model: first });
       report.unorouter = { ok: true, model: first, models: models.length, reply: t.slice(0, 20) };
     } catch (e) { report.unorouter = { ok: false, error: e.message }; }
@@ -750,7 +750,8 @@ function uniPickModels(ids) {
   const prefer = free.filter(id => /chat|instruct|gpt|llama|deepseek|qwen|mistral|gemini|claude|kimi|phi|command|grok|nova|flash|thinking|reason|turbo|hermes|nous|agnes/i.test(id));
   const out = [];
   for (const id of [...prefer, ...free, ...chat]) { if (!out.includes(id)) out.push(id); if (out.length >= 6) break; }
-  return out.length ? out : ['gpt-4o-mini'];
+  // nomes REAIS do catálogo como reserva (gpt-4o-mini não existe nesse router)
+  return out.length ? out : ['agnes-2.5-flash:free', 'cohere-command-a:free', 'deepseek-r1-distill-qwen-32b:free'];
 }
 function uniImageModels(ids) {
   const imgs = ids.filter(id => /xl|sdxl|diffusion|stable|flux|dall|image|albedo|anything|ampony|dreamshaper|kandinsky|cogview|playground|realistic/i.test(id));
