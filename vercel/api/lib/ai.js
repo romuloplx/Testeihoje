@@ -848,6 +848,7 @@ function gemText(j) {
 // Cada modelo tem cota própria — testa vários e guarda o que responder
 const GEM_MODEL_CANDIDATES = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
 let _gemBestModel = null;
+let _gemBest = null;
 async function geminiGenerateTried({ body, timeout = 45000, kind = 'chat' }) {
   const discovered = await geminiListModels();
   const usable = discovered.filter(id => {
@@ -861,14 +862,16 @@ async function geminiGenerateTried({ body, timeout = 45000, kind = 'chat' }) {
       ? ['gemini-2.5-flash-preview-tts', 'gemini-2.5-pro-preview-tts']
       : GEM_MODEL_CANDIDATES;
   const ordered = [...prefer.filter(p => !usable.length || usable.includes(p)), ...usable, ...(usable.length ? [] : prefer)];
-  // modelos de chat guardam o "melhor"; tts/imagem só usam modelos do tipo certo
+  // "melhor modelo" guardado POR TIPO (chat não pode herdar um modelo de voz!)
+  _gemBest = _gemBest || {};
   const list = kind === 'chat'
-    ? [...new Set([_gemBestModel, gemModel(), ...ordered].filter(Boolean))]
+    ? [...new Set([_gemBest[kind], gemModel(), ...ordered].filter(Boolean))]
     : [...new Set(ordered)];
   const errs = [];
   for (const model of list) {
     try {
       const j = await geminiGenerate({ model, body, timeout });
+      _gemBest[kind] = model;
       _gemBestModel = model;
       return j;
     } catch (e) {
@@ -966,9 +969,10 @@ async function geminiTTS(text, voice = 'onyx', timeout = 45000) {
   await _loadLame();
   const voiceName = GEM_TTS_VOICES[voice] || 'Aoede';
   const body = {
-    // o modelo de voz do Gemini espera um comando de locução — texto cru ele tenta "responder"
-    contents: [{ role: 'user', parts: [{ text: 'Say in a natural narrator tone: ' + String(text).slice(0, 4000) }] }],
+    // formato documentado do Gemini TTS: instrução "Say ...:" + fala entre aspas, sem role
+    contents: [{ parts: [{ text: 'Say in a natural narrator tone: "' + String(text).slice(0, 4000).replace(/"/g, "'") + '"' }] }],
     generationConfig: {
+      maxOutputTokens: 8192,
       responseModalities: ['AUDIO'],
       speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } }
     }
