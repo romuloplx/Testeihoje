@@ -12,5 +12,6 @@ module.exports = async (req, res) => {
   if (check === '2') out.pipeline = await fullPipelineProbe();
   if (check === '3') out.candidates = await candidatesProbe();
   if (check === '5') out.unorouter = await unorouterProbe();
+  if (check === '6') out.unorouterVideo = await unorouterVideoProbe();
   send(res, 200, out);
 };

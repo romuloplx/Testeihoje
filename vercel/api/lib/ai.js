@@ -625,6 +625,48 @@ function uniTtsModels(ids) {
   return [...free, ...tts.filter(id => !/free/i.test(id))].slice(0, 4);
 }
 
+// Melhoria de roteiro (paridade HeyGen: Proofread + Filler word removal)
+async function enhanceScript({ text, mode = 'polish' }) {
+  const systems = {
+    polish: 'Você é editor de roteiros para YouTube. Melhore o texto: corrija gramática, remova palavras de preenchimento (hum, é, tipo, sabe, basicamente, né, ah), deixe frases fluidas e naturais para locução. Mantenha o significado, o idioma e o tamanho aproximado. Devolva APENAS o texto final, sem comentários.',
+    shorten: 'Você é editor de roteiros. Resuma o texto em até 60% do tamanho original, mantendo as ideias principais e um tom natural para locução. Devolva APENAS o texto final.',
+    hype: 'Você é roteirista de YouTube. Reescreva o texto com mais energia e ganchos, mantendo fatos e idioma. Frases curtas, tom envolvente. Devolva APENAS o texto final.'
+  };
+  const r = await withRetries(() => chatWithFallback({
+    system: systems[mode] || systems.polish,
+    user: String(text || '').slice(0, 12000)
+  }), 2);
+  return r;
+}
+
+// Probe de vídeo/avatar/lip-sync no router (?check=6) — informa o roadmap "estilo HeyGen"
+async function unorouterVideoProbe() {
+  const out = { catalog: {}, endpoints: {} };
+  if (!process.env.UNOROUTER_API_KEY) return { ok: false, error: 'sem UNOROUTER_API_KEY' };
+  try {
+    const r = await fetch(uniBase() + '/models', { headers: uniHeaders(), signal: AbortSignal.timeout(10000) });
+    const j = await r.json().catch(() => ({}));
+    const ids = (j.data || []).map(m => m.id).filter(Boolean);
+    out.catalog.count = ids.length;
+    out.catalog.videoLike = ids.filter(id => /video|veo|sora|kling|wan|hyun|hunyuan|^hy\d|hailuo|minimax-video|runway|pika|luma|dreammachine|avatar|lip|wav2lip|sadtalker|musetalk|echomimic|hallo|liveportrait|omnihuman|sonic/i.test(id)).slice(0, 25);
+    out.catalog.imageToVideo = ids.filter(id => /i2v|img2vid|image-to-video|t2v|text-to-video/i.test(id)).slice(0, 15);
+    out.catalog.speechOmni = ids.filter(id => /omni|aura|speech|voice|audio/i.test(id)).slice(0, 15);
+  } catch (e) { out.catalog = { ok: false, error: e.message }; }
+  // endpooints de vídeo (cada router nomeia diferente)
+  for (const path of ['/videos/generations', '/video/generations', '/videos']) {
+    try {
+      const r = await fetch(uniBase() + path, {
+        method: 'POST', headers: uniHeaders(),
+        body: JSON.stringify({ model: 'hy4-preview', prompt: 'a red apple on a table', n: 1, duration: 2 }),
+        signal: AbortSignal.timeout(12000)
+      });
+      const body = (await r.text().catch(() => '')).slice(0, 140);
+      out.endpoints[path] = { status: r.status, ok: r.ok, body: r.ok ? body || 'ok' : body };
+    } catch (e) { out.endpoints[path] = { status: 0, error: String(e.message || e).slice(0, 100) }; }
+  }
+  return out;
+}
+
 // Repete a cadeia em caso de falha (provedores gratuitos limitam rajadas)
 async function withRetries(fn, times = 2) {
   let last = { error: 'sem tentativas' };
@@ -854,7 +896,7 @@ function send(res, status, obj) {
 
 module.exports = {
   TTS_VOICES, mockScript, mockCreateFull, mockDubResult,
-  generateWithOpenAI, generateCreateFull, generateSceneImage, dubWithOpenAI,
+  generateWithOpenAI, generateCreateFull, generateSceneImage, dubWithOpenAI, enhanceScript,
   chatWithFallback, ttsWithFallback, chatViaPollinations, ttsGoogle, ttsStreamElements,
-  probeOpenAI, fullPipelineProbe, candidatesProbe, unorouterProbe, getBody, send
+  probeOpenAI, fullPipelineProbe, candidatesProbe, unorouterProbe, unorouterVideoProbe, getBody, send
 };

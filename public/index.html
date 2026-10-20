@@ -191,10 +191,22 @@ video{width:100%;border-radius:12px;margin-top:12px;background:black}
     <textarea id="prompt" placeholder="Exemplo: Crie um documentário realista sobre dinossauros, com narração masculina em português brasileiro."></textarea>
     <div class="hint">Dica: seja específico. Ex: “vídeo de 10min sobre buracos negros para iniciantes, tom divertido + exemplos”</div>
 
+    <label>🎨 Modelos prontos (estilo HeyGen)</label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="ghost" type="button" onclick="applyTemplate('ads')">📢 Ads & Promo</button>
+      <button class="ghost" type="button" onclick="applyTemplate('edu')">🎓 Educacional</button>
+      <button class="ghost" type="button" onclick="applyTemplate('explainer')">💡 Explainer</button>
+      <button class="ghost" type="button" onclick="applyTemplate('howto')">🛠️ Dicas & Como-fazer</button>
+      <button class="ghost" type="button" onclick="applyTemplate('news')">📰 Notícias</button>
+      <button class="ghost" type="button" onclick="applyTemplate('podcast')">🎙️ Podcast</button>
+    </div>
+
     <div class="row">
       <div>
         <label>Duração</label>
         <select id="duration">
+          <option value="1">1 minuto (Short)</option>
+          <option value="2">2 minutos</option>
           <option value="5">5 minutos</option>
           <option value="10" selected>10 minutos</option>
           <option value="15">15 minutos</option>
@@ -250,6 +262,7 @@ video{width:100%;border-radius:12px;margin-top:12px;background:black}
         <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
           <button class="ghost" onclick="copyText(document.getElementById('createScript').innerText)">📋 Copiar roteiro</button>
           <button class="ghost" onclick="speakText(document.getElementById('createScript').innerText)">🔊 Ouvir narração</button>
+          <button class="ghost" onclick="enhanceCurrentScript()">✨ Melhorar com IA</button>
           <button class="ghost" onclick="openTab('projects', document.querySelectorAll('.tabs button')[2])">📁 Ver nos projetos</button>
         </div>
         <button class="primary" id="buildVideoBtn" onclick="buildCreateVideo()" style="width:100%;margin-top:12px">🎬 Montar vídeo (imagens em movimento + voz)</button>
@@ -262,6 +275,7 @@ video{width:100%;border-radius:12px;margin-top:12px;background:black}
           <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
             <a id="createdVideoDl" class="ghost" download="video-dubai-pro.webm" style="padding:8px 14px;text-decoration:none">⬇️ Baixar vídeo (YouTube)</a>
             <a id="createdAudioDl" class="ghost" download="narracao.mp3" style="padding:8px 14px;text-decoration:none">🎙️ Baixar narração</a>
+            <button class="ghost" onclick="downloadSRT()">📜 Baixar legendas (SRT)</button>
             <button class="ghost" onclick="downloadSceneImages()">🖼️ Baixar imagens das cenas</button>
           </div>
         </div>
@@ -452,6 +466,81 @@ function openTab(id, button){
 function fillExample(){
   $('#prompt').value = "Crie um documentário realista sobre dinossauros para YouTube, 10 minutos, com narração masculina em português brasileiro. Comece com um hook curioso, explique as 5 espécies mais fascinantes e termine com um convite para se inscrever. Tom empolgante e educativo.";
   toast('💡 Exemplo preenchido — agora clique em Criar');
+}
+
+// ===== Modelos de vídeo (estilo HeyGen: Ads, Educ, Explainer...) =====
+const TEMPLATES = {
+  ads: { style:'cinematic', duration:'1', prompt:'Crie um vídeo promocional curto para [SEU PRODUTO/SERVIÇO]: ganchos rápidos nos primeiros 3 segundos, 3 benefícios claros, prova social e call-to-action forte no final. Tom energético, estilo comercial profissional.' },
+  edu: { style:'documentary', duration:'5', prompt:'Crie um vídeo educacional sobre [TEMA] para iniciantes: objetivo de aprendizagem no início, explicação passo a passo com exemplos do dia a dia, resumo final e pergunta para a seção de comentários. Tom didático e acolhedor.' },
+  explainer: { style:'animation', duration:'5', prompt:'Crie um vídeo explicativo sobre [CONCEITO/PRODUTO]: comece com o problema, explique o "como funciona" de forma visual e simples, mostre benefícios e encerre com um resumo em 3 pontos. Tom claro e direto.' },
+  howto: { style:'realistic', duration:'5', prompt:'Crie um vídeo de dicas e como-fazer sobre [ASSUNTO]: liste 5 a 7 dicas práticas em ordem, com exemplos rápidos e erros comuns a evitar. Tom de especialista amigo, ritmo ágil.' },
+  news: { style:'documentary', duration:'5', prompt:'Crie um vídeo de notícias sobre [TEMA]: o que aconteceu (fatos), por que importa, contexto curto, o que vem a seguir e fontes/cuidados. Tom jornalístico neutro e objetivo.' },
+  podcast: { style:'images', duration:'10', prompt:'Crie um episódio de podcast em vídeo sobre [TEMA]: abertura acolhedora, 3 blocos de discussão com histórias e opiniões, momentos de reflexão e encerramento com convite para seguir o canal. Tom conversacional e natural.' }
+};
+function applyTemplate(kind){
+  const t = TEMPLATES[kind];
+  if(!t) return;
+  $('#prompt').value = t.prompt;
+  $('#style').value = t.style;
+  $('#duration').value = t.duration;
+  toast('🎨 Modelo aplicado — personalize entre [COLCHETES] e clique em Criar');
+  $('#prompt').focus();
+}
+
+// ===== Melhorar roteiro (paridade HeyGen: Proofread + remover "é/hum/tipo") =====
+async function enhanceCurrentScript(){
+  const box = document.getElementById('createScript');
+  const original = (box.innerText||'').trim();
+  if(!original){ toast('Gere o roteiro primeiro','warn'); return; }
+  const btn = event && event.target ? event.target : null;
+  if(btn){ btn.disabled=true; btn.textContent='✨ Melhorando...'; }
+  try{
+    const r = await fetch('/api/enhance', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ text: original, mode:'polish' })
+    });
+    const j = await r.json();
+    if(!r.ok || j.error) throw new Error(j.error||'falhou');
+    box.innerText = j.text;
+    if(typeof currentCreateData!=='undefined' && currentCreateData) currentCreateData.script = j.text;
+    // substitui as narrações das cenas pelo texto limpo quando couber
+    toast('✨ Roteiro melhorado por ' + (j.provider||'IA') + ' — gramática e palavras de preenchimento');
+  }catch(e){
+    toast('⚠️ Não deu para melhorar: '+e.message,'warn');
+  }finally{
+    if(btn){ btn.disabled=false; btn.textContent='✨ Melhorar com IA'; }
+  }
+}
+
+// ===== Legendas SRT (paridade HeyGen: Captions) =====
+function fmtSRT(t){
+  const h=String(Math.floor(t/3600)).padStart(2,'0');
+  const m=String(Math.floor((t%3600)/60)).padStart(2,'0');
+  const s=String(Math.floor(t%60)).padStart(2,'0');
+  const ms=String(Math.round((t%1)*1000)).padStart(3,'0');
+  return `${h}:${m}:${s},${ms}`;
+}
+function downloadSRT(){
+  const d = (typeof currentCreateData!=='undefined') ? currentCreateData : null;
+  if(!d||!d.scenes||!d.scenes.length){ toast('Gere o roteiro primeiro','warn'); return; }
+  let n=1, out='';
+  for(const sc of d.scenes){
+    const sent = String(sc.narration||sc.title||'').split(/(?<=[.!?…])\s+/).filter(Boolean);
+    const dur = Math.max(1,(sc.end-sc.start));
+    const totalChars = sent.reduce((a,s)=>a+s.length,0)||1;
+    let t = sc.start;
+    for(const s of sent){
+      const w = s.length/totalChars*dur;
+      out += n+'\n'+fmtSRT(t)+' --> '+fmtSRT(Math.min(sc.end,t+w))+'\n'+s+'\n\n';
+      t += w; n++;
+    }
+  }
+  const blob = new Blob([out],{type:'application/x-subrip'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'legendas-dubai-pro.srt';
+  a.click();
+  toast('📜 Legendas SRT geradas ('+(n-1)+' trechos)');
 }
 
 function previewVideo(){

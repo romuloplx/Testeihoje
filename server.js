@@ -271,12 +271,13 @@ async function generateWithOpenAI(prompt, duration, style, voice) {
 app.get('/api/health', async (req, res) => {
   const out = { ok: true, mode: process.env.OPENAI_API_KEY ? 'openai' : 'mock', projects: projects.length, uptime: process.uptime() };
   const check = String(req.query.check || '');
-  if (check === '1' || check === '2' || check === '3' || check === '5') {
+  if (check === '1' || check === '2' || check === '3' || check === '5' || check === '6') {
     const shared = require('./vercel/api/lib/ai');
     if (check === '1') out.openaiCheck = await shared.probeOpenAI();
     if (check === '2') out.pipeline = await shared.fullPipelineProbe();
     if (check === '3') out.candidates = await shared.candidatesProbe();
     if (check === '5') out.unorouter = await shared.unorouterProbe();
+    if (check === '6') out.unorouterVideo = await shared.unorouterVideoProbe();
   }
   res.json(out);
 });
@@ -430,6 +431,17 @@ app.post('/api/dub', async (req, res) => {
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Erro no processamento: ' + e.message });
+  }
+});
+
+// Melhoria de roteiro (estilo HeyGen: Proofread + limpeza de palavras de preenchimento)
+app.post('/api/enhance', async (req, res) => {
+  try {
+    const out = await require('./vercel/api/lib/ai').enhanceScript({ text: req.body.text, mode: req.body.mode });
+    if (out.error) return res.status(502).json({ error: 'Edição falhou: ' + out.error });
+    res.json({ text: out.text, provider: out.provider || 'ia' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 
