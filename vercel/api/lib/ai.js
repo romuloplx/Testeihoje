@@ -551,15 +551,15 @@ async function probeOpenAI() {
   // Gemini (Google) — texto + transcrição de áudio
   if (process.env.GEMINI_API_KEY) {
     try {
-      const g = await geminiChat({ user: 'responda apenas: ok', maxTokens: 20 });
+      const g = await geminiChat({ user: 'responda apenas: ok', maxTokens: 20, timeout: 15000 });
       report.gemini = g ? { ok: true, model: g.provider, reply: g.text.slice(0, 20) } : { ok: false, error: 'chave rejeitada (401/403)' };
     } catch (e) { report.gemini = { ok: false, error: e.message }; }
     try {
-      const t = await geminiTranscribe(makeTestWav(), '');
+      const t = await geminiTranscribe(makeTestWav(), '', 15000);
       report.geminiAudio = { ok: true, info: 'endpoint de áudio OK' + (t ? ` (“${String(t).slice(0, 20)}”)` : ' (áudio de teste sem fala)') };
     } catch (e) { report.geminiAudio = { ok: false, error: e.message }; }
     try {
-      const v = await geminiTTS('olá', 'nova');
+      const v = await geminiTTS('olá', 'nova', 15000);
       report.geminiTts = v && v.buffer ? { ok: true, provider: v.provider, bytes: v.buffer.length } : { ok: false, error: 'sem áudio' };
     } catch (e) { report.geminiTts = { ok: false, error: e.message }; }
   } else {
@@ -877,7 +877,7 @@ async function geminiGenerateTried({ body, timeout = 45000, kind = 'chat' }) {
   throw new Error(errs.join(' | ') || 'nenhum modelo Gemini respondeu');
 }
 // Texto/JSON (roteiro, tradução, SEO)
-async function geminiChat({ system, user, json, maxTokens = 8000 }) {
+async function geminiChat({ system, user, json, maxTokens = 8000, timeout = 45000 }) {
   if (!process.env.GEMINI_API_KEY) return null;
   try {
     const body = {
@@ -886,7 +886,7 @@ async function geminiChat({ system, user, json, maxTokens = 8000 }) {
     };
     if (system) body.systemInstruction = { parts: [{ text: system }] };
     if (json) body.generationConfig.responseMimeType = 'application/json';
-    const j = await geminiGenerateTried({ body });
+    const j = await geminiGenerateTried({ body, timeout });
     const text = gemText(j);
     if (!text) throw new Error('resposta vazia');
     return { text, provider: 'gemini/' + (_gemBestModel || gemModel()) };
@@ -896,7 +896,7 @@ async function geminiChat({ system, user, json, maxTokens = 8000 }) {
   }
 }
 // Transcrição de áudio (multimodal) — mesma função do Whisper
-async function geminiTranscribe(audioBuf, language) {
+async function geminiTranscribe(audioBuf, language, timeout = 90000) {
   if (!process.env.GEMINI_API_KEY) return null;
   const body = {
     contents: [{ role: 'user', parts: [
@@ -905,7 +905,7 @@ async function geminiTranscribe(audioBuf, language) {
     ] }],
     generationConfig: { temperature: 0 }
   };
-  const j = await geminiGenerateTried({ body, timeout: 90000 });
+  const j = await geminiGenerateTried({ body, timeout });
   const text = gemText(j);
   return text || null;
 }
@@ -958,7 +958,7 @@ function pcmToMp3(pcmBuf) {
   } catch (e) { return null; }
 }
 const GEM_TTS_VOICES = { onyx: 'Charon', nova: 'Aoede', alloy: 'Kore', echo: 'Puck', fable: 'Fenrir', shimmer: 'Leda', ash: 'Orus', coral: 'Zephyr', sage: 'Enceladus' };
-async function geminiTTS(text, voice = 'onyx') {
+async function geminiTTS(text, voice = 'onyx', timeout = 45000) {
   if (!process.env.GEMINI_API_KEY) return null;
   await _loadLame();
   const voiceName = GEM_TTS_VOICES[voice] || 'Aoede';
@@ -969,7 +969,7 @@ async function geminiTTS(text, voice = 'onyx') {
       speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } }
     }
   };
-  const j = await geminiGenerateTried({ body, timeout: 45000, kind: 'tts' });
+  const j = await geminiGenerateTried({ body, timeout, kind: 'tts' });
   const parts = (j && j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts) || [];
   for (const p of parts) {
     if (p.inlineData && p.inlineData.data) {
