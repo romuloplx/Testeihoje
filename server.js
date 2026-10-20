@@ -429,6 +429,38 @@ app.post('/api/dub', async (req, res) => {
   }
 });
 
+// Avatar Falante (estilo HeyGen: retrato IA + fala + ponte Unorouter i2v)
+app.post('/api/avatar', async (req, res) => {
+  try {
+    const ai = require('./vercel/api/lib/ai');
+    const body = req.body || {};
+    const action = String(body.action || 'portrait');
+    if (action === 'portrait') {
+      const out = await ai.generateAvatarPortrait({ prompt: body.prompt, style: body.style });
+      if (!out || !out.imageBase64) {
+        return res.json({
+          imageBase64: null,
+          mock: true,
+          error: out && out.error,
+          message: 'Retrato gerado localmente no estúdio (provedores externos indisponíveis no momento).'
+        });
+      }
+      return res.json({ imageBase64: out.imageBase64, mime: out.mime || 'image/png', model: out.model });
+    }
+    if (action === 'script') {
+      const out = await ai.generateAvatarScript({ topic: body.topic || body.prompt, durationSec: body.durationSec, tone: body.tone });
+      return res.json(out);
+    }
+    if (action === 'video') {
+      const out = await ai.generateAvatarVideo({ imageBase64: body.imageBase64, prompt: body.prompt, duration: body.duration });
+      return res.json(out);
+    }
+    res.status(400).json({ error: `Ação desconhecida: ${action}` });
+  } catch (e) {
+    res.status(500).json({ error: e.message || 'Erro interno no Avatar IA' });
+  }
+});
+
 // Melhoria de roteiro (estilo HeyGen: Proofread + limpeza de palavras de preenchimento)
 app.post('/api/enhance', async (req, res) => {
   try {

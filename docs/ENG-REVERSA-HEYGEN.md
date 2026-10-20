@@ -122,8 +122,8 @@ Avatar responde em tempo real (conversa, suporte, kiosk) — combina TTS streami
 | Dublagem de vídeo (translate) | ✅ **TEMOS** | 🌍 Dublar: transcreve→traduz→voz→vídeo trocado | **Sem lip-sync** |
 | Trilha/SFX | 🔴 | — | Sem API de áudio musical no momento |
 | Remover trechos (AI clipping) | 🟡 | Cortar por cena já dá no editor do YouTube | Roadmap |
-| **Photo Avatar (foto que fala)** | 🟡 **ROADMAP** | Foto + voz + legendas animadas (sem animar boca) | Ver §8 |
-| **Lip-sync real (a "mágica")** | 🔴 | Requer modelo tipo Wav2Lip/MuseTalk/LivePortrait em GPU | Ver §8 |
+| **Photo Avatar (foto que fala)** | ✅ **NOVO** | 🗣️ Avatar: foto/estúdio/IA + lip-sync acústico + piscar + 16:9/9:16/1:1 | Implementado (`/api/avatar` + motor Canvas C⁰) |
+| **Lip-sync real (a "mágica")** | 🟡 **HÍBRIDO** | Lip-sync acústico 2D (RMS+ZCR) local + ponte `/api/avatar` (`hy4-preview`) | Paridade visual leve + API pronta |
 | Clonagem de voz | 🔴 | Requer modelo de voice cloning | Ver §8 |
 | Live Avatar (tempo real) | 🔴 | Streaming + GPU | Roadmap longo |
 

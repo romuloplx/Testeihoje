@@ -211,7 +211,7 @@ async function generateSceneImage({ prompt, style }) {
         const r = await fetch(uniBase() + '/images/generations', {
           method: 'POST', headers: uniHeaders(),
           body: JSON.stringify({ model, prompt: fullPrompt, n: 1, size: '1024x1024', response_format: 'b64_json' }),
-          signal: AbortSignal.timeout(60000)
+          signal: AbortSignal.timeout(25000)
         });
         if (r.ok) {
           const j = await r.json();
@@ -219,7 +219,7 @@ async function generateSceneImage({ prompt, style }) {
           const url = j && j.data && j.data[0] && j.data[0].url;
           if (b64) return { imageBase64: b64, mime: 'image/png', model: 'unorouter/' + model };
           if (url) {
-            const fr = await fetch(url, { signal: AbortSignal.timeout(30000) });
+            const fr = await fetch(url, { signal: AbortSignal.timeout(20000) });
             if (fr.ok) {
               const buf = Buffer.from(await fr.arrayBuffer());
               if (buf.length > 100) return { imageBase64: buf.toString('base64'), mime: fr.headers.get('content-type') || 'image/png', model: 'unorouter/' + model };
@@ -239,11 +239,11 @@ async function generateSceneImage({ prompt, style }) {
     { model: '', w: 256, h: 256 }
   ];
   for (const opt of ladder) {
-    for (let tent = 0; tent < 2; tent++) {
+    for (let tent = 0; tent < 1; tent++) {
       try {
         const seed = Math.floor(Math.random() * 100000);
         const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=${opt.w}&height=${opt.h}&nologo=true&seed=${seed}` + (opt.model ? `&model=${opt.model}` : '');
-        const r = await fetch(url, { signal: AbortSignal.timeout(60000) });
+        const r = await fetch(url, { signal: AbortSignal.timeout(20000) });
         if (r.status === 429 || r.status === 402) { await sleep(2000); continue; }
         if (!r.ok) { errors.push(`pollinations ${opt.w}x${opt.h}: HTTP ${r.status}`); break; }
         const buf = Buffer.from(await r.arrayBuffer());
@@ -251,6 +251,7 @@ async function generateSceneImage({ prompt, style }) {
         return { imageBase64: buf.toString('base64'), mime: r.headers.get('content-type') || 'image/jpeg', model: `pollinations-${opt.w}x${opt.h}(free)` };
       } catch (e) {
         errors.push(`pollinations ${opt.w}x${opt.h}: ${e.message}`);
+        if (/fetch failed|ENOTFOUND|ECONNREFUSED/i.test(e.message)) return { error: errors.join(' | ') };
         await sleep(1500);
       }
     }
@@ -1011,6 +1012,7 @@ async function withRetries(fn, times = 2) {
   for (let i = 0; i < times; i++) {
     last = await fn();
     if (!last.error) return last;
+    if (/sem OPENAI_API_KEY.*sem GEMINI_API_KEY.*sem UNOROUTER_API_KEY.*fetch failed/i.test(last.error)) return last;
     if (i < times - 1) await sleep(2500);
   }
   return last;
@@ -1045,7 +1047,11 @@ async function chatViaPollinations({ system, user, json }) {
         const text = j && j.choices && j.choices[0] && j.choices[0].message ? String(j.choices[0].message.content || '').trim() : '';
         if (!text) { lastErr = new Error('resposta vazia'); continue; }
         return text;
-      } catch (e) { lastErr = e; await sleep(1500); }
+      } catch (e) {
+        lastErr = e;
+        if (/fetch failed|ENOTFOUND|ECONNREFUSED/i.test(e.message)) throw lastErr;
+        await sleep(1500);
+      }
     }
   }
   // GET (só para prompts curtos)
@@ -1152,7 +1158,11 @@ async function ttsGoogle({ text, lang = 'pt' }) {
         const b = Buffer.from(await r.arrayBuffer());
         if (!b.length) { lastErr = new Error('áudio vazio'); continue; }
         parts.push(b); ok = true;
-      } catch (e) { lastErr = e; await sleep(1200); }
+      } catch (e) {
+        lastErr = e;
+        if (/fetch failed|ENOTFOUND|ECONNREFUSED/i.test(e.message)) throw lastErr;
+        await sleep(1200);
+      }
     }
     if (!ok) throw lastErr;
     await sleep(350);
@@ -1258,9 +1268,171 @@ function send(res, status, obj) {
   res.end(JSON.stringify(obj));
 }
 
+// ============ AVATAR FALANTE (estilo HeyGen — Fase 2 + ponte Fase 3) ============
+
+// Retrato frontal de apresentador com lábios fechados/neutros — ideal para animação labial (lip-sync)
+async function generateAvatarPortrait({ prompt = '', style = 'studio' }) {
+  const styleDesc = {
+    studio: 'photorealistic studio portrait photography, 85mm lens, soft key and rim lighting, clean modern studio bokeh background',
+    news: 'photorealistic TV news anchor portrait, broadcast newsroom studio background, crisp lighting, professional blazer',
+    creator: 'photorealistic YouTube creator portrait in cozy RGB podcast studio with soft warm lamps, natural friendly expression',
+    exec: 'photorealistic executive portrait in bright modern glass office, confident approachable expression',
+    pixar: '3D Pixar / Disney stylized character portrait, expressive eyes, warm soft lighting, clean gradient studio backdrop'
+  }[style] || 'photorealistic studio portrait photography, soft studio lighting';
+
+  const subject = String(prompt || '').trim() || 'apresentador carismático brasileiro de 30 anos';
+  const fullPrompt = `${styleDesc}, ${subject}, centered front-facing head and shoulders portrait, looking directly straight into the camera lens, symmetrical face centered in frame, relaxed natural closed mouth with gentle pleasant expression, both eyes clearly visible, no hands near face, no microphone covering mouth, no text, no watermark`;
+
+  const errors = [];
+  if (process.env.OPENAI_API_KEY) {
+    const OpenAI = require('openai');
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const attempts = [
+      { model: 'gpt-image-1', size: '1024x1024', quality: 'medium', n: 1, output_format: 'jpeg' },
+      { model: 'dall-e-3', size: '1024x1024', quality: 'standard', n: 1, response_format: 'b64_json' }
+    ];
+    for (const opts of attempts) {
+      try {
+        const img = await openai.images.generate({ prompt: fullPrompt, ...opts });
+        const b64 = img.data[0].b64_json;
+        if (b64) return { imageBase64: b64, mime: opts.output_format === 'jpeg' ? 'image/jpeg' : 'image/png', model: 'openai/' + opts.model };
+      } catch (e) {
+        errors.push(`openai/${opts.model}: ${e.message}`);
+        if (e.status === 401) break;
+      }
+    }
+  }
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      const g = await geminiImage(fullPrompt);
+      if (g && g.imageBase64) return g;
+      errors.push('gemini/image: sem imagem');
+    } catch (e) { errors.push('gemini/image: ' + e.message); }
+  }
+  if (process.env.UNOROUTER_API_KEY) {
+    const ids = await unorouterModels();
+    const imgList = [...uniImageModels(ids), 'dall-e-3'].slice(0, 3);
+    for (const model of imgList) {
+      try {
+        const r = await fetch(uniBase() + '/images/generations', {
+          method: 'POST', headers: uniHeaders(),
+          body: JSON.stringify({ model, prompt: fullPrompt, n: 1, size: '1024x1024', response_format: 'b64_json' }),
+          signal: AbortSignal.timeout(22000)
+        });
+        if (r.ok) {
+          const j = await r.json();
+          const b64 = j && j.data && j.data[0] && j.data[0].b64_json;
+          const url = j && j.data && j.data[0] && j.data[0].url;
+          if (b64) return { imageBase64: b64, mime: 'image/png', model: 'unorouter/' + model };
+          if (url) {
+            const fr = await fetch(url, { signal: AbortSignal.timeout(18000) });
+            if (fr.ok) {
+              const buf = Buffer.from(await fr.arrayBuffer());
+              if (buf.length > 200) return { imageBase64: buf.toString('base64'), mime: fr.headers.get('content-type') || 'image/png', model: 'unorouter/' + model };
+            }
+          }
+        } else errors.push(`unorouter/${model}: HTTP ${r.status}`);
+      } catch (e) { errors.push(`unorouter/${model}: ${e.message}`); }
+    }
+  }
+  for (const [w, h, mdl] of [[1024, 1024, 'flux'], [768, 768, ''], [512, 512, '']]) {
+    try {
+      const seed = Math.floor(Math.random() * 100000);
+      const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=${w}&height=${h}&nologo=true&seed=${seed}` + (mdl ? `&model=${mdl}` : '');
+      const r = await fetch(url, { signal: AbortSignal.timeout(18000) });
+      if (!r.ok) { errors.push(`pollinations ${w}x${h}: HTTP ${r.status}`); continue; }
+      const buf = Buffer.from(await r.arrayBuffer());
+      if (buf.length > 500) return { imageBase64: buf.toString('base64'), mime: r.headers.get('content-type') || 'image/jpeg', model: `pollinations-${w}x${h}(free)` };
+    } catch (e) {
+      errors.push(`pollinations ${w}x${h}: ${e.message}`);
+      if (/fetch failed|ENOTFOUND|ECONNREFUSED/i.test(e.message)) break;
+    }
+  }
+  return { error: errors.join(' | ') || 'nenhum provedor de retrato respondeu' };
+}
+
+// Gera monólogo falado natural para o apresentador (sem rubricas, pronto para locução e lip-sync)
+async function generateAvatarScript({ topic, durationSec = 30, tone = 'natural' }) {
+  const words = Math.max(25, Math.min(650, Math.round((Number(durationSec) || 30) * 2.2)));
+  const toneMap = {
+    natural: 'conversacional, carismático e claro, como um ótimo apresentador falando direto para a câmera',
+    sales: 'persuasivo, energético, com gancho forte nos primeiros 3 segundos, benefícios claros e chamada para ação final',
+    edu: 'didático, acolhedor, com exemplo simples e fácil de entender',
+    news: 'jornalístico, confiável, direto ao ponto e objetivo'
+  };
+  const system = `Você escreve falas para um apresentador virtual (estilo HeyGen). Escreva APENAS as palavras exatas que serão faladas em voz alta, em português brasileiro, sem títulos, sem [rubricas], sem emojis, sem asteriscos. Tom ${toneMap[tone] || toneMap.natural}. Aproximadamente ${words} palavras.`;
+  const user = `Assunto da apresentação: "${String(topic || '').trim()}".`;
+  const r = await withRetries(() => chatWithFallback({ system, user, maxTokens: 2500 }), 2);
+  if (!r.error && r.text) {
+    return {
+      text: r.text.replace(/\*\*|\[.*?\]|\(.*?\)/g, '').replace(/\s{2,}/g, ' ').trim(),
+      provider: r.provider,
+      mode: 'openai'
+    };
+  }
+  // Fallback local imediato se estiver em modo MOCK offline
+  const cleanTopic = String(topic || 'inteligência artificial aplicada a vídeos').trim();
+  return {
+    text: `Olá! Seja muito bem-vindo. Hoje quero falar direto com você sobre ${cleanTopic}. Muita gente acha que produzir conteúdo profissional leva horas de gravação, iluminação e edição, mas com o DubAI PRO você transforma qualquer ideia em uma apresentação dinâmica em poucos cliques. Gostou? Então aproveite para testar sua própria voz, personalizar o cenário e baixar seu vídeo pronto para publicar!`,
+    provider: 'mock-local',
+    mode: 'mock',
+    warning: r.error
+  };
+}
+
+// Ponte Fase 3 (Image-to-Video via Unorouter hy4-preview / hy3 quando houver saldo; senão informa fallback local)
+async function generateAvatarVideo({ imageBase64, prompt = '', duration = 5 }) {
+  if (!process.env.UNOROUTER_API_KEY) {
+    return { ok: false, fallback: 'canvas-lipsync', reason: 'sem UNOROUTER_API_KEY configurada' };
+  }
+  try {
+    const ids = await unorouterModels();
+    const candidates = ids.filter(id => /^hy\d|hunyuan|wan|kling|hailuo|minimax-video|luma|pika|runway|veo|sora/i.test(id));
+    const model = candidates.find(id => /hy4/i.test(id)) || candidates[0] || 'hy4-preview';
+    const motionPrompt = `Realistic talking presenter speaking naturally directly to camera, subtle head nods, natural eye blinks, lip movements, studio lighting. ${prompt}`.slice(0, 500);
+    const payload = {
+      model,
+      prompt: motionPrompt,
+      duration: Math.min(10, Math.max(3, Number(duration) || 5))
+    };
+    if (imageBase64) payload.image = `data:image/jpeg;base64,${String(imageBase64).replace(/^data:[^;]+;base64,/, '')}`;
+    const r = await fetch(uniBase() + '/video/generations', {
+      method: 'POST',
+      headers: uniHeaders(),
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(45000)
+    });
+    const raw = await r.text().catch(() => '');
+    if (!r.ok) {
+      return {
+        ok: false,
+        fallback: 'canvas-lipsync',
+        status: r.status,
+        model,
+        reason: /balance|credit|insufficient/i.test(raw) ? 'saldo Unorouter zerado (usando motor Lip-Sync local)' : `HTTP ${r.status}: ${raw.slice(0, 120)}`
+      };
+    }
+    const j = JSON.parse(raw || '{}');
+    const url = (j.data && j.data[0] && j.data[0].url) || j.video_url || j.url;
+    const b64 = (j.data && j.data[0] && j.data[0].b64_json) || j.b64_json;
+    if (b64) return { ok: true, videoBase64: b64, mime: 'video/mp4', provider: 'unorouter/' + model };
+    if (url) {
+      const vr = await fetch(url, { signal: AbortSignal.timeout(30000) });
+      if (vr.ok) {
+        const buf = Buffer.from(await vr.arrayBuffer());
+        if (buf.length > 1000) return { ok: true, videoBase64: buf.toString('base64'), mime: vr.headers.get('content-type') || 'video/mp4', provider: 'unorouter/' + model };
+      }
+    }
+    return { ok: false, fallback: 'canvas-lipsync', model, reason: 'resposta sem vídeo direto (' + raw.slice(0, 100) + ')' };
+  } catch (e) {
+    return { ok: false, fallback: 'canvas-lipsync', reason: e.message };
+  }
+}
+
 module.exports = {
   TTS_VOICES, mockScript, mockCreateFull, mockDubResult,
   generateWithOpenAI, generateCreateFull, generateSceneImage, dubWithOpenAI, enhanceScript,
+  generateAvatarPortrait, generateAvatarScript, generateAvatarVideo,
   chatWithFallback, ttsWithFallback, chatViaPollinations, ttsGoogle, ttsStreamElements,
   probeOpenAI, fullPipelineProbe, candidatesProbe, unorouterProbe, unorouterVideoProbe, getBody, send
 };

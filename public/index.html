@@ -156,11 +156,54 @@ video{width:100%;border-radius:12px;margin-top:12px;background:black}
   display:flex;align-items:center;gap:8px;max-width:90vw;
 }
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
-.row{display:flex;gap:10px}
-.row > *{flex:1}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row > *{flex:1;min-width:160px}
 .hint{font-size:11px;color:#7c7ca8;margin-top:6px}
 .kbd{font-family:monospace;background:#23234a;padding:2px 6px;border-radius:6px;border:1px solid var(--border);font-size:11px}
 .footer{text-align:center;color:#6b7280;font-size:11px;margin-top:14px;line-height:1.6}
+
+/* Avatar Studio (Fase 2 — Foto Falante estilo HeyGen) */
+.avatar-grid{
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px;
+}
+@media(max-width:520px){
+  .avatar-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tabs{flex-wrap:wrap}
+  .tabs button{min-width:calc(50% - 6px);padding:10px 8px;font-size:12px}
+}
+.avatar-item{
+  background:#1c1c35;border:1.5px solid var(--border);border-radius:14px;padding:8px;
+  cursor:pointer;text-align:center;transition:.18s;position:relative;overflow:hidden;
+}
+.avatar-item:hover{border-color:#6366f1;transform:translateY(-2px)}
+.avatar-item.active{
+  border-color:#00d4ff;background:linear-gradient(180deg,#26204a 0%,#191933 100%);
+  box-shadow:0 0 0 2px rgba(0,212,255,.22),0 8px 22px rgba(124,58,237,.28);
+}
+.avatar-item img{
+  width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:10px;display:block;background:#0e0e1d;
+}
+.avatar-item .av-name{font-size:12px;font-weight:800;margin-top:6px;color:#fff}
+.avatar-item .av-role{font-size:10.5px;color:var(--muted);margin-top:2px}
+.avatar-stage-wrap{
+  margin-top:14px;background:#0b0b18;border:1px solid var(--border2);border-radius:16px;
+  padding:12px;position:relative;
+}
+.avatar-stage-canvas-box{
+  display:flex;justify-content:center;align-items:center;background:#05050c;
+  border-radius:12px;overflow:hidden;max-height:420px;position:relative;
+}
+#avatarPreviewCanvas{
+  max-width:100%;max-height:400px;width:auto;height:auto;display:block;border-radius:10px;
+}
+#avatarPreviewCanvas.calibrating{cursor:crosshair;outline:2px dashed #00d4ff}
+.calib-banner{
+  margin-top:8px;padding:8px 12px;border-radius:10px;font-size:11.5px;
+  background:#0e749030;border:1px solid #06b6d466;color:#a5f3fc;text-align:center;
+}
+input[type="range"]{
+  padding:0;height:6px;accent-color:#06b6d4;cursor:pointer;margin-top:10px;
+}
 </style>
 </head>
 <body>
@@ -176,9 +219,10 @@ video{width:100%;border-radius:12px;margin-top:12px;background:black}
 <main>
 
 <div class="tabs">
-  <button class="active" onclick="openTab('create',this)">🎬 Criar</button>
-  <button onclick="openTab('dub',this)">🌍 Dublar</button>
-  <button onclick="openTab('projects',this)">📁 Projetos <span id="projCount" class="kbd" style="margin-left:6px">0</span></button>
+  <button id="tab-create" class="active" onclick="openTab('create',this)">🎬 Criar</button>
+  <button id="tab-avatar" onclick="openTab('avatar',this)">🗣️ Avatar <span class="kbd" style="margin-left:4px;background:#3b0764;border-color:#7c3aed;color:#e9d5ff">NOVO</span></button>
+  <button id="tab-dub" onclick="openTab('dub',this)">🌍 Dublar</button>
+  <button id="tab-projects" onclick="openTab('projects',this)">📁 Projetos <span id="projCount" class="kbd" style="margin-left:4px">0</span></button>
 </div>
 
 <!-- CREATE -->
@@ -263,7 +307,8 @@ video{width:100%;border-radius:12px;margin-top:12px;background:black}
           <button class="ghost" onclick="copyText(document.getElementById('createScript').innerText)">📋 Copiar roteiro</button>
           <button class="ghost" onclick="speakText(document.getElementById('createScript').innerText)">🔊 Ouvir narração</button>
           <button class="ghost" onclick="enhanceCurrentScript()">✨ Melhorar com IA</button>
-          <button class="ghost" onclick="openTab('projects', document.querySelectorAll('.tabs button')[2])">📁 Ver nos projetos</button>
+          <button class="ghost" onclick="sendCreateToAvatar()" style="border-color:#7c3aed;color:#e9d5ff">🗣️ Narrar com Avatar</button>
+          <button class="ghost" onclick="openTab('projects')">📁 Ver nos projetos</button>
         </div>
         <button class="primary" id="buildVideoBtn" onclick="buildCreateVideo()" style="width:100%;margin-top:12px">🎬 Montar vídeo (imagens em movimento + voz)</button>
         <div id="videoBuildProgress" class="hidden" style="margin-top:10px">
@@ -290,8 +335,163 @@ video{width:100%;border-radius:12px;margin-top:12px;background:black}
 
   <div class="card" style="background:#111125">
     <h3 style="margin:0">Como funciona?</h3>
-    <p style="margin:8px 0 0 0">1️⃣ Você descreve a ideia → 2️⃣ IA gera roteiro com timestamps → 3️⃣ Vira projeto salvo → 4️⃣ Você narra com TTS ou exporta.</p>
-    <p class="hint">Sem <span class="kbd">OPENAI_API_KEY</span> o app roda em modo MOCK (roteiros locais realistas). Com a chave, usa GPT-4o de verdade.</p>
+    <p style="margin:8px 0 0 0">1️⃣ Você descreve a ideia → 2️⃣ IA gera roteiro com timestamps → 3️⃣ Vira projeto salvo → 4️⃣ Monte com cenas ou envie para o <b>🗣️ Avatar Falante</b>.</p>
+    <p class="hint">Com chaves na Vercel (OpenAI / Gemini / Unorouter) usa a cadeia completa em rodízio; sem chave, roda em modo MOCK/grátis.</p>
+  </div>
+</section>
+
+<!-- AVATAR (Foto Falante — Estilo HeyGen Fase 2 + Ponte Fase 3) -->
+<section id="avatar" class="hidden">
+  <div class="card">
+    <h2>🗣️ Avatar Falante (Foto + Voz + Lip-Sync)</h2>
+    <p>Escolha um apresentador de estúdio, envie sua própria foto ou gere um rosto inédito com IA. A boca, os olhos, o movimento da cabeça e as legendas acompanham cada sílaba da locução.</p>
+
+    <label>1️⃣ Escolha seu apresentador de estúdio</label>
+    <div id="avatarPresetGrid" class="avatar-grid"></div>
+
+    <div class="row" style="margin-top:12px">
+      <div>
+        <label style="margin-top:0">📷 Ou envie sua foto / retrato</label>
+        <input type="file" id="avatarFile" accept="image/*" onchange="onUploadAvatarPhoto(event)">
+      </div>
+      <div>
+        <label style="margin-top:0">✨ Estilo ao gerar avatar IA</label>
+        <select id="avatarAiStyle">
+          <option value="studio">Estúdio Pro (85mm)</option>
+          <option value="creator">Criador / Podcast RGB</option>
+          <option value="news">Âncora de Telejornal</option>
+          <option value="exec">Executivo Moderno</option>
+          <option value="pixar">Estilizado 3D Pixar</option>
+        </select>
+      </div>
+    </div>
+
+    <label>🎨 Gerar apresentador exclusivo com IA (opcional)</label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <input id="avatarAiPrompt" style="flex:1;margin-top:0;min-width:200px" placeholder="Ex: médica brasileira carismática de jaleco em consultório iluminado">
+      <button class="ghost" type="button" id="genAvatarBtn" onclick="generateAiAvatarPortrait()" style="border-color:#7c3aed;color:#e9d5ff">🎨 Gerar Rosto IA</button>
+    </div>
+
+    <!-- Palco Ao Vivo -->
+    <div class="avatar-stage-wrap">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+        <div style="font-size:12px;font-weight:800;color:#e0e7ff">🎬 Palco ao Vivo <span id="avatarActiveLabel" class="tag" style="margin-left:6px">Clara — Executiva</span></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="ghost" type="button" id="avatarLiveBtn" onclick="toggleAvatarLivePreview()" style="padding:7px 12px;border-color:#06b6d4;color:#a5f3fc">▶️ Testar Fala Ao Vivo</button>
+          <button class="ghost" type="button" id="calibMouthBtn" onclick="toggleMouthCalibration()" style="padding:7px 12px">🎯 Ajustar Boca</button>
+        </div>
+      </div>
+
+      <div class="avatar-stage-canvas-box">
+        <canvas id="avatarPreviewCanvas" width="1280" height="720" onclick="onAvatarCanvasClick(event)"></canvas>
+      </div>
+
+      <div id="calibBanner" class="calib-banner hidden">
+        🎯 <b>Modo de calibração ativo:</b> clique exatamente sobre o <b>centro dos lábios</b> na foto acima para ajustar a sincronia labial. Clique em "🎯 Ajustar Boca" novamente para concluir.
+      </div>
+
+      <div class="row" style="margin-top:10px;align-items:end">
+        <div>
+          <label style="margin-top:0">Modo de animação facial</label>
+          <select id="avatarAnimMode" onchange="refreshAvatarStageConfig()">
+            <option value="lipsync" selected>🗣️ Lip-Sync Realista (Boca + Piscar + Cabeça)</option>
+            <option value="gentle">🎥 Movimento Cinematográfico + Halo de Voz</option>
+            <option value="unorouter">⚡ Tentar Vídeo Neural IA (Unorouter) + Fallback Lip-Sync</option>
+          </select>
+        </div>
+        <div>
+          <label style="margin-top:0">Abertura labial: <span id="mouthGainVal">100%</span></label>
+          <input type="range" id="avatarMouthGain" min="40" max="150" value="100" oninput="document.getElementById('mouthGainVal').textContent=this.value+'%'">
+        </div>
+      </div>
+    </div>
+
+    <label>2️⃣ O que o avatar vai falar</label>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 4px">
+      <button class="ghost" type="button" onclick="fillAvatarPresetScript('sales')">📢 Pitch 30s</button>
+      <button class="ghost" type="button" onclick="fillAvatarPresetScript('edu')">🎓 Micro-Aula</button>
+      <button class="ghost" type="button" onclick="fillAvatarPresetScript('news')">📰 Notícia</button>
+      <button class="ghost" type="button" onclick="fillAvatarPresetScript('welcome')">👋 Boas-vindas</button>
+      <button class="ghost" type="button" id="aiWriteAvatarBtn" onclick="aiWriteAvatarScript()" style="border-color:#7c3aed;color:#e9d5ff">🪄 Escrever com IA</button>
+      <button class="ghost" type="button" onclick="enhanceAvatarScript()">✨ Limpar "é/hum"</button>
+    </div>
+    <textarea id="avatarScript" placeholder="Digite ou gere o texto que o apresentador vai narrar olhando para a câmera...">Olá! Bem-vindo ao DubAI PRO. Agora você pode transformar uma única foto em um apresentador virtual completo, com voz natural, movimento realista e legendas sincronizadas prontas para YouTube, Reels e TikTok!</textarea>
+
+    <label>Título / Destaque no vídeo (opcional — usado no selo ou slide ao lado)</label>
+    <input id="avatarHeadline" value="DubAI PRO • Estúdio com Avatar IA" placeholder="Ex: 3 Segredos para Crescer no YouTube em 2026" oninput="refreshAvatarStageConfig()">
+
+    <div class="row">
+      <div>
+        <label>Formato do vídeo</label>
+        <select id="avatarFormat" onchange="refreshAvatarStageConfig()">
+          <option value="16:9" selected>📺 16:9 YouTube / Aula (1280×720)</option>
+          <option value="9:16">📱 9:16 TikTok / Reels / Shorts (720×1280)</option>
+          <option value="1:1">🟦 1:1 Feed / LinkedIn (960×960)</option>
+        </select>
+      </div>
+      <div>
+        <label>Layout de cena</label>
+        <select id="avatarLayout" onchange="refreshAvatarStageConfig()">
+          <option value="center" selected>🎙️ Apresentador em Destaque</option>
+          <option value="slide">🖼️ Apresentador + Slide de Tópicos (HeyGen)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Legendas sincronizadas</label>
+        <select id="avatarCaptions" onchange="refreshAvatarStageConfig()">
+          <option value="karaoke" selected>💬 Karaokê Dinâmico (palavra ativa)</option>
+          <option value="clean">📝 Legenda Clássica de Estúdio</option>
+          <option value="none">🚫 Sem legenda queimada (apenas .SRT)</option>
+        </select>
+      </div>
+      <div>
+        <label>Voz do apresentador</label>
+        <div style="display:flex;gap:8px">
+          <select id="avatarVoice" style="flex:1">
+            <option value="nova" selected>Nova — Feminina natural</option>
+            <option value="onyx">Onyx — Masculina grave</option>
+            <option value="alloy">Alloy — Neutra</option>
+            <option value="echo">Echo — Masculina</option>
+            <option value="fable">Fable — Masculina expressiva</option>
+            <option value="shimmer">Shimmer — Feminina suave</option>
+            <option value="ash">Ash — Neutra firme</option>
+            <option value="coral">Coral — Feminina clara</option>
+            <option value="sage">Sage — Neutra calma</option>
+          </select>
+          <button class="ghost" type="button" onclick="previewVoice(document.getElementById('avatarVoice').value)">🔊</button>
+        </div>
+      </div>
+    </div>
+
+    <button class="primary" id="renderAvatarBtn" onclick="renderAvatarVideo()">🎬 Renderizar Vídeo do Avatar (MP4 / WebM)</button>
+
+    <div class="progress-wrap" id="avatarProgress">
+      <div class="progress-bar"><div class="progress-fill" id="avatarProgressFill"></div></div>
+      <div class="progress-steps">
+        <span id="av1" class="active">Voz IA</span>
+        <span id="av2">Fonemas</span>
+        <span id="av3"> Lip-Sync HD</span>
+        <span id="av4">Finalizando</span>
+      </div>
+    </div>
+
+    <div class="status" id="avatarStatus"></div>
+
+    <div id="avatarResultWrap" class="hidden" style="margin-top:14px">
+      <div style="background:#0f0f1e;border:1px solid var(--border);border-radius:12px;padding:14px">
+        <div id="avatarResultTitle" style="font-weight:800;font-size:13.5px;margin-bottom:8px">✅ Vídeo do Avatar pronto!</div>
+        <video id="avatarResultVideo" controls playsinline style="width:100%;max-height:460px;border-radius:10px;background:#000"></video>
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+          <a id="avatarVideoDl" class="ghost" download="avatar-dubai-pro.webm" style="padding:9px 14px;text-decoration:none;border-color:#06b6d4;color:#a5f3fc">⬇️ Baixar Vídeo</a>
+          <a id="avatarAudioDl" class="ghost" download="avatar-voz.mp3" style="padding:9px 14px;text-decoration:none">🎙️ Baixar Voz</a>
+          <button class="ghost" type="button" onclick="downloadAvatarSRT()">📜 Baixar Legendas (.SRT)</button>
+          <button class="ghost" type="button" onclick="downloadAvatarThumbnail()">🖼️ Baixar Capa (.PNG)</button>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -456,10 +656,13 @@ async function checkHealth(){
 
 function openTab(id, button){
   document.querySelectorAll('main section').forEach(s=>s.classList.add('hidden'));
-  document.getElementById(id).classList.remove('hidden');
+  const sec=document.getElementById(id);
+  if(sec) sec.classList.remove('hidden');
   document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('active'));
-  if(button) button.classList.add('active');
+  const targetBtn = button || document.getElementById('tab-'+id);
+  if(targetBtn) targetBtn.classList.add('active');
   if(id==='projects') loadProjects();
+  if(id==='avatar') ensureAvatarLoop();
   window.scrollTo({top:0, behavior:'smooth'});
 }
 
@@ -503,7 +706,6 @@ async function enhanceCurrentScript(){
     if(!r.ok || j.error) throw new Error(j.error||'falhou');
     box.innerText = j.text;
     if(typeof currentCreateData!=='undefined' && currentCreateData) currentCreateData.script = j.text;
-    // substitui as narrações das cenas pelo texto limpo quando couber
     toast('✨ Roteiro melhorado por ' + (j.provider||'IA') + ' — gramática e palavras de preenchimento');
   }catch(e){
     toast('⚠️ Não deu para melhorar: '+e.message,'warn');
@@ -609,6 +811,7 @@ async function createVideo(){
     }
     $('#createResult').classList.remove('hidden');
     toast('✅ Roteiro criado!');
+    if(data.project) saveProject(data.project);
     await loadProjects();
   }catch(error){
     showStatus('createStatus','❌ Todas as IAs da cadeia foram tentadas e nenhuma respondeu nesta rodada — costuma ser limite temporário dos provedores (erros 429 = cota do plano grátis). Tente de novo em ~1 min, é só clicar de novo.\n\nDetalhes técnicos: '+error.message,'error');
@@ -788,6 +991,7 @@ async function dubVideo(){
     $('#dubScript').textContent = txt;
     $('#dubResult').classList.remove('hidden');
     toast(data.audioBase64?'✅ Dublagem pronta — baixe o vídeo com o áudio trocado!':'⚠️ Simulação sem áudio','info');
+    if(data.project) saveProject(data.project);
     await loadProjects();
   }catch(e){
     const hint=e.message&&e.message.includes('401')?' → A chave OpenAI está inválida: gere uma nova em platform.openai.com/account/api-keys e atualize na Vercel.':'';
@@ -1099,16 +1303,22 @@ async function downloadDubVideo(){
   }
 }
 
-// --- Projects ---
+// --- Projects (localStorage — persiste no navegador) ---
+const LS_KEY='dubai_projects';
+function getLocalProjects(){
+  try{ return JSON.parse(localStorage.getItem(LS_KEY)) || []; }catch(e){ return []; }
+}
+function setLocalProjects(list){
+  localStorage.setItem(LS_KEY, JSON.stringify(list));
+}
+function saveProject(p){
+  const list=getLocalProjects();
+  list.unshift(p);
+  setLocalProjects(list);
+}
 async function loadProjects(){
-  try{
-    const r=await fetch('/api/projects');
-    const list=await r.json();
-    currentProjects=list;
-    renderProjects(list);
-  }catch(e){
-    showStatus('createStatus','⚠️ Não foi possível carregar projetos','warn');
-  }
+  currentProjects=getLocalProjects();
+  renderProjects(currentProjects);
 }
 function renderProjects(list){
   const container=$('#projectList');
@@ -1124,7 +1334,8 @@ function renderProjects(list){
   empty.style.display='none';
 
   list.forEach(p=>{
-    const isCreate = p.type==='create';
+    const typeLabel = p.type==='avatar' ? '🗣️ Avatar' : (p.type==='create' ? '🎬 Criação' : '🌍 Dublagem');
+    const metaTag = p.format ? p.format : (p.duration ? p.duration+' min' : (p.fileName||''));
     const date = new Date(p.createdAt).toLocaleString('pt-BR');
     const card=document.createElement('div');
     card.className='project';
@@ -1134,9 +1345,9 @@ function renderProjects(list){
         <div class="project-meta">
           <div class="project-title">${escapeHtml(p.title || p.prompt?.slice(0,60) || 'Projeto sem título')}</div>
           <div class="project-sub">
-            <span class="tag ${p.mode==='openai'?'success':''}">${p.mode==='openai'?'GPT-4o':'MOCK'}</span>
-            <span class="tag">${isCreate ? '🎬 Criação' : '🌍 Dublagem'}</span>
-            <span class="tag">${escapeHtml(p.duration ? p.duration+' min' : (p.fileName||''))}</span>
+            <span class="tag ${p.mode==='openai'?'success':''}">${p.mode==='openai'?'IA REAL':'LOCAL'}</span>
+            <span class="tag">${typeLabel}</span>
+            ${metaTag ? `<span class="tag">${escapeHtml(metaTag)}</span>` : ''}
           </div>
           <div class="project-sub" style="margin-top:6px;color:var(--muted)">${date} • ${escapeHtml(p.status||'pronto')}</div>
         </div>
@@ -1166,17 +1377,16 @@ function escapeHtml(s){
 function escapeForJs(s){
   return (s||'').replace(/\\/g,'\\\\').replace(/`/g,'\\`').replace(/\$/g,'\\$').replace(/\n/g,'\\n').replace(/"/g,'\\"');
 }
-async function deleteProject(id){
+function deleteProject(id){
   if(!confirm('Excluir este projeto?')) return;
-  const r=await fetch('/api/projects/'+id,{method:'DELETE'});
-  if(r.ok){ toast('🗑️ Projeto excluído'); loadProjects(); } else toast('Erro ao excluir','error');
+  setLocalProjects(getLocalProjects().filter(p=>p.id!==id));
+  toast('🗑️ Projeto excluído');
+  loadProjects();
 }
-async function clearAll(){
+function clearAll(){
   if(!currentProjects.length) return toast('Nada para limpar','warn');
   if(!confirm(`Excluir todos os ${currentProjects.length} projetos?`)) return;
-  for(const p of [...currentProjects]){
-    await fetch('/api/projects/'+p.id,{method:'DELETE'});
-  }
+  setLocalProjects([]);
   toast('🗑️ Todos os projetos removidos');
   loadProjects();
 }
@@ -1211,7 +1421,1433 @@ function speakText(text){
   }
 }
 
+// ============ AVATAR STUDIO ENGINE (Fase 2 HeyGen + Lip-Sync Acústico + 16:9/9:16/1:1) ============
+const AVATAR_SIZE = 720;
+const avatarSourceCanvas = document.createElement('canvas');
+avatarSourceCanvas.width = AVATAR_SIZE;
+avatarSourceCanvas.height = AVATAR_SIZE;
+const avatarWorkCanvas = document.createElement('canvas');
+avatarWorkCanvas.width = AVATAR_SIZE;
+avatarWorkCanvas.height = AVATAR_SIZE;
+
+const AVATAR_PRESETS = [
+  { id:'clara', name:'Clara', role:'Executiva & Negócios', voice:'nova', bg1:'#2b1e54', bg2:'#0c1329', glow:'#00d4ff', skin:'#edb99a', skinShadow:'#cf9171', hair:'#1d1522', hairStyle:'long', lip:'#b85668', outfit:'#1e293b', collar:'#e2e8f0', iris:'#4a3222', brows:'#241926', beard:0 },
+  { id:'lucas', name:'Lucas', role:'Tech & IA', voice:'echo', bg1:'#112b3c', bg2:'#090d1a', glow:'#38bdf8', skin:'#e3b190', skinShadow:'#c28b68', hair:'#231c18', hairStyle:'fade', lip:'#a65d60', outfit:'#0f172a', collar:'#38bdf8', iris:'#334155', brows:'#231c18', beard:0.18 },
+  { id:'sofia', name:'Sofia', role:'Educadora & Cursos', voice:'coral', bg1:'#1b3a3b', bg2:'#0c1624', glow:'#34d399', skin:'#9c6244', skinShadow:'#7a482e', hair:'#181210', hairStyle:'curly', lip:'#8e414d', outfit:'#065f46', collar:'#d1fae5', iris:'#2c1d14', brows:'#181210', beard:0 },
+  { id:'rafael', name:'Rafael', role:'Podcast & Storytelling', voice:'onyx', bg1:'#3b1d38', bg2:'#100d1c', glow:'#a855f7', skin:'#d39c79', skinShadow:'#b07856', hair:'#1f1917', hairStyle:'wave', lip:'#995257', outfit:'#27272a', collar:'#a855f7', iris:'#3d2b1f', brows:'#1f1917', beard:0.32 },
+  { id:'helena', name:'Helena', role:'Jornalismo & TV', voice:'shimmer', bg1:'#1d2c59', bg2:'#0b1021', glow:'#60a5fa', skin:'#f3c9b1', skinShadow:'#d5a388', hair:'#6e3f28', hairStyle:'bob', lip:'#c2596b', outfit:'#1e3a8a', collar:'#dbeafe', iris:'#2d5a6b', brows:'#5c3420', beard:0 },
+  { id:'davi', name:'Davi', role:'Criador UGC & Ads', voice:'fable', bg1:'#3d2616', bg2:'#120f1d', glow:'#fb923c', skin:'#b87a56', skinShadow:'#935b3b', hair:'#191514', hairStyle:'short', lip:'#944c52', outfit:'#312e81', collar:'#fde68a', iris:'#2f2017', brows:'#191514', beard:0.10 }
+];
+
+let activeAvatarId = 'clara';
+let activeAvatarName = 'Clara — Executiva & Negócios';
+let avatarLandmarks = { mx:0.50, my:0.548, faceW:0.34, faceH:0.435, eyeLX:0.432, eyeLY:0.403, eyeRX:0.568, eyeRY:0.403 };
+let avatarCalibrating = false;
+let lastAvatarDrawBox = { x:0, y:0, w:360, h:360 };
+let avatarAnimRAF = null;
+let avatarLiveState = { playing:false, audioCtx:null, sourceNode:null, profile:null, startAt:0, duration:0, text:'', synthActive:false, smoothOpen:0, smoothWide:0, clickPulseUntil:0 };
+let avatarCreatedVideoURL = null, avatarCreatedAudioURL = null, lastAvatarThumbDataUrl = '';
+let avatarExtraBullets = [];
+
+function buildStudioAvatarCanvas(p, targetCanvas){
+  const S = AVATAR_SIZE;
+  const c = targetCanvas || document.createElement('canvas');
+  c.width = S; c.height = S;
+  const g = c.getContext('2d');
+  // Studio gradient backdrop + rim bokeh
+  const bg = g.createRadialGradient(S*0.5, S*0.34, S*0.06, S*0.5, S*0.5, S*0.72);
+  bg.addColorStop(0, p.bg1);
+  bg.addColorStop(1, p.bg2);
+  g.fillStyle = bg; g.fillRect(0, 0, S, S);
+  const rim = g.createRadialGradient(S*0.5, S*0.38, S*0.08, S*0.5, S*0.38, S*0.42);
+  rim.addColorStop(0, p.glow + '33');
+  rim.addColorStop(1, 'transparent');
+  g.fillStyle = rim; g.fillRect(0, 0, S, S);
+
+  const cx = S * 0.5, cy = S * 0.44, rx = S * 0.17, ry = S * 0.217;
+
+  // Back hair layer (for long/bob/curly styles)
+  g.fillStyle = p.hair;
+  if(p.hairStyle === 'long'){
+    g.beginPath();
+    g.ellipse(cx, cy + S*0.05, rx*1.34, ry*1.42, 0, 0, Math.PI*2);
+    g.fill();
+  } else if(p.hairStyle === 'bob'){
+    g.beginPath();
+    g.ellipse(cx, cy + S*0.02, rx*1.28, ry*1.18, 0, 0, Math.PI*2);
+    g.fill();
+  } else if(p.hairStyle === 'curly'){
+    for(let a=0;a<12;a++){
+      const ang = (a/12)*Math.PI*2;
+      g.beginPath();
+      g.arc(cx + Math.cos(ang)*rx*1.14, cy - S*0.02 + Math.sin(ang)*ry*0.95, S*0.062, 0, Math.PI*2);
+      g.fill();
+    }
+  }
+
+  // Shoulders & studio outfit
+  const shGrad = g.createLinearGradient(0, S*0.64, 0, S);
+  shGrad.addColorStop(0, p.outfit);
+  shGrad.addColorStop(1, '#070913');
+  g.fillStyle = shGrad;
+  g.beginPath();
+  g.moveTo(cx - S*0.36, S);
+  g.quadraticCurveTo(cx - S*0.34, S*0.68, cx - S*0.08, S*0.655);
+  g.lineTo(cx + S*0.08, S*0.655);
+  g.quadraticCurveTo(cx + S*0.34, S*0.68, cx + S*0.36, S);
+  g.closePath();
+  g.fill();
+
+  // Collar / V-lapel accent
+  g.fillStyle = p.collar;
+  g.beginPath();
+  g.moveTo(cx - S*0.075, S*0.655);
+  g.lineTo(cx, S*0.79);
+  g.lineTo(cx + S*0.075, S*0.655);
+  g.closePath();
+  g.fill();
+
+  // Neck + soft chin shadow
+  const neckGrad = g.createLinearGradient(0, S*0.56, 0, S*0.70);
+  neckGrad.addColorStop(0, p.skinShadow);
+  neckGrad.addColorStop(1, p.skin);
+  g.fillStyle = neckGrad;
+  g.beginPath();
+  g.roundRect(cx - S*0.062, S*0.56, S*0.124, S*0.135, S*0.04);
+  g.fill();
+
+  // Ears
+  g.fillStyle = p.skinShadow;
+  g.beginPath(); g.ellipse(cx - rx*0.99, cy + S*0.012, S*0.022, S*0.044, -0.1, 0, Math.PI*2); g.fill();
+  g.beginPath(); g.ellipse(cx + rx*0.99, cy + S*0.012, S*0.022, S*0.044, 0.1, 0, Math.PI*2); g.fill();
+
+  // Head contour with 3D studio key light
+  const faceGrad = g.createRadialGradient(cx - rx*0.22, cy - ry*0.25, rx*0.1, cx, cy, ry*1.12);
+  faceGrad.addColorStop(0, p.skin);
+  faceGrad.addColorStop(0.78, p.skin);
+  faceGrad.addColorStop(1, p.skinShadow);
+  g.fillStyle = faceGrad;
+  g.beginPath();
+  g.ellipse(cx, cy, rx, ry, 0, 0, Math.PI*2);
+  g.fill();
+
+  // Optional subtle beard/stubble shading (moves with jaw naturally during lip-sync!)
+  if(p.beard > 0){
+    g.save();
+    g.beginPath(); g.ellipse(cx, cy, rx*0.985, ry*0.985, 0, 0, Math.PI*2); g.clip();
+    const bGrad = g.createLinearGradient(0, cy + ry*0.18, 0, cy + ry);
+    bGrad.addColorStop(0, 'rgba(25,20,20,0)');
+    bGrad.addColorStop(0.45, `rgba(28,22,22,${p.beard})`);
+    bGrad.addColorStop(1, `rgba(24,19,19,${p.beard*1.25})`);
+    g.fillStyle = bGrad;
+    g.fillRect(cx - rx, cy + ry*0.15, rx*2, ry);
+    g.restore();
+  }
+
+  // Subtle cheek warmth
+  for(const dir of [-1, 1]){
+    const ch = g.createRadialGradient(cx + dir*rx*0.52, cy + ry*0.14, 2, cx + dir*rx*0.52, cy + ry*0.14, rx*0.36);
+    ch.addColorStop(0, 'rgba(225,110,115,0.13)');
+    ch.addColorStop(1, 'transparent');
+    g.fillStyle = ch;
+    g.fillRect(cx - rx, cy - ry, rx*2, ry*2);
+  }
+
+  // Eyes (exact y = 0.403*S = 290.16, dx = ±0.068*S = ±49)
+  const eyeY = S * 0.403, eyeDX = S * 0.068;
+  for(const dir of [-1, 1]){
+    const ex = cx + dir * eyeDX;
+    // Sclera
+    g.fillStyle = '#f8fafc';
+    g.beginPath(); g.ellipse(ex, eyeY, S*0.030, S*0.0165, 0, 0, Math.PI*2); g.fill();
+    // Iris
+    g.fillStyle = p.iris;
+    g.beginPath(); g.arc(ex, eyeY, S*0.0135, 0, Math.PI*2); g.fill();
+    // Pupil + studio catchlights
+    g.fillStyle = '#09090b';
+    g.beginPath(); g.arc(ex, eyeY, S*0.0068, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#ffffff';
+    g.beginPath(); g.arc(ex - S*0.0042, eyeY - S*0.0042, S*0.0032, 0, Math.PI*2); g.fill();
+    g.beginPath(); g.arc(ex + S*0.0035, eyeY + S*0.0032, S*0.0016, 0, Math.PI*2); g.fill();
+    // Upper lash crease
+    g.strokeStyle = '#181218'; g.lineWidth = S*0.0042; g.lineCap = 'round';
+    g.beginPath();
+    g.moveTo(ex - S*0.031, eyeY + S*0.002);
+    g.quadraticCurveTo(ex, eyeY - S*0.020, ex + S*0.031, eyeY + S*0.002);
+    g.stroke();
+    // Eyebrow
+    g.strokeStyle = p.brows; g.lineWidth = S*0.0075;
+    g.beginPath();
+    g.moveTo(ex - S*0.034*dir, eyeY - S*0.031);
+    g.quadraticCurveTo(ex, eyeY - S*0.043, ex + S*0.036*dir, eyeY - S*0.028);
+    g.stroke();
+  }
+
+  // Soft nose bridge & tip
+  g.strokeStyle = p.skinShadow; g.lineWidth = S*0.0042; g.lineCap = 'round';
+  g.beginPath();
+  g.moveTo(cx - S*0.004, eyeY + S*0.018);
+  g.quadraticCurveTo(cx - S*0.008, S*0.478, cx, S*0.486);
+  g.stroke();
+  g.fillStyle = p.skinShadow;
+  g.beginPath(); g.ellipse(cx, S*0.490, S*0.019, S*0.008, 0, 0, Math.PI); g.fill();
+
+  // Natural closed lips at exact y = 0.548 * S = 394.6
+  const my = S * 0.548, mw = S * 0.048;
+  // Upper lip
+  g.fillStyle = p.lip;
+  g.beginPath();
+  g.moveTo(cx - mw, my);
+  g.quadraticCurveTo(cx - mw*0.45, my - S*0.013, cx - mw*0.12, my - S*0.008);
+  g.lineTo(cx, my - S*0.0105);
+  g.lineTo(cx + mw*0.12, my - S*0.008);
+  g.quadraticCurveTo(cx + mw*0.45, my - S*0.013, cx + mw, my);
+  g.closePath();
+  g.fill();
+  // Lower lip
+  g.globalAlpha = 0.9;
+  g.beginPath();
+  g.moveTo(cx - mw, my);
+  g.quadraticCurveTo(cx, my + S*0.019, cx + mw, my);
+  g.closePath();
+  g.fill();
+  g.globalAlpha = 1;
+  // Lip parting line
+  g.strokeStyle = 'rgba(40,14,20,0.55)'; g.lineWidth = S*0.0026;
+  g.beginPath();
+  g.moveTo(cx - mw*0.95, my);
+  g.quadraticCurveTo(cx, my + S*0.002, cx + mw*0.95, my);
+  g.stroke();
+
+  // Front hair crown
+  g.fillStyle = p.hair;
+  g.beginPath();
+  g.ellipse(cx, cy - ry*0.76, rx*1.08, ry*0.44, 0, Math.PI, Math.PI*2);
+  g.fill();
+  if(p.hairStyle === 'long' || p.hairStyle === 'bob'){
+    g.beginPath();
+    g.moveTo(cx - rx*1.05, cy - ry*0.55);
+    g.quadraticCurveTo(cx - S*0.02, cy - ry*0.95, cx + rx*1.05, cy - ry*0.45);
+    g.quadraticCurveTo(cx + rx*0.98, cy - ry*1.12, cx - rx*1.05, cy - ry*0.55);
+    g.fill();
+  }
+  return c;
+}
+
+function initAvatarPresets(){
+  const grid = document.getElementById('avatarPresetGrid');
+  if(!grid) return;
+  grid.innerHTML = '';
+  AVATAR_PRESETS.forEach((p, idx) => {
+    const c = buildStudioAvatarCanvas(p);
+    const thumb = c.toDataURL('image/jpeg', 0.86);
+    p._thumb = thumb;
+    const div = document.createElement('div');
+    div.className = 'avatar-item' + (idx === 0 ? ' active' : '');
+    div.id = 'av-card-' + p.id;
+    div.onclick = () => selectStudioAvatar(p.id);
+    div.innerHTML = `<img src="${thumb}" alt="${p.name}"><div class="av-name">${p.name}</div><div class="av-role">${p.role}</div>`;
+    grid.appendChild(div);
+  });
+  selectStudioAvatar('clara', true);
+}
+
+function selectStudioAvatar(id, silent){
+  const p = AVATAR_PRESETS.find(x => x.id === id) || AVATAR_PRESETS[0];
+  activeAvatarId = p.id;
+  activeAvatarName = `${p.name} — ${p.role}`;
+  document.querySelectorAll('.avatar-item').forEach(el => el.classList.toggle('active', el.id === 'av-card-' + p.id));
+  buildStudioAvatarCanvas(p, avatarSourceCanvas);
+  avatarLandmarks = { mx:0.50, my:0.548, faceW:0.34, faceH:0.435, eyeLX:0.432, eyeLY:0.403, eyeRX:0.568, eyeRY:0.403 };
+  const lbl = document.getElementById('avatarActiveLabel');
+  if(lbl) lbl.textContent = activeAvatarName;
+  const vSel = document.getElementById('avatarVoice');
+  if(vSel && p.voice) vSel.value = p.voice;
+  if(!silent) toast(`🗣️ Avatar ${p.name} selecionado`);
+  ensureAvatarLoop();
+}
+
+async function detectAvatarLandmarks(canvas){
+  const S = canvas.width;
+  // 1) Native FaceDetector (Chromium / Android Chrome)
+  if('FaceDetector' in window){
+    try{
+      const fd = new window.FaceDetector({ fastMode:false, maxDetectedFaces:1 });
+      const faces = await fd.detect(canvas);
+      if(faces && faces.length){
+        const f = faces[0];
+        const b = f.boundingBox;
+        const fw = Math.max(0.16, Math.min(0.75, b.width / S));
+        const fh = Math.max(0.20, Math.min(0.82, b.height / S));
+        let mx = (b.x + b.width * 0.5) / S;
+        let my = (b.y + b.height * 0.76) / S;
+        let eyes = [];
+        for(const lm of (f.landmarks || [])){
+          if(lm.type === 'mouth' && lm.locations && lm.locations[0]){
+            mx = lm.locations[0].x / S;
+            my = lm.locations[0].y / S;
+          }
+          if(lm.type === 'eye' && lm.locations && lm.locations[0]){
+            eyes.push({ x: lm.locations[0].x / S, y: lm.locations[0].y / S });
+          }
+        }
+        eyes.sort((a,b) => a.x - b.x);
+        return {
+          mx, my, faceW: fw, faceH: fh,
+          eyeLX: eyes[0] ? eyes[0].x : (b.x + b.width * 0.34) / S,
+          eyeLY: eyes[0] ? eyes[0].y : (b.y + b.height * 0.38) / S,
+          eyeRX: eyes[1] ? eyes[1].x : (b.x + b.width * 0.66) / S,
+          eyeRY: eyes[1] ? eyes[1].y : (b.y + b.height * 0.38) / S
+        };
+      }
+    }catch(e){}
+  }
+  // 2) Skin-cluster + horizontal lip/eye contrast heuristic on 120x120 thumbnail
+  try{
+    const N = 120;
+    const tc = document.createElement('canvas'); tc.width = N; tc.height = N;
+    const tx = tc.getContext('2d');
+    tx.drawImage(canvas, 0, 0, N, N);
+    const d = tx.getImageData(0, 0, N, N).data;
+    let sumX = 0, sumY = 0, cnt = 0, minX = N, maxX = 0, minY = N, maxY = 0;
+    for(let y = Math.floor(N*0.08); y < Math.floor(N*0.78); y++){
+      for(let x = Math.floor(N*0.16); x < Math.floor(N*0.84); x++){
+        const i = (y*N + x)*4;
+        const r = d[i], g = d[i+1], b = d[i+2];
+        const maxC = Math.max(r,g,b), minC = Math.min(r,g,b);
+        const isSkin = r > 75 && g > 40 && b > 25 && r > b && (maxC - minC) > 14 && Math.abs(r - g) > 8;
+        if(isSkin){
+          sumX += x; sumY += y; cnt++;
+          if(x < minX) minX = x; if(x > maxX) maxX = x;
+          if(y < minY) minY = y; if(y > maxY) maxY = y;
+        }
+      }
+    }
+    if(cnt > N*N*0.04){
+      const cx = Math.max(0.32, Math.min(0.68, (sumX / cnt) / N));
+      const fw = Math.max(0.24, Math.min(0.56, (maxX - minX) / N * 0.88));
+      const topY = Math.max(0.08, minY / N);
+      const fh = Math.max(0.28, Math.min(0.62, Math.min((maxY - minY) / N, fw * 1.32)));
+      // Scan mouth band [topY + 0.60*fh .. topY + 0.86*fh] for strongest lip redness/contrast
+      let bestMy = topY + fh * 0.74, bestScore = -1;
+      const x0 = Math.max(2, Math.floor((cx - fw*0.18)*N)), x1 = Math.min(N-2, Math.ceil((cx + fw*0.18)*N));
+      for(let y = Math.max(2, Math.floor((topY + fh*0.58)*N)); y <= Math.min(N-3, Math.ceil((topY + fh*0.86)*N)); y++){
+        let sc = 0;
+        for(let x = x0; x <= x1; x++){
+          const i = (y*N + x)*4, iu = ((y-1)*N + x)*4, idn = ((y+1)*N + x)*4;
+          const vGrad = Math.abs((d[iu]+d[iu+1]+d[iu+2]) - (d[idn]+d[idn+1]+d[idn+2]));
+          const redness = Math.max(0, d[i] - d[i+1]*0.92);
+          sc += vGrad * 0.65 + redness * 1.4;
+        }
+        if(sc > bestScore){ bestScore = sc; bestMy = y / N; }
+      }
+      const eyeY = Math.max(0.18, bestMy - fh * 0.34);
+      return {
+        mx: cx, my: Math.max(0.30, Math.min(0.76, bestMy)),
+        faceW: fw, faceH: fh,
+        eyeLX: cx - fw * 0.20, eyeLY: eyeY,
+        eyeRX: cx + fw * 0.20, eyeRY: eyeY
+      };
+    }
+  }catch(e){}
+  return { mx:0.50, my:0.52, faceW:0.36, faceH:0.46, eyeLX:0.425, eyeLY:0.37, eyeRX:0.575, eyeRY:0.37 };
+}
+
+async function applyCustomAvatarBitmap(bitmap, label){
+  const S = AVATAR_SIZE;
+  const ctx = avatarSourceCanvas.getContext('2d');
+  ctx.clearRect(0, 0, S, S);
+  const iw = bitmap.width, ih = bitmap.height;
+  const side = Math.min(iw, ih);
+  const sx = Math.max(0, (iw - side) / 2);
+  const sy = Math.max(0, (ih - side) * 0.16); // prioriza cabeça e ombros em fotos verticais
+  ctx.drawImage(bitmap, sx, sy, side, side, 0, 0, S, S);
+  avatarLandmarks = await detectAvatarLandmarks(avatarSourceCanvas);
+  activeAvatarId = 'custom';
+  activeAvatarName = label || 'Foto Personalizada';
+  document.querySelectorAll('.avatar-item').forEach(el => el.classList.remove('active'));
+  const lbl = document.getElementById('avatarActiveLabel');
+  if(lbl) lbl.textContent = activeAvatarName;
+  avatarLiveState.clickPulseUntil = performance.now() + 900;
+  ensureAvatarLoop();
+}
+
+async function onUploadAvatarPhoto(ev){
+  const file = ev.target && ev.target.files && ev.target.files[0];
+  if(!file) return;
+  try{
+    const bmp = await createImageBitmap(file);
+    await applyCustomAvatarBitmap(bmp, '📷 ' + file.name.slice(0, 26));
+    toast('📷 Foto carregada! Se precisar, ajuste o ponto da boca em 🎯 Ajustar Boca.');
+  }catch(e){
+    toast('Erro ao ler imagem: ' + e.message, 'error');
+  }
+}
+
+async function generateAiAvatarPortrait(){
+  const btn = document.getElementById('genAvatarBtn');
+  const prompt = (document.getElementById('avatarAiPrompt').value || '').trim();
+  const style = document.getElementById('avatarAiStyle').value;
+  btn.disabled = true; btn.textContent = '⏳ Gerando...';
+  try{
+    const r = await fetch('/api/avatar', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'portrait', prompt: prompt || 'apresentador carismático em estúdio moderno', style })
+    });
+    const j = await r.json();
+    if(j && j.imageBase64){
+      const blob = await (await fetch(`data:${j.mime||'image/png'};base64,${j.imageBase64}`)).blob();
+      const bmp = await createImageBitmap(blob);
+      await applyCustomAvatarBitmap(bmp, '✨ Avatar IA (' + (j.model || 'novo') + ')');
+      toast('✨ Apresentador gerado por ' + (j.model || 'IA') + '!');
+    } else {
+      // Fallback local imediato baseado na descrição do usuário
+      const hash = Array.from(prompt || style).reduce((a,c) => ((a<<5)-a)+c.charCodeAt(0), 0);
+      const base = Object.assign({}, AVATAR_PRESETS[Math.abs(hash) % AVATAR_PRESETS.length]);
+      base.glow = ['#00d4ff','#a855f7','#34d399','#fb923c','#f472b6'][Math.abs(hash>>3)%5];
+      buildStudioAvatarCanvas(base, avatarSourceCanvas);
+      avatarLandmarks = { mx:0.50, my:0.548, faceW:0.34, faceH:0.435, eyeLX:0.432, eyeLY:0.403, eyeRX:0.568, eyeRY:0.403 };
+      activeAvatarId = 'custom-local';
+      activeAvatarName = '✨ ' + (prompt ? prompt.slice(0, 26) : 'Avatar Estúdio');
+      document.getElementById('avatarActiveLabel').textContent = activeAvatarName;
+      toast('🎨 Avatar de estúdio criado localmente (sem API de imagem externa ativa)', 'warn');
+    }
+  }catch(e){
+    toast('⚠️ ' + e.message, 'warn');
+  }finally{
+    btn.disabled = false; btn.textContent = '🎨 Gerar Rosto IA';
+  }
+}
+
+function toggleMouthCalibration(){
+  avatarCalibrating = !avatarCalibrating;
+  const cv = document.getElementById('avatarPreviewCanvas');
+  const banner = document.getElementById('calibBanner');
+  const btn = document.getElementById('calibMouthBtn');
+  if(cv) cv.classList.toggle('calibrating', avatarCalibrating);
+  if(banner) banner.classList.toggle('hidden', !avatarCalibrating);
+  if(btn) btn.textContent = avatarCalibrating ? '✅ Concluir Ajuste' : '🎯 Ajustar Boca';
+}
+
+function onAvatarCanvasClick(ev){
+  if(!avatarCalibrating){
+    toggleAvatarLivePreview();
+    return;
+  }
+  const cv = document.getElementById('avatarPreviewCanvas');
+  const rect = cv.getBoundingClientRect();
+  const cx = (ev.clientX - rect.left) * (cv.width / Math.max(1, rect.width));
+  const cy = (ev.clientY - rect.top) * (cv.height / Math.max(1, rect.height));
+  const b = lastAvatarDrawBox;
+  if(!b || b.w < 10) return;
+  const nx = Math.max(0.18, Math.min(0.82, (cx - b.x) / b.w));
+  const ny = Math.max(0.22, Math.min(0.85, (cy - b.y) / b.h));
+  const dx = nx - avatarLandmarks.mx;
+  const dy = ny - avatarLandmarks.my;
+  avatarLandmarks.mx = nx;
+  avatarLandmarks.my = ny;
+  avatarLandmarks.eyeLX = Math.max(0.15, Math.min(0.85, avatarLandmarks.eyeLX + dx));
+  avatarLandmarks.eyeRX = Math.max(0.15, Math.min(0.85, avatarLandmarks.eyeRX + dx));
+  avatarLandmarks.eyeLY = Math.max(0.12, Math.min(0.75, avatarLandmarks.eyeLY + dy * 0.45));
+  avatarLandmarks.eyeRY = Math.max(0.12, Math.min(0.75, avatarLandmarks.eyeRY + dy * 0.45));
+  avatarLiveState.clickPulseUntil = performance.now() + 950;
+  toast('🎯 Ponto da boca atualizado! Veja o teste de abertura.');
+}
+
+// Deformação inversa contínua C⁰: pálpebras (piscar natural com a própria pele da foto) + mandíbula/lábios (lip-sync)
+function renderWarpedPortraitCanvas(mouthOpen, mouthWide, blinkAmt, allowLipWarp){
+  const S = AVATAR_SIZE;
+  const wctx = avatarWorkCanvas.getContext('2d');
+  wctx.clearRect(0, 0, S, S);
+  wctx.drawImage(avatarSourceCanvas, 0, 0, S, S);
+
+  const lm = avatarLandmarks;
+  const fw = lm.faceW * S, fh = lm.faceH * S;
+
+  // 1) Piscar natural esticando suavemente a pálpebra superior da própria imagem (sem cor artificial)
+  if(blinkAmt > 0.025){
+    const erx = fw * 0.115, ery = fw * 0.052;
+    for(const [exN, eyN] of [[lm.eyeLX, lm.eyeLY], [lm.eyeRX, lm.eyeRY]]){
+      const ex = exN * S, ey = eyN * S;
+      const y0 = ey - ery, totalH = ery * 2;
+      const lidLine = 0.36 + 0.50 * blinkAmt;
+      wctx.save();
+      wctx.beginPath();
+      wctx.ellipse(ex, ey, erx, ery * 1.08, 0, 0, Math.PI*2);
+      wctx.clip();
+      for(let y = y0; y < y0 + totalH; y += 1.5){
+        const t = (y - y0) / totalH;
+        const srcT = t <= lidLine
+          ? (t / lidLine) * 0.36
+          : 0.36 + ((t - lidLine) / Math.max(0.05, 1 - lidLine)) * 0.64;
+        wctx.drawImage(avatarSourceCanvas, ex - erx, y0 + srcT * totalH, erx * 2, 2.2, ex - erx, y, erx * 2, 2.2);
+      }
+      wctx.strokeStyle = `rgba(18,12,16,${0.18 * blinkAmt})`;
+      wctx.lineWidth = Math.max(1.2, S * 0.0024);
+      wctx.beginPath();
+      const ly = y0 + lidLine * totalH;
+      wctx.moveTo(ex - erx * 0.78, ly);
+      wctx.quadraticCurveTo(ex, ly + ery * 0.16 * blinkAmt, ex + erx * 0.78, ly);
+      wctx.stroke();
+      wctx.restore();
+    }
+  }
+
+  // 2) Lip-sync + descida suave do queixo/mandíbula
+  if(allowLipWarp && mouthOpen > 0.015){
+    const mx = lm.mx * S, my = lm.my * S;
+    const lipRx = fw * 0.142 * (1 + 0.18 * mouthWide);
+    const jawRx = fw * 0.31;
+    const yTop = my - fh * 0.075;
+    const yBot = my + fh * 0.295;
+    const gap = Math.min(fh * 0.082, mouthOpen * fh * 0.072);
+    const uLip = my - gap * 0.22;
+    const lLip = my + gap * 0.78;
+
+    wctx.save();
+    wctx.beginPath();
+    wctx.ellipse(mx, (yTop + yBot) * 0.5, jawRx, (yBot - yTop) * 0.5, 0, 0, Math.PI*2);
+    wctx.clip();
+
+    const step = 2;
+    for(let y = yTop; y < yBot; y += step){
+      let srcY;
+      if(y <= uLip){
+        srcY = yTop + ((y - yTop) / Math.max(1, uLip - yTop)) * (my - yTop);
+      } else if(y >= lLip){
+        srcY = my + ((y - lLip) / Math.max(1, yBot - lLip)) * (yBot - my);
+      } else {
+        srcY = my;
+      }
+      wctx.drawImage(avatarSourceCanvas, mx - jawRx, srcY, jawRx * 2, step + 0.9, mx - jawRx, y, jawRx * 2, step + 0.9);
+    }
+
+    // Cavidade oral suave e natural estritamente dentro do contorno amendoado dos lábios
+    if(gap > 1.2){
+      wctx.save();
+      wctx.beginPath();
+      wctx.moveTo(mx - lipRx, my + gap * 0.12);
+      wctx.quadraticCurveTo(mx, uLip - gap * 0.10, mx + lipRx, my + gap * 0.12);
+      wctx.quadraticCurveTo(mx, lLip + gap * 0.16, mx - lipRx, my + gap * 0.12);
+      wctx.closePath();
+      wctx.clip();
+
+      const cav = wctx.createLinearGradient(0, uLip, 0, lLip);
+      cav.addColorStop(0, '#1f0b10');
+      cav.addColorStop(0.55, '#2b1016');
+      cav.addColorStop(1, '#3d1921');
+      wctx.fillStyle = cav;
+      wctx.fillRect(mx - lipRx, uLip - 2, lipRx * 2, (lLip - uLip) + 6);
+
+      // Leve reflexo suave dos dentes superiores em vogais abertas
+      if(mouthOpen > 0.24){
+        const teethAlpha = Math.min(0.62, (mouthOpen - 0.24) * 1.5);
+        wctx.fillStyle = `rgba(241,236,232,${teethAlpha})`;
+        wctx.beginPath();
+        wctx.roundRect(mx - lipRx * 0.66, uLip - 1, lipRx * 1.32, Math.max(2, gap * 0.27), 3);
+        wctx.fill();
+      }
+      // Língua sutil ao fundo
+      wctx.fillStyle = 'rgba(158,72,82,0.42)';
+      wctx.beginPath();
+      wctx.ellipse(mx, lLip + gap * 0.05, lipRx * 0.52, gap * 0.32, 0, Math.PI, Math.PI*2);
+      wctx.fill();
+      wctx.restore();
+    }
+    wctx.restore();
+  }
+  return avatarWorkCanvas;
+}
+
+// Piscar natural orgânico a cada ~3.8s com piscada dupla ocasional
+function blinkAtTime(t){
+  const cycle = 3.9;
+  const phase = t % cycle;
+  const pulse = (p, w) => (p >= 0 && p <= w) ? Math.sin(Math.PI * (p / w)) : 0;
+  let b = pulse(phase - 1.1, 0.15);
+  if(Math.floor(t / cycle) % 3 === 1) b = Math.max(b, pulse(phase - 1.36, 0.13));
+  return b;
+}
+
+// Extrai envelope acústico real do AudioBuffer (antecipação labial de 22ms + vogal ZCR)
+function buildPcmLipProfile(audioBuffer){
+  const sr = audioBuffer.sampleRate;
+  const ch = audioBuffer.getChannelData(0);
+  const fps = 60;
+  const nFrames = Math.max(1, Math.ceil(audioBuffer.duration * fps));
+  const rawRms = new Float32Array(nFrames);
+  const rawZcr = new Float32Array(nFrames);
+  const win = Math.max(64, Math.floor(sr * 0.042));
+  const lookahead = Math.floor(sr * 0.022);
+
+  for(let f = 0; f < nFrames; f++){
+    const center = Math.floor((f / fps) * sr) + lookahead;
+    const s0 = Math.max(0, center - (win >> 1));
+    const s1 = Math.min(ch.length - 1, s0 + win);
+    let sumSq = 0, zc = 0;
+    for(let i = s0; i < s1; i++){
+      const v = ch[i];
+      sumSq += v * v;
+      if((v >= 0 && ch[i+1] < 0) || (v < 0 && ch[i+1] >= 0)) zc++;
+    }
+    const len = Math.max(1, s1 - s0);
+    rawRms[f] = Math.sqrt(sumSq / len);
+    rawZcr[f] = zc / len;
+  }
+
+  // Normaliza pelo percentil 95 para funcionar igual em qualquer volume de TTS
+  const sorted = Array.from(rawRms).sort((a,b) => a - b);
+  const p95 = Math.max(0.015, sorted[Math.floor(sorted.length * 0.95)] || 0.08);
+  const openArr = new Float32Array(nFrames);
+  const wideArr = new Float32Array(nFrames);
+  let smO = 0, smW = 0;
+  for(let f = 0; f < nFrames; f++){
+    let norm = Math.min(1.15, rawRms[f] / p95);
+    norm = norm < 0.085 ? 0 : Math.min(1, Math.pow((norm - 0.085) / 0.915, 0.78));
+    smO = norm > smO ? smO + (norm - smO) * 0.54 : smO + (norm - smO) * 0.25;
+    const targetW = norm < 0.04 ? 0 : Math.max(-0.35, Math.min(0.45, (rawZcr[f] - 0.09) * 3.2));
+    smW += (targetW - smW) * 0.30;
+    openArr[f] = smO;
+    wideArr[f] = smW;
+  }
+  return { fps, openArr, wideArr, duration: audioBuffer.duration };
+}
+
+// Fallback fonético sílaba-a-sílaba quando testando sem áudio decodificado
+function phonemeMouthAt(text, t, totalDur){
+  if(!text || totalDur <= 0 || t < 0 || t >= totalDur) return { open:0, wide:0 };
+  const idx = Math.min(text.length - 1, Math.floor((t / totalDur) * text.length));
+  const ch = text[idx].toLowerCase();
+  if('.,;:!?—\n'.includes(ch)) return { open:0, wide:0 };
+  if(ch === ' ') return { open:0.06, wide:0 };
+  if('mbp'.includes(ch)) return { open:0.02, wide:0 };
+  if('aáàâã'.includes(ch)) return { open:0.86, wide:0.10 };
+  if('eéê'.includes(ch)) return { open:0.56, wide:0.34 };
+  if('iíy'.includes(ch)) return { open:0.34, wide:0.44 };
+  if('oóôõ'.includes(ch)) return { open:0.68, wide:-0.28 };
+  if('uú'.includes(ch)) return { open:0.36, wide:-0.34 };
+  if('szcxj'.includes(ch)) return { open:0.22, wide:0.35 };
+  return { open:0.32, wide:0.05 };
+}
+
+// Divide o roteiro em blocos cronometrados com palavras individuais para legenda Karaokê + .SRT
+function buildTimedCaptions(text, totalDur){
+  const clean = String(text || '').replace(/\s+/g, ' ').trim();
+  if(!clean) return [];
+  const rawWords = clean.split(' ');
+  const groups = [];
+  let cur = [];
+  for(const w of rawWords){
+    cur.push(w);
+    const endsPunct = /[.!?…,:;]$/.test(w);
+    if(cur.length >= 7 || (cur.length >= 4 && endsPunct)){
+      groups.push(cur); cur = [];
+    }
+  }
+  if(cur.length) groups.push(cur);
+  const weights = groups.map(g => g.reduce((a, w) => a + w.length + (/[.!?…]$/.test(w) ? 5 : /[,;:]$/.test(w) ? 2.5 : 1), 0));
+  const sumW = weights.reduce((a,b) => a + b, 0) || 1;
+  let acc = 0;
+  return groups.map((words, gi) => {
+    const dur = (weights[gi] / sumW) * totalDur;
+    const start = acc;
+    const end = acc + dur;
+    acc = end;
+    const wWeights = words.map(w => w.length + 1);
+    const wSum = wWeights.reduce((a,b) => a + b, 0) || 1;
+    let wa = start;
+    const timedWords = words.map((w, wi) => {
+      const wd = (wWeights[wi] / wSum) * dur;
+      const item = { word: w, start: wa, end: wa + wd };
+      wa += wd;
+      return item;
+    });
+    return { text: words.join(' '), words: timedWords, start, end };
+  });
+}
+
+function getAvatarDimensions(fmt){
+  if(fmt === '9:16') return { w: 720, h: 1280 };
+  if(fmt === '1:1') return { w: 960, h: 960 };
+  return { w: 1280, h: 720 };
+}
+
+function refreshAvatarStageConfig(){
+  const fmt = (document.getElementById('avatarFormat') || {}).value || '16:9';
+  const dim = getAvatarDimensions(fmt);
+  const cv = document.getElementById('avatarPreviewCanvas');
+  if(cv && (cv.width !== dim.w || cv.height !== dim.h)){
+    cv.width = dim.w; cv.height = dim.h;
+  }
+}
+
+// Renderiza o quadro completo (cenário + slide opcional + avatar vivo + halo de voz + legendas karaokê + guia de calibração)
+function drawAvatarStageFrame(ctx, opts){
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  const {
+    t = 0, mouthOpen = 0, mouthWide = 0, speaking = false,
+    animMode = 'lipsync', layout = 'center', captionMode = 'karaoke',
+    headline = '', captions = [], bullets = [], showCalib = false
+  } = opts || {};
+
+  // 1) Fundo desfocado de estúdio derivado do próprio retrato + vinheta cinematográfica
+  ctx.save();
+  ctx.fillStyle = '#070712';
+  ctx.fillRect(0, 0, W, H);
+  ctx.globalAlpha = 0.34;
+  ctx.filter = 'blur(26px)';
+  const cover = Math.max(W, H) * 1.16;
+  ctx.drawImage(avatarSourceCanvas, (W - cover)/2, (H - cover)/2, cover, cover);
+  ctx.filter = 'none';
+  ctx.globalAlpha = 1;
+  const vig = ctx.createRadialGradient(W*0.5, H*0.45, Math.min(W,H)*0.15, W*0.5, H*0.5, Math.max(W,H)*0.78);
+  vig.addColorStop(0, 'rgba(10,12,26,0.28)');
+  vig.addColorStop(1, 'rgba(6,6,15,0.86)');
+  ctx.fillStyle = vig;
+  ctx.fillRect(0, 0, W, H);
+
+  // Grade sutil de estúdio
+  const orb = ctx.createRadialGradient(W*0.82, H*0.18, 10, W*0.82, H*0.18, W*0.45);
+  orb.addColorStop(0, 'rgba(6,182,212,0.14)');
+  orb.addColorStop(1, 'transparent');
+  ctx.fillStyle = orb; ctx.fillRect(0, 0, W, H);
+  ctx.restore();
+
+  const blink = blinkAtTime(t);
+  const portrait = renderWarpedPortraitCanvas(mouthOpen, mouthWide, blink, animMode !== 'gentle');
+
+  // Micro-movimento natural de cabeça e respiração ("Avatar IV performance")
+  const breath = Math.sin(t * 1.65) * 0.0055;
+  const talkEnergy = speaking ? mouthOpen : 0;
+  const tilt = Math.sin(t * 1.15) * 0.008 + Math.sin(t * 2.7) * 0.011 * talkEnergy;
+  const bobY = Math.sin(t * 1.65) * (H * 0.004) - talkEnergy * (H * 0.006);
+  const dynScale = 1 + breath + talkEnergy * 0.014;
+
+  const isLandscape = W > H;
+  let avX, avY, avS;
+
+  if(layout === 'slide' && isLandscape){
+    // Apresentador à esquerda em moldura de estúdio + Slide de tópicos à direita
+    avS = Math.min(H * 0.76, W * 0.42);
+    avX = W * 0.055;
+    avY = (H - avS) * 0.46;
+
+    // Painel Slide estilo HeyGen à direita
+    const sx = avX + avS + W * 0.04;
+    const sw = W - sx - W * 0.05;
+    const sy = H * 0.13, sh = H * 0.70;
+    ctx.save();
+    ctx.fillStyle = 'rgba(17, 19, 38, 0.84)';
+    ctx.strokeStyle = 'rgba(124, 58, 237, 0.45)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(sx, sy, sw, sh, 22); ctx.fill(); ctx.stroke();
+
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = `800 ${Math.round(H*0.022)}px Inter, sans-serif`;
+    ctx.fillText('⚡ DESTAQUES DA APRESENTAÇÃO', sx + 28, sy + 42);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `800 ${Math.round(H*0.042)}px Inter, sans-serif`;
+    let curY = wrapText(ctx, headline || activeAvatarName, sx + 28, sy + 88, sw - 56, Math.round(H*0.050)) + 26;
+
+    const list = bullets.length ? bullets : captions.slice(0, 4).map(c => c.text);
+    const activeIdx = list.length ? Math.min(list.length - 1, Math.floor((t / Math.max(1, (captions[captions.length-1]?.end || 10))) * list.length)) : 0;
+    list.slice(0, 4).forEach((item, idx) => {
+      if(curY > sy + sh - 36) return;
+      const isAct = idx === activeIdx && speaking;
+      ctx.fillStyle = isAct ? 'rgba(124,58,237,0.30)' : 'rgba(255,255,255,0.04)';
+      ctx.beginPath(); ctx.roundRect(sx + 20, curY - 24, sw - 40, 52, 12); ctx.fill();
+      ctx.fillStyle = isAct ? '#38bdf8' : '#a5b4fc';
+      ctx.font = `700 ${Math.round(H*0.025)}px Inter, sans-serif`;
+      const shortItem = item.length > 62 ? item.slice(0, 60) + '…' : item;
+      ctx.fillText((isAct ? '▶ ' : '• ') + shortItem, sx + 34, curY + 8);
+      curY += 64;
+    });
+    ctx.restore();
+  } else if(layout === 'slide' && !isLandscape){
+    // Vertical 9:16 ou 1:1 com Card de tópico no topo + Apresentador em destaque
+    const pad = W * 0.06;
+    const ch = H * 0.22;
+    ctx.save();
+    ctx.fillStyle = 'rgba(17, 19, 38, 0.86)';
+    ctx.strokeStyle = 'rgba(6, 182, 212, 0.45)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(pad, H*0.05, W - pad*2, ch, 20); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = `800 ${Math.round(W*0.030)}px Inter, sans-serif`;
+    ctx.fillText('⚡ EM DESTAQUE', pad + 22, H*0.05 + 38);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `800 ${Math.round(W*0.046)}px Inter, sans-serif`;
+    wrapText(ctx, headline || activeAvatarName, pad + 22, H*0.05 + 84, W - pad*2 - 44, Math.round(W*0.054));
+    ctx.restore();
+
+    avS = Math.min(W * 0.86, H * 0.56);
+    avX = (W - avS) * 0.5;
+    avY = H * 0.30;
+  } else {
+    // Apresentador em tela cheia / destaque central
+    avS = isLandscape ? Math.min(H * 0.94, W * 0.62) : Math.min(W * 0.94, H * 0.72);
+    avX = (W - avS) * 0.5;
+    avY = isLandscape ? (H - avS) * 0.5 : H * 0.12;
+  }
+
+  lastAvatarDrawBox = { x: avX, y: avY, w: avS, h: avS };
+
+  // Halo acústico reativo ao redor do apresentador
+  const cx = avX + avS * 0.5, cy = avY + avS * 0.5;
+  if(mouthOpen > 0.02 || animMode === 'gentle'){
+    const haloR = avS * (0.48 + mouthOpen * 0.075);
+    const hg = ctx.createRadialGradient(cx, cy, avS * 0.34, cx, cy, haloR * 1.12);
+    hg.addColorStop(0, `rgba(124,58,237,${0.20 + mouthOpen * 0.36})`);
+    hg.addColorStop(0.6, `rgba(6,182,212,${0.12 + mouthOpen * 0.26})`);
+    hg.addColorStop(1, 'transparent');
+    ctx.fillStyle = hg;
+    ctx.beginPath(); ctx.arc(cx, cy, haloR * 1.12, 0, Math.PI*2); ctx.fill();
+  }
+
+  // Desenha o apresentador em card arredondado de estúdio com iluminação de borda
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(avX, avY, avS, avS, Math.round(avS * 0.055));
+  ctx.clip();
+  ctx.translate(cx, cy + bobY);
+  ctx.rotate(tilt);
+  ctx.scale(dynScale, dynScale);
+  ctx.drawImage(portrait, -avS * 0.5, -avS * 0.5, avS, avS);
+  ctx.restore();
+
+  // Borda sutil luminosa no card do avatar
+  ctx.save();
+  ctx.strokeStyle = mouthOpen > 0.05 ? `rgba(56,189,248,${0.35 + mouthOpen*0.45})` : 'rgba(255,255,255,0.14)';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.roundRect(avX, avY, avS, avS, Math.round(avS * 0.055));
+  ctx.stroke();
+  ctx.restore();
+
+  // Selo de título discreto no canto superior esquerdo (quando em modo tela cheia)
+  if(headline && layout === 'center'){
+    ctx.save();
+    ctx.font = `700 ${Math.round(Math.min(W,H)*0.026)}px Inter, sans-serif`;
+    const tw = Math.min(W * 0.72, ctx.measureText(headline).width + 38);
+    ctx.fillStyle = 'rgba(12, 14, 28, 0.76)';
+    ctx.strokeStyle = 'rgba(124, 58, 237, 0.55)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.roundRect(24, 22, tw, 44, 999); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#22d3ee';
+    ctx.beginPath(); ctx.arc(44, 44, 5, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillText(headline.slice(0, 52), 58, 51);
+    ctx.restore();
+  }
+
+  // Equalizador de voz ao vivo no canto inferior do avatar quando falando
+  if(speaking){
+    ctx.save();
+    const bars = 9, bw = 5, gapB = 4;
+    const bx0 = avX + avS - (bars * (bw + gapB)) - 18, by0 = avY + avS - 22;
+    for(let b = 0; b < bars; b++){
+      const wave = 0.25 + 0.75 * Math.abs(Math.sin(t * 9 + b * 0.9)) * Math.max(0.18, mouthOpen);
+      const bh = 6 + wave * 22;
+      ctx.fillStyle = b % 2 === 0 ? '#38bdf8' : '#a855f7';
+      ctx.beginPath(); ctx.roundRect(bx0 + b*(bw + gapB), by0 - bh, bw, bh, 3); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // Legendas sincronizadas (Karaokê ou Clássica)
+  if(captionMode !== 'none' && captions.length){
+    const cue = captions.find(c => t >= c.start && t < c.end) || (speaking ? captions[captions.length - 1] : captions[0]);
+    if(cue){
+      ctx.save();
+      const fSize = Math.round(isLandscape ? H * 0.043 : W * 0.048);
+      ctx.font = `800 ${fSize}px Inter, sans-serif`;
+      const maxLineW = W * 0.86;
+      // Quebra palavras em até 2 linhas centralizadas
+      const lines = [];
+      let curLine = [];
+      for(const wObj of cue.words){
+        const test = curLine.map(x => x.word).concat(wObj.word).join(' ');
+        if(curLine.length && ctx.measureText(test).width > maxLineW){
+          lines.push(curLine); curLine = [wObj];
+        } else curLine.push(wObj);
+      }
+      if(curLine.length) lines.push(curLine);
+
+      const lineH = Math.round(fSize * 1.34);
+      const boxH = lines.length * lineH + 26;
+      const boxW = Math.min(W * 0.90, Math.max(...lines.map(l => ctx.measureText(l.map(x=>x.word).join(' ')).width)) + 48);
+      const boxX = (W - boxW) * 0.5;
+      const boxY = H - boxH - (isLandscape ? H * 0.045 : H * 0.065);
+
+      ctx.fillStyle = 'rgba(9, 10, 22, 0.84)';
+      ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.roundRect(boxX, boxY, boxW, boxH, 16); ctx.fill(); ctx.stroke();
+
+      lines.forEach((lineWords, li) => {
+        const fullStr = lineWords.map(x => x.word).join(' ');
+        let xCur = (W - ctx.measureText(fullStr).width) * 0.5;
+        const yCur = boxY + 18 + (li + 0.82) * lineH;
+        lineWords.forEach((wObj, wi) => {
+          const active = captionMode === 'karaoke' && speaking && t >= wObj.start - 0.04 && t <= wObj.end + 0.08;
+          const passed = captionMode === 'karaoke' && speaking && t > wObj.end;
+          const wStr = wObj.word + (wi < lineWords.length - 1 ? ' ' : '');
+          const ww = ctx.measureText(wObj.word).width;
+          if(active){
+            ctx.fillStyle = 'rgba(124, 58, 237, 0.55)';
+            ctx.beginPath(); ctx.roundRect(xCur - 5, yCur - fSize * 0.86, ww + 10, fSize * 1.12, 8); ctx.fill();
+            ctx.fillStyle = '#38bdf8';
+          } else {
+            ctx.fillStyle = passed ? '#e2e8f0' : '#ffffff';
+          }
+          ctx.fillText(wObj.word, xCur, yCur);
+          xCur += ctx.measureText(wStr).width;
+        });
+      });
+      ctx.restore();
+    }
+  }
+
+  // Mira interativa de calibração da boca e olhos (apenas na prévia quando ativado)
+  if(showCalib){
+    const mx = avX + avatarLandmarks.mx * avS, my = avY + avatarLandmarks.my * avS;
+    const elx = avX + avatarLandmarks.eyeLX * avS, ely = avY + avatarLandmarks.eyeLY * avS;
+    const erx = avX + avatarLandmarks.eyeRX * avS, ery = avY + avatarLandmarks.eyeRY * avS;
+    ctx.save();
+    ctx.strokeStyle = '#00d4ff'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(mx, my, 12, 0, Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(mx - 20, my); ctx.lineTo(mx + 20, my); ctx.moveTo(mx, my - 20); ctx.lineTo(mx, my + 20); ctx.stroke();
+    ctx.fillStyle = '#00d4ff'; ctx.font = 'bold 13px Inter, sans-serif';
+    ctx.fillText('👄 BOCA', mx + 16, my + 4);
+    ctx.strokeStyle = '#a855f7';
+    for(const [ex, ey] of [[elx, ely], [erx, ery]]){
+      ctx.beginPath(); ctx.arc(ex, ey, 7, 0, Math.PI*2); ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
+function ensureAvatarLoop(){
+  if(avatarAnimRAF) return;
+  refreshAvatarStageConfig();
+  function tick(){
+    const sec = document.getElementById('avatar');
+    const cv = document.getElementById('avatarPreviewCanvas');
+    if(!sec || !cv){ avatarAnimRAF = null; return; }
+    if(sec.classList.contains('hidden') && !avatarLiveState.playing){
+      avatarAnimRAF = null; return;
+    }
+    const ctx = cv.getContext('2d');
+    const gain = (Number(document.getElementById('avatarMouthGain')?.value) || 100) / 100;
+    const now = performance.now();
+    let t = now / 1000;
+    let mOpen = 0, mWide = 0, speaking = false;
+
+    if(avatarLiveState.playing){
+      const elapsed = avatarLiveState.audioCtx
+        ? (avatarLiveState.audioCtx.currentTime - avatarLiveState.startAt)
+        : ((now - avatarLiveState.startAt) / 1000);
+      t = Math.max(0, elapsed);
+      speaking = true;
+      if(t >= avatarLiveState.duration){
+        stopAvatarLivePreview();
+      } else if(avatarLiveState.profile){
+        const p = avatarLiveState.profile;
+        const fi = Math.min(p.openArr.length - 1, Math.max(0, Math.floor(t * p.fps)));
+        mOpen = p.openArr[fi] * gain;
+        mWide = p.wideArr[fi];
+      } else {
+        const ph = phonemeMouthAt(avatarLiveState.text, t, avatarLiveState.duration);
+        avatarLiveState.smoothOpen += (ph.open * gain - avatarLiveState.smoothOpen) * 0.34;
+        avatarLiveState.smoothWide += (ph.wide - avatarLiveState.smoothWide) * 0.25;
+        mOpen = avatarLiveState.smoothOpen;
+        mWide = avatarLiveState.smoothWide;
+      }
+    } else if(now < avatarLiveState.clickPulseUntil){
+      const rem = (avatarLiveState.clickPulseUntil - now) / 950;
+      mOpen = Math.sin(rem * Math.PI * 3) * 0.72 * gain;
+      mOpen = Math.max(0, mOpen);
+    }
+
+    const scriptTxt = (document.getElementById('avatarScript')?.value || '').trim();
+    const durEst = avatarLiveState.playing ? avatarLiveState.duration : Math.max(4, scriptTxt.split(/\s+/).length / 2.2);
+    const captions = buildTimedCaptions(scriptTxt, durEst);
+
+    drawAvatarStageFrame(ctx, {
+      t,
+      mouthOpen: Math.min(1.25, mOpen),
+      mouthWide: mWide,
+      speaking,
+      animMode: document.getElementById('avatarAnimMode')?.value || 'lipsync',
+      layout: document.getElementById('avatarLayout')?.value || 'center',
+      captionMode: document.getElementById('avatarCaptions')?.value || 'karaoke',
+      headline: document.getElementById('avatarHeadline')?.value || '',
+      captions,
+      bullets: avatarExtraBullets,
+      showCalib: avatarCalibrating
+    });
+
+    avatarAnimRAF = requestAnimationFrame(tick);
+  }
+  avatarAnimRAF = requestAnimationFrame(tick);
+}
+
+function stopAvatarLivePreview(){
+  if(avatarLiveState.sourceNode){
+    try{ avatarLiveState.sourceNode.stop(); }catch(e){}
+    avatarLiveState.sourceNode = null;
+  }
+  if(avatarLiveState.audioCtx){
+    try{ avatarLiveState.audioCtx.close(); }catch(e){}
+    avatarLiveState.audioCtx = null;
+  }
+  if(avatarLiveState.synthActive && 'speechSynthesis' in window){
+    try{ speechSynthesis.cancel(); }catch(e){}
+  }
+  avatarLiveState.playing = false;
+  avatarLiveState.synthActive = false;
+  avatarLiveState.profile = null;
+  const btn = document.getElementById('avatarLiveBtn');
+  if(btn) btn.textContent = '▶️ Testar Fala Ao Vivo';
+}
+
+// Sintetiza o texto completo em partes com /api/tts e devolve AudioBuffer + Blob combinados
+async function synthesizeAvatarSpeech(text, voice, onStep){
+  const sentences = String(text || '').trim().split(/(?<=[.!?…\n])\s+/).filter(Boolean);
+  const chunks = [];
+  let cur = '';
+  for(const s of sentences){
+    if(cur && (cur + ' ' + s).length > 3200){ chunks.push(cur); cur = s; }
+    else cur = cur ? cur + ' ' + s : s;
+  }
+  if(cur) chunks.push(cur);
+
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const decodeCtx = new AC();
+  const decodedBuffers = [];
+  const rawBlobs = [];
+  const providers = new Set();
+
+  try{
+    for(let i = 0; i < chunks.length; i++){
+      if(onStep) onStep(i + 1, chunks.length);
+      const r = await fetch('/api/tts', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ text: chunks[i], voice })
+      });
+      const ct = r.headers.get('content-type') || '';
+      if(!r.ok || !ct.includes('audio')) throw new Error('provedor de voz indisponível');
+      const blob = await r.blob();
+      rawBlobs.push(blob);
+      if(r.headers.get('x-audio-provider')) providers.add(r.headers.get('x-audio-provider'));
+      const ab = await blob.arrayBuffer();
+      const audioBuf = await decodeCtx.decodeAudioData(ab.slice(0));
+      decodedBuffers.push(audioBuf);
+    }
+    if(!decodedBuffers.length) throw new Error('sem áudio decodificado');
+    const sr = decodedBuffers[0].sampleRate;
+    const totalLen = decodedBuffers.reduce((acc, b) => acc + Math.round(b.duration * sr), 0);
+    const merged = decodeCtx.createBuffer(1, Math.max(1, totalLen), sr);
+    const outData = merged.getChannelData(0);
+    let offset = 0;
+    for(const b of decodedBuffers){
+      const d0 = b.getChannelData(0);
+      if(b.sampleRate === sr){
+        outData.set(d0.subarray(0, Math.min(d0.length, outData.length - offset)), offset);
+        offset += d0.length;
+      } else {
+        const nLen = Math.min(outData.length - offset, Math.round(b.duration * sr));
+        for(let j = 0; j < nLen; j++){
+          outData[offset + j] = d0[Math.min(d0.length - 1, Math.floor(j * b.sampleRate / sr))];
+        }
+        offset += nLen;
+      }
+    }
+    const wavBytes = encodeWavMono(outData, sr);
+    await decodeCtx.close().catch(()=>{});
+    return {
+      audioBuffer: merged,
+      downloadBlob: rawBlobs.length === 1 ? rawBlobs[0] : new Blob([wavBytes], { type:'audio/wav' }),
+      ext: rawBlobs.length === 1 && !(rawBlobs[0].type||'').includes('wav') ? 'mp3' : 'wav',
+      providers: [...providers]
+    };
+  }catch(e){
+    await decodeCtx.close().catch(()=>{});
+    return { error: e.message };
+  }
+}
+
+async function toggleAvatarLivePreview(){
+  if(avatarLiveState.playing){
+    stopAvatarLivePreview();
+    return;
+  }
+  const text = (document.getElementById('avatarScript')?.value || '').trim();
+  if(!text){ toast('Digite o texto que o avatar vai falar', 'warn'); return; }
+  const previewText = text.slice(0, 600);
+  const voice = document.getElementById('avatarVoice')?.value || 'nova';
+  const btn = document.getElementById('avatarLiveBtn');
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ Preparando voz...'; }
+
+  try{
+    const tts = await synthesizeAvatarSpeech(previewText, voice);
+    if(tts && tts.audioBuffer){
+      const AC = window.AudioContext || window.webkitAudioContext;
+      const ctx = new AC();
+      const src = ctx.createBufferSource();
+      src.buffer = tts.audioBuffer;
+      src.connect(ctx.destination);
+      avatarLiveState.audioCtx = ctx;
+      avatarLiveState.sourceNode = src;
+      avatarLiveState.profile = buildPcmLipProfile(tts.audioBuffer);
+      avatarLiveState.duration = tts.audioBuffer.duration;
+      avatarLiveState.startAt = ctx.currentTime;
+      avatarLiveState.text = previewText;
+      avatarLiveState.playing = true;
+      src.onended = () => { if(avatarLiveState.sourceNode === src) stopAvatarLivePreview(); };
+      src.start(0);
+      toast('🗣️ Avatar falando ao vivo (' + (tts.providers.join(', ') || 'IA') + ')');
+    } else {
+      // Fallback instantâneo com voz local do navegador + sincronia fonética sílaba-a-sílaba
+      const estDur = Math.max(3.5, previewText.split(/\s+/).length / 2.25);
+      avatarLiveState.audioCtx = null;
+      avatarLiveState.profile = null;
+      avatarLiveState.duration = estDur;
+      avatarLiveState.startAt = performance.now();
+      avatarLiveState.text = previewText;
+      avatarLiveState.smoothOpen = 0;
+      avatarLiveState.smoothWide = 0;
+      avatarLiveState.playing = true;
+      if('speechSynthesis' in window){
+        speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(previewText);
+        u.lang = 'pt-BR'; u.rate = 1.02;
+        const vs = speechSynthesis.getVoices();
+        const pt = vs.find(v => v.lang.toLowerCase().includes('pt-br')) || vs.find(v => v.lang.toLowerCase().includes('pt'));
+        if(pt) u.voice = pt;
+        u.onend = () => stopAvatarLivePreview();
+        avatarLiveState.synthActive = true;
+        speechSynthesis.speak(u);
+      }
+      toast('🗣️ Prévia ao vivo iniciada (sincronia fonética local)');
+    }
+    if(btn) btn.textContent = '⏹️ Parar Prévia';
+    ensureAvatarLoop();
+  }finally{
+    if(btn) btn.disabled = false;
+  }
+}
+
+const AVATAR_SCRIPT_TEMPLATES = {
+  sales: { headline:'Oferta Especial • Resultados Reais', text:'Pare por dez segundos! Se você ainda perde horas gravando e editando vídeos do zero, precisa conhecer esta solução. Com apenas um texto simples, você coloca um apresentador virtual no ar, com voz natural e legendas dinâmicas prontas para vender todos os dias. Clique no link da descrição e comece agora mesmo!' },
+  edu: { headline:'Aula Rápida • Conceito na Prática', text:'Olá, tudo bem? Na aula rápida de hoje, vamos entender de forma simples como a inteligência artificial transforma texto em vídeos envolventes. Primeiro, estruturamos uma ideia clara. Depois, escolhemos a voz ideal para o público. E por fim, combinamos ritmo visual com legendas dinâmicas que dobram a retenção até o final!' },
+  news: { headline:' Giro de Notícias • Tecnologia & IA', text:' Boa noite! Um novo avanço na produção audiovisual está mudando a rotina de criadores e empresas no Brasil. Ferramentas acessíveis agora permitem produzir boletins diários, vídeos educativos e comunicados em múltiplos idiomas em poucos minutos, reduzindo custos de estúdio sem abrir mão da clareza.' },
+  welcome: { headline:'Bem-vindo ao Canal!', text:'Oi! Que alegria ter você por aqui! Neste espaço, eu trago toda semana dicas práticas, tutoriais diretos ao ponto e novidades que vão acelerar seus projetos. Já se inscreva no canal, ative as notificações e me conta aqui nos comentários qual tema você quer ver no próximo vídeo!' }
+};
+
+function fillAvatarPresetScript(kind){
+  const t = AVATAR_SCRIPT_TEMPLATES[kind];
+  if(!t) return;
+  document.getElementById('avatarScript').value = t.text.trim();
+  document.getElementById('avatarHeadline').value = t.headline;
+  avatarExtraBullets = [];
+  toast('📝 Modelo de fala aplicado!');
+}
+
+async function aiWriteAvatarScript(){
+  const btn = document.getElementById('aiWriteAvatarBtn');
+  const current = (document.getElementById('avatarScript').value || '').trim();
+  const topic = prompt('Sobre qual tema o avatar deve falar? (ex: Como vender pelo WhatsApp em 60 segundos)', current.slice(0, 90) || 'Dicas para crescer nas redes sociais com IA');
+  if(!topic) return;
+  btn.disabled = true; btn.textContent = '⏳ Escrevendo...';
+  try{
+    const r = await fetch('/api/avatar', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'script', topic, durationSec: 35, tone:'natural' })
+    });
+    const j = await r.json();
+    if(j && j.text){
+      document.getElementById('avatarScript').value = j.text;
+      document.getElementById('avatarHeadline').value = topic.slice(0, 52);
+      toast('🪄 Fala escrita por ' + (j.provider || 'IA') + '!');
+    }
+  }catch(e){
+    toast('⚠️ ' + e.message, 'warn');
+  }finally{
+    btn.disabled = false; btn.textContent = '🪄 Escrever com IA';
+  }
+}
+
+async function enhanceAvatarScript(){
+  const box = document.getElementById('avatarScript');
+  const txt = (box.value || '').trim();
+  if(!txt) return toast('Digite a fala primeiro', 'warn');
+  try{
+    const r = await fetch('/api/enhance', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ text: txt, mode:'polish' })
+    });
+    const j = await r.json();
+    if(!r.ok || j.error) throw new Error(j.error || 'indisponível no modo local');
+    box.value = j.text;
+    toast('✨ Texto polido para locução (' + (j.provider || 'IA') + ')');
+  }catch(e){
+    // Limpeza local de muletas de linguagem caso offline
+    box.value = txt.replace(/\b(hum+|éé+|tipo assim|basicamente|né)\b[, ]*/gi, '').replace(/\s{2,}/g, ' ').trim();
+    toast('✨ Muletas de fala removidas!');
+  }
+}
+
+function sendCreateToAvatar(){
+  const d = currentCreateData;
+  if(!d || (!d.script && !(d.scenes && d.scenes.length))){
+    toast('Gere um roteiro primeiro', 'warn'); return;
+  }
+  const cleanSpeech = (d.scenes && d.scenes.length)
+    ? d.scenes.map(s => s.narration).filter(Boolean).join('\n\n')
+    : d.script;
+  document.getElementById('avatarScript').value = cleanSpeech;
+  avatarExtraBullets = (d.scenes || []).map(s => s.title).filter(Boolean).slice(0, 4);
+  if(d.seo && d.seo.title) document.getElementById('avatarHeadline').value = d.seo.title.slice(0, 52);
+  if(avatarExtraBullets.length) document.getElementById('avatarLayout').value = 'slide';
+  document.getElementById('avatarVoice').value = document.getElementById('voice').value;
+  openTab('avatar');
+  toast('🗣️ Roteiro e tópicos enviados para o Avatar Falante!');
+}
+
+async function renderAvatarVideo(){
+  stopAvatarLivePreview();
+  const text = (document.getElementById('avatarScript').value || '').trim();
+  if(!text){ showStatus('avatarStatus', '⚠️ Digite ou gere a fala do avatar primeiro.', 'warn'); return; }
+
+  const btn = document.getElementById('renderAvatarBtn');
+  const voice = document.getElementById('avatarVoice').value || 'nova';
+  const fmt = document.getElementById('avatarFormat').value || '16:9';
+  const layout = document.getElementById('avatarLayout').value || 'center';
+  const captionMode = document.getElementById('avatarCaptions').value || 'karaoke';
+  const animMode = document.getElementById('avatarAnimMode').value || 'lipsync';
+  const headline = (document.getElementById('avatarHeadline').value || '').trim();
+  const gain = (Number(document.getElementById('avatarMouthGain')?.value) || 100) / 100;
+
+  btn.disabled = true; btn.textContent = '⏳ Renderizando vídeo...';
+  document.getElementById('avatarProgress').classList.add('show');
+  document.getElementById('avatarResultWrap').classList.add('hidden');
+  setProgress('avatarProgressFill', 10);
+  setStep(['av1','av2','av3','av4'], 0);
+  showStatus('avatarStatus', '🎙️ Gerando locução neural para o apresentador...', 'info');
+
+  try{
+    let videoBlob = null;
+    let infoNote = '';
+
+    // 1) Gera áudio neural completo
+    const tts = await synthesizeAvatarSpeech(text, voice, (i, n) => {
+      showStatus('avatarStatus', `🎙️ Gerando voz neural (${i}/${n})...`, 'info');
+      setProgress('avatarProgressFill', Math.round(10 + (i / n) * 25));
+    });
+
+    // 2) Se o usuário escolheu testar geração neural de vídeo via Unorouter (hy4-preview / Fase 3)
+    if(animMode === 'unorouter'){
+      showStatus('avatarStatus', '⚡ Consultando motor de vídeo neural Unorouter (hy4-preview)...', 'info');
+      const imgB64 = avatarSourceCanvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+      const vr = await (await fetch('/api/avatar', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ action:'video', imageBase64: imgB64, prompt: headline || text.slice(0, 120), duration: 5 })
+      })).json().catch(() => ({ ok:false }));
+      if(vr && vr.ok && vr.videoBase64){
+        videoBlob = await (await fetch(`data:${vr.mime||'video/mp4'};base64,${vr.videoBase64}`)).blob();
+        infoNote = `Vídeo neural gerado via ${vr.provider}`;
+      } else {
+        infoNote = `Nota: ${vr && vr.reason ? vr.reason : 'usando motor Lip-Sync HD local'}`;
+      }
+    }
+
+    setStep(['av1','av2','av3','av4'], 1);
+    setProgress('avatarProgressFill', 42);
+
+    const hasRealAudio = !!(tts && tts.audioBuffer);
+    const totalDur = hasRealAudio
+      ? Math.max(1.5, tts.audioBuffer.duration)
+      : Math.max(4, text.split(/\s+/).length / 2.25);
+    const lipProfile = hasRealAudio ? buildPcmLipProfile(tts.audioBuffer) : null;
+    const captions = buildTimedCaptions(text, totalDur);
+
+    // Captura capa/miniatura real em alta qualidade
+    const dim = getAvatarDimensions(fmt);
+    const recCanvas = document.createElement('canvas');
+    recCanvas.width = dim.w; recCanvas.height = dim.h;
+    const rctx = recCanvas.getContext('2d');
+
+    drawAvatarStageFrame(rctx, {
+      t: 0.4, mouthOpen: 0.28, mouthWide: 0.12, speaking: true,
+      animMode, layout, captionMode, headline, captions, bullets: avatarExtraBullets, showCalib: false
+    });
+    lastAvatarThumbDataUrl = recCanvas.toDataURL('image/jpeg', 0.80);
+
+    // 3) Grava vídeo HD 30fps com WebAudio MediaStreamDestination (compatível com Chrome, Edge, Safari e Mobile)
+    if(!videoBlob){
+      setStep(['av1','av2','av3','av4'], 2);
+      showStatus('avatarStatus', hasRealAudio
+        ? `🎬 Gravando Avatar com Lip-Sync Acústico (${Math.round(totalDur)}s em HD ${dim.w}×${dim.h})...`
+        : `🎬 Gravando Avatar com Sincronia Fonética + Legendas (${Math.round(totalDur)}s — provedores de voz offline)...`, 'info');
+
+      const mime = pickRecorderMime();
+      if(!mime) throw new Error('Seu navegador não suporta MediaRecorder.');
+
+      const stream = recCanvas.captureStream(30);
+      let recAudioCtx = null, recSource = null;
+
+      if(hasRealAudio){
+        const AC = window.AudioContext || window.webkitAudioContext;
+        recAudioCtx = new AC();
+        const dest = recAudioCtx.createMediaStreamDestination();
+        recSource = recAudioCtx.createBufferSource();
+        recSource.buffer = tts.audioBuffer;
+        recSource.connect(dest);
+        recSource.connect(recAudioCtx.destination);
+        dest.stream.getAudioTracks().forEach(tr => stream.addTrack(tr));
+      }
+
+      const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 4800000 });
+      const chunks = [];
+      rec.ondataavailable = e => { if(e.data && e.data.size) chunks.push(e.data); };
+      const recStopped = new Promise(res => rec.onstop = res);
+      rec.start(500);
+
+      const wallStart = performance.now();
+      let audioStart = 0;
+      if(recAudioCtx && recSource){
+        audioStart = recAudioCtx.currentTime;
+        recSource.start(0);
+      }
+
+      let smoothO = 0, smoothW = 0;
+      await new Promise(resolve => {
+        function stepFrame(){
+          const t = recAudioCtx
+            ? Math.max(0, recAudioCtx.currentTime - audioStart)
+            : (performance.now() - wallStart) / 1000;
+          let mOpen = 0, mWide = 0;
+          if(lipProfile){
+            const fi = Math.min(lipProfile.openArr.length - 1, Math.max(0, Math.floor(t * lipProfile.fps)));
+            mOpen = lipProfile.openArr[fi] * gain;
+            mWide = lipProfile.wideArr[fi];
+          } else {
+            const ph = phonemeMouthAt(text, t, totalDur);
+            smoothO += (ph.open * gain - smoothO) * 0.34;
+            smoothW += (ph.wide - smoothW) * 0.25;
+            mOpen = smoothO; mWide = smoothW;
+          }
+          drawAvatarStageFrame(rctx, {
+            t, mouthOpen: Math.min(1.25, mOpen), mouthWide: mWide, speaking: true,
+            animMode, layout, captionMode, headline, captions, bullets: avatarExtraBullets, showCalib: false
+          });
+          setProgress('avatarProgressFill', Math.round(42 + Math.min(1, t / totalDur) * 54));
+          if(t >= totalDur){
+            resolve();
+            return;
+          }
+          // Continua gravando mesmo se a aba ficar em segundo plano!
+          if(document.hidden) setTimeout(stepFrame, 33);
+          else requestAnimationFrame(stepFrame);
+        }
+        stepFrame();
+      });
+
+      await new Promise(r => setTimeout(r, 260));
+      rec.stop();
+      await recStopped;
+      if(recAudioCtx){ await recAudioCtx.close().catch(()=>{}); }
+      videoBlob = new Blob(chunks, { type: mime.split(';')[0] });
+    }
+
+    setStep(['av1','av2','av3','av4'], 3);
+    setProgress('avatarProgressFill', 100);
+
+    if(avatarCreatedVideoURL) URL.revokeObjectURL(avatarCreatedVideoURL);
+    if(avatarCreatedAudioURL) URL.revokeObjectURL(avatarCreatedAudioURL);
+    avatarCreatedVideoURL = URL.createObjectURL(videoBlob);
+
+    const vidEl = document.getElementById('avatarResultVideo');
+    vidEl.src = avatarCreatedVideoURL;
+
+    const vDl = document.getElementById('avatarVideoDl');
+    vDl.href = avatarCreatedVideoURL;
+    vDl.download = `avatar-dubai-pro-${fmt.replace(':','x')}.${videoBlob.type.includes('mp4') ? 'mp4' : 'webm'}`;
+
+    const aDl = document.getElementById('avatarAudioDl');
+    if(hasRealAudio && tts.downloadBlob){
+      avatarCreatedAudioURL = URL.createObjectURL(tts.downloadBlob);
+      aDl.href = avatarCreatedAudioURL;
+      aDl.download = `avatar-voz.${tts.ext || 'mp3'}`;
+      aDl.classList.remove('hidden');
+    } else {
+      aDl.classList.add('hidden');
+    }
+
+    document.getElementById('avatarResultWrap').classList.remove('hidden');
+    const provLabel = hasRealAudio ? (tts.providers.join(', ') || 'voz neural') : 'sincronia fonética + legendas';
+    const doneMsg = `✅ Vídeo do Avatar pronto (${fmt}, ${Math.round(totalDur)}s • ${provLabel})${infoNote ? ' — ' + infoNote : ''}!`;
+    document.getElementById('avatarResultTitle').textContent = doneMsg;
+    showStatus('avatarStatus', doneMsg, hasRealAudio ? 'success' : 'warn');
+
+    // Salva automaticamente em Meus Projetos com miniatura real do apresentador
+    const pid = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    saveProject({
+      id: pid,
+      type: 'avatar',
+      title: headline || `Avatar: ${activeAvatarName.split('—')[0].trim()}`,
+      prompt: `${activeAvatarName} • Formato ${fmt}`,
+      format: fmt,
+      script: text,
+      mode: hasRealAudio ? 'openai' : 'mock',
+      status: 'vídeo avatar pronto',
+      createdAt: new Date().toISOString(),
+      thumbnail: lastAvatarThumbDataUrl
+    });
+    await loadProjects();
+    toast('🎬 Vídeo do Avatar pronto para baixar!');
+  }catch(e){
+    showStatus('avatarStatus', '❌ Erro ao renderizar avatar: ' + e.message, 'error');
+    toast(e.message, 'error');
+    setProgress('avatarProgressFill', 0);
+  }finally{
+    btn.disabled = false; btn.textContent = '🎬 Renderizar Vídeo do Avatar (MP4 / WebM)';
+    setTimeout(() => { document.getElementById('avatarProgress').classList.remove('show'); }, 1400);
+  }
+}
+
+function downloadAvatarSRT(){
+  const text = (document.getElementById('avatarScript').value || '').trim();
+  if(!text) return toast('Digite a fala primeiro', 'warn');
+  const vid = document.getElementById('avatarResultVideo');
+  const totalDur = (vid && vid.duration && isFinite(vid.duration)) ? vid.duration : Math.max(4, text.split(/\s+/).length / 2.25);
+  const cues = buildTimedCaptions(text, totalDur);
+  let out = '';
+  cues.forEach((c, i) => {
+    out += `${i+1}\n${fmtSRT(c.start)} --> ${fmtSRT(c.end)}\n${c.text}\n\n`;
+  });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([out], { type:'application/x-subrip' }));
+  a.download = 'avatar-legendas-dubai-pro.srt';
+  a.click();
+  toast('📜 Legendas .SRT baixadas!');
+}
+
+function downloadAvatarThumbnail(){
+  const cv = document.getElementById('avatarPreviewCanvas');
+  const url = lastAvatarThumbDataUrl || (cv ? cv.toDataURL('image/png') : '');
+  if(!url) return toast(' Gere ou visualize o avatar primeiro', 'warn');
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'avatar-capa-dubai-pro.png';
+  a.click();
+  toast('🖼️ Capa PNG baixada!');
+}
+
 // Init
+initAvatarPresets();
 checkHealth();
 loadProjects();
 if('speechSynthesis' in window) speechSynthesis.getVoices();
