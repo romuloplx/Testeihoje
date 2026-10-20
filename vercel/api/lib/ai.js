@@ -560,7 +560,7 @@ async function probeOpenAI() {
     } catch (e) { report.geminiAudio = { ok: false, error: e.message }; }
     try {
       const v = await geminiTTS('olá', 'nova', 15000);
-      report.geminiTts = v && v.buffer ? { ok: true, provider: v.provider, bytes: v.buffer.length } : { ok: false, error: 'sem áudio' };
+      report.geminiTts = v && v.buffer ? { ok: true, provider: v.provider, bytes: v.buffer.length } : { ok: false, error: (v && v.error) || 'sem áudio' };
     } catch (e) { report.geminiTts = { ok: false, error: e.message }; }
   } else {
     report.gemini = { ok: false, error: 'sem GEMINI_API_KEY' };
@@ -981,9 +981,23 @@ async function geminiTTS(text, voice = 'onyx', timeout = 45000) {
       if (pcm.length < 1000) continue;
       const mp3 = pcmToMp3(pcm);
       if (mp3 && mp3.length > 500) return { buffer: mp3, provider: 'gemini/' + (_gemBestModel || 'tts') };
+      // sem lame: ainda devolve o PCM como WAV (o navegador toca; merges mais complexos caem na cadeia)
+      const wav = wrapPcmAsWav(pcm, 24000);
+      return { buffer: wav, provider: 'gemini/' + (_gemBestModel || 'tts') + '(wav)' };
     }
   }
-  return null;
+  const summary = parts.map(p => Object.keys(p).join('+') + (p.inlineData ? ':' + (p.inlineData.mimeType || '?') : '')).join(', ');
+  return { error: `sem áudio (modelo ${_gemBestModel || '?'}, lame=${!!_lameMod}, parts: ${summary || 'nenhuma'})` };
+}
+
+// PCM mono L16 LE → WAV (fallback quando o encoder MP3 não carrega)
+function wrapPcmAsWav(pcm, rate = 24000) {
+  const hdr = Buffer.alloc(44);
+  hdr.write('RIFF', 0); hdr.writeUInt32LE(36 + pcm.length, 4); hdr.write('WAVE', 8);
+  hdr.write('fmt ', 12); hdr.writeUInt32LE(16, 16); hdr.writeUInt16LE(1, 20); hdr.writeUInt16LE(1, 22);
+  hdr.writeUInt32LE(rate, 24); hdr.writeUInt32LE(rate * 2, 28); hdr.writeUInt16LE(2, 32); hdr.writeUInt16LE(16, 34);
+  hdr.write('data', 36); hdr.writeUInt32LE(pcm.length, 40);
+  return Buffer.concat([hdr, pcm]);
 }
 
 // Repete a cadeia em caso de falha (provedores gratuitos limitam rajadas)
@@ -1202,7 +1216,7 @@ async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR' }) {
     try {
       const g = await geminiTTS(text, voice);
       if (g && g.buffer) return g;
-      errors.push('gemini/tts: sem áudio');
+      errors.push('gemini/tts: ' + (g && g.error ? g.error : 'sem áudio'));
     } catch (e) { errors.push(e.message); }
   } else errors.push('gemini/tts: sem GEMINI_API_KEY');
   try {
