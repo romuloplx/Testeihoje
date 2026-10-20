@@ -987,7 +987,8 @@ async function geminiTTS(text, voice = 'onyx', timeout = 45000) {
     }
   }
   const summary = parts.map(p => Object.keys(p).join('+') + (p.inlineData ? ':' + (p.inlineData.mimeType || '?') : '')).join(', ');
-  return { error: `sem áudio (modelo ${_gemBestModel || '?'}, lame=${!!_lameMod}, parts: ${summary || 'nenhuma'})` };
+  const raw = JSON.stringify(j || {}).slice(0, 280);
+  return { error: `sem áudio (modelo ${_gemBestModel || '?'}, lame=${!!_lameMod}, parts: ${summary || 'nenhuma'}) raw: ${raw}` };
 }
 
 // PCM mono L16 LE → WAV (fallback quando o encoder MP3 não carrega)
