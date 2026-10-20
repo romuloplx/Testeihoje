@@ -1036,8 +1036,8 @@ async function runDiag(){
     const err=v=>v&&v.error?String(v.error).slice(0,90):'sem resposta';
     const row=(ok,label,detail)=>`<div style="margin:4px 0">${ok?'✅':'❌'} <b>${label}</b>${detail?' <span style="opacity:.75">— '+detail+'</span>':''}</div>`;
     box.innerHTML=
-      row(!!(c.models&&c.models.ok),'OpenAI (chave paga)',c.models&&c.models.ok?c.models.count+' modelos':err(c.models))+
-      row(!!(c.unorouter&&c.unorouter.ok),'Unorouter (sua API)',c.unorouter&&c.unorouter.ok?((c.unorouter.models||0)+' modelos • '+c.unorouter.model):err(c.unorouter))+
+      row(!!(c.models&&c.models.ok),'OpenAI / Rota sk-…',c.models&&c.models.ok?(c.models.info||(c.models.count+' modelos')):err(c.models))+
+      row(!!(c.unorouter&&c.unorouter.ok),'Unorouter (sua API)',c.unorouter&&c.unorouter.ok?(c.unorouter.info||((c.unorouter.models||0)+' modelos • '+c.unorouter.model)):err(c.unorouter))+
       row(!!(c.gemini&&c.gemini.ok),'Gemini (Google IA)',c.gemini&&c.gemini.ok?c.gemini.model+' • respondendo':err(c.gemini))+
       row(!!(c.geminiAudio&&c.geminiAudio.ok),'Gemini transcreve áudio',c.geminiAudio&&c.geminiAudio.ok?c.geminiAudio.info:err(c.geminiAudio))+
       row(!!(c.geminiTts&&c.geminiTts.ok),'Gemini voz (TTS)',c.geminiTts&&c.geminiTts.ok?(c.geminiTts.provider+' • '+(c.geminiTts.bytes||0)+' bytes'):err(c.geminiTts))+

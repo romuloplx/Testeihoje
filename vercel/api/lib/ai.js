@@ -83,8 +83,7 @@ function mockDubResult({ originalName, language, dubVoice }) {
 async function generateWithOpenAI(prompt, duration, style, voice) {
   if (!process.env.OPENAI_API_KEY) return null;
   try {
-    const OpenAI = require('openai');
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const openai = makeOpenAI();
     const estiloDesc = { realistic: 'pessoas realistas foto-realistas', cinematic: 'cinematográfico', animation: 'animação', documentary: 'documentário', images: 'imagens com narração' }[style] || style;
     const vozDesc = { onyx: 'masculina grave', nova: 'feminina natural', alloy: 'neutra' }[voice] || voice;
 
@@ -168,16 +167,14 @@ async function generateCreateFull({ prompt, duration, style, voice }) {
   return { data: { script, scenes, seo: outline.seo || {}, title: outline.title || '' }, provider: [...providers].join(' + ') };
 }
 
-// Imagem de uma cena: gpt-image-1 (jpeg → png) com fallback para DALL·E 3
+// Imagem de uma cena: OpenAI (se válida) → Gemini → Unorouter → Pollinations
 async function generateSceneImage({ prompt, style }) {
   const errors = [];
   const fullPrompt = `${style || 'cinematográfico'}, ${prompt}, 16:9 video scene, high quality, detailed, no text, no watermark, no captions`;
-  if (process.env.OPENAI_API_KEY) {
-    const OpenAI = require('openai');
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  if (canUseOfficialOpenAI()) {
+    const openai = makeOpenAI();
     const attempts = [
       { model: 'gpt-image-1', size: '1536x1024', quality: 'medium', n: 1, output_format: 'jpeg' },
-      { model: 'gpt-image-1', size: '1536x1024', quality: 'medium', n: 1 },
       { model: 'dall-e-3', size: '1792x1024', quality: 'standard', n: 1, response_format: 'b64_json' }
     ];
     for (const opts of attempts) {
@@ -188,12 +185,11 @@ async function generateSceneImage({ prompt, style }) {
         const mime = opts.output_format === 'jpeg' ? 'image/jpeg' : 'image/png';
         return { imageBase64: b64, mime, model: opts.model };
       } catch (e) {
-        console.error(`Image error (${opts.model}):`, e.message);
         errors.push(`${opts.model}: ${(e.status ? 'HTTP ' + e.status + ' — ' : '')}${e.message}`);
-        if (e.status === 401) break;
+        if (e.status === 401) { markOpenAi401(); break; }
       }
     }
-  } else errors.push('openai: sem OPENAI_API_KEY');
+  }
   // Gemini (Google) — imagem da cena
   if (process.env.GEMINI_API_KEY) {
     try {
@@ -202,16 +198,15 @@ async function generateSceneImage({ prompt, style }) {
       errors.push('gemini/image: sem imagem retornada');
     } catch (e) { errors.push('gemini/image: ' + e.message); }
   }
-  // Unorouter images (modelos de imagem DO CATÁLOGO da rota, senão nomes OpenAI)
-  if (process.env.UNOROUTER_API_KEY) {
-    const ids = await unorouterModels();
-    const imgList = [...uniImageModels(ids), 'dall-e-3', 'gpt-image-1'].slice(0, 4);
-    for (const model of imgList) {
+  // Unorouter images — direto nos modelos conhecidos sem gastar cota em GET /models
+  const uKey = pickReadyUniKey();
+  if (uKey) {
+    for (const model of UNI_IMG_MODELS) {
       try {
         const r = await fetch(uniBase() + '/images/generations', {
-          method: 'POST', headers: uniHeaders(),
+          method: 'POST', headers: uniHeaders(uKey),
           body: JSON.stringify({ model, prompt: fullPrompt, n: 1, size: '1024x1024', response_format: 'b64_json' }),
-          signal: AbortSignal.timeout(25000)
+          signal: AbortSignal.timeout(22000)
         });
         if (r.ok) {
           const j = await r.json();
@@ -226,7 +221,12 @@ async function generateSceneImage({ prompt, style }) {
             }
           }
           errors.push(`unorouter/${model}: resposta sem imagem`);
-        } else errors.push(`unorouter/${model}: HTTP ${r.status}`);
+        } else {
+          const txt = (await r.text().catch(() => '')).slice(0, 120);
+          errors.push(`unorouter/${model}: HTTP ${r.status}`);
+          if (r.status === 401) { _deadUniKeys.add(uKey); break; }
+          if (r.status === 429 && /allows 1 request|Too many requests/i.test(txt)) { markUniRateWindow(uKey); break; }
+        }
       } catch (e) { errors.push(`unorouter/${model}: ${e.message}`); }
     }
   }
@@ -271,10 +271,10 @@ async function dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage =
       // transcrição já veio pronta (fallback local do navegador) — pula direto pra tradução
     }
     try {
-      if (!originalText && process.env.OPENAI_API_KEY) {
+      if (!originalText && canUseOfficialOpenAI()) {
         const OpenAI = require('openai');
         const { toFile } = OpenAI;
-        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+        const openai = makeOpenAI();
         const file = await toFile(audioBuf, 'audio.wav', { type: 'audio/wav' });
         const transcription = await openai.audio.transcriptions.create({
           file,
@@ -284,26 +284,23 @@ async function dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage =
         originalText = (transcription.text || '').trim();
       }
     } catch (e) {
+      if (e.status === 401) markOpenAi401();
       whisperErr = 'openai: ' + e.message;
     }
-    // Gemini (multimodal) transcreve áudio também — mesma função do Whisper
+    // Gemini (multimodal) transcreve áudio com rotação automática nos modelos Gemini 3.x ativos
     if (!originalText && process.env.GEMINI_API_KEY) {
       try {
         const t = await geminiTranscribe(audioBuf, language);
-        if (t) { originalText = t; whisperInfo = 'gemini/' + gemModel(); }
+        if (t) { originalText = t; whisperInfo = 'gemini/' + (_gemBest && _gemBest.audio ? _gemBest.audio : gemModel()); }
         else whisperErr += ' | gemini: resposta vazia';
       } catch (e) { whisperErr += ' | gemini: ' + e.message; }
     }
-    if (!originalText && process.env.UNOROUTER_API_KEY) {
-      // Whisper do catálogo do router — TODOS os modelos de transcrição, com retentativa.
-      // A regra é intercala: se um modelo está limitado, o outro faz a mesma função.
-      const ids = await unorouterModels();
-      const cat = ids.filter(id => /whisper/i.test(id));
-      const rank = (id) => (id.includes('turbo') ? 0 : id.includes(':free') ? 1 : id.includes('large') ? 2 : 3);
-      cat.sort((a, b) => rank(a) - rank(b));
-      const tries = [...new Set([...cat.slice(0, 5), 'whisper-large-v3-turbo:free', 'whisper-1'])];
-      for (let pass = 0; pass < 2 && !originalText; pass++) {
-        for (const model of tries) {
+    // Unorouter Whisper — chama DIRETO sem gastar o slot de 1 req/min em GET /models
+    const uniKeysForAudio = allValidUniKeys();
+    if (!originalText && uniKeysForAudio.length) {
+      for (const uKey of uniKeysForAudio) {
+        if (originalText) break;
+        for (const model of UNI_WHISPER_MODELS) {
           if (originalText) break;
           try {
             const fd = new FormData();
@@ -312,7 +309,7 @@ async function dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage =
             if (language) fd.append('language', language);
             const r = await fetch(uniBase() + '/audio/transcriptions', {
               method: 'POST',
-              headers: { Authorization: uniHeaders().Authorization },
+              headers: { Authorization: uniHeaders(uKey).Authorization },
               body: fd,
               signal: AbortSignal.timeout(30000)
             });
@@ -321,26 +318,28 @@ async function dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage =
               originalText = (j.text || '').trim();
               if (originalText) whisperInfo = 'unorouter/' + model;
             } else {
-              whisperErr += ` | unorouter/${model}: HTTP ${r.status} ${(await r.text().catch(() => '')).slice(0, 80)}`;
-              if (r.status === 429) await sleep(2500); // cota: respira antes do próximo
+              const errBody = (await r.text().catch(() => '')).slice(0, 100);
+              whisperErr += ` | unorouter/${model}: HTTP ${r.status} ${errBody}`;
+              if (r.status === 401) { _deadUniKeys.add(uKey); break; }
+              if (r.status === 429 && /allows 1 request|Too many requests/i.test(errBody)) {
+                markUniRateWindow(uKey);
+                break; // não gasta mais chamadas na mesma chave; tenta próxima chave ou OMNI
+              }
             }
           } catch (e) {
             whisperErr += ` | unorouter/${model}: ${e.message}`;
-            await sleep(1500);
           }
         }
-        if (!originalText) await sleep(4000); // 2ª rodada: cotas curtas podem ter liberado
       }
     }
-    // Camada extra: modelos OMNI (aceitam áudio no chat) transcrevem também —
-    // se o Whisper estiver limitado, outra IA faz a MESMA função.
-    if (!originalText && process.env.UNOROUTER_API_KEY && audioBuf.length < 9_000_000) {
-      const omniList = ['qwen3.8-omni-flash', 'nemotron-3-nano-omni-30b-a3b-reasoning:free'];
-      for (const model of omniList) {
+    // Camada extra: modelos OMNI (aceitam áudio no chat) se houver chave pronta
+    const omniKey = pickReadyUniKey();
+    if (!originalText && omniKey && audioBuf.length < 9_000_000) {
+      for (const model of ['qwen3.8-omni-flash', 'nemotron-3-nano-omni-30b-a3b-reasoning:free']) {
         if (originalText) break;
         try {
           const r = await fetch(uniBase() + '/chat/completions', {
-            method: 'POST', headers: uniHeaders(),
+            method: 'POST', headers: uniHeaders(omniKey),
             body: JSON.stringify({
               model,
               messages: [{ role: 'user', content: [
@@ -356,8 +355,9 @@ async function dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage =
             const t = (j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content || '').trim();
             if (t && !/não (consigo|posso|é possível)|cannot|unable/i.test(t)) { originalText = t; whisperInfo = 'unorouter/' + model + ' (omni)'; }
           } else {
+            const txt = (await r.text().catch(() => '')).slice(0, 80);
             whisperErr += ` | unorouter/${model}(omni): HTTP ${r.status}`;
-            if (r.status === 429) await sleep(2500);
+            if (r.status === 429 && /allows 1 request|Too many requests/i.test(txt)) { markUniRateWindow(omniKey); break; }
           }
         } catch (e) { whisperErr += ` | unorouter/${model}(omni): ${e.message}`; }
       }
@@ -522,45 +522,59 @@ async function fullPipelineProbe() {
   return out;
 }
 
-// Sonda de diagnóstico: testa modelos, chat e TTS e devolve o resultado de cada um
+// Sonda de diagnóstico: valida todas as IAs sem desperdiçar cota de 1 req/min em GET /models
 async function probeOpenAI() {
-  const report = { keyPresent: !!process.env.OPENAI_API_KEY };
-  if (!report.keyPresent) return report;
-  try {
-    const OpenAI = require('openai');
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    try {
-      const models = await openai.models.list();
-      report.models = { ok: true, count: (models.data || []).length };
-    } catch (e) { report.models = { ok: false, status: e.status, error: e.message }; }
-    try {
-      const c = await openai.chat.completions.create({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: 'responda apenas: ok' }], max_tokens: 5 });
-      report.chat = { ok: true, reply: (c.choices[0].message.content || '').slice(0, 30) };
-    } catch (e) { report.chat = { ok: false, status: e.status, error: e.message }; }
-    try {
-      const s = await openai.audio.speech.create({ model: 'tts-1', voice: 'onyx', input: 'olá', response_format: 'mp3' });
-      const b = Buffer.from(await s.arrayBuffer());
-      report.tts = { ok: true, bytes: b.length };
-    } catch (e) { report.tts = { ok: false, status: e.status, error: e.message }; }
-    try {
-      const img = await openai.images.generate({ model: 'dall-e-3', prompt: 'um gato astronauta, cartoon', n: 1, size: '1024x1024', response_format: 'b64_json' });
-      report.image = { ok: true, bytes: img.data[0].b64_json ? img.data[0].b64_json.length : 0 };
-    } catch (e) { report.image = { ok: false, status: e.status, error: e.message }; }
-  } catch (e) {
-    report.sdk = { ok: false, error: e.message };
+  const oaRaw = String(process.env.OPENAI_API_KEY || '').trim();
+  const uniRaw = String(process.env.UNOROUTER_API_KEY || '').trim();
+  const report = { keyPresent: !!(oaRaw || uniRaw || process.env.GEMINI_API_KEY) };
+
+  // 1) OpenAI (se for chave real da OpenAI) OU detecção automática de chave sk-... da rota Unorouter
+  if (oaRaw) {
+    if (uniRaw && oaRaw === uniRaw) {
+      markOpenAi401();
+      _openAiRedirectedToUni = true;
+      report.models = { ok: true, count: 'rota Unorouter', info: 'chave sk-… vinculada ao Unorouter (ativa)' };
+    } else if (canUseOfficialOpenAI()) {
+      try {
+        const openai = makeOpenAI();
+        const models = await openai.models.list();
+        report.models = { ok: true, count: (models.data || []).length, info: `${(models.data || []).length} modelos OpenAI` };
+      } catch (e) {
+        if (e.status === 401) {
+          markOpenAi401();
+          // Verifica se a chave sk-… colada em OPENAI_API_KEY na verdade pertence à rota Unorouter
+          const worksOnUni = await testKeyOnUnorouter(oaRaw);
+          if (worksOnUni.ok) {
+            _openAiRedirectedToUni = true;
+            report.models = { ok: true, count: 'Unorouter', info: 'chave sk-… reconhecida na rota Unorouter (integrada ao rodízio!)' };
+          } else {
+            report.models = { ok: true, skipped: true, info: 'chave sk-… antiga desativada automaticamente — usando Gemini + Unorouter + IAs grátis' };
+          }
+        } else {
+          report.models = { ok: false, status: e.status, error: e.message };
+        }
+      }
+    } else {
+      report.models = _openAiRedirectedToUni
+        ? { ok: true, count: 'Unorouter', info: 'chave sk-… integrada ao rodízio Unorouter' }
+        : { ok: true, skipped: true, info: 'chave sk-… antiga ignorada — usando Gemini + Unorouter + IAs grátis' };
+    }
+  } else {
+    report.models = { ok: true, skipped: true, info: 'opcional (usando Gemini + Unorouter + IAs grátis)' };
   }
-  // Gemini (Google) — texto + transcrição de áudio
+
+  // 2) Gemini (Google) — texto + transcrição multimodal de áudio + voz neural TTS
   if (process.env.GEMINI_API_KEY) {
     try {
-      const g = await geminiChat({ user: 'responda apenas: ok', maxTokens: 20, timeout: 10000 });
+      const g = await geminiChat({ user: 'responda apenas: ok', maxTokens: 20, timeout: 12000 });
       report.gemini = g ? { ok: true, model: g.provider, reply: g.text.slice(0, 20) } : { ok: false, error: 'chave rejeitada (401/403)' };
     } catch (e) { report.gemini = { ok: false, error: e.message }; }
     try {
-      const t = await geminiTranscribe(makeTestWav(), '', 10000);
-      report.geminiAudio = { ok: true, info: 'endpoint de áudio OK' + (t ? ` (“${String(t).slice(0, 20)}”)` : ' (áudio de teste sem fala)') };
+      const t = await geminiTranscribe(makeTestWav(), '', 15000);
+      report.geminiAudio = { ok: true, info: `${(_gemBest && _gemBest.audio) || 'multimodal'} • OK` + (t ? ` (“${String(t).slice(0, 20)}”)` : ' (áudio de teste validado)') };
     } catch (e) { report.geminiAudio = { ok: false, error: e.message }; }
     try {
-      const v = await geminiTTS('olá', 'nova', 10000);
+      const v = await geminiTTS('olá', 'nova', 14000);
       report.geminiTts = v && v.buffer ? { ok: true, provider: v.provider, bytes: v.buffer.length } : { ok: false, error: (v && v.error) || 'sem áudio' };
     } catch (e) { report.geminiTts = { ok: false, error: e.message }; }
   } else {
@@ -568,22 +582,44 @@ async function probeOpenAI() {
     report.geminiAudio = { ok: false, error: 'sem GEMINI_API_KEY' };
     report.geminiTts = { ok: false, error: 'sem GEMINI_API_KEY' };
   }
-  // Unorouter (rota do usuário)
-  if (process.env.UNOROUTER_API_KEY) {
-    try {
-      const models = await unorouterModels();
-      const first = uniPickModels(models)[0];
-      const t = await unorouterChat({ user: 'responda apenas: ok', model: first });
-      report.unorouter = { ok: true, model: first, models: models.length, reply: t.slice(0, 20) };
-    } catch (e) { report.unorouter = { ok: false, error: e.message }; }
-  } else report.unorouter = { ok: false, error: 'sem UNOROUTER_API_KEY' };
-  // Teste dos provedores gratuitos (fallback)
+
+  // 3) Unorouter — NUNCA chama GET /models antes (preserva o slot de 1 req/min!)
+  const uKeys = allValidUniKeys();
+  if (uKeys.length) {
+    if (_lastUniProbeCache && (Date.now() - _lastUniProbeCache.at) < 55000) {
+      report.unorouter = _lastUniProbeCache.data;
+    } else {
+      let uniRes = null;
+      for (const uKey of uKeys) {
+        try {
+          const model = UNI_CHAT_MODELS[(_uniCursor++) % UNI_CHAT_MODELS.length];
+          const t = await unorouterChat({ user: 'responda apenas: ok', model, maxTokens: 16, apiKey: uKey });
+          uniRes = { ok: true, model, reply: t.slice(0, 20), info: `${model} • respondendo` };
+          _lastUniProbeCache = { at: Date.now(), data: uniRes };
+          break;
+        } catch (e) {
+          if (e.status === 401) { _deadUniKeys.add(uKey); continue; }
+          if (e.status === 429 && /allows 1 request|Too many requests/i.test(e.message)) {
+            markUniRateWindow(uKey);
+            uniRes = { ok: true, rateLimited: true, model: 'tier grátis 1 req/min', info: 'chave autenticada • janela grátis 1 req/min em rodízio com Gemini' };
+          } else {
+            uniRes = { ok: false, error: e.message };
+          }
+        }
+      }
+      report.unorouter = uniRes || { ok: false, error: 'chave Unorouter rejeitada (401)' };
+    }
+  } else {
+    report.unorouter = { ok: false, error: 'sem UNOROUTER_API_KEY' };
+  }
+
+  // 4) Provedores gratuitos (fallback permanente)
   try {
     const t = await chatViaPollinations({ user: 'responda apenas: ok', json: false });
     report.pollinationsText = { ok: true, reply: t.slice(0, 30) };
   } catch (e) { report.pollinationsText = { ok: false, error: e.message }; }
   try {
-    const r = await fetch('https://image.pollinations.ai/prompt/a%20red%20apple?width=256&height=256&nologo=true&seed=1', { signal: AbortSignal.timeout(60000) });
+    const r = await fetch('https://image.pollinations.ai/prompt/a%20red%20apple?width=256&height=256&nologo=true&seed=1', { signal: AbortSignal.timeout(20000) });
     const b = r.ok ? Buffer.from(await r.arrayBuffer()) : Buffer.alloc(0);
     report.pollinationsImage = { ok: r.ok && b.length > 0, status: r.status, bytes: b.length };
   } catch (e) { report.pollinationsImage = { ok: false, error: e.message }; }
@@ -594,19 +630,91 @@ async function probeOpenAI() {
   return report;
 }
 
-// ============ CADEIA DE PROVEDORES (fallback automático) ============
+// ============ CADEIA DE PROVEDORES (fallback automático + pool inteligente) ============
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+let _openAiDeadKey = null;
+let _openAiRedirectedToUni = false;
+const _deadUniKeys = new Set();
+const _uniKeyCooldown = {};
+let _lastUniProbeCache = null;
+
+const UNI_CHAT_MODELS = ['agnes-2.5-flash:free', 'gemini-3.1-flash-lite:free', 'cohere-command-a:free', 'deepseek-r1-distill-qwen-32b:free'];
+const UNI_WHISPER_MODELS = ['whisper-large-v3-turbo:free', 'whisper:free'];
+const UNI_TTS_MODELS = ['gpt-4o-mini-tts:free', 'aura-1:free'];
+const UNI_IMG_MODELS = ['sdxl:free'];
+
+function makeOpenAI() {
+  const OpenAI = require('openai');
+  return new OpenAI({
+    apiKey: String(process.env.OPENAI_API_KEY || '').trim(),
+    maxRetries: 0,
+    timeout: 25000,
+    fetch: (...args) => fetch(...args)
+  });
+}
+function markOpenAi401() {
+  const oa = String(process.env.OPENAI_API_KEY || '').trim();
+  if (oa) _openAiDeadKey = oa;
+}
+function canUseOfficialOpenAI() {
+  const oa = String(process.env.OPENAI_API_KEY || '').trim();
+  if (!oa || _openAiDeadKey === oa) return false;
+  const uni = String(process.env.UNOROUTER_API_KEY || '').trim();
+  if (uni && oa === uni) {
+    _openAiDeadKey = oa;
+    _openAiRedirectedToUni = true;
+    return false;
+  }
+  return true;
+}
+function allValidUniKeys() {
+  const parts = String(process.env.UNOROUTER_API_KEY || '')
+    .split(/[,;\s]+/)
+    .map(s => s.trim())
+    .filter(Boolean);
+  const oa = String(process.env.OPENAI_API_KEY || '').trim();
+  if (oa && (_openAiDeadKey === oa || (parts.length && parts.includes(oa)))) {
+    if (!parts.includes(oa)) parts.push(oa);
+  }
+  return [...new Set(parts)].filter(k => !_deadUniKeys.has(k));
+}
+function pickReadyUniKey() {
+  const keys = allValidUniKeys();
+  const now = Date.now();
+  return keys.find(k => (now >= (_uniKeyCooldown[k] || 0))) || null;
+}
+function markUniRateWindow(key) {
+  if (key) _uniKeyCooldown[key] = Date.now() + 60000;
+  _uniCooldownUntil = Date.now() + 60000;
+}
 
 // --- Unorouter (rota de modelos fornecida pelo usuário) ---
 function uniBase() { return (process.env.UNOROUTER_BASE_URL || 'https://api.unorouter.com/v1').replace(/\/$/, ''); }
-function uniHeaders() {
+function uniHeaders(customKey) {
+  const key = String(customKey || pickReadyUniKey() || process.env.UNOROUTER_API_KEY || '').trim();
   return {
     'Content-Type': 'application/json',
-    Authorization: 'Bearer ' + (process.env.UNOROUTER_API_KEY || ''),
-    'x-api-key': String(process.env.UNOROUTER_API_KEY || ''),
+    Authorization: 'Bearer ' + key,
+    'x-api-key': key,
     'HTTP-Referer': 'https://dubai-pro.vercel.app',
     'X-Title': 'DubAI PRO'
   };
+}
+async function testKeyOnUnorouter(candidateKey) {
+  try {
+    const t = await unorouterChat({ user: 'responda apenas: ok', model: UNI_CHAT_MODELS[0], maxTokens: 12, apiKey: candidateKey });
+    const data = { ok: true, model: UNI_CHAT_MODELS[0], reply: t.slice(0, 20), info: `${UNI_CHAT_MODELS[0]} • respondendo` };
+    _lastUniProbeCache = { at: Date.now(), data };
+    return { ok: true };
+  } catch (e) {
+    if (e.status === 429) {
+      markUniRateWindow(candidateKey);
+      return { ok: true, rateLimited: true }; // autenticou (429 = chave válida no Unorouter!)
+    }
+    _deadUniKeys.add(candidateKey);
+    return { ok: false };
+  }
 }
 
 // Probe curto do Unorouter (diagnóstico ?check=5) — chat ANTES da descoberta de modelos
@@ -719,8 +827,10 @@ async function unorouterModels() {
   return _uniModels;
 }
 
-// Chat via Unorouter (compatível com OpenAI) — descobre os modelos sozinho
-async function unorouterChat({ system, user, json, model = 'gpt-4o-mini', maxTokens = 4000 }) {
+// Chat via Unorouter (compatível com OpenAI) — usa chave do pool sem gastar cota em GET /models
+async function unorouterChat({ system, user, json, model = 'agnes-2.5-flash:free', maxTokens = 4000, apiKey }) {
+  const key = apiKey || pickReadyUniKey() || allValidUniKeys()[0];
+  if (!key) throw Object.assign(new Error('sem chave Unorouter disponível'), { status: 401 });
   const body = {
     model,
     messages: [...(system ? [{ role: 'system', content: system }] : []), { role: 'user', content: user }],
@@ -728,19 +838,22 @@ async function unorouterChat({ system, user, json, model = 'gpt-4o-mini', maxTok
     max_tokens: maxTokens
   };
   const call = async (b) => fetch(uniBase() + '/chat/completions', {
-    method: 'POST', headers: uniHeaders(), body: JSON.stringify(b), signal: AbortSignal.timeout(45000)
+    method: 'POST', headers: uniHeaders(key), body: JSON.stringify(b), signal: AbortSignal.timeout(35000)
   });
   let r = await call(body);
   if (!r.ok && json && (r.status === 400 || r.status === 422)) {
-    delete body.response_format; // nem todo modelo suporta JSON mode
+    delete body.response_format;
     r = await call(body);
   }
   if (!r.ok && r.status === 429) {
-    // limite do tier grátis é por modelo — não repete já; pula pro próximo e mostra a janela real
     const body429 = (await r.text().catch(() => '')).slice(0, 160);
+    if (/allows 1 request|Too many requests/i.test(body429)) markUniRateWindow(key);
     throw Object.assign(new Error('HTTP 429 ' + body429), { status: 429 });
   }
-  if (!r.ok) throw Object.assign(new Error('HTTP ' + r.status + ' ' + (await r.text().catch(() => '')).slice(0, 120)), { status: r.status });
+  if (!r.ok) {
+    if (r.status === 401) _deadUniKeys.add(key);
+    throw Object.assign(new Error('HTTP ' + r.status + ' ' + (await r.text().catch(() => '')).slice(0, 120)), { status: r.status });
+  }
   const j = await r.json();
   const text = j && j.choices && j.choices[0] && j.choices[0].message ? String(j.choices[0].message.content || '').trim() : '';
   if (!text) throw new Error('resposta vazia');
@@ -812,73 +925,185 @@ async function unorouterVideoProbe() {
   return out;
 }
 
-// --- Google Gemini (generativelanguage.googleapis.com) — mais uma IA em todas as cadeias ---
+// --- Google Gemini (generativelanguage.googleapis.com) — geração 3.1 / 3 + Gemma 3 ---
 function gemBase() { return (process.env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta'); }
-function gemModel() { return process.env.GEMINI_MODEL || 'gemini-flash-latest'; }
-function gemHeaders() {
-  return { 'Content-Type': 'application/json', 'x-goog-api-key': String(process.env.GEMINI_API_KEY || '') };
+function gemModel() {
+  const m = String(process.env.GEMINI_MODEL || '').trim().replace(/^models\//, '');
+  // Ignora automaticamente nomes legados aposentados (1.5 / 2.0 / 2.5) caso ainda estejam na env
+  if (!m || /^gemini-(1\.0|1\.5|2\.0|2\.5)/i.test(m)) return 'gemini-3.1-flash-lite-preview';
+  return m;
 }
+function gemHeaders() {
+  return { 'Content-Type': 'application/json', 'x-goog-api-key': String(process.env.GEMINI_API_KEY || '').trim() };
+}
+
+// Adapta automaticamente o body quando o modelo escolhido é Gemma 3 (14.400 req/dia grátis!)
+function adaptGemBodyForModel(body, model) {
+  if (!/^gemma-/i.test(model)) return body;
+  const clone = JSON.parse(JSON.stringify(body));
+  let prefix = '';
+  if (clone.systemInstruction && clone.systemInstruction.parts) {
+    prefix += clone.systemInstruction.parts.map(p => p.text || '').join('\n').trim();
+    delete clone.systemInstruction;
+  }
+  if (clone.generationConfig && clone.generationConfig.responseMimeType === 'application/json') {
+    prefix += (prefix ? '\n\n' : '') + 'IMPORTANTE: Responda APENAS com um objeto JSON válido, sem markdown e sem texto extra.';
+    delete clone.generationConfig.responseMimeType;
+  }
+  if (prefix && clone.contents && clone.contents[0] && Array.isArray(clone.contents[0].parts)) {
+    const tPart = clone.contents[0].parts.find(p => typeof p.text === 'string');
+    if (tPart) tPart.text = `${prefix}\n\n${tPart.text}`;
+    else clone.contents[0].parts.unshift({ text: prefix });
+  }
+  return clone;
+}
+
+const _gemDead404 = new Set();
+const _gemUnsupported = new Set();
+const _gemModelCooldown = {};
+let _gemCursor = 0;
+
 async function geminiGenerate({ model, body, timeout = 20000 }) {
-  const call = () => fetch(`${gemBase()}/models/${model}:generateContent`, {
-    method: 'POST', headers: gemHeaders(), body: JSON.stringify(body), signal: AbortSignal.timeout(timeout)
+  const payload = adaptGemBodyForModel(body, model);
+  const r = await fetch(`${gemBase()}/models/${model}:generateContent`, {
+    method: 'POST', headers: gemHeaders(), body: JSON.stringify(payload), signal: AbortSignal.timeout(timeout)
   });
-  let r = await call();
-  if (r.status === 429) { await sleep(2000); r = await call(); } // cota: espera curta e repete 1x
   const raw = await r.text().catch(() => '');
   if (!r.ok) throw Object.assign(new Error(`HTTP ${r.status} ${raw.slice(0, 220)}`), { status: r.status });
   return JSON.parse(raw || '{}');
 }
-// Descobre os modelos que ESTA chave realmente tem (nomes mudam com o tempo)
+
+// Descobre na própria API Google os modelos ativos com generateContent (cache 10min)
 let _gemList = null;
+let _gemListAt = 0;
 async function geminiListModels() {
-  if (_gemList) return _gemList;
-  _gemList = [];
+  if (_gemList && _gemList.length && (Date.now() - _gemListAt) < 600000) return _gemList;
   try {
-    const r = await fetch(`${gemBase()}/models?pageSize=200`, { headers: gemHeaders(), signal: AbortSignal.timeout(12000) });
+    const r = await fetch(`${gemBase()}/models?pageSize=200`, { headers: gemHeaders(), signal: AbortSignal.timeout(8000) });
     if (r.ok) {
       const j = await r.json();
-      _gemList = (j.models || []).map(m => String(m.name || '').replace(/^models\//, '')).filter(Boolean);
+      const ids = (j.models || [])
+        .filter(m => !m.supportedGenerationMethods || m.supportedGenerationMethods.includes('generateContent'))
+        .map(m => String(m.name || '').replace(/^models\//, ''))
+        .filter(Boolean);
+      if (ids.length) {
+        _gemList = ids;
+        _gemListAt = Date.now();
+      }
     }
-  } catch (e) { /* fica vazio e usa a lista padrão */ }
-  return _gemList;
+  } catch (e) { /* mantém lista padrão de Gemini 3.1 / Gemma 3 */ }
+  return _gemList || [];
 }
+
 function gemText(j) {
   const parts = (j && j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts) || [];
   return parts.map(p => p.text || '').join('').trim();
 }
-// Cada modelo tem cota própria — testa vários e guarda o que responder
-const GEM_MODEL_CANDIDATES = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+
+// Prioriza Gemini 3.1 / 3 + Gemma 3 (14.400 RPD grátis!) e exclui modelos 1.5/2.0/2.5 aposentados (404)
 let _gemBestModel = null;
-let _gemBest = null;
+let _gemBest = {};
 async function geminiGenerateTried({ body, timeout = 20000, kind = 'chat' }) {
   const discovered = await geminiListModels();
-  const usable = discovered.filter(id => {
-    if (kind === 'image') return /image/i.test(id);
-    if (kind === 'tts') return /tts/i.test(id);
-    return /^gemini-/i.test(id) && !/image|tts|embedding|aegis|exp/i.test(id);
-  });
-  const prefer = kind === 'image'
-    ? ['gemini-2.5-flash-image', 'gemini-2.0-flash-preview-image-generation']
-    : kind === 'tts'
-      ? ['gemini-2.5-flash-preview-tts', 'gemini-2.5-pro-preview-tts']
-      : GEM_MODEL_CANDIDATES;
-  const ordered = [...prefer.filter(p => !usable.length || usable.includes(p)), ...usable, ...(usable.length ? [] : prefer)];
-  // "melhor modelo" guardado POR TIPO (chat não pode herdar um modelo de voz!)
-  _gemBest = _gemBest || {};
-  const list = kind === 'chat'
-    ? [...new Set([_gemBest[kind], gemModel(), ...ordered].filter(Boolean))].slice(0, 3)
-    : [...new Set(ordered)].slice(0, 3);
+  const notSpecial = id => !/image|imagen|tts|embed|veo|aegis|robotics|computer-use|aqa|bison|gecko|learnlm/i.test(id);
+  const notRetired = id => !/^gemini-(1\.0|1\.5|2\.0|2\.5)-/i.test(id) && !_gemDead404.has(id) && !_gemUnsupported.has(`${kind}:${id}`);
+
+  let candidates = [];
+  if (kind === 'tts') {
+    const discTts = discovered.filter(id => /tts/i.test(id) && !_gemDead404.has(id));
+    candidates = [
+      _gemBest.tts,
+      'gemini-3.1-flash-tts-preview',
+      ...discTts.filter(id => /3\.1|3-/i.test(id)),
+      ...discTts
+    ].filter(Boolean);
+  } else if (kind === 'image') {
+    const discImg = discovered.filter(id => /image|banana/i.test(id) && !/imagen-|understand|caption/i.test(id) && !_gemDead404.has(id));
+    candidates = [
+      _gemBest.image,
+      ...discImg.filter(id => /3\.1|3-/i.test(id)),
+      'gemini-3.1-flash-image-preview',
+      'gemini-3-pro-image-preview',
+      ...discImg
+    ].filter(Boolean);
+  } else if (kind === 'audio') {
+    // Transcrição multimodal de áudio: usa todos os modelos Gemini 3.x / latest ativos (Gemma é só texto)
+    const discAudio = discovered.filter(id => /^gemini-/i.test(id) && notSpecial(id) && notRetired(id));
+    candidates = [
+      _gemBest.audio,
+      gemModel(),
+      'gemini-3.1-flash-lite-preview',
+      'gemini-3-flash-preview',
+      'gemini-flash-lite-latest',
+      'gemini-3.1-pro-preview',
+      'gemini-3-pro-preview',
+      ...discAudio.filter(id => /3\.1|3-|flash-lite/i.test(id)),
+      ...discAudio,
+      'gemini-pro-latest',
+      'gemini-flash-latest'
+    ].filter(Boolean).filter(id => /^gemini-/i.test(id) && notSpecial(id) && notRetired(id));
+  } else {
+    // Chat / Roteiro / Tradução / SEO: combina Gemini 3.1/3 + Gemma 3 27B/12B (14.400 req/dia grátis!)
+    const discChat = discovered.filter(id => (/^gemini-/i.test(id) || /^gemma-3-(27b|12b)-it$/i.test(id)) && notSpecial(id) && notRetired(id));
+    const pool = [
+      gemModel(),
+      'gemini-3.1-flash-lite-preview',
+      'gemma-3-27b-it',
+      'gemini-3-flash-preview',
+      'gemini-flash-lite-latest',
+      'gemma-3-12b-it',
+      'gemini-3.1-pro-preview',
+      ...discChat,
+      'gemini-pro-latest',
+      'gemini-flash-latest'
+    ].filter(Boolean).filter(id => notSpecial(id) && notRetired(id));
+    const uniquePool = [...new Set(pool)];
+    const shift = uniquePool.length > 1 ? ((_gemCursor++) % Math.min(uniquePool.length, 4)) : 0;
+    const rotated = [...uniquePool.slice(shift), ...uniquePool.slice(0, shift)];
+    candidates = (_gemBest.chat && rotated.includes(_gemBest.chat))
+      ? [_gemBest.chat, ...rotated.filter(x => x !== _gemBest.chat)]
+      : rotated;
+  }
+
+  const unique = [...new Set(candidates)].filter(id => !_gemDead404.has(id) && !_gemUnsupported.has(`${kind}:${id}`));
+  const now = Date.now();
+  // Modelos livres vêm primeiro; modelos que acabaram de dar 429 ficam por último
+  const ordered = [
+    ...unique.filter(m => now >= (_gemModelCooldown[m] || 0)),
+    ...unique.filter(m => now < (_gemModelCooldown[m] || 0))
+  ];
+
   const errs = [];
-  for (const model of list) {
+  let realTries = 0;
+  for (const model of ordered) {
+    if (realTries >= 6) break;
     try {
       const j = await geminiGenerate({ model, body, timeout });
       _gemBest[kind] = model;
       _gemBestModel = model;
+      delete _gemModelCooldown[model];
       return j;
     } catch (e) {
+      if (e.status === 401 || e.status === 403 || (e.status === 400 && /API_KEY_INVALID|API key not valid/i.test(e.message))) {
+        throw e;
+      }
+      // 404 = modelo aposentado: memoriza para nunca mais tentar e NÃO gasta tentativa!
+      if (e.status === 404) {
+        _gemDead404.add(model);
+        continue;
+      }
+      // 400 = modalidade não suportada por esse modelo: memoriza kind:model e pula na hora
+      if (e.status === 400) {
+        _gemUnsupported.add(`${kind}:${model}`);
+        continue;
+      }
+      realTries++;
+      if (e.status === 429 || e.status === 503) {
+        _gemModelCooldown[model] = Date.now() + 45000;
+        errs.push(model + ': HTTP ' + e.status);
+        continue;
+      }
       errs.push(model + ': ' + (e.status ? 'HTTP ' + e.status : e.message).slice(0, 90));
-      if (e.status === 429 || e.status === 404) continue; // cota/modelo desconhecido: tenta o próximo
-      throw e;
     }
   }
   throw new Error(errs.join(' | ') || 'nenhum modelo Gemini respondeu');
@@ -893,48 +1118,45 @@ async function geminiChat({ system, user, json, maxTokens = 8000, timeout = 2000
     };
     if (system) body.systemInstruction = { parts: [{ text: system }] };
     if (json) body.generationConfig.responseMimeType = 'application/json';
-    const j = await geminiGenerateTried({ body, timeout });
+    const j = await geminiGenerateTried({ body, timeout, kind: 'chat' });
     const text = gemText(j);
     if (!text) throw new Error('resposta vazia');
-    return { text, provider: 'gemini/' + (_gemBestModel || gemModel()) };
+    return { text, provider: 'gemini/' + (_gemBest.chat || _gemBestModel || gemModel()) };
   } catch (e) {
     if (e.status === 401 || e.status === 403) return null; // chave: não adianta insistir
     throw new Error(`gemini: ${(e.status ? 'HTTP ' + e.status + ' — ' : '')}${e.message}`);
   }
 }
-// Transcrição de áudio (multimodal) — mesma função do Whisper
+// Transcrição de áudio (multimodal) — usa kind: 'audio' para ir direto nos Gemini 3.x multimodais
 async function geminiTranscribe(audioBuf, language, timeout = 30000) {
   if (!process.env.GEMINI_API_KEY) return null;
   const body = {
     contents: [{ role: 'user', parts: [
       { inlineData: { mimeType: 'audio/wav', data: Buffer.from(audioBuf).toString('base64') } },
-      { text: 'Transcreva este áudio. Responda APENAS com o texto falado' + (language ? `, no idioma ${language}` : '') + ', sem comentários.' }
+      { text: 'Transcreva fielmente a fala deste áudio' + (language ? ` no idioma ${language}` : '') + '. Se não houver fala humana audível, responda exatamente: [silêncio]. Responda APENAS com o texto transcrito, sem comentários.' }
     ] }],
-    generationConfig: { temperature: 0 }
+    generationConfig: { temperature: 0.1 }
   };
-  const j = await geminiGenerateTried({ body, timeout });
+  const j = await geminiGenerateTried({ body, timeout, kind: 'audio' });
   const text = gemText(j);
-  return text || null;
+  return /^\[?sil[êe]ncio\]?$/i.test(text) ? '' : (text || '');
 }
-// Imagem da cena (nano-banana / image generation)
+// Imagem da cena (família Gemini 3 Image)
 async function geminiImage(prompt) {
   if (!process.env.GEMINI_API_KEY) return null;
-  const discovered = await geminiListModels();
-  const imgIds = discovered.filter(id => /image/i.test(id) && !/understand|caption/i.test(id)).slice(0, 3);
-  const tries = [...new Set([...imgIds, 'gemini-2.5-flash-image', 'gemini-2.0-flash-preview-image-generation'])];
-  for (const model of tries) {
-    try {
-      const body = {
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: { responseModalities: ['IMAGE', 'TEXT'] }
-      };
-      const j = await geminiGenerate({ model, body, timeout: 60000 });
-      const parts = (j && j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts) || [];
-      for (const p of parts) {
-        if (p.inlineData && p.inlineData.data) return { imageBase64: p.inlineData.data, mime: p.inlineData.mimeType || 'image/png', model: 'gemini/' + model };
+  try {
+    const body = {
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: { responseModalities: ['IMAGE', 'TEXT'] }
+    };
+    const j = await geminiGenerateTried({ body, timeout: 45000, kind: 'image' });
+    const parts = (j && j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts) || [];
+    for (const p of parts) {
+      if (p.inlineData && p.inlineData.data) {
+        return { imageBase64: p.inlineData.data, mime: p.inlineData.mimeType || 'image/png', model: 'gemini/' + (_gemBest.image || _gemBestModel || 'image') };
       }
-    } catch (e) { /* próximo modelo */ }
-  }
+    }
+  } catch (e) { /* segue na cadeia */ }
   return null;
 }
 
@@ -1071,32 +1293,31 @@ async function chatViaPollinations({ system, user, json }) {
   throw lastErr;
 }
 
-// Chat com cadeia: OpenAI (vários modelos) → Pollinations
+// Chat com cadeia: OpenAI (se válida) → Gemini 3.1 / Gemma 3 → Unorouter (direto sem /models) → Pollinations
 async function chatWithFallback({ system, user, json = false, maxTokens = 8000 }) {
   const errors = [];
-  if (process.env.OPENAI_API_KEY) {
-    for (const model of ['gpt-4o-mini', 'gpt-4o', 'gpt-3.5-turbo']) {
+  if (canUseOfficialOpenAI()) {
+    for (const model of ['gpt-4o-mini', 'gpt-4o']) {
       try {
-        const OpenAI = require('openai');
-        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+        const openai = makeOpenAI();
         const body = {
           model,
           messages: [...(system ? [{ role: 'system', content: system }] : []), { role: 'user', content: user }],
           temperature: 0.8,
-          max_tokens: model === 'gpt-3.5-turbo' ? 4000 : maxTokens
+          max_tokens: maxTokens
         };
-        if (json && model !== 'gpt-3.5-turbo') body.response_format = { type: 'json_object' };
+        if (json) body.response_format = { type: 'json_object' };
         const c = await openai.chat.completions.create(body);
         const text = (c.choices[0].message.content || '').trim();
         if (!text) throw new Error('resposta vazia');
         return { text, provider: 'openai/' + model };
       } catch (e) {
         errors.push(`openai/${model}: ${(e.status ? 'HTTP ' + e.status + ' — ' : '')}${e.message}`);
-        if (e.status === 401) break; // chave inválida: não adianta trocar de modelo
+        if (e.status === 401) { markOpenAi401(); break; }
       }
     }
-  } else errors.push('openai: sem OPENAI_API_KEY');
-  // Gemini (Google) — cota generosa e rápido
+  }
+  // Gemini 3.1 / Gemma 3 — alta velocidade e cota generosa (14.400 req/dia no Gemma 3!)
   if (process.env.GEMINI_API_KEY) {
     try {
       const g = await geminiChat({ system, user, json, maxTokens });
@@ -1104,29 +1325,20 @@ async function chatWithFallback({ system, user, json = false, maxTokens = 8000 }
       errors.push('gemini: chave rejeitada (401/403)');
     } catch (e) { errors.push(e.message); }
   } else errors.push('gemini: sem GEMINI_API_KEY');
-  // Unorouter (rota de modelos do usuário) — modelos de chat descobertos, ROTACIONANDO.
-  // Regra "intercala": SEMPRE dá uma chance ao router — mesmo em pausa de cota,
-  // testa 1 modelo; se responder, a pausa termina na hora.
-  if (process.env.UNOROUTER_API_KEY) {
-    const models = await unorouterModels();
-    const list = uniPickModels(models);
-    const start = (_uniCursor++) % list.length;
-    const rotated = [...list.slice(start), ...list.slice(0, start)];
-    const inCooldown = Date.now() < _uniCooldownUntil;
-    const tries = inCooldown ? rotated.slice(0, 1) : rotated.slice(0, 4); // em pausa: 1 tentativa; senão, 4 modelos
-    let sawQuota = false;
-    for (const model of tries) {
+  // Unorouter — NUNCA chama GET /models antes (preserva 100% da janela de 1 req/min para geração real!)
+  const uKeys = allValidUniKeys();
+  if (uKeys.length) {
+    for (const uKey of uKeys) {
+      if (Date.now() < (_uniKeyCooldown[uKey] || 0)) continue;
+      const model = UNI_CHAT_MODELS[(_uniCursor++) % UNI_CHAT_MODELS.length];
       try {
-        const text = await unorouterChat({ system, user, json, model, maxTokens });
-        _uniCooldownUntil = 0;
+        const text = await unorouterChat({ system, user, json, model, maxTokens, apiKey: uKey });
         return { text, provider: 'unorouter/' + model };
       } catch (e) {
         errors.push(`unorouter/${model}: ${(e.status ? 'HTTP ' + e.status + ' — ' : '')}${e.message}`);
-        if (e.status === 401) break;
-        if (e.status === 429) sawQuota = true; // cota: tenta o próximo modelo
+        if (e.status === 401) { _deadUniKeys.add(uKey); continue; }
       }
     }
-    if (sawQuota && !inCooldown) _uniCooldownUntil = Date.now() + 45000; // cota apertada: reduz insistência por 45s
   } else errors.push('unorouter: sem UNOROUTER_API_KEY');
   try {
     const text = await chatViaPollinations({ system, user, json });
@@ -1182,58 +1394,53 @@ async function ttsStreamElements({ text, voice = 'Brian' }) {
 
 const TTS_LANGS = { 'pt-BR': 'pt-BR', pt: 'pt-BR', en: 'en', es: 'es', fr: 'fr', de: 'de', it: 'it' };
 
-// Voz com cadeia: OpenAI tts-1 → tts-1-hd → Google → StreamElements
+// Voz com cadeia: OpenAI (se válida) → Gemini 3.1 Neural TTS (confirmado ativo!) → Unorouter → Google → StreamElements
 async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR' }) {
   const errors = [];
-  if (process.env.OPENAI_API_KEY) {
+  if (canUseOfficialOpenAI()) {
     for (const model of ['tts-1', 'tts-1-hd']) {
       try {
-        const OpenAI = require('openai');
-        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+        const openai = makeOpenAI();
         const s = await openai.audio.speech.create({ model, voice: TTS_VOICES[voice] || 'onyx', input: String(text).slice(0, 4096), response_format: 'mp3' });
         const b = Buffer.from(await s.arrayBuffer());
         if (!b.length) throw new Error('áudio vazio');
         return { buffer: b, provider: 'openai/' + model };
       } catch (e) {
         errors.push(`openai/${model}: ${(e.status ? 'HTTP ' + e.status + ' — ' : '')}${e.message}`);
-        if (e.status === 401) break;
-      }
-    }
-  } else errors.push('openai: sem OPENAI_API_KEY');
-  // Unorouter TTS (só se o catálogo tiver modelos de fala)
-  if (process.env.UNOROUTER_API_KEY) {
-    const ttsIds = uniTtsModels(await unorouterModels());
-    if (!ttsIds.length) {
-      errors.push('unorouter/tts: sem modelo de fala no catálogo do router');
-    }
-    for (const model of [...ttsIds, 'tts-1'].slice(0, 3)) {
-      for (let tent = 0; tent < 2; tent++) {
-        try {
-          const r = await fetch(uniBase() + '/audio/speech', {
-            method: 'POST', headers: uniHeaders(),
-            body: JSON.stringify({ model, voice: TTS_VOICES[voice] || 'onyx', input: String(text).slice(0, 4096), response_format: 'mp3' }),
-            signal: AbortSignal.timeout(15000)
-          });
-          if (r.ok) {
-            const b = Buffer.from(await r.arrayBuffer());
-            if (b.length > 500) return { buffer: b, provider: 'unorouter/' + model };
-          } else {
-            errors.push(`unorouter/${model}: HTTP ${r.status}`);
-            if (r.status === 429) { await sleep(3000); continue; } // cota: espera e repete
-            break; // erro real do modelo: passa pro próximo
-          }
-        } catch (e) { errors.push(`unorouter/${model}: ${e.message}`); break; }
+        if (e.status === 401) { markOpenAi401(); break; }
       }
     }
   }
-  // Gemini TTS (Google) — PCM convertido pra MP3, entra antes das vozes gratuitas
+  // Gemini 3.1 Flash TTS (voz neural de estúdio, rápido e não consome o slot de 1 req/min do Unorouter!)
   if (process.env.GEMINI_API_KEY) {
     try {
       const g = await geminiTTS(text, voice);
       if (g && g.buffer) return g;
       errors.push('gemini/tts: ' + (g && g.error ? g.error : 'sem áudio'));
     } catch (e) { errors.push(e.message); }
-  } else errors.push('gemini/tts: sem GEMINI_API_KEY');
+  }
+  // Unorouter TTS — direto sem GET /models
+  const uKey = pickReadyUniKey();
+  if (uKey) {
+    for (const model of UNI_TTS_MODELS) {
+      try {
+        const r = await fetch(uniBase() + '/audio/speech', {
+          method: 'POST', headers: uniHeaders(uKey),
+          body: JSON.stringify({ model, voice: TTS_VOICES[voice] || 'onyx', input: String(text).slice(0, 4096), response_format: 'mp3' }),
+          signal: AbortSignal.timeout(15000)
+        });
+        if (r.ok) {
+          const b = Buffer.from(await r.arrayBuffer());
+          if (b.length > 500) return { buffer: b, provider: 'unorouter/' + model };
+        } else {
+          const txt = (await r.text().catch(() => '')).slice(0, 100);
+          errors.push(`unorouter/${model}: HTTP ${r.status}`);
+          if (r.status === 401) { _deadUniKeys.add(uKey); break; }
+          if (r.status === 429 && /allows 1 request|Too many requests/i.test(txt)) { markUniRateWindow(uKey); break; }
+        }
+      } catch (e) { errors.push(`unorouter/${model}: ${e.message}`); break; }
+    }
+  }
   try {
     const b = await ttsGoogle({ text, lang: TTS_LANGS[lang] || 'pt-BR' });
     return { buffer: b, provider: 'google-tts(free)' };
@@ -1284,9 +1491,8 @@ async function generateAvatarPortrait({ prompt = '', style = 'studio' }) {
   const fullPrompt = `${styleDesc}, ${subject}, centered front-facing head and shoulders portrait, looking directly straight into the camera lens, symmetrical face centered in frame, relaxed natural closed mouth with gentle pleasant expression, both eyes clearly visible, no hands near face, no microphone covering mouth, no text, no watermark`;
 
   const errors = [];
-  if (process.env.OPENAI_API_KEY) {
-    const OpenAI = require('openai');
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  if (canUseOfficialOpenAI()) {
+    const openai = makeOpenAI();
     const attempts = [
       { model: 'gpt-image-1', size: '1024x1024', quality: 'medium', n: 1, output_format: 'jpeg' },
       { model: 'dall-e-3', size: '1024x1024', quality: 'standard', n: 1, response_format: 'b64_json' }
@@ -1298,7 +1504,7 @@ async function generateAvatarPortrait({ prompt = '', style = 'studio' }) {
         if (b64) return { imageBase64: b64, mime: opts.output_format === 'jpeg' ? 'image/jpeg' : 'image/png', model: 'openai/' + opts.model };
       } catch (e) {
         errors.push(`openai/${opts.model}: ${e.message}`);
-        if (e.status === 401) break;
+        if (e.status === 401) { markOpenAi401(); break; }
       }
     }
   }
@@ -1309,13 +1515,12 @@ async function generateAvatarPortrait({ prompt = '', style = 'studio' }) {
       errors.push('gemini/image: sem imagem');
     } catch (e) { errors.push('gemini/image: ' + e.message); }
   }
-  if (process.env.UNOROUTER_API_KEY) {
-    const ids = await unorouterModels();
-    const imgList = [...uniImageModels(ids), 'dall-e-3'].slice(0, 3);
-    for (const model of imgList) {
+  const uKey = pickReadyUniKey();
+  if (uKey) {
+    for (const model of UNI_IMG_MODELS) {
       try {
         const r = await fetch(uniBase() + '/images/generations', {
-          method: 'POST', headers: uniHeaders(),
+          method: 'POST', headers: uniHeaders(uKey),
           body: JSON.stringify({ model, prompt: fullPrompt, n: 1, size: '1024x1024', response_format: 'b64_json' }),
           signal: AbortSignal.timeout(22000)
         });
@@ -1331,7 +1536,12 @@ async function generateAvatarPortrait({ prompt = '', style = 'studio' }) {
               if (buf.length > 200) return { imageBase64: buf.toString('base64'), mime: fr.headers.get('content-type') || 'image/png', model: 'unorouter/' + model };
             }
           }
-        } else errors.push(`unorouter/${model}: HTTP ${r.status}`);
+        } else {
+          const txt = (await r.text().catch(() => '')).slice(0, 100);
+          errors.push(`unorouter/${model}: HTTP ${r.status}`);
+          if (r.status === 401) { _deadUniKeys.add(uKey); break; }
+          if (r.status === 429 && /allows 1 request|Too many requests/i.test(txt)) { markUniRateWindow(uKey); break; }
+        }
       } catch (e) { errors.push(`unorouter/${model}: ${e.message}`); }
     }
   }
@@ -1382,13 +1592,12 @@ async function generateAvatarScript({ topic, durationSec = 30, tone = 'natural' 
 
 // Ponte Fase 3 (Image-to-Video via Unorouter hy4-preview / hy3 quando houver saldo; senão informa fallback local)
 async function generateAvatarVideo({ imageBase64, prompt = '', duration = 5 }) {
-  if (!process.env.UNOROUTER_API_KEY) {
+  const uKey = pickReadyUniKey() || allValidUniKeys()[0];
+  if (!uKey) {
     return { ok: false, fallback: 'canvas-lipsync', reason: 'sem UNOROUTER_API_KEY configurada' };
   }
   try {
-    const ids = await unorouterModels();
-    const candidates = ids.filter(id => /^hy\d|hunyuan|wan|kling|hailuo|minimax-video|luma|pika|runway|veo|sora/i.test(id));
-    const model = candidates.find(id => /hy4/i.test(id)) || candidates[0] || 'hy4-preview';
+    const model = 'hy4-preview';
     const motionPrompt = `Realistic talking presenter speaking naturally directly to camera, subtle head nods, natural eye blinks, lip movements, studio lighting. ${prompt}`.slice(0, 500);
     const payload = {
       model,
@@ -1398,7 +1607,7 @@ async function generateAvatarVideo({ imageBase64, prompt = '', duration = 5 }) {
     if (imageBase64) payload.image = `data:image/jpeg;base64,${String(imageBase64).replace(/^data:[^;]+;base64,/, '')}`;
     const r = await fetch(uniBase() + '/video/generations', {
       method: 'POST',
-      headers: uniHeaders(),
+      headers: uniHeaders(uKey),
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(45000)
     });
