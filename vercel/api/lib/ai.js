@@ -312,6 +312,57 @@ async function dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage =
         if (!originalText) await sleep(4000); // 2ª rodada: cotas curtas podem ter liberado
       }
     }
+    // Camada extra: modelos OMNI (aceitam áudio no chat) transcrevem também —
+    // se o Whisper estiver limitado, outra IA faz a MESMA função.
+    if (!originalText && process.env.UNOROUTER_API_KEY && audioBuf.length < 9_000_000) {
+      const omniList = ['qwen3.8-omni-flash', 'nemotron-3-nano-omni-30b-a3b-reasoning:free'];
+      for (const model of omniList) {
+        if (originalText) break;
+        try {
+          const r = await fetch(uniBase() + '/chat/completions', {
+            method: 'POST', headers: uniHeaders(),
+            body: JSON.stringify({
+              model,
+              messages: [{ role: 'user', content: [
+                { type: 'input_audio', input_audio: { data: audioBuf.toString('base64'), format: 'wav' } },
+                { type: 'text', text: 'Transcreva este áudio. Responda APENAS com o texto falado, sem comentários.' }
+              ] }],
+              max_tokens: 4000
+            }),
+            signal: AbortSignal.timeout(90000)
+          });
+          if (r.ok) {
+            const j = await r.json();
+            const t = (j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content || '').trim();
+            if (t && !/não (consigo|posso|é possível)|cannot|unable/i.test(t)) { originalText = t; whisperInfo = 'unorouter/' + model + ' (omni)'; }
+          } else {
+            whisperErr += ` | unorouter/${model}(omni): HTTP ${r.status}`;
+            if (r.status === 429) await sleep(2500);
+          }
+        } catch (e) { whisperErr += ` | unorouter/${model}(omni): ${e.message}`; }
+      }
+    }
+    // Última chance: se tudo foi429 (cota), espera a janela ("retry in 60s") e tenta 1x no melhor modelo
+    if (!originalText && /429/.test(whisperErr) && process.env.UNOROUTER_API_KEY) {
+      await sleep(50000);
+      const ids = await unorouterModels();
+      const best = (ids.find(id => /whisper-large-v3-turbo/i.test(id)) || ids.find(id => /whisper/i.test(id)) || 'whisper-large-v3-turbo:free');
+      try {
+        const fd = new FormData();
+        fd.append('file', new Blob([audioBuf], { type: 'audio/wav' }), 'audio.wav');
+        fd.append('model', best);
+        if (language) fd.append('language', language);
+        const r = await fetch(uniBase() + '/audio/transcriptions', {
+          method: 'POST', headers: { Authorization: uniHeaders().Authorization }, body: fd,
+          signal: AbortSignal.timeout(60000)
+        });
+        if (r.ok) {
+          const j = await r.json();
+          originalText = (j.text || '').trim();
+          if (originalText) whisperInfo = 'unorouter/' + best;
+        } else whisperErr += ` | unorouter/${best} (após espera): HTTP ${r.status}`;
+      } catch (e) { whisperErr += ` | unorouter/${best} (após espera): ${e.message}`; }
+    }
     if (!originalText) throw new Error('Não foi possível transcrever o áudio. ' + whisperErr);
 
     // Tradução com cadeia de provedores (GPT → IA gratuita)
@@ -579,8 +630,36 @@ async function unorouterProbe() {
     }
     out.image = done || { ok: false, error: errs.join(' | ').slice(0, 240) };
   } catch (e) { out.image = { ok: false, error: e.message }; }
+  // whisper de verdade: 1s de WAV sintético só pra ver se o endpoint de transcrição responde
+  try {
+    const wav = makeTestWav();
+    const fd = new FormData();
+    fd.append('file', new Blob([wav], { type: 'audio/wav' }), 't.wav');
+    fd.append('model', 'whisper-large-v3-turbo:free');
+    const r = await fetch(uniBase() + '/audio/transcriptions', {
+      method: 'POST', headers: { Authorization: uniHeaders().Authorization }, body: fd,
+      signal: AbortSignal.timeout(30000)
+    });
+    out.whisper = { ok: r.ok, status: r.status, model: 'whisper-large-v3-turbo:free', info: r.ok ? 'endpoint de transcrição OK' : (await r.text().catch(() => '')).slice(0, 120) };
+  } catch (e) { out.whisper = { ok: false, error: e.message }; }
   delete out.modelList;
   return out;
+}
+
+// 1 segundo de WAV sintético (8 kHz, seno fraco) para testar o endpoint de transcrição
+function makeTestWav() {
+  const rate = 8000, secs = 1, n = rate * secs;
+  const data = Buffer.alloc(n * 2);
+  for (let i = 0; i < n; i++) {
+    const v = Math.round(Math.sin(2 * Math.PI * 440 * i / rate) * 3000);
+    data.writeInt16LE(v, i * 2);
+  }
+  const hdr = Buffer.alloc(44);
+  hdr.write('RIFF', 0); hdr.writeUInt32LE(36 + data.length, 4); hdr.write('WAVE', 8);
+  hdr.write('fmt ', 12); hdr.writeUInt32LE(16, 16); hdr.writeUInt16LE(1, 20); hdr.writeUInt16LE(1, 22);
+  hdr.writeUInt32LE(rate, 24); hdr.writeUInt32LE(rate * 2, 28); hdr.writeUInt16LE(2, 32); hdr.writeUInt16LE(16, 34);
+  hdr.write('data', 36); hdr.writeUInt32LE(data.length, 40);
+  return Buffer.concat([hdr, data]);
 }
 
 let _uniModels = null;
