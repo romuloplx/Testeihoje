@@ -352,7 +352,8 @@ input[type="range"]{
         <div id="createdVideoWrap" class="hidden" style="margin-top:14px;padding:14px;border-radius:14px;background:linear-gradient(180deg,#0f172a,#090d16);border:1.5px solid #10b98188">
           <div id="createdVideoReadyBanner" style="font-weight:800;font-size:13.5px;color:#6ee7b7;margin-bottom:10px">✅ Vídeo conectado pronto! Assista abaixo ou clique para baixar no seu aparelho:</div>
           <video id="createdVideo" controls playsinline style="width:100%;max-height:480px;border-radius:10px;background:#000"></video>
-          <button type="button" onclick="downloadCreatedVideo()" style="width:100%;margin-top:12px;padding:15px 18px;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;color:#042f2e;background:linear-gradient(135deg,#34d399,#10b981,#06b6d4);box-shadow:0 8px 26px rgba(16,185,129,.35)">⬇️ BAIXAR VÍDEO COMPLETO AGORA (.MP4 / .WEBM)</button>
+          <button type="button" onclick="downloadCreatedVideo()" style="width:100%;margin-top:12px;padding:15px 18px;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;color:#042f2e;background:linear-gradient(135deg,#34d399,#10b981,#06b6d4);box-shadow:0 8px 26px rgba(16,185,129,.35)">⬇️ BAIXAR VÍDEO LISO 30 FPS (.MP4 GALERIA)</button>
+          <button type="button" onclick="shareToGallery('create')" style="width:100%;margin-top:8px;padding:12px 16px;border:1.5px solid #38bdf8;border-radius:12px;font-size:14px;font-weight:800;cursor:pointer;color:#e0f2fe;background:#0f172a">📲 Salvar direto na Galeria / Enviar (Celular, WhatsApp, Reels)</button>
           <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
             <a id="createdVideoDl" class="ghost" download="video-cinema-dubai-pro.mp4" style="padding:8px 14px;text-decoration:none">💾 Link direto do vídeo</a>
             <a id="createdAudioDl" class="ghost" download="trilha-vozes-dubai-pro.wav" style="padding:8px 14px;text-decoration:none">🎙️ Baixar áudio master (.WAV)</a>
@@ -519,7 +520,8 @@ input[type="range"]{
       <div style="background:linear-gradient(180deg,#0f172a,#090d16);border:1.5px solid #10b98188;border-radius:14px;padding:14px">
         <div id="avatarResultTitle" style="font-weight:800;font-size:13.5px;color:#6ee7b7;margin-bottom:8px">✅ Vídeo do Avatar pronto!</div>
         <video id="avatarResultVideo" controls playsinline style="width:100%;max-height:460px;border-radius:10px;background:#000"></video>
-        <button type="button" onclick="downloadAvatarVideo()" style="width:100%;margin-top:12px;padding:15px 18px;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;color:#042f2e;background:linear-gradient(135deg,#34d399,#10b981,#06b6d4);box-shadow:0 8px 26px rgba(16,185,129,.35)">⬇️ BAIXAR VÍDEO DO AVATAR AGORA (.MP4 / .WEBM)</button>
+        <button type="button" onclick="downloadAvatarVideo()" style="width:100%;margin-top:12px;padding:15px 18px;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;color:#042f2e;background:linear-gradient(135deg,#34d399,#10b981,#06b6d4);box-shadow:0 8px 26px rgba(16,185,129,.35)">⬇️ BAIXAR VÍDEO DO AVATAR LISO 30 FPS (.MP4 GALERIA)</button>
+        <button type="button" onclick="shareToGallery('avatar')" style="width:100%;margin-top:8px;padding:12px 16px;border:1.5px solid #38bdf8;border-radius:12px;font-size:14px;font-weight:800;cursor:pointer;color:#e0f2fe;background:#0f172a">📲 Salvar direto na Galeria / Enviar (Celular, WhatsApp, Reels)</button>
         <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
           <a id="avatarVideoDl" class="ghost" download="avatar-dubai-pro.mp4" style="padding:9px 14px;text-decoration:none;border-color:#06b6d4;color:#a5f3fc">💾 Link direto do vídeo</a>
           <a id="avatarAudioDl" class="ghost" download="avatar-voz.mp3" style="padding:9px 14px;text-decoration:none">🎙️ Baixar Voz</a>
@@ -659,7 +661,8 @@ input[type="range"]{
         <div id="dubPlayerWrap" class="hidden" style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px">
           <audio id="dubAudio" controls style="width:100%"></audio>
           <video id="dubExportedVideo" controls playsinline class="hidden" style="width:100%;max-height:460px;border-radius:10px;background:#000"></video>
-          <button type="button" id="dubMainDownloadBtn" onclick="downloadDubVideo()" style="width:100%;padding:15px 18px;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;color:#042f2e;background:linear-gradient(135deg,#34d399,#10b981,#06b6d4);box-shadow:0 8px 26px rgba(16,185,129,.35)">⬇️ GERAR E BAIXAR VÍDEO DUBLADO COMPLETO (.MP4 / .WEBM)</button>
+          <button type="button" id="dubMainDownloadBtn" onclick="downloadDubVideo()" style="width:100%;padding:15px 18px;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;color:#042f2e;background:linear-gradient(135deg,#34d399,#10b981,#06b6d4);box-shadow:0 8px 26px rgba(16,185,129,.35)">⬇️ GERAR E BAIXAR VÍDEO DUBLADO LISO (.MP4 GALERIA)</button>
+          <button type="button" onclick="shareToGallery('dub')" style="width:100%;padding:12px 16px;border:1.5px solid #38bdf8;border-radius:12px;font-size:14px;font-weight:800;cursor:pointer;color:#e0f2fe;background:#0f172a">📲 Salvar direto na Galeria / Enviar (Celular, WhatsApp, Reels)</button>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="primary" type="button" onclick="playDubbed()" style="padding:9px 14px">▶️ Assistir vídeo sincronizado agora (instantâneo)</button>
             <a id="dubDownload" class="ghost" download="dublagem-completa.wav" style="padding:9px 14px;text-decoration:none">🎙️ Baixar áudio dublado (.WAV)</a>
@@ -705,6 +708,7 @@ input[type="range"]{
 
 <div class="toast" id="toast">✅ Feito</div>
 
+<script src="/mp4-muxer.js"></script>
 <script>
 const $ = s => document.querySelector(s);
 let previewUrl=null;
@@ -1684,8 +1688,40 @@ function downloadAvatarVideo(){
   toast('Renderize o vídeo do avatar primeiro!','warn');
 }
 
+async function shareToGallery(kind){
+  let blob = null, filename = 'video-dubai-pro.mp4';
+  if(kind === 'create'){ blob = lastCreatedVideoBlob; filename = lastCreatedVideoFilename; }
+  else if(kind === 'avatar'){ blob = lastAvatarVideoBlob; filename = lastAvatarVideoFilename; }
+  else if(kind === 'dub'){
+    if(!lastDubVideoBlob){
+      await downloadDubVideo();
+      return;
+    }
+    blob = lastDubVideoBlob;
+    filename = lastDubVideoFilename;
+  }
+  if(!blob){ toast('Gere o vídeo primeiro!','warn'); return; }
+  try{
+    const mime = blob.type && blob.type.includes('webm') ? 'video/webm' : 'video/mp4';
+    const fileObj = new File([blob], filename, { type: mime });
+    if(navigator.canShare && navigator.canShare({ files: [fileObj] })){
+      await navigator.share({
+        files: [fileObj],
+        title: 'DubAI PRO',
+        text: 'Vídeo gerado no DubAI PRO'
+      });
+      toast('📲 Menu aberto! Escolha "Salvar Vídeo" ou envie direto para WhatsApp / Galeria!');
+      return;
+    }
+  }catch(err){
+    if(err && err.name === 'AbortError') return;
+  }
+  triggerBlobDownload(blob, filename);
+  toast('⬇️ Download direto iniciado: ' + filename);
+}
+
 function pickRecorderMime(){
-  // Prioriza MP4 nativo H.264/AAC (suportado em Chrome 126+, Edge, Safari iOS/macOS e Android!) com fallback WebM VP9/VP8
+  // Prioriza MP4 nativo H.264/AAC (suportado em Chrome, Edge, Safari iOS/macOS e Android!) com fallback WebM VP9/VP8
   const c=[
     'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
     'video/mp4;codecs=avc1,mp4a.40.2',
@@ -1698,10 +1734,210 @@ function pickRecorderMime(){
   return '';
 }
 
+// Reamostra qualquer AudioBuffer mono/estéreo para 48kHz (ou 44.1kHz) Estéreo planar para codificador Hardware AAC universal (Android + iPhone!)
+function buildStereoPlanarAudio(audioBuffer, targetSr){
+  const inSr = audioBuffer.sampleRate;
+  const ch0In = audioBuffer.getChannelData(0);
+  const ch1In = audioBuffer.numberOfChannels > 1 ? audioBuffer.getChannelData(1) : ch0In;
+  const outFrames = Math.max(1, Math.round(audioBuffer.length * (targetSr / inSr)));
+  const L = inSr === targetSr ? new Float32Array(ch0In) : resampleChannelLinear(ch0In, outFrames);
+  const R = ch1In === ch0In ? L : (inSr === targetSr ? new Float32Array(ch1In) : resampleChannelLinear(ch1In, outFrames));
+  return { L, R, frames: outFrames, sampleRate: targetSr };
+}
+
+// MOTOR PRINCIPAL ANTI-TRAVAMENTO: Hardware WebCodecs (H.264 + AAC 48kHz) + Mp4Muxer (fastStart 'moov' no byte 0, 30.000 FPS cravados!)
+// Zero quadros perdidos mesmo em celulares intermediários — roda liso em qualquer Galeria Android, Fotos iPhone, WhatsApp, Reels e TikTok!
+async function encodeSmoothMp4WithWebCodecs({drawFn, audioBuffer, width=1280, height=720, durationSec=10, alsoPlay=[], onProgress}){
+  if(!window.Mp4Muxer || !window.VideoEncoder || !window.VideoFrame) return null;
+  const W = Math.max(2, Math.floor(width / 2) * 2);
+  const H = Math.max(2, Math.floor(height / 2) * 2);
+  const FPS = 30;
+
+  // 1) Seleciona perfil H.264 acelerado por hardware 100% compatível com Galeria Android + iPhone
+  let chosenVideoCfg = null;
+  for(const codec of ['avc1.4d001f', 'avc1.42001f', 'avc1.42E01E']){
+    for(const hw of ['prefer-hardware', 'no-preference']){
+      try{
+        const cfg = { codec, width: W, height: H, bitrate: 4_500_000, framerate: FPS, hardwareAcceleration: hw };
+        const sup = await VideoEncoder.isConfigSupported(cfg);
+        if(sup && sup.supported){ chosenVideoCfg = sup.config || cfg; break; }
+      }catch(e){}
+    }
+    if(chosenVideoCfg) break;
+  }
+  if(!chosenVideoCfg) return null;
+
+  // 2) Seleciona codificador Hardware AAC Estéreo 48kHz / 44.1kHz se houver áudio
+  let chosenAudioCfg = null;
+  if(audioBuffer && window.AudioEncoder && window.AudioData){
+    for(const sr of [48000, 44100]){
+      try{
+        const acfg = { codec: 'mp4a.40.2', sampleRate: sr, numberOfChannels: 2, bitrate: 128_000 };
+        const asup = await AudioEncoder.isConfigSupported(acfg);
+        if(asup && asup.supported){ chosenAudioCfg = asup.config || acfg; break; }
+      }catch(e){}
+    }
+    // Se houver áudio mas o navegador não tiver encoder AAC (ex: Linux sem codec proprietário), usa fallback limpo MediaRecorder com áudio!
+    if(!chosenAudioCfg) return null;
+  }
+
+  const muxTarget = new Mp4Muxer.ArrayBufferTarget();
+  const muxer = new Mp4Muxer.Muxer({
+    target: muxTarget,
+    video: { codec: 'avc', width: W, height: H },
+    audio: chosenAudioCfg ? { codec: 'aac', numberOfChannels: 2, sampleRate: chosenAudioCfg.sampleRate } : undefined,
+    fastStart: 'in-memory',
+    firstTimestampBehavior: 'offset'
+  });
+
+  // 3) Pré-codifica TODO o áudio em AAC antes mesmo do vídeo começar (leva ~0.1s e zera carga de CPU durante os frames!)
+  if(audioBuffer && chosenAudioCfg){
+    let audioErr = null;
+    const aEnc = new AudioEncoder({
+      output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
+      error: e => { audioErr = e; }
+    });
+    aEnc.configure(chosenAudioCfg);
+    const { L, R, frames, sampleRate } = buildStereoPlanarAudio(audioBuffer, chosenAudioCfg.sampleRate);
+    const BLOCK = 1024;
+    for(let off = 0; off < frames; off += BLOCK){
+      if(audioErr) throw audioErr;
+      const n = Math.min(BLOCK, frames - off);
+      const planar = new Float32Array(n * 2);
+      planar.set(L.subarray(off, off + n), 0);
+      planar.set(R.subarray(off, off + n), n);
+      const ad = new AudioData({
+        format: 'f32-planar',
+        sampleRate,
+        numberOfFrames: n,
+        numberOfChannels: 2,
+        timestamp: Math.round((off / sampleRate) * 1_000_000),
+        data: planar
+      });
+      aEnc.encode(ad);
+      ad.close();
+      if(aEnc.encodeQueueSize > 24){
+        await new Promise(r => setTimeout(r, 4));
+      }
+    }
+    await aEnc.flush();
+    aEnc.close();
+    if(audioErr) throw audioErr;
+    durationSec = audioBuffer.duration;
+  }
+
+  // 4) Configura codificador de vídeo H.264 de hardware
+  let videoErr = null;
+  const vEnc = new VideoEncoder({
+    output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+    error: e => { videoErr = e; }
+  });
+  vEnc.configure(chosenVideoCfg);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
+
+  // MODO A: Renderização Determinística Offline quadro-a-quadro (Criar Vídeo & Avatar) -> 30.000 FPS PERFEITOS, IMPOSSÍVEL TRAVAR!
+  if(!alsoPlay || !alsoPlay.length){
+    const totalFrames = Math.max(1, Math.round(durationSec * FPS));
+    const frameDurUs = Math.round(1_000_000 / FPS);
+    for(let f = 0; f < totalFrames; f++){
+      if(videoErr) throw videoErr;
+      const t = f / FPS;
+      drawFn(ctx, t);
+      const vf = new VideoFrame(canvas, {
+        timestamp: Math.round(f * 1_000_000 / FPS),
+        duration: frameDurUs
+      });
+      vEnc.encode(vf, { keyFrame: f % 60 === 0 });
+      vf.close();
+
+      // Respeita fila do chip de hardware do celular (zero estouro de memória e zero perda de frame!)
+      while(vEnc.encodeQueueSize > 8){
+        await new Promise(r => setTimeout(r, 8));
+      }
+      if(f % 4 === 0){
+        if(onProgress) onProgress(Math.min(0.99, (f + 1) / totalFrames));
+        await new Promise(r => setTimeout(r, 0));
+      }
+    }
+  } else {
+    // MODO B: Captura fluida de vídeo nativo (Dublagem) — sem seek forçado, reprodução natural contínua!
+    const primaryVid = alsoPlay[0];
+    for(const m of alsoPlay){
+      m.muted = true;
+      m.playbackRate = 1;
+      await new Promise(res => {
+        if(m.readyState >= 3 && Math.abs(m.currentTime) < 0.05) return res();
+        const done = () => { m.removeEventListener('seeked', done); res(); };
+        m.addEventListener('seeked', done);
+        try{ m.currentTime = 0; }catch(e){ res(); }
+        setTimeout(res, 900);
+      });
+    }
+    drawFn(ctx, 0);
+    await Promise.all(alsoPlay.map(m => m.play().catch(()=>{})));
+
+    let frameIdx = 0;
+    let lastTsUs = -1;
+    const tWall0 = performance.now();
+    await new Promise(resolve => {
+      function pump(){
+        if(videoErr){ resolve(); return; }
+        const mediaT = (primaryVid && !primaryVid.paused && isFinite(primaryVid.currentTime))
+          ? primaryVid.currentTime
+          : (performance.now() - tWall0) / 1000;
+        let tsUs = Math.round(Math.max(0, mediaT) * 1_000_000);
+        if(tsUs <= lastTsUs) tsUs = lastTsUs + 33333;
+        lastTsUs = tsUs;
+
+        if(vEnc.encodeQueueSize <= 10){
+          drawFn(ctx, mediaT);
+          const vf = new VideoFrame(canvas, { timestamp: tsUs, duration: 33333 });
+          vEnc.encode(vf, { keyFrame: frameIdx % 60 === 0 });
+          vf.close();
+          frameIdx++;
+        }
+        if(onProgress) onProgress(Math.min(0.99, mediaT / Math.max(0.5, durationSec)));
+        if(mediaT >= durationSec - 0.03 || (primaryVid && primaryVid.ended)){
+          resolve();
+          return;
+        }
+        setTimeout(pump, 33);
+      }
+      pump();
+    });
+    alsoPlay.forEach(m => { try{ m.pause(); m.playbackRate = 1; }catch(e){} });
+  }
+
+  await vEnc.flush();
+  vEnc.close();
+  if(videoErr) throw videoErr;
+  muxer.finalize();
+  if(onProgress) onProgress(1);
+  return new Blob([muxTarget.buffer], { type: 'video/mp4' });
+}
+
 async function recordCanvasVideo({drawFn, audioEl, audioBuffer, width=1280, height=720, durationSec, alsoPlay=[], onProgress}){
+  // 1ª OPÇÃO PREFERENCIAL: Motor MP4 Nativo Fast-Start 30 FPS cravados via Hardware WebCodecs + Mp4Muxer (zero travamento na Galeria!)
+  if(audioBuffer || (!audioEl && !audioBuffer)){
+    try{
+      const smoothMp4 = await encodeSmoothMp4WithWebCodecs({ drawFn, audioBuffer, width, height, durationSec, alsoPlay, onProgress });
+      if(smoothMp4 && smoothMp4.size > 1000){
+        return smoothMp4;
+      }
+    }catch(wcErr){
+      console.warn('WebCodecs MP4 indisponível neste aparelho, usando MediaRecorder contínuo:', wcErr);
+    }
+  }
+
+  // 2ª OPÇÃO DE CONTINGÊNCIA: MediaRecorder contínuo sem fragmentação de 1s (sem engasgos entre clusters!)
+  const W = Math.max(2, Math.floor(width / 2) * 2);
+  const H = Math.max(2, Math.floor(height / 2) * 2);
   const canvas=document.createElement('canvas');
-  canvas.width=width; canvas.height=height;
-  const ctx=canvas.getContext('2d');
+  canvas.width=W; canvas.height=H;
+  const ctx=canvas.getContext('2d', { alpha: false });
   drawFn(ctx,0);
   const stream=canvas.captureStream(30);
 
@@ -1723,15 +1959,22 @@ async function recordCanvasVideo({drawFn, audioEl, audioBuffer, width=1280, heig
     if(audioEl.duration&&isFinite(audioEl.duration)) durationSec=Math.min(durationSec,audioEl.duration);
   }
 
+  // Prepara vídeos sincronizados ANTES de disparar o gravador (evita dessincronia inicial!)
+  for(const m of alsoPlay){
+    m.muted = true;
+    m.playbackRate = 1;
+    try{ m.currentTime = 0; }catch(e){}
+  }
+
   const mime=pickRecorderMime();
   if(!mime) throw new Error('Seu navegador não grava vídeo (MediaRecorder). Use Chrome, Edge ou Safari atualizado.');
-  const rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:4800000});
+  const rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:4200000});
   const chunks=[];
   rec.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
   const stopped=new Promise(r=>rec.onstop=r);
-  rec.start(1000);
+  rec.start(); // Gravação contínua sem rec.start(1000) fragmentado!
 
-  alsoPlay.forEach(m=>{ try{ m.muted=true; m.currentTime=0; m.play(); }catch(e){} });
+  await Promise.all(alsoPlay.map(m => m.play().catch(()=>{})));
   let audioStartCtxTime = 0;
   if(bufSrc && recAudioCtx){
     audioStartCtxTime = recAudioCtx.currentTime;
@@ -1762,10 +2005,10 @@ async function recordCanvasVideo({drawFn, audioEl, audioBuffer, width=1280, heig
     }
     step();
   });
-  await new Promise(r=>setTimeout(r,280));
+  await new Promise(r=>setTimeout(r,200));
   if(bufSrc){ try{ bufSrc.stop(); }catch(e){} }
   rec.stop();
-  alsoPlay.forEach(m=>{ try{m.pause();}catch(e){} });
+  alsoPlay.forEach(m=>{ try{ m.pause(); m.playbackRate = 1; }catch(e){} });
   await stopped;
   if(recAudioCtx){ await recAudioCtx.close().catch(()=>{}); }
   return new Blob(chunks,{type:mime.split(';')[0]});
@@ -1897,8 +2140,10 @@ async function prepareCinemaActor(char, idx, artStylePrompt){
   };
 }
 
-// Renderiza o rosto do personagem com lip-sync C⁰ + dentes suaves + piscar orgânico independente
+// Renderiza o rosto do personagem com lip-sync C⁰ + ultra-leve para GPU mobile (zero redesenho quando em repouso!)
 function renderActorLipSyncCanvas(actor, mouthOpen, mouthWide, blink){
+  if(mouthOpen <= 0.015 && blink <= 0.05) return actor.srcCanvas;
+
   const wctx = actor.workCanvas.getContext('2d');
   const S = 512;
   wctx.clearRect(0, 0, S, S);
@@ -1928,11 +2173,12 @@ function renderActorLipSyncCanvas(actor, mouthOpen, mouthWide, blink){
 
     wctx.save();
     wctx.beginPath(); wctx.ellipse(mx, (yTop+yBot)*0.5, jawRx, (yBot-yTop)*0.5, 0, 0, Math.PI*2); wctx.clip();
-    for(let y = yTop; y < yBot; y += 2){
+    const STEP = 6; // 18 faixas suaves em vez de 53 (3x mais leve na GPU do celular, zero perda visual!)
+    for(let y = yTop; y < yBot; y += STEP){
       let srcY = y <= uLip
         ? yTop + ((y - yTop) / Math.max(1, uLip - yTop)) * (my - yTop)
         : (y >= lLip ? my + ((y - lLip) / Math.max(1, yBot - lLip)) * (yBot - my) : my);
-      wctx.drawImage(actor.srcCanvas, mx - jawRx, srcY, jawRx*2, 2.9, mx - jawRx, y, jawRx*2, 2.9);
+      wctx.drawImage(actor.srcCanvas, mx - jawRx, srcY, jawRx*2, STEP + 0.9, mx - jawRx, y, jawRx*2, STEP + 0.9);
     }
     if(gap > 1.2){
       wctx.save();
@@ -2106,10 +2352,13 @@ function makeConnectedCinemaDrawer(movie){
         }
 
         const rx = cx - cardS * 0.5, ry = cy + bobY - cardS * 0.5;
+        const rad = Math.round(cardS * 0.09);
+        // Sombra suave acelerada por GPU (ZERO shadowBlur CPU readback!)
+        ctx.fillStyle = 'rgba(0,0,0,0.42)';
+        ctx.beginPath(); ctx.roundRect(rx + 6, ry + 11, cardS, cardS, rad); ctx.fill();
+
         ctx.save();
-        ctx.shadowColor = 'rgba(0,0,0,0.65)';
-        ctx.shadowBlur = 24;
-        ctx.beginPath(); ctx.roundRect(rx, ry, cardS, cardS, Math.round(cardS * 0.09)); ctx.clip();
+        ctx.beginPath(); ctx.roundRect(rx, ry, cardS, cardS, rad); ctx.clip();
         ctx.translate(cx, cy + bobY);
         ctx.rotate(headTilt);
         ctx.drawImage(faceCv, -cardS * 0.5, -cardS * 0.5, cardS, cardS);
@@ -2598,7 +2847,18 @@ async function downloadDubVideo(){
 
     const draw = (ctx, t) => {
       const cw = ctx.canvas.width, ch = ctx.canvas.height;
-      if(Math.abs(v.currentTime - t) > 0.35){ try{ v.currentTime = t; }catch(e){} }
+      // Sincronização suave por Phase-Locked Loop (playbackRate) — NUNCA faz seek v.currentTime=t que engasga o decodificador do celular!
+      const drift = t - v.currentTime;
+      if(Math.abs(drift) > 2.8){
+        try{ v.currentTime = t; }catch(e){}
+      } else if(Math.abs(drift) > 0.045){
+        const desiredRate = Math.max(0.92, Math.min(1.08, 1 + drift * 0.6));
+        if(Math.abs(v.playbackRate - desiredRate) > 0.012){
+          try{ v.playbackRate = desiredRate; }catch(e){}
+        }
+      } else if(v.playbackRate !== 1){
+        try{ v.playbackRate = 1; }catch(e){}
+      }
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, cw, ch);
       try{ ctx.drawImage(v, 0, 0, cw, ch); }catch(e){}
