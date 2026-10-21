@@ -3211,24 +3211,20 @@ function renderActorLipSyncCanvas(actor, mouthOpen, mouthWide, blink){
         x0, my + shiftY * 0.85, colW + 0.8, (yBot - my) - shiftY * 0.85
       );
     }
-    if(gap > 1.1){
-      const uLip = my - gap * 0.22;
-      const lLip = my + gap * 0.78;
+    if(gap > 1.0){
+      const uLip = my - gap * 0.20;
+      const lLip = my + gap * 0.80;
+      const cyM = (uLip + lLip) * 0.5;
+      const ryM = Math.max(1.5, (lLip - uLip) * 0.52);
       wctx.save();
-      wctx.beginPath();
-      wctx.moveTo(mx - lipRx, my + gap*0.08);
-      wctx.quadraticCurveTo(mx, uLip - gap*0.12, mx + lipRx, my + gap*0.08);
-      wctx.quadraticCurveTo(mx, lLip + gap*0.18, mx - lipRx, my + gap*0.08);
-      wctx.closePath(); wctx.clip();
-      const oralGrad = wctx.createRadialGradient(mx, (uLip+lLip)*0.5, 1, mx, (uLip+lLip)*0.5, lipRx);
-      oralGrad.addColorStop(0, `rgb(${Math.max(10,(m.oralR||34)-12)},${Math.max(5,(m.oralG||12)-6)},${Math.max(8,(m.oralB||18)-6)})`);
-      oralGrad.addColorStop(1, `rgb(${m.oralR||34},${m.oralG||12},${m.oralB||18})`);
+      const oralGrad = wctx.createRadialGradient(mx, cyM, 0.5, mx, cyM, lipRx * 0.92);
+      oralGrad.addColorStop(0, `rgba(${Math.max(10,(m.oralR||32)-10)},${Math.max(5,(m.oralG||11)-5)},${Math.max(8,(m.oralB||16)-5)},0.86)`);
+      oralGrad.addColorStop(0.65, `rgba(${m.oralR||32},${m.oralG||11},${m.oralB||16},0.52)`);
+      oralGrad.addColorStop(1, `rgba(${m.oralR||32},${m.oralG||11},${m.oralB||16},0)`);
       wctx.fillStyle = oralGrad;
-      wctx.fillRect(mx - lipRx, uLip - 3, lipRx*2, (lLip - uLip) + 8);
-      if(mouthOpen > 0.20){
-        wctx.fillStyle = 'rgba(244,240,236,0.56)';
-        wctx.beginPath(); wctx.roundRect(mx - lipRx*0.58, uLip - 1, lipRx*1.16, Math.max(1.8, gap*0.24), 2); wctx.fill();
-      }
+      wctx.beginPath();
+      wctx.ellipse(mx, cyM, lipRx * 0.88, ryM, 0, 0, Math.PI * 2);
+      wctx.fill();
       wctx.restore();
     }
     wctx.restore();
@@ -4416,31 +4412,79 @@ function buildStudioAvatarCanvas(p, targetCanvas){
   g.fillStyle = p.skinShadow;
   g.beginPath(); g.ellipse(cx, S*0.490, S*0.019, S*0.008, 0, 0, Math.PI); g.fill();
 
-  // Natural closed lips at exact y = 0.548 * S = 394.6
-  const my = S * 0.548, mw = S * 0.048;
-  // Upper lip
-  g.fillStyle = p.lip;
+  // Natural 3D shaded lips at exact y = 0.548 * S = 394.6 (philtrum, Cupid's bow, soft vermilion & commissures)
+  const my = S * 0.548, mw = S * 0.050;
+  // Subtle philtrum dimple above Cupid's bow
+  const philGrad = g.createLinearGradient(0, my - S*0.036, 0, my - S*0.009);
+  philGrad.addColorStop(0, 'rgba(0,0,0,0)');
+  philGrad.addColorStop(1, 'rgba(65,30,32,0.11)');
+  g.fillStyle = philGrad;
   g.beginPath();
-  g.moveTo(cx - mw, my);
-  g.quadraticCurveTo(cx - mw*0.45, my - S*0.013, cx - mw*0.12, my - S*0.008);
-  g.lineTo(cx, my - S*0.0105);
-  g.lineTo(cx + mw*0.12, my - S*0.008);
-  g.quadraticCurveTo(cx + mw*0.45, my - S*0.013, cx + mw, my);
+  g.ellipse(cx, my - S*0.020, S*0.0085, S*0.014, 0, 0, Math.PI*2);
+  g.fill();
+
+  // Soft mentolabial shadow under lower lip
+  const chinShade = g.createRadialGradient(cx, my + S*0.025, 2, cx, my + S*0.025, mw * 0.90);
+  chinShade.addColorStop(0, 'rgba(48,22,26,0.18)');
+  chinShade.addColorStop(1, 'rgba(48,22,26,0)');
+  g.fillStyle = chinShade;
+  g.beginPath();
+  g.ellipse(cx, my + S*0.025, mw * 0.82, S*0.010, 0, 0, Math.PI*2);
+  g.fill();
+
+  // Lower lip cushion with 3D vertical shading (fuller in center, soft taper at corners)
+  const lLipGrad = g.createLinearGradient(0, my - S*0.002, 0, my + S*0.021);
+  lLipGrad.addColorStop(0, 'rgba(38,14,20,0.42)');
+  lLipGrad.addColorStop(0.28, p.lip);
+  lLipGrad.addColorStop(0.68, p.lip);
+  lLipGrad.addColorStop(1, p.skinShadow);
+  g.fillStyle = lLipGrad;
+  g.beginPath();
+  g.moveTo(cx - mw, my - S*0.001);
+  g.bezierCurveTo(cx - mw*0.52, my + S*0.022, cx + mw*0.52, my + S*0.022, cx + mw, my - S*0.001);
+  g.quadraticCurveTo(cx, my + S*0.002, cx - mw, my - S*0.001);
   g.closePath();
   g.fill();
-  // Lower lip
-  g.globalAlpha = 0.9;
+
+  // Soft natural sheen on lower lip cushion
+  const glossGrad = g.createRadialGradient(cx, my + S*0.0095, 1, cx, my + S*0.0095, mw * 0.52);
+  glossGrad.addColorStop(0, 'rgba(255,235,238,0.26)');
+  glossGrad.addColorStop(0.6, 'rgba(255,220,225,0.08)');
+  glossGrad.addColorStop(1, 'rgba(255,220,225,0)');
+  g.fillStyle = glossGrad;
   g.beginPath();
-  g.moveTo(cx - mw, my);
-  g.quadraticCurveTo(cx, my + S*0.019, cx + mw, my);
+  g.ellipse(cx, my + S*0.0095, mw * 0.48, S*0.0052, 0, 0, Math.PI*2);
+  g.fill();
+
+  // Upper lip with natural Cupid's bow and subtle downward shadow
+  const uLipGrad = g.createLinearGradient(0, my - S*0.014, 0, my + S*0.002);
+  uLipGrad.addColorStop(0, p.lip);
+  uLipGrad.addColorStop(0.75, p.lip);
+  uLipGrad.addColorStop(1, 'rgba(42,15,22,0.58)');
+  g.fillStyle = uLipGrad;
+  g.beginPath();
+  g.moveTo(cx - mw, my - S*0.0005);
+  g.quadraticCurveTo(cx - mw*0.52, my - S*0.0135, cx - mw*0.14, my - S*0.0125);
+  g.quadraticCurveTo(cx, my - S*0.0085, cx + mw*0.14, my - S*0.0125);
+  g.quadraticCurveTo(cx + mw*0.52, my - S*0.0135, cx + mw, my - S*0.0005);
+  g.quadraticCurveTo(cx, my + S*0.0022, cx - mw, my - S*0.0005);
   g.closePath();
   g.fill();
-  g.globalAlpha = 1;
-  // Lip parting line
-  g.strokeStyle = 'rgba(40,14,20,0.55)'; g.lineWidth = S*0.0026;
+
+  // Feathered lip parting line & oral commissures (soft corners)
+  const partGrad = g.createLinearGradient(cx - mw, 0, cx + mw, 0);
+  partGrad.addColorStop(0, 'rgba(36,12,18,0.12)');
+  partGrad.addColorStop(0.18, 'rgba(36,12,18,0.48)');
+  partGrad.addColorStop(0.5, 'rgba(28,9,14,0.62)');
+  partGrad.addColorStop(0.82, 'rgba(36,12,18,0.48)');
+  partGrad.addColorStop(1, 'rgba(36,12,18,0.12)');
+  g.strokeStyle = partGrad;
+  g.lineWidth = S*0.0022;
+  g.lineCap = 'round';
   g.beginPath();
-  g.moveTo(cx - mw*0.95, my);
-  g.quadraticCurveTo(cx, my + S*0.002, cx + mw*0.95, my);
+  g.moveTo(cx - mw*0.98, my - S*0.0008);
+  g.quadraticCurveTo(cx - mw*0.32, my + S*0.0018, cx, my + S*0.0008);
+  g.quadraticCurveTo(cx + mw*0.32, my + S*0.0018, cx + mw*0.98, my - S*0.0008);
   g.stroke();
 
   // Front hair crown
@@ -4949,9 +4993,10 @@ function onAvatarPointerUp(ev){
   avatarDraggingPoint = null;
 }
 
-// Motor Anatômico 2D com Janela de Cosseno & Alinhamento de Inclinação Facial:
+// Motor Anatômico Sub-Pixel 2D com Interpolação Bilinear & Sombreamento Oral Difuso:
 // - Pálpebras piscam suavemente acompanhando o ângulo exato dos olhos (zero borda quadrada!)
-// - Lábios e mandíbula abrem com decaimento radial nos cantos da boca e tom oral real amostrado da foto!
+// - Lábios e mandíbula deformam os pixels reais da foto pixel-a-pixel com interpolação bilinear sub-pixel,
+//   preservando a textura real dos lábios sem colar dentes/língua artificiais em vetor!
 function renderWarpedPortraitCanvas(mouthOpen, mouthWide, blinkAmt, allowLipWarp){
   const S = AVATAR_SIZE;
   const wctx = avatarWorkCanvas.getContext('2d');
@@ -4975,7 +5020,6 @@ function renderWarpedPortraitCanvas(mouthOpen, mouthWide, blinkAmt, allowLipWarp
       const y0 = ey - ery, totalH = ery * 2;
       const lidLine = 0.34 + 0.52 * blinkAmt;
       wctx.save();
-      // Recorte amendoado suave rotacionado no ângulo real do olho
       wctx.beginPath();
       wctx.ellipse(ex, ey, erx * 1.04, ery * 1.08, eyeAngle, 0, Math.PI * 2);
       wctx.clip();
@@ -4987,7 +5031,6 @@ function renderWarpedPortraitCanvas(mouthOpen, mouthWide, blinkAmt, allowLipWarp
           : 0.34 + ((t - lidLine) / Math.max(0.05, 1 - lidLine)) * 0.66;
         wctx.drawImage(avatarSourceCanvas, ex - erx, y0 + srcT * totalH, erx * 2, 2.1, ex - erx, y, erx * 2, 2.1);
       }
-      // Sombra natural dos cílios superiores ao fechar a pálpebra
       wctx.strokeStyle = `rgba(18,12,16,${0.22 * blinkAmt})`;
       wctx.lineWidth = Math.max(1.3, S * 0.0025);
       wctx.beginPath();
@@ -4999,93 +5042,185 @@ function renderWarpedPortraitCanvas(mouthOpen, mouthWide, blinkAmt, allowLipWarp
     }
   }
 
-  // 2) Lip-Sync Anatômico 2D (Lábios + Cantos da Boca + Descida Natural do Queixo com Decaimento em Cosseno)
-  if(allowLipWarp && mouthOpen > 0.012){
+  // 2) Lip-Sync Anatômico Sub-Pixel (Deformação Bilinear 2D dos Lábios Reais da Foto + Sombra Oral Orgânica Difusa)
+  if(allowLipWarp && (mouthOpen > 0.008 || Math.abs(mouthWide) > 0.015)){
     const mx = lm.mx * S, my = lm.my * S;
+    // Compressão suave (soft-knee) para que a abertura da boca seja sempre humana e proporcional
+    const effOpen = Math.tanh(Math.max(0, mouthOpen) * 1.05);
+    const effWide = Math.max(-0.36, Math.min(0.42, mouthWide || 0));
+
     const baseMouthW = (lm.mouthW || (lm.faceW * 0.28)) * S;
-    const lipRx = Math.max(14, baseMouthW * 0.52 * avatarMouthWidthScale * (1 + 0.16 * mouthWide));
-    const jawRx = Math.max(lipRx * 1.65, fw * 0.30);
+    // Quando a mandíbula abre em 'O/A' os cantos contraem levemente; em 'E/I' alargam suavemente
+    const lipRx = Math.max(14, baseMouthW * 0.50 * avatarMouthWidthScale * (1 + 0.11 * effWide - 0.05 * effOpen));
+    const jawRx = Math.max(lipRx * 1.78, fw * 0.31);
+    const topDist = Math.max(14, fh * 0.082);
     const chinY = Math.max(my + fh * 0.14, Math.min(S * 0.96, (lm.chinY || (lm.my + 0.115)) * S));
-    const yTop = my - Math.max(10, fh * 0.072);
-    const yBot = Math.min(S - 4, chinY + fh * 0.065);
-    const gap = Math.min(fh * 0.086, mouthOpen * fh * 0.074);
+    const chinDist = Math.max(fh * 0.16, (chinY - my) + fh * 0.058);
 
-    // Deformação em colunas verticais com perfil cosseno horizontal (os cantos da bochecha têm deslocamento zero = zero costura!)
-    const colW = 4;
-    for(let x = mx - jawRx; x < mx + jawRx; x += colW){
-      const normX = Math.abs((x + colW * 0.5 - mx) / jawRx);
-      if(normX >= 1) continue;
-      // Janela de cosseno elevado: 1.0 no centro dos lábios -> 0.0 suave nas bochechas
-      const hWeight = 0.5 * (1 + Math.cos(Math.PI * normX));
-      const localGap = gap * hWeight;
-      if(localGap < 0.35) continue;
+    // Abertura vertical realista (lábios humanos em fala natural abrem ~3.5% a 4.5% da altura da face)
+    const gap = Math.min(fh * 0.046, effOpen * fh * 0.039);
+    const cosA = Math.cos(eyeAngle * 0.65), sinA = Math.sin(eyeAngle * 0.65);
 
-      const uLip = my - localGap * 0.24;
-      const lLip = my + localGap * 0.76;
-      const stepY = 2;
-      for(let y = yTop; y < yBot; y += stepY){
-        let srcY;
-        if(y <= uLip){
-          srcY = yTop + ((y - yTop) / Math.max(1, uLip - yTop)) * (my - yTop);
-        } else if(y >= lLip){
-          srcY = my + ((y - lLip) / Math.max(1, yBot - lLip)) * (yBot - my);
-        } else {
-          srcY = my;
+    const bx0 = Math.max(0, Math.floor(mx - jawRx - 4));
+    const bx1 = Math.min(S - 1, Math.ceil(mx + jawRx + 4));
+    const by0 = Math.max(0, Math.floor(my - topDist - 4));
+    const by1 = Math.min(S - 1, Math.ceil(my + chinDist + 4));
+    const bw = bx1 - bx0 + 1, bh = by1 - by0 + 1;
+
+    if(bw > 4 && bh > 4){
+      const srcImg = wctx.getImageData(bx0, by0, bw, bh);
+      const outImg = wctx.createImageData(bw, bh);
+      const sData = srcImg.data;
+      const dData = outImg.data;
+      dData.set(sData);
+
+      const oral = lm.oralColor || { r:28, g:11, b:16, lipR:158, lipG:76, lipB:86 };
+      const invJawRx = 1 / jawRx;
+      const invLipRx = 1 / lipRx;
+      const sigmaH = 1 / (2 * (fh * 0.055) * (fh * 0.055));
+
+      for(let py = by0; py <= by1; py++){
+        const dy = py - my;
+        const rowOff = (py - by0) * bw;
+
+        for(let px = bx0; px <= bx1; px++){
+          const dx = px - mx;
+          const lx = dx * cosA + dy * sinA;
+          const ly = -dx * sinA + dy * cosA;
+
+          const nx = Math.abs(lx) * invJawRx;
+          if(nx >= 1) continue;
+
+          // Janela de cosseno elevado horizontal: 1.0 no centro -> 0.0 contínuo nas bochechas
+          const wJawX = 0.5 * (1 + Math.cos(Math.PI * nx));
+          const uLip = lx * invLipRx;
+          const absULip = Math.abs(uLip);
+          const inLips = absULip < 1;
+          // Curva anatômica das comissuras labiais: cantos da boca ancorados suavemente
+          const lipCurve = inLips ? Math.pow(1 - uLip * uLip, 1.55) : 0;
+
+          const uLipY = -gap * 0.21 * lipCurve;
+          const lLipY = +gap * 0.79 * lipCurve;
+
+          // Leve elevação natural dos cantos da boca em vogais abertas/sorriso sutil de fala
+          const cornerLift = -effWide * (fh * 0.0075) * Math.sin(Math.min(1, absULip) * Math.PI) * wJawX;
+          const lyAdj = ly - cornerLift;
+
+          if(lyAdj <= -topDist || lyAdj >= chinDist) continue;
+
+          // Co-articulação horizontal dos cantos labiais (arredondamento em O/U vs extensão em E/I)
+          const hBand = Math.exp(-(ly * ly) * sigmaH);
+          const srcLx = lx - lx * (effWide * 0.068 - effOpen * 0.032) * wJawX * hBand;
+
+          let srcLy = lyAdj;
+          let cavityAlpha = 0;
+          let cavR = oral.r, cavG = oral.g, cavB = oral.b;
+          let shadeMul = 1.0;
+
+          if(lyAdj <= uLipY){
+            // Zona 1: Lábio superior e filtro labial (comprime suavemente mantendo 100% da textura real do lábio superior)
+            const tUp = (lyAdj - uLipY) / Math.max(1, -topDist - uLipY);
+            const wUp = 0.5 * (1 + Math.cos(Math.PI * Math.min(1, Math.max(0, tUp))));
+            srcLy = lyAdj - uLipY * wUp;
+          } else if(lyAdj >= lLipY){
+            // Zona 2: Lábio inferior, sulco mentolabial e queixo (desce intacto acompanhando a mandíbula)
+            const tDn = (lyAdj - lLipY) / Math.max(1, chinDist - lLipY);
+            if(tDn >= 1) continue;
+            const wDn = 0.5 * (1 + Math.cos(Math.PI * Math.pow(tDn, 0.86)));
+            const jawCarrier = gap * 0.34 * wJawX * Math.sin(Math.PI * tDn);
+            const effectiveDrop = lLipY * wDn + jawCarrier * (1 - lipCurve * 0.58);
+            srcLy = lyAdj - effectiveDrop;
+
+            // Sombreamento 3D natural no volume do lábio inferior e na dobra do queixo
+            if(inLips && gap > 0.8){
+              const distBelowLip = lyAdj - lLipY;
+              const lipRoll = fh * 0.022;
+              if(distBelowLip > 0 && distBelowLip < lipRoll){
+                shadeMul = 1 + 0.036 * Math.sin(Math.PI * (distBelowLip / lipRoll)) * lipCurve * effOpen;
+              } else if(distBelowLip >= lipRoll && distBelowLip < lipRoll * 2.4){
+                shadeMul = 1 - 0.045 * Math.sin(Math.PI * ((distBelowLip - lipRoll) / (lipRoll * 1.4))) * lipCurve * effOpen;
+              }
+            }
+          } else {
+            // Zona 3: Interior da abertura labial (transição 100% difusa a partir dos lábios reais da foto, sem adesivo!)
+            const localOpen = Math.max(0.001, lLipY - uLipY);
+            const v = (lyAdj - uLipY) / localOpen; // 0 na borda interna superior -> 1 na borda interna inferior
+            // Amostra os pixels reais da linha interna dos lábios da própria foto para as bordas
+            srcLy = (v - 0.5) * 2.1;
+
+            const vBell = Math.sin(Math.PI * v);
+            const hBell = Math.pow(Math.max(0, 1 - uLip * uLip), 1.38);
+            const openFade = Math.min(1, localOpen / 2.6);
+            cavityAlpha = Math.min(0.88, Math.pow(vBell, 0.74) * hBell * openFade);
+
+            const depthShade = 1 - 0.24 * vBell * hBell;
+            cavR = oral.r * depthShade;
+            cavG = oral.g * depthShade;
+            cavB = oral.b * depthShade;
+
+            // Reflexo difuso e sombreado da arcada superior apenas em vogais abertas (sem retângulo branco!)
+            if(effOpen > 0.22 && v > 0.06 && v < 0.40 && absULip < 0.62){
+              const tv = Math.sin(Math.PI * ((v - 0.06) / 0.34));
+              const th = Math.pow(Math.max(0, 1 - Math.pow(uLip / 0.62, 2)), 1.65);
+              const arch3D = 0.68 + 0.32 * Math.cos(uLip * 2.15);
+              const microTooth = 1 - 0.045 * Math.pow(Math.sin(uLip * Math.PI * 5.5), 6);
+              const tMix = Math.min(0.30, (effOpen - 0.22) * 0.52) * tv * th;
+              const tr = 220 * arch3D * microTooth;
+              const tg = 212 * arch3D * microTooth;
+              const tb = 204 * arch3D * microTooth;
+              cavR = cavR * (1 - tMix) + tr * tMix;
+              cavG = cavG * (1 - tMix) + tg * tMix;
+              cavB = cavB * (1 - tMix) + tb * tMix;
+            } else if(v > 0.54 && v < 0.94){
+              // Subtom quente muito sutil no fundo inferior da cavidade oral
+              const lv = Math.sin(Math.PI * ((v - 0.54) / 0.40));
+              const lMix = 0.20 * lv * hBell * Math.min(1, effOpen * 1.2);
+              cavR = cavR * (1 - lMix) + (oral.lipR * 0.58) * lMix;
+              cavG = cavG * (1 - lMix) + (oral.lipG * 0.38) * lMix;
+              cavB = cavB * (1 - lMix) + (oral.lipB * 0.42) * lMix;
+            }
+          }
+
+          // Rotaciona de volta para o espaço de coordenadas da imagem e faz amostragem bilinear sub-pixel
+          const sDx = srcLx * cosA - srcLy * sinA;
+          const sDy = srcLx * sinA + srcLy * cosA;
+          const sx = Math.max(0, Math.min(bw - 1.001, (mx + sDx) - bx0));
+          const sy = Math.max(0, Math.min(bh - 1.001, (my + sDy) - by0));
+
+          const x0 = sx | 0, y0 = sy | 0;
+          const fx = sx - x0, fy = sy - y0;
+          const w00 = (1 - fx) * (1 - fy);
+          const w10 = fx * (1 - fy);
+          const w01 = (1 - fx) * fy;
+          const w11 = fx * fy;
+
+          const i00 = (y0 * bw + x0) << 2;
+          const i10 = i00 + 4;
+          const i01 = i00 + (bw << 2);
+          const i11 = i01 + 4;
+
+          let r = sData[i00] * w00 + sData[i10] * w10 + sData[i01] * w01 + sData[i11] * w11;
+          let g = sData[i00 + 1] * w00 + sData[i10 + 1] * w10 + sData[i01 + 1] * w01 + sData[i11 + 1] * w11;
+          let b = sData[i00 + 2] * w00 + sData[i10 + 2] * w10 + sData[i01 + 2] * w01 + sData[i11 + 2] * w11;
+
+          if(shadeMul !== 1.0){
+            r *= shadeMul; g *= shadeMul; b *= shadeMul;
+          }
+          if(cavityAlpha > 0.002){
+            const invC = 1 - cavityAlpha;
+            r = r * invC + cavR * cavityAlpha;
+            g = g * invC + cavG * cavityAlpha;
+            b = b * invC + cavB * cavityAlpha;
+          }
+
+          const outIdx = (rowOff + (px - bx0)) << 2;
+          dData[outIdx]     = r;
+          dData[outIdx + 1] = g;
+          dData[outIdx + 2] = b;
         }
-        wctx.drawImage(avatarSourceCanvas, x, srcY, colW + 0.6, stepY + 0.8, x, y, colW + 0.6, stepY + 0.8);
-      }
-    }
-
-    // Cavidade oral orgânica adaptada ao tom real de lábio/sombra da foto
-    if(gap > 1.1){
-      const uLipCenter = my - gap * 0.22;
-      const lLipCenter = my + gap * 0.78;
-      const oral = lm.oralColor || { r:30, g:12, b:18, lipR:160, lipG:76, lipB:86 };
-
-      wctx.save();
-      wctx.translate(mx, my);
-      wctx.rotate(eyeAngle * 0.65);
-      wctx.translate(-mx, -my);
-
-      wctx.beginPath();
-      wctx.moveTo(mx - lipRx, my + gap * 0.06);
-      wctx.quadraticCurveTo(mx, uLipCenter - gap * 0.12, mx + lipRx, my + gap * 0.06);
-      wctx.quadraticCurveTo(mx, lLipCenter + gap * 0.18, mx - lipRx, my + gap * 0.06);
-      wctx.closePath();
-      wctx.clip();
-
-      const cav = wctx.createLinearGradient(0, uLipCenter, 0, lLipCenter);
-      cav.addColorStop(0, `rgb(${oral.r},${oral.g},${oral.b})`);
-      cav.addColorStop(0.55, `rgb(${Math.min(90, oral.r+12)},${Math.min(50, oral.g+6)},${Math.min(58, oral.b+8)})`);
-      cav.addColorStop(1, `rgb(${Math.min(115, oral.r+24)},${Math.min(64, oral.g+12)},${Math.min(72, oral.b+15)})`);
-      wctx.fillStyle = cav;
-      wctx.fillRect(mx - lipRx, uLipCenter - 3, lipRx * 2, (lLipCenter - uLipCenter) + 8);
-
-      // Reflexo sutil e difuso dos dentes superiores apenas em vogais bem abertas
-      if(mouthOpen > 0.25){
-        const teethAlpha = Math.min(0.50, (mouthOpen - 0.25) * 1.25);
-        const tGrad = wctx.createLinearGradient(mx - lipRx * 0.65, 0, mx + lipRx * 0.65, 0);
-        tGrad.addColorStop(0, `rgba(215,208,205,${teethAlpha * 0.35})`);
-        tGrad.addColorStop(0.2, `rgba(242,238,235,${teethAlpha})`);
-        tGrad.addColorStop(0.8, `rgba(242,238,235,${teethAlpha})`);
-        tGrad.addColorStop(1, `rgba(215,208,205,${teethAlpha * 0.35})`);
-        wctx.fillStyle = tGrad;
-        wctx.beginPath();
-        wctx.roundRect(mx - lipRx * 0.62, uLipCenter - 1, lipRx * 1.24, Math.max(2, gap * 0.26), 3);
-        wctx.fill();
       }
 
-      // Língua orgânica suave ao fundo
-      wctx.fillStyle = `rgba(${ oral.lipR },${ Math.round(oral.lipG * 0.85) },${ Math.round(oral.lipB * 0.9) },0.36)`;
-      wctx.beginPath();
-      wctx.ellipse(mx, lLipCenter + gap * 0.06, lipRx * 0.50, gap * 0.30, 0, Math.PI, Math.PI * 2);
-      wctx.fill();
-
-      // Borda interna suave dos lábios para transição 100% natural com a pele da foto
-      wctx.strokeStyle = `rgba(${oral.r},${oral.g},${oral.b},0.55)`;
-      wctx.lineWidth = Math.max(1.5, S * 0.0035);
-      wctx.stroke();
-      wctx.restore();
+      wctx.putImageData(outImg, bx0, by0);
     }
   }
   return avatarWorkCanvas;
@@ -5106,16 +5241,17 @@ function blinkAtTime(t){
   return b;
 }
 
-// Extrai envelope acústico real do AudioBuffer (antecipação labial de 22ms + vogal ZCR)
-function buildPcmLipProfile(audioBuffer){
+// Extrai envelope acústico silábico real do AudioBuffer (articulação natural sílaba-a-sílaba + fechamento bilabial + vogal ZCR)
+function buildPcmLipProfile(audioBuffer, textHint = ''){
   const sr = audioBuffer.sampleRate;
   const ch = audioBuffer.getChannelData(0);
   const fps = 60;
   const nFrames = Math.max(1, Math.ceil(audioBuffer.duration * fps));
   const rawRms = new Float32Array(nFrames);
   const rawZcr = new Float32Array(nFrames);
-  const win = Math.max(64, Math.floor(sr * 0.042));
-  const lookahead = Math.floor(sr * 0.022);
+  // Janela curta de 28ms para capturar perfeitamente os vales entre sílabas e consoantes (m, b, p, t, s)
+  const win = Math.max(64, Math.floor(sr * 0.028));
+  const lookahead = Math.floor(sr * 0.020);
 
   for(let f = 0; f < nFrames; f++){
     const center = Math.floor((f / fps) * sr) + lookahead;
@@ -5132,39 +5268,77 @@ function buildPcmLipProfile(audioBuffer){
     rawZcr[f] = zc / len;
   }
 
-  // Normaliza pelo percentil 95 para funcionar igual em qualquer volume de TTS
+  // Normaliza pelo percentil 95 e extrai a modulação silábica local (evita boca travada aberta em frases longas!)
   const sorted = Array.from(rawRms).sort((a,b) => a - b);
   const p95 = Math.max(0.015, sorted[Math.floor(sorted.length * 0.95)] || 0.08);
   const openArr = new Float32Array(nFrames);
   const wideArr = new Float32Array(nFrames);
   let smO = 0, smW = 0;
   for(let f = 0; f < nFrames; f++){
-    let norm = Math.min(1.15, rawRms[f] / p95);
-    norm = norm < 0.085 ? 0 : Math.min(1, Math.pow((norm - 0.085) / 0.915, 0.78));
-    smO = norm > smO ? smO + (norm - smO) * 0.54 : smO + (norm - smO) * 0.25;
-    const targetW = norm < 0.04 ? 0 : Math.max(-0.35, Math.min(0.45, (rawZcr[f] - 0.09) * 3.2));
-    smW += (targetW - smW) * 0.30;
+    let sumLocal = 0, cnt = 0;
+    for(let k = Math.max(0, f - 6); k <= Math.min(nFrames - 1, f + 6); k++){
+      sumLocal += rawRms[k]; cnt++;
+    }
+    const localMean = Math.max(0.001, sumLocal / cnt);
+    const baseEnv = Math.min(1.05, rawRms[f] / p95);
+    const relToLocal = rawRms[f] / localMean;
+    // Fechamento labial natural nos vales de consoantes entre as vogais
+    const consonantClosure = relToLocal < 0.86 ? Math.pow(relToLocal / 0.86, 2.3) : 1.0;
+    // Consoantes sibilantes/fricativas (ZCR alto) reduzem a abertura vertical
+    const sibilantDamp = rawZcr[f] > 0.16 ? Math.max(0.32, 1 - (rawZcr[f] - 0.16) * 3.0) : 1.0;
+    const sylPeak = Math.max(0, (rawRms[f] - localMean * 0.68) / (p95 * 0.46));
+
+    let targetO = baseEnv < 0.075 ? 0 : Math.min(0.84, (baseEnv * 0.28 + sylPeak * 0.58) * consonantClosure * sibilantDamp);
+    let targetW = baseEnv < 0.05 ? 0 : Math.max(-0.32, Math.min(0.38, (rawZcr[f] - 0.095) * 2.8));
+
+    if(textHint){
+      const ph = phonemeMouthAt(textHint, f / fps, audioBuffer.duration);
+      if(ph.open <= 0.05 && baseEnv > 0.06){
+        // Bilabiais (M, B, P): fecha suavemente os lábios
+        targetO *= 0.28;
+      } else {
+        targetO = targetO * 0.80 + ph.open * 0.20 * Math.min(1, baseEnv * 1.4);
+        targetW = targetW * 0.65 + ph.wide * 0.35;
+      }
+    }
+
+    smO = targetO > smO ? smO + (targetO - smO) * 0.48 : smO + (targetO - smO) * 0.36;
+    smW += (targetW - smW) * 0.28;
     openArr[f] = smO;
     wideArr[f] = smW;
   }
   return { fps, openArr, wideArr, duration: audioBuffer.duration };
 }
 
-// Fallback fonético sílaba-a-sílaba quando testando sem áudio decodificado
+function sampleLipProfileAt(profile, t){
+  if(!profile || !profile.openArr || !profile.openArr.length) return { open: 0, wide: 0 };
+  const exact = Math.max(0, t * profile.fps);
+  const i0 = Math.min(profile.openArr.length - 1, exact | 0);
+  const i1 = Math.min(profile.openArr.length - 1, i0 + 1);
+  const frac = exact - i0;
+  return {
+    open: profile.openArr[i0] * (1 - frac) + profile.openArr[i1] * frac,
+    wide: profile.wideArr[i0] * (1 - frac) + profile.wideArr[i1] * frac
+  };
+}
+
+// Fallback fonético sílaba-a-sílaba com ritmo natural quando testando sem áudio decodificado
 function phonemeMouthAt(text, t, totalDur){
   if(!text || totalDur <= 0 || t < 0 || t >= totalDur) return { open:0, wide:0 };
   const idx = Math.min(text.length - 1, Math.floor((t / totalDur) * text.length));
   const ch = text[idx].toLowerCase();
+  const sylPulse = 0.72 + 0.28 * Math.sin(t * Math.PI * 11.5);
   if('.,;:!?—\n'.includes(ch)) return { open:0, wide:0 };
-  if(ch === ' ') return { open:0.06, wide:0 };
-  if('mbp'.includes(ch)) return { open:0.02, wide:0 };
-  if('aáàâã'.includes(ch)) return { open:0.86, wide:0.10 };
-  if('eéê'.includes(ch)) return { open:0.56, wide:0.34 };
-  if('iíy'.includes(ch)) return { open:0.34, wide:0.44 };
-  if('oóôõ'.includes(ch)) return { open:0.68, wide:-0.28 };
-  if('uú'.includes(ch)) return { open:0.36, wide:-0.34 };
-  if('szcxj'.includes(ch)) return { open:0.22, wide:0.35 };
-  return { open:0.32, wide:0.05 };
+  if(ch === ' ') return { open:0.04, wide:0 };
+  if('mbp'.includes(ch)) return { open:0.01, wide:0 };
+  if('fv'.includes(ch)) return { open:0.12 * sylPulse, wide:0.12 };
+  if('aáàâã'.includes(ch)) return { open:0.74 * sylPulse, wide:0.08 };
+  if('eéê'.includes(ch)) return { open:0.50 * sylPulse, wide:0.28 };
+  if('iíy'.includes(ch)) return { open:0.30 * sylPulse, wide:0.36 };
+  if('oóôõ'.includes(ch)) return { open:0.60 * sylPulse, wide:-0.26 };
+  if('uú'.includes(ch)) return { open:0.32 * sylPulse, wide:-0.30 };
+  if('szcxj'.includes(ch)) return { open:0.18 * sylPulse, wide:0.28 };
+  return { open:0.26 * sylPulse, wide:0.04 };
 }
 
 // Divide o roteiro em blocos cronometrados com palavras individuais para legenda Karaokê + .SRT
@@ -5503,10 +5677,9 @@ function ensureAvatarLoop(){
       if(t >= avatarLiveState.duration){
         stopAvatarLivePreview();
       } else if(avatarLiveState.profile){
-        const p = avatarLiveState.profile;
-        const fi = Math.min(p.openArr.length - 1, Math.max(0, Math.floor(t * p.fps)));
-        mOpen = p.openArr[fi] * gain;
-        mWide = p.wideArr[fi];
+        const s = sampleLipProfileAt(avatarLiveState.profile, t);
+        mOpen = s.open * gain;
+        mWide = s.wide;
       } else {
         const ph = phonemeMouthAt(avatarLiveState.text, t, avatarLiveState.duration);
         avatarLiveState.smoothOpen += (ph.open * gain - avatarLiveState.smoothOpen) * 0.34;
@@ -5650,7 +5823,7 @@ async function toggleAvatarLivePreview(){
       src.connect(ctx.destination);
       avatarLiveState.audioCtx = ctx;
       avatarLiveState.sourceNode = src;
-      avatarLiveState.profile = buildPcmLipProfile(tts.audioBuffer);
+      avatarLiveState.profile = buildPcmLipProfile(tts.audioBuffer, previewText);
       avatarLiveState.duration = tts.audioBuffer.duration;
       avatarLiveState.startAt = ctx.currentTime;
       avatarLiveState.text = previewText;
@@ -5819,7 +5992,7 @@ async function renderAvatarVideo(){
     const totalDur = hasRealAudio
       ? Math.max(1.5, tts.audioBuffer.duration)
       : Math.max(4, text.split(/\s+/).length / 2.25);
-    const lipProfile = hasRealAudio ? buildPcmLipProfile(tts.audioBuffer) : null;
+    const lipProfile = hasRealAudio ? buildPcmLipProfile(tts.audioBuffer, text) : null;
     const captions = buildTimedCaptions(text, totalDur);
 
     // Captura capa/miniatura real em alta qualidade
@@ -5879,9 +6052,9 @@ async function renderAvatarVideo(){
             : (performance.now() - wallStart) / 1000;
           let mOpen = 0, mWide = 0;
           if(lipProfile){
-            const fi = Math.min(lipProfile.openArr.length - 1, Math.max(0, Math.floor(t * lipProfile.fps)));
-            mOpen = lipProfile.openArr[fi] * gain;
-            mWide = lipProfile.wideArr[fi];
+            const s = sampleLipProfileAt(lipProfile, t);
+            mOpen = s.open * gain;
+            mWide = s.wide;
           } else {
             const ph = phonemeMouthAt(text, t, totalDur);
             smoothO += (ph.open * gain - smoothO) * 0.34;
