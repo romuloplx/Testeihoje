@@ -494,9 +494,7 @@ input[type="range"]{
       <button class="ghost" type="button" onclick="enhanceAvatarScript()">✨ Limpar "é/hum"</button>
     </div>
     <textarea id="avatarScript" placeholder="Digite ou gere o texto que o apresentador vai narrar olhando para a câmera...">Olá! Bem-vindo ao DubAI PRO. Agora você pode transformar uma única foto em um apresentador virtual completo, com voz natural, movimento realista e legendas sincronizadas prontas para YouTube, Reels e TikTok!</textarea>
-
-    <label>Título / Destaque no vídeo (opcional — usado no selo ou slide ao lado)</label>
-    <input id="avatarHeadline" value="DubAI PRO • Estúdio com Avatar IA" placeholder="Ex: 3 Segredos para Crescer no YouTube em 2026" oninput="refreshAvatarStageConfig()">
+    <input type="hidden" id="avatarHeadline" value="">
 
     <div class="row">
       <div>
@@ -508,10 +506,10 @@ input[type="range"]{
         </select>
       </div>
       <div>
-        <label>Layout de cena</label>
+        <label>Enquadramento do Avatar</label>
         <select id="avatarLayout" onchange="refreshAvatarStageConfig()">
-          <option value="center" selected>🎙️ Apresentador em Destaque</option>
-          <option value="slide">🖼️ Apresentador + Slide de Tópicos (HeyGen)</option>
+          <option value="center" selected>🎙️ Avatar Centralizado (Estúdio Limpo)</option>
+          <option value="closeup">🖼️ Avatar Amplo / Close-up</option>
         </select>
       </div>
     </div>
@@ -5265,66 +5263,13 @@ function drawAvatarStageFrame(ctx, opts){
   const isLandscape = W > H;
   let avX, avY, avS;
 
-  if(layout === 'slide' && isLandscape){
-    // Apresentador à esquerda em moldura de estúdio + Slide de tópicos à direita
-    avS = Math.min(H * 0.76, W * 0.42);
-    avX = W * 0.055;
-    avY = (H - avS) * 0.46;
-
-    // Painel Slide estilo HeyGen à direita
-    const sx = avX + avS + W * 0.04;
-    const sw = W - sx - W * 0.05;
-    const sy = H * 0.13, sh = H * 0.70;
-    ctx.save();
-    ctx.fillStyle = 'rgba(17, 19, 38, 0.84)';
-    ctx.strokeStyle = 'rgba(124, 58, 237, 0.45)';
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.roundRect(sx, sy, sw, sh, 22); ctx.fill(); ctx.stroke();
-
-    ctx.fillStyle = '#38bdf8';
-    ctx.font = `800 ${Math.round(H*0.022)}px Inter, sans-serif`;
-    ctx.fillText('⚡ DESTAQUES DA APRESENTAÇÃO', sx + 28, sy + 42);
-
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `800 ${Math.round(H*0.042)}px Inter, sans-serif`;
-    let curY = wrapText(ctx, headline || activeAvatarName, sx + 28, sy + 88, sw - 56, Math.round(H*0.050)) + 26;
-
-    const list = bullets.length ? bullets : captions.slice(0, 4).map(c => c.text);
-    const activeIdx = list.length ? Math.min(list.length - 1, Math.floor((t / Math.max(1, (captions[captions.length-1]?.end || 10))) * list.length)) : 0;
-    list.slice(0, 4).forEach((item, idx) => {
-      if(curY > sy + sh - 36) return;
-      const isAct = idx === activeIdx && speaking;
-      ctx.fillStyle = isAct ? 'rgba(124,58,237,0.30)' : 'rgba(255,255,255,0.04)';
-      ctx.beginPath(); ctx.roundRect(sx + 20, curY - 24, sw - 40, 52, 12); ctx.fill();
-      ctx.fillStyle = isAct ? '#38bdf8' : '#a5b4fc';
-      ctx.font = `700 ${Math.round(H*0.025)}px Inter, sans-serif`;
-      const shortItem = item.length > 62 ? item.slice(0, 60) + '…' : item;
-      ctx.fillText((isAct ? '▶ ' : '• ') + shortItem, sx + 34, curY + 8);
-      curY += 64;
-    });
-    ctx.restore();
-  } else if(layout === 'slide' && !isLandscape){
-    // Vertical 9:16 ou 1:1 com Card de tópico no topo + Apresentador em destaque
-    const pad = W * 0.06;
-    const ch = H * 0.22;
-    ctx.save();
-    ctx.fillStyle = 'rgba(17, 19, 38, 0.86)';
-    ctx.strokeStyle = 'rgba(6, 182, 212, 0.45)';
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.roundRect(pad, H*0.05, W - pad*2, ch, 20); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#38bdf8';
-    ctx.font = `800 ${Math.round(W*0.030)}px Inter, sans-serif`;
-    ctx.fillText('⚡ EM DESTAQUE', pad + 22, H*0.05 + 38);
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `800 ${Math.round(W*0.046)}px Inter, sans-serif`;
-    wrapText(ctx, headline || activeAvatarName, pad + 22, H*0.05 + 84, W - pad*2 - 44, Math.round(W*0.054));
-    ctx.restore();
-
-    avS = Math.min(W * 0.86, H * 0.56);
+  if(layout === 'closeup'){
+    // Avatar amplo / close-up limpo sem abas laterais
+    avS = isLandscape ? Math.min(H * 0.96, W * 0.72) : Math.min(W * 0.96, H * 0.80);
     avX = (W - avS) * 0.5;
-    avY = H * 0.30;
+    avY = isLandscape ? (H - avS) * 0.5 : H * 0.08;
   } else {
-    // Apresentador em tela cheia / destaque central
+    // Apresentador em destaque central limpo (sem aba lateral de apresentação)
     avS = isLandscape ? Math.min(H * 0.94, W * 0.62) : Math.min(W * 0.94, H * 0.72);
     avX = (W - avS) * 0.5;
     avY = isLandscape ? (H - avS) * 0.5 : H * 0.12;
@@ -5363,22 +5308,6 @@ function drawAvatarStageFrame(ctx, opts){
   ctx.roundRect(avX, avY, avS, avS, Math.round(avS * 0.055));
   ctx.stroke();
   ctx.restore();
-
-  // Selo de título discreto no canto superior esquerdo (quando em modo tela cheia)
-  if(headline && layout === 'center'){
-    ctx.save();
-    ctx.font = `700 ${Math.round(Math.min(W,H)*0.026)}px Inter, sans-serif`;
-    const tw = Math.min(W * 0.72, ctx.measureText(headline).width + 38);
-    ctx.fillStyle = 'rgba(12, 14, 28, 0.76)';
-    ctx.strokeStyle = 'rgba(124, 58, 237, 0.55)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.roundRect(24, 22, tw, 44, 999); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#22d3ee';
-    ctx.beginPath(); ctx.arc(44, 44, 5, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#f8fafc';
-    ctx.fillText(headline.slice(0, 52), 58, 51);
-    ctx.restore();
-  }
 
   // Equalizador de voz ao vivo no canto inferior do avatar quando falando
   if(speaking){
@@ -5829,12 +5758,11 @@ function sendCreateToAvatar(){
     ? d.scenes.map(s => s.narration).filter(Boolean).join('\n\n')
     : d.script;
   document.getElementById('avatarScript').value = cleanSpeech;
-  avatarExtraBullets = (d.scenes || []).map(s => s.title).filter(Boolean).slice(0, 4);
-  if(d.seo && d.seo.title) document.getElementById('avatarHeadline').value = d.seo.title.slice(0, 52);
-  if(avatarExtraBullets.length) document.getElementById('avatarLayout').value = 'slide';
+  avatarExtraBullets = [];
+  document.getElementById('avatarLayout').value = 'center';
   document.getElementById('avatarVoice').value = document.getElementById('voice').value;
   openTab('avatar');
-  toast('🗣️ Roteiro e tópicos enviados para o Avatar Falante!');
+  toast('🗣️ Roteiro enviado para o Avatar Falante!');
 }
 
 async function renderAvatarVideo(){
