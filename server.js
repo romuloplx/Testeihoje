@@ -535,6 +535,9 @@ app.post('/api/tts', async (req, res) => {
   }
 });
 
+// TikTok Auto-Post API (OAuth v2 PKCE + Direct Post + Inbox Draft + Webhook + Viral AI Caption)
+app.all('/api/tiktok', (req, res) => require('./vercel/api/tiktok')(req, res));
+
 // Serve frontend
 app.use(express.static(path.join(__dirname, 'public')));
 
