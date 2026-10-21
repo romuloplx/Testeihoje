@@ -1,8 +1,0 @@
-{
-  "rewrites": [
-    { "source": "/terms", "destination": "/api/tiktok?page=terms" },
-    { "source": "/privacy", "destination": "/api/tiktok?page=privacy" },
-    { "source": "/tiktok:rest*", "destination": "/api/tiktok?verify_file=tiktok:rest*" },
-    { "source": "/api/tiktok/:rest*", "destination": "/api/tiktok?verify_file=:rest*" }
-  ]
-}

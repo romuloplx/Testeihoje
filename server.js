@@ -302,76 +302,80 @@ app.delete('/api/projects/:id', (req, res) => {
 });
 
 app.post('/api/create', async (req, res) => {
-  const { prompt, duration, style, voice, cinemaMode, customCharacters } = req.body;
+  try {
+    const { prompt, duration, style, voice, cinemaMode, customCharacters } = req.body || {};
 
-  if (!prompt || !prompt.trim()) {
-    return res.status(400).json({ error: 'Descreva o vídeo primeiro.' });
+    if (!prompt || !prompt.trim()) {
+      return res.status(400).json({ error: 'Descreva o vídeo primeiro.' });
+    }
+    if (prompt.length > 8000) {
+      return res.status(400).json({ error: 'Descrição muito longa (máx 8000 caracteres).' });
+    }
+
+    const sharedAi = require('./vercel/api/lib/ai');
+    let data = null;
+    let mode = 'mock';
+    let aiError = null;
+    let provider = 'local';
+
+    const gen = await sharedAi.generateCreateFull({ prompt, duration, style, voice, cinemaMode, customCharacters });
+    if (gen && gen.data) {
+      data = gen.data;
+      provider = gen.provider || 'ia';
+      mode = provider === 'story-engine-fallback' ? 'mock' : 'openai';
+      aiError = gen.error || null;
+    } else {
+      aiError = (gen && gen.error) || 'sem provedores ativos';
+      data = sharedAi.mockCreateFull({ prompt, duration, style, voice, customCharacters });
+    }
+    const scriptText = data.script;
+    const scriptMeta = data.meta || null;
+
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    const project = {
+      id,
+      type: 'create',
+      prompt: prompt.trim(),
+      title: data.title || prompt.trim().slice(0, 80),
+      duration: String(duration || '1'),
+      style: style || 'realistic',
+      voice: voice || 'onyx',
+      cinemaMode: cinemaMode || 'connected',
+      characters: data.characters || [],
+      mood: data.mood || 'cinematic',
+      artStylePrompt: data.artStylePrompt || '',
+      script: scriptText,
+      scenes: data.scenes,
+      seo: data.seo,
+      meta: scriptMeta,
+      mode,
+      provider,
+      status: 'roteiro_pronto',
+      createdAt: new Date().toISOString(),
+      thumbnail: `https://picsum.photos/seed/${id}/640/360`
+    };
+
+    projects.unshift(project);
+    saveProjects(projects);
+
+    res.json({
+      id: project.id,
+      title: data.title || project.title,
+      characters: data.characters || [],
+      mood: data.mood || 'cinematic',
+      artStylePrompt: data.artStylePrompt || '',
+      script: project.script,
+      scenes: data.scenes,
+      seo: data.seo,
+      project,
+      mode,
+      provider,
+      warning: mode === 'openai' ? undefined : `Roteiro de história e personagens gerados localmente (${aiError}).`,
+      message: mode === 'openai' ? `História e personagens criados com IA (${provider})!` : `⚡ História com personagens pronta!`
+    });
+  } catch (e) {
+    res.status(500).json({ error: 'Erro ao gerar história: ' + (e.message || 'falha inesperada') });
   }
-  if (prompt.length > 2000) {
-    return res.status(400).json({ error: 'Descrição muito longa (máx 2000 caracteres).' });
-  }
-
-  const sharedAi = require('./vercel/api/lib/ai');
-  let data = null;
-  let mode = 'mock';
-  let aiError = null;
-  let provider = 'local';
-
-  const gen = await sharedAi.generateCreateFull({ prompt, duration, style, voice, cinemaMode, customCharacters });
-  if (gen && gen.data) {
-    data = gen.data;
-    provider = gen.provider || 'ia';
-    mode = provider === 'story-engine-fallback' ? 'mock' : 'openai';
-    aiError = gen.error || null;
-  } else {
-    aiError = (gen && gen.error) || 'sem provedores ativos';
-    data = sharedAi.mockCreateFull({ prompt, duration, style, voice, customCharacters });
-  }
-  const scriptText = data.script;
-  const scriptMeta = data.meta || null;
-
-  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-  const project = {
-    id,
-    type: 'create',
-    prompt: prompt.trim(),
-    title: data.title || prompt.trim().slice(0, 80),
-    duration: String(duration || '1'),
-    style: style || 'realistic',
-    voice: voice || 'onyx',
-    cinemaMode: cinemaMode || 'connected',
-    characters: data.characters || [],
-    mood: data.mood || 'cinematic',
-    artStylePrompt: data.artStylePrompt || '',
-    script: scriptText,
-    scenes: data.scenes,
-    seo: data.seo,
-    meta: scriptMeta,
-    mode,
-    provider,
-    status: 'roteiro_pronto',
-    createdAt: new Date().toISOString(),
-    thumbnail: `https://picsum.photos/seed/${id}/640/360`
-  };
-
-  projects.unshift(project);
-  saveProjects(projects);
-
-  res.json({
-    id: project.id,
-    title: data.title || project.title,
-    characters: data.characters || [],
-    mood: data.mood || 'cinematic',
-    artStylePrompt: data.artStylePrompt || '',
-    script: project.script,
-    scenes: data.scenes,
-    seo: data.seo,
-    project,
-    mode,
-    provider,
-    warning: mode === 'openai' ? undefined : `Roteiro de história e personagens gerados localmente (${aiError}).`,
-    message: mode === 'openai' ? `História e personagens criados com IA (${provider})!` : `⚡ História com personagens pronta!`
-  });
 });
 
 app.post('/api/scene-image', async (req, res) => {
@@ -410,9 +414,8 @@ app.post('/api/dub', async (req, res) => {
       return res.status(400).json({ error: 'Selecione um vídeo ou áudio.' });
     }
 
-    const hasCloudAi = !!(process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY || process.env.UNOROUTER_API_KEY);
     let result = null;
-    if ((audioBase64 || transcription) && hasCloudAi) {
+    if (audioBase64 || transcription) {
       result = await require('./vercel/api/lib/ai').dubWithOpenAI({ audioBase64, audioMime, language, dubVoice, targetLanguage, transcription });
       if (!result || result.error) {
         return res.status(502).json({

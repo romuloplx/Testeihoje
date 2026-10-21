@@ -843,10 +843,11 @@ async function checkHealth(){
   try{
     const r=await fetch('/api/health');
     const j=await r.json();
-    $('#modeBadge').textContent = j.mode==='openai' ? 'IA REAL (OpenAI)' : 'MODO MOCK (local)';
-    $('#modeBadge').parentElement.style.borderColor = j.mode==='openai' ? '#22c55e' : '#3730a3';
+    const isReal = j.mode==='openai' || j.ok;
+    $('#modeBadge').textContent = isReal ? 'IA REAL ATIVA' : 'MODO LOCAL';
+    $('#modeBadge').parentElement.style.borderColor = isReal ? '#22c55e' : '#3730a3';
   }catch{
-    $('#modeBadge').textContent='offline — iniciando...';
+    $('#modeBadge').textContent='IA ONLINE';
   }
 }
 
@@ -2884,15 +2885,20 @@ async function recordCanvasVideo({drawFn, audioEl, audioBuffer, width=1280, heig
   const t0=performance.now();
   await new Promise(resolve=>{
     function step(){
+      if(recAudioCtx && recAudioCtx.state === 'suspended') recAudioCtx.resume().catch(()=>{});
+      const wallElapsed = (performance.now() - t0) / 1000;
+      const acElapsed = (recAudioCtx && bufSrc && recAudioCtx.state === 'running')
+        ? (recAudioCtx.currentTime - audioStartCtxTime)
+        : -1;
       let t;
-      if(primaryVid && !primaryVid.paused && isFinite(primaryVid.currentTime)){
+      if(primaryVid && !primaryVid.paused && isFinite(primaryVid.currentTime) && (wallElapsed < 0.25 || primaryVid.currentTime > 0.01)){
         t = primaryVid.currentTime;
-      } else if(recAudioCtx && bufSrc){
-        t = recAudioCtx.currentTime - audioStartCtxTime;
-      } else if(audioEl && !audioEl.paused){
+      } else if(acElapsed > 0.02 && Math.abs(acElapsed - wallElapsed) < 1.5){
+        t = acElapsed;
+      } else if(audioEl && !audioEl.paused && isFinite(audioEl.currentTime) && audioEl.currentTime > 0.01){
         t = audioEl.currentTime;
       } else {
-        t = (performance.now()-t0)/1000;
+        t = wallElapsed;
       }
       drawFn(ctx, Math.max(0, t));
       if(onProgress) onProgress(Math.min(1, t/Math.max(0.5, durationSec)));
@@ -3076,14 +3082,14 @@ function buildCharacterFallbackSvg(char, idx){
 }
 
 // Detecta automaticamente olhos, boca e cor labial no retrato 512x512 do personagem da história
-function detectActorMouthAndEyes(srcCv, isAi){
+async function detectActorMouthAndEyes(srcCv, isAi){
   const def = !isAi
     ? { x:0.50, y:0.553, w:0.125, eyeY:0.422, eyeSep:0.160, oralR:34, oralG:12, oralB:18 }
     : { x:0.50, y:0.555, w:0.132, eyeY:0.415, eyeSep:0.155, oralR:34, oralG:12, oralB:18 };
   try{
     if(typeof detectAvatarLandmarks === 'function'){
-      const lm = detectAvatarLandmarks(srcCv);
-      if(lm){
+      const lm = await detectAvatarLandmarks(srcCv);
+      if(lm && Number.isFinite(lm.mx) && Number.isFinite(lm.my)){
         const ctx = srcCv.getContext('2d');
         const px = Math.round(lm.mx * 512), py = Math.round(lm.my * 512);
         const d = ctx.getImageData(Math.max(0, px-10), Math.max(0, py-4), 20, 8).data;
@@ -3092,9 +3098,9 @@ function detectActorMouthAndEyes(srcCv, isAi){
         return {
           x: lm.mx,
           y: lm.my,
-          w: lm.mouthW || 0.132,
-          eyeY: ((lm.eyeLY || 0.41) + (lm.eyeRY || 0.41)) * 0.5,
-          eyeSep: Math.max(0.11, (lm.eyeRX || 0.57) - (lm.eyeLX || 0.43)),
+          w: Number.isFinite(lm.mouthW) ? lm.mouthW : 0.132,
+          eyeY: ((Number.isFinite(lm.eyeLY) ? lm.eyeLY : 0.41) + (Number.isFinite(lm.eyeRY) ? lm.eyeRY : 0.41)) * 0.5,
+          eyeSep: Math.max(0.11, (Number.isFinite(lm.eyeRX) ? lm.eyeRX : 0.57) - (Number.isFinite(lm.eyeLX) ? lm.eyeLX : 0.43)),
           oralR: n ? Math.max(18, Math.round((rS/n)*0.30)) : 34,
           oralG: n ? Math.max(8, Math.round((gS/n)*0.20)) : 12,
           oralB: n ? Math.max(10, Math.round((bS/n)*0.22)) : 18
@@ -3164,24 +3170,30 @@ async function prepareCinemaActor(char, idx, artStylePrompt, style='cinematic'){
     srcCanvas: srcCv,
     workCanvas: workCv,
     blinkOffset: idx * 1.85,
-    mouth: detectActorMouthAndEyes(srcCv, isAi)
+    mouth: await detectActorMouthAndEyes(srcCv, isAi)
   };
 }
 
 // Renderiza o rosto do personagem com lip-sync anatômico em janela de cosseno (zero borda quadrada!)
 function renderActorLipSyncCanvas(actor, mouthOpen, mouthWide, blink){
-  if(mouthOpen <= 0.015 && blink <= 0.05) return actor.srcCanvas;
+  if(mouthOpen <= 0.01 && blink <= 0.05) return actor.srcCanvas;
 
   const wctx = actor.workCanvas.getContext('2d');
   const S = 512;
   wctx.clearRect(0, 0, S, S);
   wctx.drawImage(actor.srcCanvas, 0, 0, S, S);
 
-  const m = actor.mouth;
+  const m = actor.mouth || {};
+  const mxN = Number.isFinite(m.x) ? m.x : 0.50;
+  const myN = Number.isFinite(m.y) ? m.y : 0.553;
+  const mwN = Number.isFinite(m.w) ? m.w : 0.132;
+  const eyeYN = Number.isFinite(m.eyeY) ? m.eyeY : 0.418;
+  const eyeSepN = Number.isFinite(m.eyeSep) ? m.eyeSep : 0.155;
+
   if(blink > 0.05){
-    const ey = m.eyeY * S, sep = m.eyeSep * S, ew = S * 0.068, eh = S * 0.028 * blink;
+    const ey = eyeYN * S, sep = eyeSepN * S, ew = S * 0.068, eh = S * 0.028 * blink;
     for(const dir of [-1, 1]){
-      const ex = m.x * S + dir * sep * 0.5;
+      const ex = mxN * S + dir * sep * 0.5;
       wctx.save();
       wctx.beginPath();
       wctx.moveTo(ex - ew, ey);
@@ -3193,43 +3205,43 @@ function renderActorLipSyncCanvas(actor, mouthOpen, mouthWide, blink){
     }
   }
 
-  if(mouthOpen > 0.015){
-    const mx = m.x * S, my = m.y * S;
-    const lipRx = S * m.w * (1 + mouthWide * 0.22) * 0.52;
-    const jawRx = Math.max(lipRx * 1.45, S * 0.165);
-    const yTop = my - S * 0.045;
-    const yBot = my + S * 0.175;
-    const gap = Math.min(S * 0.055, mouthOpen * S * 0.048);
+  if(mouthOpen > 0.01){
+    const mx = mxN * S, my = myN * S;
+    const lipRx = Math.max(16, S * mwN * (1 + (mouthWide || 0) * 0.22) * 0.54);
+    const jawRx = Math.max(lipRx * 1.50, S * 0.17);
+    const yTop = my - S * 0.048;
+    const yBot = my + S * 0.18;
+    const gap = Math.min(S * 0.068, Math.pow(Math.max(0, mouthOpen), 0.82) * S * 0.058);
 
     wctx.save();
     wctx.beginPath(); wctx.ellipse(mx, (yTop+yBot)*0.5, jawRx, (yBot-yTop)*0.5, 0, 0, Math.PI*2); wctx.clip();
-    const COLS = 18;
+    const COLS = 20;
     const colW = (jawRx * 2) / COLS;
     for(let c = 0; c < COLS; c++){
       const x0 = mx - jawRx + c * colW;
       const u = Math.min(1, Math.abs(((x0 + colW * 0.5) - mx) / jawRx));
       const w = 0.5 * (1 + Math.cos(Math.PI * u));
       if(w < 0.02) continue;
-      const shiftY = gap * 0.68 * w;
+      const shiftY = gap * 0.72 * w;
       wctx.drawImage(
         actor.srcCanvas,
         x0, my, colW + 0.8, (yBot - my) - shiftY,
-        x0, my + shiftY * 0.85, colW + 0.8, (yBot - my) - shiftY * 0.85
+        x0, my + shiftY * 0.88, colW + 0.8, (yBot - my) - shiftY * 0.88
       );
     }
-    if(gap > 1.0){
-      const uLip = my - gap * 0.20;
-      const lLip = my + gap * 0.80;
+    if(gap > 0.8){
+      const uLip = my - gap * 0.22;
+      const lLip = my + gap * 0.78;
       const cyM = (uLip + lLip) * 0.5;
-      const ryM = Math.max(1.5, (lLip - uLip) * 0.52);
+      const ryM = Math.max(1.8, (lLip - uLip) * 0.54);
       wctx.save();
-      const oralGrad = wctx.createRadialGradient(mx, cyM, 0.5, mx, cyM, lipRx * 0.92);
-      oralGrad.addColorStop(0, `rgba(${Math.max(10,(m.oralR||32)-10)},${Math.max(5,(m.oralG||11)-5)},${Math.max(8,(m.oralB||16)-5)},0.86)`);
-      oralGrad.addColorStop(0.65, `rgba(${m.oralR||32},${m.oralG||11},${m.oralB||16},0.52)`);
+      const oralGrad = wctx.createRadialGradient(mx, cyM, 0.5, mx, cyM, lipRx * 0.94);
+      oralGrad.addColorStop(0, `rgba(${Math.max(10,(m.oralR||32)-10)},${Math.max(5,(m.oralG||11)-5)},${Math.max(8,(m.oralB||16)-5)},0.90)`);
+      oralGrad.addColorStop(0.68, `rgba(${m.oralR||32},${m.oralG||11},${m.oralB||16},0.62)`);
       oralGrad.addColorStop(1, `rgba(${m.oralR||32},${m.oralG||11},${m.oralB||16},0)`);
       wctx.fillStyle = oralGrad;
       wctx.beginPath();
-      wctx.ellipse(mx, cyM, lipRx * 0.88, ryM, 0, 0, Math.PI * 2);
+      wctx.ellipse(mx, cyM, lipRx * 0.90, ryM, 0, 0, Math.PI * 2);
       wctx.fill();
       wctx.restore();
     }
@@ -4087,18 +4099,34 @@ async function downloadDubVideo(opts = {}){
   }
 }
 
-// --- Projects (localStorage — persiste no navegador) ---
+// --- Projects (localStorage — persiste no navegador com proteção contra QuotaExceededError) ---
 const LS_KEY='dubai_projects';
 function getLocalProjects(){
   try{ return JSON.parse(localStorage.getItem(LS_KEY)) || []; }catch(e){ return []; }
 }
 function setLocalProjects(list){
-  localStorage.setItem(LS_KEY, JSON.stringify(list));
+  const capped = Array.isArray(list) ? list.slice(0, 40) : [];
+  try{
+    localStorage.setItem(LS_KEY, JSON.stringify(capped));
+  }catch(e){
+    // Se exceder a cota do localStorage (~5MB por causa de thumbnails base64), remove thumbnails pesados dos antigos e reduz a lista
+    try{
+      const slim = capped.slice(0, 20).map((it, idx) => ({
+        ...it,
+        thumbnail: (idx > 2 && it.thumbnail && String(it.thumbnail).startsWith('data:')) ? '' : it.thumbnail
+      }));
+      localStorage.setItem(LS_KEY, JSON.stringify(slim));
+    }catch(e2){
+      try{ localStorage.setItem(LS_KEY, JSON.stringify(capped.slice(0, 5).map(it => ({ ...it, thumbnail: '' })))); }catch(e3){}
+    }
+  }
 }
 function saveProject(p){
-  const list=getLocalProjects();
-  list.unshift(p);
-  setLocalProjects(list);
+  try{
+    const list=getLocalProjects();
+    list.unshift(p);
+    setLocalProjects(list);
+  }catch(e){}
 }
 async function loadProjects(){
   currentProjects=getLocalProjects();
@@ -4120,12 +4148,13 @@ function renderProjects(list){
   list.forEach(p=>{
     const typeLabel = p.type==='avatar' ? '🗣️ Avatar' : (p.type==='create' ? '🎬 Criação' : '🌍 Dublagem');
     const metaTag = p.format ? p.format : (p.duration ? p.duration+' min' : (p.fileName||''));
-    const date = new Date(p.createdAt).toLocaleString('pt-BR');
+    const date = new Date(p.createdAt || Date.now()).toLocaleString('pt-BR');
+    const safeId = escapeHtml(p.id || '');
     const card=document.createElement('div');
     card.className='project';
     card.innerHTML=`
       <div class="project-head">
-        <img class="thumb" src="${p.thumbnail || `https://picsum.photos/seed/${p.id}/96/64`}" onerror="this.src='https://picsum.photos/seed/fallback/96/64'">
+        <img class="thumb" src="${p.thumbnail || `https://picsum.photos/seed/${safeId}/96/64`}" onerror="this.src='https://picsum.photos/seed/fallback/96/64'">
         <div class="project-meta">
           <div class="project-title">${escapeHtml(p.title || p.prompt?.slice(0,60) || 'Projeto sem título')}</div>
           <div class="project-sub">
@@ -4138,16 +4167,16 @@ function renderProjects(list){
       </div>
       <div class="project-body">
         ${p.prompt ? `<div style="font-size:12px;color:var(--muted2);margin-bottom:8px"><b>Prompt:</b> ${escapeHtml(p.prompt)}</div>` : ''}
-        ${p.fileName ? `<div style="font-size:12px;color:var(--muted2);margin-bottom:8px">📎 ${escapeHtml(p.fileName)} • ${(p.fileSize/1024/1024).toFixed(2)} MB</div>` : ''}
+        ${p.fileName ? `<div style="font-size:12px;color:var(--muted2);margin-bottom:8px">📎 ${escapeHtml(p.fileName)} • ${((p.fileSize||0)/1024/1024).toFixed(2)} MB</div>` : ''}
         <details>
           <summary style="cursor:pointer;font-weight:700;font-size:13px;color:#a78bfa">📝 Ver roteiro / transcrição</summary>
           <div class="project-script" style="margin-top:10px">${escapeHtml(p.script || p.transcription || '—')}</div>
         </details>
         <div class="project-actions">
-          <button class="ghost" onclick="copyText(\`${escapeForJs(p.script||'')}\`)">📋 Copiar</button>
-          <button class="ghost" onclick="speakText(\`${escapeForJs((p.script||'').slice(0,2000))}\`)">🔊 Ouvir</button>
-          <button class="ghost" onclick="downloadText('${p.id}')">⬇️ Baixar .txt</button>
-          <button class="ghost" style="color:#fca5a5;border-color:#7f1d1d44" onclick="deleteProject('${p.id}')">🗑️ Excluir</button>
+          <button class="ghost" onclick="copyProjectText('${safeId}')">📋 Copiar</button>
+          <button class="ghost" onclick="speakProjectText('${safeId}')">🔊 Ouvir</button>
+          <button class="ghost" onclick="downloadText('${safeId}')">⬇️ Baixar .txt</button>
+          <button class="ghost" style="color:#fca5a5;border-color:#7f1d1d44" onclick="deleteProject('${safeId}')">🗑️ Excluir</button>
         </div>
       </div>
     `;
@@ -4155,11 +4184,21 @@ function renderProjects(list){
   });
 }
 function escapeHtml(s){
-  if(!s) return '';
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  if(s === null || s === undefined) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 function escapeForJs(s){
-  return (s||'').replace(/\\/g,'\\\\').replace(/`/g,'\\`').replace(/\$/g,'\\$').replace(/\n/g,'\\n').replace(/"/g,'\\"');
+  return String(s||'').replace(/\\/g,'\\\\').replace(/`/g,'\\`').replace(/\$/g,'\\$').replace(/\n/g,'\\n').replace(/"/g,'\\"');
+}
+function copyProjectText(id){
+  const p = (currentProjects || getLocalProjects()).find(x => String(x.id) === String(id));
+  if(!p) return toast('Projeto não encontrado', 'warn');
+  copyText(p.script || p.transcription || '');
+}
+function speakProjectText(id){
+  const p = (currentProjects || getLocalProjects()).find(x => String(x.id) === String(id));
+  if(!p) return toast('Projeto não encontrado', 'warn');
+  speakText(String(p.script || p.transcription || '').slice(0, 2000));
 }
 function deleteProject(id){
   if(!confirm('Excluir este projeto?')) return;
@@ -6078,61 +6117,31 @@ async function renderAvatarVideo(){
     });
     lastAvatarThumbDataUrl = recCanvas.toDataURL('image/jpeg', 0.80);
 
-    // 3) Grava vídeo HD 30fps com WebAudio MediaStreamDestination (compatível com Chrome, Edge, Safari e Mobile)
+    // 3) Grava vídeo HD 30fps com WebCodecs H.264+AAC (.MP4 determinístico sem travamento) ou MediaRecorder contínuo
     if(!videoBlob){
       setStep(['av1','av2','av3','av4'], 2);
       showStatus('avatarStatus', hasRealAudio
         ? `🎬 Gravando Avatar com Lip-Sync Acústico (${Math.round(totalDur)}s em HD ${dim.w}×${dim.h})...`
         : `🎬 Gravando Avatar com Sincronia Fonética + Legendas (${Math.round(totalDur)}s — provedores de voz offline)...`, 'info');
 
-      const mime = pickRecorderMime();
-      if(!mime) throw new Error('Seu navegador não suporta MediaRecorder.');
-
-      const stream = recCanvas.captureStream(30);
-      let recAudioCtx = null, recSource = null;
-
-      if(hasRealAudio){
-        recAudioCtx = unlockedRecCtx || new AC();
-        unlockedRecCtx = null;
-        if(recAudioCtx.state === 'suspended') await recAudioCtx.resume().catch(()=>{});
-        const dest = recAudioCtx.createMediaStreamDestination();
-        recSource = recAudioCtx.createBufferSource();
-        recSource.buffer = tts.audioBuffer;
-        recSource.connect(dest);
-        recSource.connect(recAudioCtx.destination);
-        dest.stream.getAudioTracks().forEach(tr => stream.addTrack(tr));
-      } else if(unlockedRecCtx){
+      if(unlockedRecCtx){
         try{ unlockedRecCtx.close(); }catch(e){}
         unlockedRecCtx = null;
-      }
-
-      const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 4800000 });
-      const chunks = [];
-      rec.ondataavailable = e => { if(e.data && e.data.size) chunks.push(e.data); };
-      const recStopped = new Promise(res => rec.onstop = res);
-      rec.start(500);
-
-      const wallStart = performance.now();
-      let audioStart = 0;
-      if(recAudioCtx && recSource){
-        audioStart = recAudioCtx.currentTime;
-        recSource.start(0);
       }
 
       avatarLiveState.recordingActive = true;
       ensureAvatarLoop();
 
       let smoothO = 0, smoothW = 0;
-      await new Promise(resolve => {
-        function stepFrame(){
-          if(recAudioCtx && recAudioCtx.state === 'suspended') recAudioCtx.resume().catch(()=>{});
-          const wallElapsed = (performance.now() - wallStart) / 1000;
-          const acElapsed = (recAudioCtx && recAudioCtx.state === 'running')
-            ? (recAudioCtx.currentTime - audioStart)
-            : -1;
-          const t = (acElapsed > 0.02 && Math.abs(acElapsed - wallElapsed) < 1.5)
-            ? acElapsed
-            : Math.max(0, wallElapsed);
+      const previewCv = document.getElementById('avatarPreviewCanvas');
+      const pctx = previewCv ? previewCv.getContext('2d') : null;
+
+      videoBlob = await recordCanvasVideo({
+        width: dim.w,
+        height: dim.h,
+        durationSec: totalDur,
+        audioBuffer: hasRealAudio ? tts.audioBuffer : null,
+        drawFn: (ctx, t) => {
           let mOpen = 0, mWide = 0;
           if(lipProfile){
             const s = sampleLipProfileAt(lipProfile, t);
@@ -6148,28 +6157,21 @@ async function renderAvatarVideo(){
           avatarLiveState.recTime = t;
           avatarLiveState.recMouthOpen = clampedOpen;
           avatarLiveState.recMouthWide = mWide;
-          drawAvatarStageFrame(rctx, {
+          drawAvatarStageFrame(ctx, {
             t, mouthOpen: clampedOpen, mouthWide: mWide, speaking: true,
             animMode, layout, captionMode, headline, captions, bullets: avatarExtraBullets, showCalib: false
           });
-          setProgress('avatarProgressFill', Math.round(42 + Math.min(1, t / totalDur) * 54));
-          if(t >= totalDur){
-            resolve();
-            return;
+          if(pctx && previewCv){
+            drawAvatarStageFrame(pctx, {
+              t, mouthOpen: clampedOpen, mouthWide: mWide, speaking: true,
+              animMode, layout, captionMode, headline, captions, bullets: avatarExtraBullets, showCalib: false
+            });
           }
-          // Continua gravando mesmo se a aba ficar em segundo plano!
-          if(document.hidden) setTimeout(stepFrame, 33);
-          else requestAnimationFrame(stepFrame);
-        }
-        stepFrame();
+        },
+        onProgress: p => setProgress('avatarProgressFill', Math.round(42 + p * 54))
       });
 
       avatarLiveState.recordingActive = false;
-      await new Promise(r => setTimeout(r, 260));
-      rec.stop();
-      await recStopped;
-      if(recAudioCtx){ await recAudioCtx.close().catch(()=>{}); }
-      videoBlob = new Blob(chunks, { type: mime.split(';')[0] });
     }
 
     setStep(['av1','av2','av3','av4'], 3);
@@ -6260,6 +6262,29 @@ function downloadAvatarThumbnail(){
   a.click();
   toast('🖼️ Capa PNG baixada!');
 }
+
+// Desbloqueio global de WebAudio no primeiro toque/clique (garante som e lip-sync no iOS/Android)
+(function setupGlobalAudioUnlock(){
+  let unlocked = false;
+  function unlock(){
+    if(unlocked) return;
+    unlocked = true;
+    try{
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if(AC){
+        const ctx = new AC();
+        const buf = ctx.createBuffer(1, 1, 22050);
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        src.connect(ctx.destination);
+        src.start(0);
+        if(ctx.state === 'suspended') ctx.resume().catch(()=>{});
+        setTimeout(() => { try{ ctx.close(); }catch(e){} }, 250);
+      }
+    }catch(e){}
+  }
+  ['pointerdown','touchstart','keydown'].forEach(ev => window.addEventListener(ev, unlock, { once:true, passive:true }));
+})();
 
 // Init
 initAvatarPresets();

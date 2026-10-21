@@ -809,6 +809,21 @@ async function dubWithOpenAI({ audioBase64, audioMime = 'audio/wav', language, d
       }
     }
 
+    // Remove marcações de closed-captions não faladas ([Music], [Música], (risos), ♪, alucinações de silêncio do Whisper)
+    if (originalText) {
+      const cleanedOrig = String(originalText)
+        .replace(/\[[^\]]*\]|\([^)]*\)|[♪♫♬♩]+/g, ' ')
+        .replace(/^(legendas pela comunidade.*|amara\.org.*|subtitles by.*|obrigado por assistir\.?)$/i, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (!cleanedOrig || /^(sil[êe]ncio|silence|music|m[úu]sica|aplausos|applause|risos|laughter|ru[íi]do|noise|sem fala|no speech|inaud[íi]vel|[.,!?;:—\-…]+)$/i.test(cleanedOrig)) {
+        originalText = '';
+        heardSilence = true;
+      } else {
+        originalText = cleanedOrig;
+      }
+    }
+
     // Se o trecho do vídeo for apenas música/efeitos/silêncio (comum em aberturas e vídeos longos!), preserva sem erro!
     if (!originalText && heardSilence) {
       return {
@@ -824,12 +839,36 @@ async function dubWithOpenAI({ audioBase64, audioMime = 'audio/wav', language, d
     if (!originalText) throw new Error('Não foi possível transcrever o áudio. ' + whisperErr);
 
     // Tradução natural para locução sincronizada (mesma duração aproximada da fala original!)
-    const tr = await chatWithFallback({
+    let tr = await chatWithFallback({
       system: 'Você é um diretor de dublagem profissional de cinema/streaming. Traduza a fala para o idioma alvo de forma natural, fluida e com duração de fala equivalente ao original (isocronia de dublagem). Não adicione comentários, notas nem aspas extras — devolva APENAS o texto traduzido pronto para ser falado.',
       user: `Traduza para ${targetLanguage}:\n\n${originalText}`
     });
-    if (tr.error) throw new Error('Tradução falhou: ' + tr.error);
-    const translatedText = (tr.text || '').trim();
+    if (tr.error || !(tr.text || '').trim()) {
+      // Fallback gratuito Google Translate GTX para nunca falhar na tradução se os LLMs estiverem em rate-limit
+      try {
+        const tl = String(targetLanguage || 'pt-BR').split(/\s/)[0];
+        const gRes = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(tl)}&dt=t&q=${encodeURIComponent(originalText)}`, {
+          signal: AbortSignal.timeout(10000)
+        });
+        if (gRes.ok) {
+          const gJson = await gRes.json();
+          const gText = Array.isArray(gJson?.[0]) ? gJson[0].map(seg => seg?.[0] || '').join('').trim() : '';
+          if (gText) tr = { text: gText, provider: 'google-translate-free' };
+        }
+      } catch (e) {}
+    }
+    if (tr.error && !(tr.text || '').trim()) throw new Error('Tradução falhou: ' + tr.error);
+    const translatedText = (tr.text || originalText).replace(/\[[^\]]*\]|\([^)]*\)|[♪♫♬♩]+/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!translatedText) {
+      return {
+        silent: true,
+        transcription: originalText,
+        translation: '',
+        dubInfo: `Trecho sem fala traduzível (${whisperInfo || 'IA'}) — áudio ambiente preservado.`,
+        audioMp3Base64: null,
+        audioMime: 'audio/wav'
+      };
+    }
 
     const parts = [];
     let current = '';
