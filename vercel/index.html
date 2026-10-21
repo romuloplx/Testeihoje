@@ -858,7 +858,10 @@ function openTab(id, button){
   const targetBtn = button || document.getElementById('tab-'+id);
   if(targetBtn) targetBtn.classList.add('active');
   if(id==='projects') loadProjects();
-  if(id==='avatar') ensureAvatarLoop();
+  if(id==='avatar'){
+    if(!avatarLiveState.playing) avatarLiveState.clickPulseUntil = performance.now() + 1800;
+    ensureAvatarLoop();
+  }
   window.scrollTo({top:0, behavior:'smooth'});
 }
 
@@ -4586,6 +4589,7 @@ function selectStudioAvatar(id, silent){
   if(lbl) lbl.textContent = activeAvatarName;
   const vSel = document.getElementById('avatarVoice');
   if(vSel && p.voice) vSel.value = p.voice;
+  avatarLiveState.clickPulseUntil = performance.now() + 1800;
   if(!silent) toast(`🗣️ Avatar ${p.name} selecionado`);
   ensureAvatarLoop();
 }
@@ -4901,7 +4905,7 @@ function triggerAvatarBlinkTest(){
 }
 
 function triggerAvatarMouthTest(){
-  avatarLiveState.clickPulseUntil = performance.now() + 1100;
+  avatarLiveState.clickPulseUntil = performance.now() + 1850;
   ensureAvatarLoop();
 }
 
@@ -4997,11 +5001,11 @@ function onAvatarPointerUp(ev){
   avatarDraggingPoint = null;
 }
 
-// Motor Anatômico Sub-Pixel 2D com Interpolação Bilinear & Sombreamento Oral Difuso:
+// Motor Anatômico Sub-Pixel 2D com Interpolação Bilinear & Sombreamento Oral 3D Realista:
 // - Pálpebras piscam suavemente acompanhando o ângulo exato dos olhos (zero borda quadrada!)
-// - Lábios e mandíbula deformam os pixels reais da foto pixel-a-pixel com interpolação bilinear sub-pixel,
-//   preservando a textura real dos lábios sem colar dentes/língua artificiais em vetor!
-function renderWarpedPortraitCanvas(mouthOpen, mouthWide, blinkAmt, allowLipWarp){
+// - Lábios superior/inferior e mandíbula se separam e articulam sílaba-a-sílaba deformando os pixels reais da foto
+//   com interpolação bilinear sub-pixel, cavidade oral orgânica e arcada superior sombreada em 3D!
+function renderWarpedPortraitCanvas(mouthOpen, mouthWide, blinkAmt, allowLipWarp = true){
   const S = AVATAR_SIZE;
   const wctx = avatarWorkCanvas.getContext('2d');
   wctx.clearRect(0, 0, S, S);
@@ -5046,23 +5050,23 @@ function renderWarpedPortraitCanvas(mouthOpen, mouthWide, blinkAmt, allowLipWarp
     }
   }
 
-  // 2) Lip-Sync Anatômico Sub-Pixel (Deformação Bilinear 2D dos Lábios Reais da Foto + Sombra Oral Orgânica Difusa)
-  if(allowLipWarp && (mouthOpen > 0.008 || Math.abs(mouthWide) > 0.015)){
+  // 2) Lip-Sync Anatômico Sub-Pixel (Separação Labial Realista + Queda de Mandíbula + Cavidade Oral 3D Sombreada)
+  if(allowLipWarp !== false && (mouthOpen > 0.005 || Math.abs(mouthWide) > 0.012)){
     const mx = lm.mx * S, my = lm.my * S;
-    // Compressão suave (soft-knee) para que a abertura da boca seja sempre humana e proporcional
-    const effOpen = Math.tanh(Math.max(0, mouthOpen) * 1.05);
+    const effOpen = Math.min(1.18, Math.pow(Math.max(0, mouthOpen), 0.80));
     const effWide = Math.max(-0.36, Math.min(0.42, mouthWide || 0));
 
-    const baseMouthW = (lm.mouthW || (lm.faceW * 0.28)) * S;
+    const refFH = Math.max(S * 0.38, fh);
+    const baseMouthW = Math.max(S * 0.092, (lm.mouthW || (lm.faceW * 0.28)) * S);
     // Quando a mandíbula abre em 'O/A' os cantos contraem levemente; em 'E/I' alargam suavemente
-    const lipRx = Math.max(14, baseMouthW * 0.50 * avatarMouthWidthScale * (1 + 0.11 * effWide - 0.05 * effOpen));
-    const jawRx = Math.max(lipRx * 1.78, fw * 0.31);
-    const topDist = Math.max(14, fh * 0.082);
-    const chinY = Math.max(my + fh * 0.14, Math.min(S * 0.96, (lm.chinY || (lm.my + 0.115)) * S));
-    const chinDist = Math.max(fh * 0.16, (chinY - my) + fh * 0.058);
+    const lipRx = Math.max(20, baseMouthW * 0.52 * avatarMouthWidthScale * (1 + 0.13 * effWide - 0.05 * effOpen));
+    const jawRx = Math.max(lipRx * 1.85, fw * 0.33);
+    const topDist = Math.max(18, refFH * 0.095);
+    const chinY = Math.max(my + refFH * 0.15, Math.min(S * 0.96, (lm.chinY || (lm.my + 0.115)) * S));
+    const chinDist = Math.max(refFH * 0.19, (chinY - my) + refFH * 0.075);
 
-    // Abertura vertical realista (lábios humanos em fala natural abrem ~3.5% a 4.5% da altura da face)
-    const gap = Math.min(fh * 0.046, effOpen * fh * 0.039);
+    // Abertura vertical clara, fluida e anatômica (visível em qualquer tela sem exagerar)
+    const gap = Math.min(refFH * 0.115, effOpen * refFH * 0.092);
     const cosA = Math.cos(eyeAngle * 0.65), sinA = Math.sin(eyeAngle * 0.65);
 
     const bx0 = Math.max(0, Math.floor(mx - jawRx - 4));
@@ -5078,10 +5082,13 @@ function renderWarpedPortraitCanvas(mouthOpen, mouthWide, blinkAmt, allowLipWarp
       const dData = outImg.data;
       dData.set(sData);
 
-      const oral = lm.oralColor || { r:28, g:11, b:16, lipR:158, lipG:76, lipB:86 };
+      const oral = lm.oralColor || { r:26, g:10, b:15, lipR:162, lipG:76, lipB:86 };
+      const baseCavR = Math.min(32, oral.r * 0.78);
+      const baseCavG = Math.min(13, oral.g * 0.72);
+      const baseCavB = Math.min(18, oral.b * 0.75);
       const invJawRx = 1 / jawRx;
       const invLipRx = 1 / lipRx;
-      const sigmaH = 1 / (2 * (fh * 0.055) * (fh * 0.055));
+      const sigmaH = 1 / (2 * (refFH * 0.060) * (refFH * 0.060));
 
       for(let py = by0; py <= by1; py++){
         const dy = py - my;
@@ -5100,88 +5107,94 @@ function renderWarpedPortraitCanvas(mouthOpen, mouthWide, blinkAmt, allowLipWarp
           const uLip = lx * invLipRx;
           const absULip = Math.abs(uLip);
           const inLips = absULip < 1;
-          // Curva anatômica das comissuras labiais: cantos da boca ancorados suavemente
-          const lipCurve = inLips ? Math.pow(1 - uLip * uLip, 1.55) : 0;
+          // Curva anatômica das comissuras labiais: ampla no centro e ancorada nos cantos
+          const lipCurve = inLips ? Math.pow(1 - uLip * uLip, 1.16) : 0;
 
-          const uLipY = -gap * 0.21 * lipCurve;
-          const lLipY = +gap * 0.79 * lipCurve;
+          const uLipY = -gap * 0.27 * lipCurve;
+          const lLipY = +gap * 0.73 * lipCurve;
 
           // Leve elevação natural dos cantos da boca em vogais abertas/sorriso sutil de fala
-          const cornerLift = -effWide * (fh * 0.0075) * Math.sin(Math.min(1, absULip) * Math.PI) * wJawX;
+          const cornerLift = -effWide * (refFH * 0.0085) * Math.sin(Math.min(1, absULip) * Math.PI) * wJawX;
           const lyAdj = ly - cornerLift;
 
           if(lyAdj <= -topDist || lyAdj >= chinDist) continue;
 
           // Co-articulação horizontal dos cantos labiais (arredondamento em O/U vs extensão em E/I)
           const hBand = Math.exp(-(ly * ly) * sigmaH);
-          const srcLx = lx - lx * (effWide * 0.068 - effOpen * 0.032) * wJawX * hBand;
+          const srcLx = lx - lx * (effWide * 0.085 - effOpen * 0.042) * wJawX * hBand;
 
           let srcLy = lyAdj;
           let cavityAlpha = 0;
-          let cavR = oral.r, cavG = oral.g, cavB = oral.b;
+          let cavR = baseCavR, cavG = baseCavG, cavB = baseCavB;
           let shadeMul = 1.0;
 
           if(lyAdj <= uLipY){
-            // Zona 1: Lábio superior e filtro labial (comprime suavemente mantendo 100% da textura real do lábio superior)
+            // Zona 1: Lábio superior e filtro labial (sobe preservando 100% da textura e arco do cupido reais)
             const tUp = (lyAdj - uLipY) / Math.max(1, -topDist - uLipY);
             const wUp = 0.5 * (1 + Math.cos(Math.PI * Math.min(1, Math.max(0, tUp))));
-            srcLy = lyAdj - uLipY * wUp;
+            srcLy = lyAdj - (uLipY + 0.65 * lipCurve) * wUp;
           } else if(lyAdj >= lLipY){
-            // Zona 2: Lábio inferior, sulco mentolabial e queixo (desce intacto acompanhando a mandíbula)
+            // Zona 2: Lábio inferior, sulco mentolabial e queixo (desce acompanhando a abertura da mandíbula)
             const tDn = (lyAdj - lLipY) / Math.max(1, chinDist - lLipY);
             if(tDn >= 1) continue;
-            const wDn = 0.5 * (1 + Math.cos(Math.PI * Math.pow(tDn, 0.86)));
-            const jawCarrier = gap * 0.34 * wJawX * Math.sin(Math.PI * tDn);
-            const effectiveDrop = lLipY * wDn + jawCarrier * (1 - lipCurve * 0.58);
+            const wDn = 0.5 * (1 + Math.cos(Math.PI * Math.pow(tDn, 0.82)));
+            const jawCarrier = gap * 0.44 * wJawX * Math.sin(Math.PI * Math.pow(tDn, 0.78));
+            const effectiveDrop = (lLipY - 0.65 * lipCurve) * wDn + jawCarrier * (1 - lipCurve * 0.52);
             srcLy = lyAdj - effectiveDrop;
 
             // Sombreamento 3D natural no volume do lábio inferior e na dobra do queixo
             if(inLips && gap > 0.8){
               const distBelowLip = lyAdj - lLipY;
-              const lipRoll = fh * 0.022;
+              const lipRoll = refFH * 0.025;
               if(distBelowLip > 0 && distBelowLip < lipRoll){
-                shadeMul = 1 + 0.036 * Math.sin(Math.PI * (distBelowLip / lipRoll)) * lipCurve * effOpen;
-              } else if(distBelowLip >= lipRoll && distBelowLip < lipRoll * 2.4){
-                shadeMul = 1 - 0.045 * Math.sin(Math.PI * ((distBelowLip - lipRoll) / (lipRoll * 1.4))) * lipCurve * effOpen;
+                shadeMul = 1 + 0.048 * Math.sin(Math.PI * (distBelowLip / lipRoll)) * lipCurve * effOpen;
+              } else if(distBelowLip >= lipRoll && distBelowLip < lipRoll * 2.5){
+                shadeMul = 1 - 0.058 * Math.sin(Math.PI * ((distBelowLip - lipRoll) / (lipRoll * 1.5))) * lipCurve * effOpen;
               }
             }
           } else {
-            // Zona 3: Interior da abertura labial (transição 100% difusa a partir dos lábios reais da foto, sem adesivo!)
+            // Zona 3: Interior da abertura labial (transição chanfrada anti-aliased de 1.5px nas bordas dos lábios reais)
             const localOpen = Math.max(0.001, lLipY - uLipY);
             const v = (lyAdj - uLipY) / localOpen; // 0 na borda interna superior -> 1 na borda interna inferior
-            // Amostra os pixels reais da linha interna dos lábios da própria foto para as bordas
-            srcLy = (v - 0.5) * 2.1;
+            srcLy = (v < 0.5 ? -0.65 : +0.65) * lipCurve;
+
+            const edgeDistV = Math.min(v, 1 - v);
+            const bevelWidth = Math.max(0.07, Math.min(0.22, 1.55 / Math.max(1.4, localOpen)));
+            const bevelT = Math.min(1, edgeDistV / bevelWidth);
+            const vMask = bevelT * bevelT * (3 - 2 * bevelT);
+            const hMask = Math.pow(Math.max(0, 1 - Math.pow(absULip, 2.35)), 0.62);
+            const openFade = Math.min(1, localOpen / 1.25);
+            cavityAlpha = Math.min(0.97, vMask * hMask * openFade);
 
             const vBell = Math.sin(Math.PI * v);
-            const hBell = Math.pow(Math.max(0, 1 - uLip * uLip), 1.38);
-            const openFade = Math.min(1, localOpen / 2.6);
-            cavityAlpha = Math.min(0.88, Math.pow(vBell, 0.74) * hBell * openFade);
+            const hBell = Math.pow(Math.max(0, 1 - uLip * uLip), 1.25);
+            const depthShade = 0.72 + 0.28 * (1 - vBell * hBell);
+            cavR = baseCavR * depthShade;
+            cavG = baseCavG * depthShade;
+            cavB = baseCavB * depthShade;
 
-            const depthShade = 1 - 0.24 * vBell * hBell;
-            cavR = oral.r * depthShade;
-            cavG = oral.g * depthShade;
-            cavB = oral.b * depthShade;
-
-            // Reflexo difuso e sombreado da arcada superior apenas em vogais abertas (sem retângulo branco!)
-            if(effOpen > 0.22 && v > 0.06 && v < 0.40 && absULip < 0.62){
-              const tv = Math.sin(Math.PI * ((v - 0.06) / 0.34));
-              const th = Math.pow(Math.max(0, 1 - Math.pow(uLip / 0.62, 2)), 1.65);
-              const arch3D = 0.68 + 0.32 * Math.cos(uLip * 2.15);
-              const microTooth = 1 - 0.045 * Math.pow(Math.sin(uLip * Math.PI * 5.5), 6);
-              const tMix = Math.min(0.30, (effOpen - 0.22) * 0.52) * tv * th;
-              const tr = 220 * arch3D * microTooth;
-              const tg = 212 * arch3D * microTooth;
-              const tb = 204 * arch3D * microTooth;
+            // Arcada dentária superior sombreada em 3D (com sombra projetada pelo lábio superior)
+            if(effOpen > 0.14 && v > 0.07 && v < 0.42 && absULip < 0.68){
+              const tv = Math.sin(Math.PI * ((v - 0.07) / 0.35));
+              const th = Math.pow(Math.max(0, 1 - Math.pow(uLip / 0.68, 2)), 1.45);
+              const topLipShadow = 0.58 + 0.42 * Math.min(1, (v - 0.07) / 0.15);
+              const arch3D = (0.64 + 0.36 * Math.cos(uLip * 2.05)) * topLipShadow;
+              const microTooth = 1 - 0.055 * Math.pow(Math.sin(uLip * Math.PI * 5.5), 4);
+              const tMix = Math.min(0.56, (effOpen - 0.14) * 0.82) * tv * th;
+              const tr = 224 * arch3D * microTooth;
+              const tg = 216 * arch3D * microTooth;
+              const tb = 208 * arch3D * microTooth;
               cavR = cavR * (1 - tMix) + tr * tMix;
               cavG = cavG * (1 - tMix) + tg * tMix;
               cavB = cavB * (1 - tMix) + tb * tMix;
-            } else if(v > 0.54 && v < 0.94){
-              // Subtom quente muito sutil no fundo inferior da cavidade oral
-              const lv = Math.sin(Math.PI * ((v - 0.54) / 0.40));
-              const lMix = 0.20 * lv * hBell * Math.min(1, effOpen * 1.2);
-              cavR = cavR * (1 - lMix) + (oral.lipR * 0.58) * lMix;
+            } else if(v > 0.52 && v < 0.91 && absULip < 0.66){
+              // Volume orgânico sutil da língua / assoalho oral ao fundo
+              const lv = Math.sin(Math.PI * ((v - 0.52) / 0.39));
+              const lh = Math.pow(Math.max(0, 1 - Math.pow(uLip / 0.66, 2)), 1.35);
+              const lMix = 0.34 * lv * lh * Math.min(1, effOpen * 1.25);
+              cavR = cavR * (1 - lMix) + (oral.lipR * 0.66) * lMix;
               cavG = cavG * (1 - lMix) + (oral.lipG * 0.38) * lMix;
-              cavB = cavB * (1 - lMix) + (oral.lipB * 0.42) * lMix;
+              cavB = cavB * (1 - lMix) + (oral.lipB * 0.43) * lMix;
             }
           }
 
@@ -5245,7 +5258,7 @@ function blinkAtTime(t){
   return b;
 }
 
-// Extrai envelope acústico silábico real do AudioBuffer (articulação natural sílaba-a-sílaba + fechamento bilabial + vogal ZCR)
+// Extrai envelope acústico silábico real do AudioBuffer (articulação clara sílaba-a-sílaba + fechamento bilabial + vogal ZCR)
 function buildPcmLipProfile(audioBuffer, textHint = ''){
   const sr = audioBuffer.sampleRate;
   const ch = audioBuffer.getChannelData(0);
@@ -5253,9 +5266,9 @@ function buildPcmLipProfile(audioBuffer, textHint = ''){
   const nFrames = Math.max(1, Math.ceil(audioBuffer.duration * fps));
   const rawRms = new Float32Array(nFrames);
   const rawZcr = new Float32Array(nFrames);
-  // Janela curta de 28ms para capturar perfeitamente os vales entre sílabas e consoantes (m, b, p, t, s)
-  const win = Math.max(64, Math.floor(sr * 0.028));
-  const lookahead = Math.floor(sr * 0.020);
+  // Janela curta de 26ms para capturar os vales entre sílabas e consoantes
+  const win = Math.max(64, Math.floor(sr * 0.026));
+  const lookahead = Math.floor(sr * 0.018);
 
   for(let f = 0; f < nFrames; f++){
     const center = Math.floor((f / fps) * sr) + lookahead;
@@ -5272,42 +5285,43 @@ function buildPcmLipProfile(audioBuffer, textHint = ''){
     rawZcr[f] = zc / len;
   }
 
-  // Normaliza pelo percentil 95 e extrai a modulação silábica local (evita boca travada aberta em frases longas!)
+  // Normaliza pelo percentil 90 para que todas as sílabas faladas movimentem a boca com presença e naturalidade
   const sorted = Array.from(rawRms).sort((a,b) => a - b);
-  const p95 = Math.max(0.015, sorted[Math.floor(sorted.length * 0.95)] || 0.08);
+  const p90 = Math.max(0.012, sorted[Math.floor(sorted.length * 0.90)] || 0.07);
   const openArr = new Float32Array(nFrames);
   const wideArr = new Float32Array(nFrames);
   let smO = 0, smW = 0;
   for(let f = 0; f < nFrames; f++){
     let sumLocal = 0, cnt = 0;
-    for(let k = Math.max(0, f - 6); k <= Math.min(nFrames - 1, f + 6); k++){
+    // Janela de ±14 quadros (~460ms) para destacar picos de vogais e vales de consoantes entre sílabas
+    for(let k = Math.max(0, f - 14); k <= Math.min(nFrames - 1, f + 14); k++){
       sumLocal += rawRms[k]; cnt++;
     }
     const localMean = Math.max(0.001, sumLocal / cnt);
-    const baseEnv = Math.min(1.05, rawRms[f] / p95);
+    const baseEnv = Math.min(1.12, Math.pow(rawRms[f] / p90, 0.78));
     const relToLocal = rawRms[f] / localMean;
-    // Fechamento labial natural nos vales de consoantes entre as vogais
-    const consonantClosure = relToLocal < 0.86 ? Math.pow(relToLocal / 0.86, 2.3) : 1.0;
-    // Consoantes sibilantes/fricativas (ZCR alto) reduzem a abertura vertical
-    const sibilantDamp = rawZcr[f] > 0.16 ? Math.max(0.32, 1 - (rawZcr[f] - 0.16) * 3.0) : 1.0;
-    const sylPeak = Math.max(0, (rawRms[f] - localMean * 0.68) / (p95 * 0.46));
 
-    let targetO = baseEnv < 0.075 ? 0 : Math.min(0.84, (baseEnv * 0.28 + sylPeak * 0.58) * consonantClosure * sibilantDamp);
-    let targetW = baseEnv < 0.05 ? 0 : Math.max(-0.32, Math.min(0.38, (rawZcr[f] - 0.095) * 2.8));
+    // Fechamento labial nos vales entre sílabas e impulso nas vogais
+    const consonantClosure = relToLocal < 0.84 ? Math.pow(Math.max(0, relToLocal / 0.84), 2.1) : 1.0;
+    const sylBoost = relToLocal >= 0.84 ? Math.min(1.28, 0.80 + (relToLocal - 0.84) * 1.35) : 0.72;
+    const sibilantDamp = rawZcr[f] > 0.18 ? Math.max(0.42, 1 - (rawZcr[f] - 0.18) * 2.4) : 1.0;
+    // Cadência silábica orgânica para nunca travar a boca estática durante vogais longas
+    const cadenceMod = 0.82 + 0.18 * Math.sin((f / fps) * Math.PI * 10.5);
+
+    let targetO = baseEnv < 0.055
+      ? 0
+      : Math.min(0.96, baseEnv * sylBoost * consonantClosure * sibilantDamp * cadenceMod);
+    let targetW = baseEnv < 0.05
+      ? 0
+      : Math.max(-0.34, Math.min(0.38, (rawZcr[f] - 0.095) * 2.8));
 
     if(textHint){
       const ph = phonemeMouthAt(textHint, f / fps, audioBuffer.duration);
-      if(ph.open <= 0.05 && baseEnv > 0.06){
-        // Bilabiais (M, B, P): fecha suavemente os lábios
-        targetO *= 0.28;
-      } else {
-        targetO = targetO * 0.80 + ph.open * 0.20 * Math.min(1, baseEnv * 1.4);
-        targetW = targetW * 0.65 + ph.wide * 0.35;
-      }
+      targetW = targetW * 0.62 + ph.wide * 0.38;
     }
 
-    smO = targetO > smO ? smO + (targetO - smO) * 0.48 : smO + (targetO - smO) * 0.36;
-    smW += (targetW - smW) * 0.28;
+    smO = targetO > smO ? smO + (targetO - smO) * 0.56 : smO + (targetO - smO) * 0.42;
+    smW += (targetW - smW) * 0.30;
     openArr[f] = smO;
     wideArr[f] = smW;
   }
@@ -5331,18 +5345,18 @@ function phonemeMouthAt(text, t, totalDur){
   if(!text || totalDur <= 0 || t < 0 || t >= totalDur) return { open:0, wide:0 };
   const idx = Math.min(text.length - 1, Math.floor((t / totalDur) * text.length));
   const ch = text[idx].toLowerCase();
-  const sylPulse = 0.72 + 0.28 * Math.sin(t * Math.PI * 11.5);
-  if('.,;:!?—\n'.includes(ch)) return { open:0, wide:0 };
-  if(ch === ' ') return { open:0.04, wide:0 };
-  if('mbp'.includes(ch)) return { open:0.01, wide:0 };
-  if('fv'.includes(ch)) return { open:0.12 * sylPulse, wide:0.12 };
-  if('aáàâã'.includes(ch)) return { open:0.74 * sylPulse, wide:0.08 };
-  if('eéê'.includes(ch)) return { open:0.50 * sylPulse, wide:0.28 };
-  if('iíy'.includes(ch)) return { open:0.30 * sylPulse, wide:0.36 };
-  if('oóôõ'.includes(ch)) return { open:0.60 * sylPulse, wide:-0.26 };
-  if('uú'.includes(ch)) return { open:0.32 * sylPulse, wide:-0.30 };
-  if('szcxj'.includes(ch)) return { open:0.18 * sylPulse, wide:0.28 };
-  return { open:0.26 * sylPulse, wide:0.04 };
+  const sylPulse = Math.max(0.15, 0.65 + 0.35 * Math.sin(t * Math.PI * 11.2));
+  if('.,;:!?—\n'.includes(ch)) return { open:0.02, wide:0 };
+  if(ch === ' ') return { open:0.12 * sylPulse, wide:0 };
+  if('mbp'.includes(ch)) return { open:0.04, wide:0 };
+  if('fv'.includes(ch)) return { open:0.22 * sylPulse, wide:0.14 };
+  if('aáàâã'.includes(ch)) return { open:0.86 * sylPulse, wide:0.10 };
+  if('eéê'.includes(ch)) return { open:0.64 * sylPulse, wide:0.30 };
+  if('iíy'.includes(ch)) return { open:0.42 * sylPulse, wide:0.36 };
+  if('oóôõ'.includes(ch)) return { open:0.74 * sylPulse, wide:-0.28 };
+  if('uú'.includes(ch)) return { open:0.44 * sylPulse, wide:-0.32 };
+  if('szcxj'.includes(ch)) return { open:0.26 * sylPulse, wide:0.28 };
+  return { open:0.42 * sylPulse, wide:0.06 };
 }
 
 // Divide o roteiro em blocos cronometrados com palavras individuais para legenda Karaokê + .SRT
@@ -5429,14 +5443,15 @@ function drawAvatarStageFrame(ctx, opts){
   ctx.restore();
 
   const blink = blinkAtTime(t);
-  const portrait = renderWarpedPortraitCanvas(mouthOpen, mouthWide, blink, animMode !== 'gentle');
+  const portrait = renderWarpedPortraitCanvas(mouthOpen, mouthWide, blink, true);
 
   // Micro-movimento natural de cabeça e respiração ("Avatar IV performance")
-  const breath = Math.sin(t * 1.65) * 0.0055;
+  const motionScale = animMode === 'gentle' ? 0.65 : 1.0;
+  const breath = Math.sin(t * 1.65) * 0.0055 * motionScale;
   const talkEnergy = speaking ? mouthOpen : 0;
-  const tilt = Math.sin(t * 1.15) * 0.008 + Math.sin(t * 2.7) * 0.011 * talkEnergy;
-  const bobY = Math.sin(t * 1.65) * (H * 0.004) - talkEnergy * (H * 0.006);
-  const dynScale = 1 + breath + talkEnergy * 0.014;
+  const tilt = (Math.sin(t * 1.15) * 0.008 + Math.sin(t * 2.7) * 0.011 * talkEnergy) * motionScale;
+  const bobY = (Math.sin(t * 1.65) * (H * 0.004) - talkEnergy * (H * 0.006)) * motionScale;
+  const dynScale = 1 + breath + talkEnergy * 0.014 * motionScale;
 
   const isLandscape = W > H;
   let avX, avY, avS;
@@ -5672,10 +5687,22 @@ function ensureAvatarLoop(){
     let t = now / 1000;
     let mOpen = 0, mWide = 0, speaking = false;
 
-    if(avatarLiveState.playing){
-      const elapsed = avatarLiveState.audioCtx
-        ? (avatarLiveState.audioCtx.currentTime - avatarLiveState.startAt)
-        : ((now - avatarLiveState.startAt) / 1000);
+    if(avatarLiveState.recordingActive){
+      t = avatarLiveState.recTime || 0;
+      mOpen = avatarLiveState.recMouthOpen || 0;
+      mWide = avatarLiveState.recMouthWide || 0;
+      speaking = true;
+    } else if(avatarLiveState.playing){
+      const ac = avatarLiveState.audioCtx;
+      if(ac && ac.state === 'suspended') ac.resume().catch(()=>{});
+      const wallElapsed = (now - (avatarLiveState.wallStartAt || avatarLiveState.startAt || now)) / 1000;
+      const acElapsed = (ac && ac.state === 'running') ? (ac.currentTime - avatarLiveState.startAt) : -1;
+      const elElapsed = (avatarLiveState.audioEl && !avatarLiveState.audioEl.paused && isFinite(avatarLiveState.audioEl.currentTime))
+        ? avatarLiveState.audioEl.currentTime
+        : -1;
+      const elapsed = (acElapsed > 0.02 && Math.abs(acElapsed - wallElapsed) < 1.5)
+        ? acElapsed
+        : (elElapsed > 0.02 ? elElapsed : wallElapsed);
       t = Math.max(0, elapsed);
       speaking = true;
       if(t >= avatarLiveState.duration){
@@ -5686,15 +5713,17 @@ function ensureAvatarLoop(){
         mWide = s.wide;
       } else {
         const ph = phonemeMouthAt(avatarLiveState.text, t, avatarLiveState.duration);
-        avatarLiveState.smoothOpen += (ph.open * gain - avatarLiveState.smoothOpen) * 0.34;
-        avatarLiveState.smoothWide += (ph.wide - avatarLiveState.smoothWide) * 0.25;
+        avatarLiveState.smoothOpen += (ph.open * gain - avatarLiveState.smoothOpen) * 0.42;
+        avatarLiveState.smoothWide += (ph.wide - avatarLiveState.smoothWide) * 0.30;
         mOpen = avatarLiveState.smoothOpen;
         mWide = avatarLiveState.smoothWide;
       }
     } else if(now < avatarLiveState.clickPulseUntil){
-      const rem = (avatarLiveState.clickPulseUntil - now) / 950;
-      mOpen = Math.sin(rem * Math.PI * 3) * 0.72 * gain;
+      const rem = (avatarLiveState.clickPulseUntil - now) / 1000;
+      mOpen = (0.46 + 0.42 * Math.sin(rem * Math.PI * 6.5)) * Math.min(1, rem * 2.4) * gain;
       mOpen = Math.max(0, mOpen);
+      mWide = Math.sin(rem * Math.PI * 3.2) * 0.24;
+      speaking = true;
     }
 
     const scriptTxt = (document.getElementById('avatarScript')?.value || '').trim();
@@ -5724,6 +5753,10 @@ function stopAvatarLivePreview(){
   if(avatarLiveState.sourceNode){
     try{ avatarLiveState.sourceNode.stop(); }catch(e){}
     avatarLiveState.sourceNode = null;
+  }
+  if(avatarLiveState.audioEl){
+    try{ avatarLiveState.audioEl.pause(); avatarLiveState.audioEl.src = ''; }catch(e){}
+    avatarLiveState.audioEl = null;
   }
   if(avatarLiveState.audioCtx){
     try{ avatarLiveState.audioCtx.close(); }catch(e){}
@@ -5817,11 +5850,23 @@ async function toggleAvatarLivePreview(){
   const btn = document.getElementById('avatarLiveBtn');
   if(btn){ btn.disabled = true; btn.textContent = '⏳ Preparando voz...'; }
 
+  // Desbloqueia o AudioContext sincronicamente no clique do usuário (essencial no celular/iOS/Android/Safari!)
+  const AC = window.AudioContext || window.webkitAudioContext;
+  let unlockedCtx = null;
+  try{
+    unlockedCtx = new AC();
+    if(unlockedCtx.state === 'suspended') unlockedCtx.resume().catch(()=>{});
+  }catch(e){}
+
+  // Inicia movimento labial imediato enquanto a voz neural carrega
+  avatarLiveState.clickPulseUntil = performance.now() + 2600;
+  ensureAvatarLoop();
+
   try{
     const tts = await synthesizeAvatarSpeech(previewText, voice);
     if(tts && tts.audioBuffer){
-      const AC = window.AudioContext || window.webkitAudioContext;
-      const ctx = new AC();
+      const ctx = unlockedCtx || new AC();
+      if(ctx.state === 'suspended') await ctx.resume().catch(()=>{});
       const src = ctx.createBufferSource();
       src.buffer = tts.audioBuffer;
       src.connect(ctx.destination);
@@ -5830,21 +5875,35 @@ async function toggleAvatarLivePreview(){
       avatarLiveState.profile = buildPcmLipProfile(tts.audioBuffer, previewText);
       avatarLiveState.duration = tts.audioBuffer.duration;
       avatarLiveState.startAt = ctx.currentTime;
+      avatarLiveState.wallStartAt = performance.now();
       avatarLiveState.text = previewText;
+      avatarLiveState.clickPulseUntil = 0;
       avatarLiveState.playing = true;
       src.onended = () => { if(avatarLiveState.sourceNode === src) stopAvatarLivePreview(); };
       src.start(0);
+      // Se o navegador móvel manteve o AudioContext suspenso, toca o Blob via HTML5 Audio mantendo o Lip-Sync acústico!
+      if(ctx.state !== 'running' && tts.downloadBlob){
+        try{
+          const aEl = new Audio(URL.createObjectURL(tts.downloadBlob));
+          avatarLiveState.audioEl = aEl;
+          aEl.onended = () => { if(avatarLiveState.audioEl === aEl) stopAvatarLivePreview(); };
+          aEl.play().catch(()=>{});
+        }catch(e){}
+      }
       toast('🗣️ Avatar falando ao vivo (' + (tts.providers.join(', ') || 'IA') + ')');
     } else {
+      if(unlockedCtx){ try{ unlockedCtx.close(); }catch(e){} }
       // Fallback instantâneo com voz local do navegador + sincronia fonética sílaba-a-sílaba
       const estDur = Math.max(3.5, previewText.split(/\s+/).length / 2.25);
       avatarLiveState.audioCtx = null;
       avatarLiveState.profile = null;
       avatarLiveState.duration = estDur;
       avatarLiveState.startAt = performance.now();
+      avatarLiveState.wallStartAt = performance.now();
       avatarLiveState.text = previewText;
       avatarLiveState.smoothOpen = 0;
       avatarLiveState.smoothWide = 0;
+      avatarLiveState.clickPulseUntil = 0;
       avatarLiveState.playing = true;
       if('speechSynthesis' in window){
         speechSynthesis.cancel();
@@ -5953,8 +6012,16 @@ async function renderAvatarVideo(){
   const layout = document.getElementById('avatarLayout').value || 'center';
   const captionMode = document.getElementById('avatarCaptions').value || 'karaoke';
   const animMode = document.getElementById('avatarAnimMode').value || 'lipsync';
-  const headline = (document.getElementById('avatarHeadline').value || '').trim();
+  const headline = (document.getElementById('avatarHeadline')?.value || '').trim();
   const gain = (Number(document.getElementById('avatarMouthGain')?.value) || 100) / 100;
+
+  // Desbloqueia o AudioContext sincronicamente no clique do botão antes do await de rede
+  const AC = window.AudioContext || window.webkitAudioContext;
+  let unlockedRecCtx = null;
+  try{
+    unlockedRecCtx = new AC();
+    if(unlockedRecCtx.state === 'suspended') unlockedRecCtx.resume().catch(()=>{});
+  }catch(e){}
 
   btn.disabled = true; btn.textContent = '⏳ Renderizando vídeo...';
   document.getElementById('avatarProgress').classList.add('show');
@@ -6006,7 +6073,7 @@ async function renderAvatarVideo(){
     const rctx = recCanvas.getContext('2d');
 
     drawAvatarStageFrame(rctx, {
-      t: 0.4, mouthOpen: 0.28, mouthWide: 0.12, speaking: true,
+      t: 0.4, mouthOpen: 0.45, mouthWide: 0.12, speaking: true,
       animMode, layout, captionMode, headline, captions, bullets: avatarExtraBullets, showCalib: false
     });
     lastAvatarThumbDataUrl = recCanvas.toDataURL('image/jpeg', 0.80);
@@ -6025,14 +6092,18 @@ async function renderAvatarVideo(){
       let recAudioCtx = null, recSource = null;
 
       if(hasRealAudio){
-        const AC = window.AudioContext || window.webkitAudioContext;
-        recAudioCtx = new AC();
+        recAudioCtx = unlockedRecCtx || new AC();
+        unlockedRecCtx = null;
+        if(recAudioCtx.state === 'suspended') await recAudioCtx.resume().catch(()=>{});
         const dest = recAudioCtx.createMediaStreamDestination();
         recSource = recAudioCtx.createBufferSource();
         recSource.buffer = tts.audioBuffer;
         recSource.connect(dest);
         recSource.connect(recAudioCtx.destination);
         dest.stream.getAudioTracks().forEach(tr => stream.addTrack(tr));
+      } else if(unlockedRecCtx){
+        try{ unlockedRecCtx.close(); }catch(e){}
+        unlockedRecCtx = null;
       }
 
       const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 4800000 });
@@ -6048,12 +6119,20 @@ async function renderAvatarVideo(){
         recSource.start(0);
       }
 
+      avatarLiveState.recordingActive = true;
+      ensureAvatarLoop();
+
       let smoothO = 0, smoothW = 0;
       await new Promise(resolve => {
         function stepFrame(){
-          const t = recAudioCtx
-            ? Math.max(0, recAudioCtx.currentTime - audioStart)
-            : (performance.now() - wallStart) / 1000;
+          if(recAudioCtx && recAudioCtx.state === 'suspended') recAudioCtx.resume().catch(()=>{});
+          const wallElapsed = (performance.now() - wallStart) / 1000;
+          const acElapsed = (recAudioCtx && recAudioCtx.state === 'running')
+            ? (recAudioCtx.currentTime - audioStart)
+            : -1;
+          const t = (acElapsed > 0.02 && Math.abs(acElapsed - wallElapsed) < 1.5)
+            ? acElapsed
+            : Math.max(0, wallElapsed);
           let mOpen = 0, mWide = 0;
           if(lipProfile){
             const s = sampleLipProfileAt(lipProfile, t);
@@ -6061,12 +6140,16 @@ async function renderAvatarVideo(){
             mWide = s.wide;
           } else {
             const ph = phonemeMouthAt(text, t, totalDur);
-            smoothO += (ph.open * gain - smoothO) * 0.34;
-            smoothW += (ph.wide - smoothW) * 0.25;
+            smoothO += (ph.open * gain - smoothO) * 0.42;
+            smoothW += (ph.wide - smoothW) * 0.30;
             mOpen = smoothO; mWide = smoothW;
           }
+          const clampedOpen = Math.min(1.25, mOpen);
+          avatarLiveState.recTime = t;
+          avatarLiveState.recMouthOpen = clampedOpen;
+          avatarLiveState.recMouthWide = mWide;
           drawAvatarStageFrame(rctx, {
-            t, mouthOpen: Math.min(1.25, mOpen), mouthWide: mWide, speaking: true,
+            t, mouthOpen: clampedOpen, mouthWide: mWide, speaking: true,
             animMode, layout, captionMode, headline, captions, bullets: avatarExtraBullets, showCalib: false
           });
           setProgress('avatarProgressFill', Math.round(42 + Math.min(1, t / totalDur) * 54));
@@ -6081,6 +6164,7 @@ async function renderAvatarVideo(){
         stepFrame();
       });
 
+      avatarLiveState.recordingActive = false;
       await new Promise(r => setTimeout(r, 260));
       rec.stop();
       await recStopped;
@@ -6142,6 +6226,8 @@ async function renderAvatarVideo(){
     toast(e.message, 'error');
     setProgress('avatarProgressFill', 0);
   }finally{
+    avatarLiveState.recordingActive = false;
+    if(unlockedRecCtx){ try{ unlockedRecCtx.close(); }catch(e){} }
     btn.disabled = false; btn.textContent = '🎬 Renderizar Vídeo do Avatar (MP4 / WebM)';
     setTimeout(() => { document.getElementById('avatarProgress').classList.remove('show'); }, 1400);
   }
