@@ -222,7 +222,6 @@ input[type="range"]{
   <button id="tab-create" class="active" onclick="openTab('create',this)">🎬 Criar</button>
   <button id="tab-avatar" onclick="openTab('avatar',this)">🗣️ Avatar <span class="kbd" style="margin-left:4px;background:#3b0764;border-color:#7c3aed;color:#e9d5ff">NOVO</span></button>
   <button id="tab-dub" onclick="openTab('dub',this)">🌍 Dublar</button>
-  <button id="tab-tiktok" onclick="openTab('tiktok',this)">🎵 TikTok <span class="kbd" style="margin-left:4px;background:#831843;border-color:#ec4899;color:#fce7f3">AUTO</span></button>
   <button id="tab-projects" onclick="openTab('projects',this)">📁 Projetos <span id="projCount" class="kbd" style="margin-left:4px">0</span></button>
 </div>
 
@@ -316,11 +315,6 @@ input[type="range"]{
       </div>
     </div>
 
-    <label style="display:flex;align-items:center;gap:9px;margin:10px 0 8px;padding:9px 12px;border-radius:10px;background:#161029;border:1px solid #db277766;cursor:pointer;font-size:12.5px;color:#fce7f3">
-      <input type="checkbox" class="tt-autopost-chk" onchange="syncTikTokAutopostChecks(this.checked)" style="width:17px;height:17px;accent-color:#ec4899;margin:0">
-      <span>🎵 <b>Auto-postar no TikTok automaticamente</b> assim que o vídeo terminar de renderizar (gera legenda viral + hashtags sozinho!)</span>
-    </label>
-
     <button class="primary" id="createFullVideoBtn" onclick="createAndBuildVideo()" style="font-size:15px;padding:15px">🎬 Criar Vídeo Completo (Narrador + Cenários + Personagens)</button>
     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
       <button class="ghost" id="createBtn" onclick="createVideo(false)" style="flex:1;min-width:180px">📝 Gerar só o roteiro primeiro</button>
@@ -359,7 +353,6 @@ input[type="range"]{
           <div id="createdVideoReadyBanner" style="font-weight:800;font-size:13.5px;color:#6ee7b7;margin-bottom:10px">✅ Vídeo conectado pronto! Assista abaixo ou clique para baixar no seu aparelho:</div>
           <video id="createdVideo" controls playsinline style="width:100%;max-height:480px;border-radius:10px;background:#000"></video>
           <button type="button" onclick="downloadCreatedVideo()" style="width:100%;margin-top:12px;padding:15px 18px;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;color:#042f2e;background:linear-gradient(135deg,#34d399,#10b981,#06b6d4);box-shadow:0 8px 26px rgba(16,185,129,.35)">⬇️ BAIXAR VÍDEO LISO 30 FPS (.MP4 GALERIA)</button>
-          <button type="button" onclick="quickPostSourceToTikTok('create')" style="width:100%;margin-top:8px;padding:13px 16px;border:none;border-radius:12px;font-size:14.5px;font-weight:800;cursor:pointer;color:#fff;background:linear-gradient(135deg,#f43f5e,#ec4899,#8b5cf6);box-shadow:0 6px 22px rgba(236,72,153,.32)">🎵 POSTAR AUTOMÁTICO NO TIKTOK AGORA (API / APP)</button>
           <button type="button" onclick="shareToGallery('create')" style="width:100%;margin-top:8px;padding:12px 16px;border:1.5px solid #38bdf8;border-radius:12px;font-size:14px;font-weight:800;cursor:pointer;color:#e0f2fe;background:#0f172a">📲 Salvar direto na Galeria / Enviar (Celular, WhatsApp, Reels)</button>
           <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
             <a id="createdVideoDl" class="ghost" download="video-cinema-dubai-pro.mp4" style="padding:8px 14px;text-decoration:none">💾 Link direto do vídeo</a>
@@ -509,11 +502,6 @@ input[type="range"]{
       </div>
     </div>
 
-    <label style="display:flex;align-items:center;gap:9px;margin:10px 0 8px;padding:9px 12px;border-radius:10px;background:#161029;border:1px solid #db277766;cursor:pointer;font-size:12.5px;color:#fce7f3">
-      <input type="checkbox" class="tt-autopost-chk" onchange="syncTikTokAutopostChecks(this.checked)" style="width:17px;height:17px;accent-color:#ec4899;margin:0">
-      <span>🎵 <b>Auto-postar no TikTok automaticamente</b> assim que o vídeo do Avatar terminar</span>
-    </label>
-
     <button class="primary" id="renderAvatarBtn" onclick="renderAvatarVideo()">🎬 Renderizar Vídeo do Avatar (MP4 / WebM)</button>
 
     <div class="progress-wrap" id="avatarProgress">
@@ -533,7 +521,6 @@ input[type="range"]{
         <div id="avatarResultTitle" style="font-weight:800;font-size:13.5px;color:#6ee7b7;margin-bottom:8px">✅ Vídeo do Avatar pronto!</div>
         <video id="avatarResultVideo" controls playsinline style="width:100%;max-height:460px;border-radius:10px;background:#000"></video>
         <button type="button" onclick="downloadAvatarVideo()" style="width:100%;margin-top:12px;padding:15px 18px;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;color:#042f2e;background:linear-gradient(135deg,#34d399,#10b981,#06b6d4);box-shadow:0 8px 26px rgba(16,185,129,.35)">⬇️ BAIXAR VÍDEO DO AVATAR LISO 30 FPS (.MP4 GALERIA)</button>
-        <button type="button" onclick="quickPostSourceToTikTok('avatar')" style="width:100%;margin-top:8px;padding:13px 16px;border:none;border-radius:12px;font-size:14.5px;font-weight:800;cursor:pointer;color:#fff;background:linear-gradient(135deg,#f43f5e,#ec4899,#8b5cf6);box-shadow:0 6px 22px rgba(236,72,153,.32)">🎵 POSTAR AUTOMÁTICO NO TIKTOK AGORA (API / APP)</button>
         <button type="button" onclick="shareToGallery('avatar')" style="width:100%;margin-top:8px;padding:12px 16px;border:1.5px solid #38bdf8;border-radius:12px;font-size:14px;font-weight:800;cursor:pointer;color:#e0f2fe;background:#0f172a">📲 Salvar direto na Galeria / Enviar (Celular, WhatsApp, Reels)</button>
         <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
           <a id="avatarVideoDl" class="ghost" download="avatar-dubai-pro.mp4" style="padding:9px 14px;text-decoration:none;border-color:#06b6d4;color:#a5f3fc">💾 Link direto do vídeo</a>
@@ -687,12 +674,7 @@ input[type="range"]{
       </div>
     </div>
 
-    <label style="display:flex;align-items:center;gap:9px;margin:12px 0 4px;padding:9px 12px;border-radius:10px;background:#161029;border:1px solid #db277766;cursor:pointer;font-size:12.5px;color:#fce7f3">
-      <input type="checkbox" class="tt-autopost-chk" onchange="syncTikTokAutopostChecks(this.checked)" style="width:17px;height:17px;accent-color:#ec4899;margin:0">
-      <span>🎵 <b>Auto-postar no TikTok automaticamente</b> assim que terminar de dublar (exporta o .MP4 + legenda viral e posta!)</span>
-    </label>
-
-    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
       <button class="primary" id="dubBtn" onclick="dubVideo()" style="flex:1;min-width:240px">🎙️ Dublar Vídeo Completo Agora (Pequeno ou Grande)</button>
       <button class="ghost hidden" type="button" id="dubStopBtn" onclick="requestStopDubbing()" style="border-color:#f59e0b;color:#fde68a">⏹️ Finalizar no ponto atual</button>
     </div>
@@ -712,6 +694,7 @@ input[type="range"]{
       <div style="background:linear-gradient(180deg,#0f172a,#090d16);border:1.5px solid #10b98188;border-radius:14px;padding:14px">
         <div id="dubTitle" style="font-weight:800;font-size:14px;color:#6ee7b7;margin-bottom:10px">✅ Dublagem concluída!</div>
         <div id="dubPlayerWrap" class="hidden" style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px">
+          <video id="dubSyncVideo" controls playsinline class="hidden" style="width:100%;max-height:460px;border-radius:10px;background:#000"></video>
           <audio id="dubAudio" controls style="width:100%"></audio>
           <video id="dubExportedVideo" controls playsinline class="hidden" style="width:100%;max-height:460px;border-radius:10px;background:#000"></video>
 
@@ -741,7 +724,6 @@ input[type="range"]{
           </div>
 
           <button type="button" id="dubMainDownloadBtn" onclick="downloadDubVideo()" style="width:100%;padding:15px 18px;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;color:#042f2e;background:linear-gradient(135deg,#34d399,#10b981,#06b6d4);box-shadow:0 8px 26px rgba(16,185,129,.35)">⬇️ GERAR E BAIXAR VÍDEO DUBLADO LISO (.MP4 GALERIA)</button>
-          <button type="button" onclick="quickPostSourceToTikTok('dub')" style="width:100%;padding:13px 16px;border:none;border-radius:12px;font-size:14.5px;font-weight:800;cursor:pointer;color:#fff;background:linear-gradient(135deg,#f43f5e,#ec4899,#8b5cf6);box-shadow:0 6px 22px rgba(236,72,153,.32)">🎵 POSTAR AUTOMÁTICO NO TIKTOK AGORA (API / APP)</button>
           <button type="button" onclick="shareToGallery('dub')" style="width:100%;padding:12px 16px;border:1.5px solid #38bdf8;border-radius:12px;font-size:14px;font-weight:800;cursor:pointer;color:#e0f2fe;background:#0f172a">📲 Salvar direto na Galeria / Enviar (Celular, WhatsApp, Reels)</button>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="primary" type="button" onclick="playDubbed()" style="padding:9px 14px">▶️ Assistir vídeo sincronizado agora (instantâneo)</button>
@@ -756,263 +738,6 @@ input[type="range"]{
           <button class="ghost" onclick="speakText(document.getElementById('dubScript').innerText)">🔊 Ouvir com Voz Humana Neural</button>
         </div>
       </div>
-    </div>
-  </div>
-</section>
-
-<!-- TIKTOK AUTO-POST STUDIO -->
-<section id="tiktok" class="hidden">
-  <!-- CARD 1: CONEXÃO OFICIAL TIKTOK API v2 + ASSISTENTE 2 MIN + VERIFICADOR DE DOMÍNIO -->
-  <div class="card" style="border-color:#ec489966">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-      <h2 style="margin:0">🎵 Central de Integração & Piloto Automático TikTok</h2>
-      <span id="ttAccountBadge" style="font-size:12px;font-weight:800;padding:5px 12px;border-radius:999px;background:#1e1b4b;border:1px solid #6366f188;color:#c7d2fe">⚡ Modo Rápido App TikTok Ativo</span>
-    </div>
-    <p style="margin-top:8px">Conecte sua conta via <b>API Oficial TikTok Content Posting v2 (developers.tiktok.com)</b> para publicar <b>100% automático</b> no seu perfil ou Caixa de Entrada do TikTok — ou gere vídeos verticais <b>9:16</b> virais completos já postando em 1 clique!</p>
-
-    <div id="ttConnectedProfileBox" class="hidden" style="margin-top:10px;padding:11px 14px;border-radius:11px;background:linear-gradient(90deg,#0f2922,#111827);border:1px solid #10b98188;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-      <div id="ttConnectedProfileInfo" style="font-size:13px;color:#d1fae5"></div>
-      <div style="display:flex;gap:6px">
-        <button class="ghost" type="button" onclick="verifyTikTokAccount()" style="font-size:12px;padding:6px 10px">🔄 Atualizar Perfil</button>
-        <button class="ghost" type="button" onclick="disconnectTikTokAccount()" style="font-size:12px;padding:6px 10px;border-color:#ef444488;color:#fca5a5">Desconectar</button>
-      </div>
-    </div>
-
-    <div style="margin-top:12px;padding:14px;border-radius:12px;background:#101327;border:1px solid #312e81">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
-        <div style="font-weight:800;font-size:13.5px;color:#fce7f3">🔑 Assistente Oficial TikTok API v2 (Passo a Passo de 2 Minutos)</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <a href="https://developers.tiktok.com/apps" target="_blank" rel="noopener" style="text-decoration:none;font-size:11.5px;font-weight:800;padding:6px 11px;border-radius:8px;background:#ec4899;color:#fff">🌐 1. Abrir developers.tiktok.com/apps ↗</a>
-          <button class="ghost" type="button" onclick="document.getElementById('ttGuideBox').classList.toggle('hidden')" style="font-size:11.5px;padding:5px 10px;border-color:#f472b688;color:#fbcfe8">📖 Mostrar / Ocultar Guia</button>
-        </div>
-      </div>
-
-      <div id="ttGuideBox" style="margin-top:10px;padding:12px 14px;border-radius:10px;background:#0a0d1c;border:1px solid #ec489955;font-size:12px;line-height:1.75;color:#e2e8f0">
-        <div style="color:#fbcfe8;font-weight:800;margin-bottom:6px">🚀 O jeito mais rápido (Funciona na hora com Modo Sandbox sem esperar revisão do TikTok!):</div>
-        <b>Passo 1:</b> Clique no botão rosa <b>Abrir developers.tiktok.com/apps</b> acima → faça login → clique em <b>Create an App</b> e, no topo da página do app, clique em <b>Create Sandbox</b> (ou configure direto no App).<br>
-        <b>Passo 2:</b> Em <b>Target Users</b> (no Sandbox), adicione o seu <b>@usuario</b> do TikTok. Ative os produtos <b>Login Kit</b> e <b>Content Posting API</b> (ative <code>user.info.basic</code>, <code>video.publish</code> e <code>video.upload</code>).<br>
-        <b>Passo 3:</b> Copie com 1 clique as <b>4 URLs Oficiais</b> abaixo e cole nos campos pedidos pelo TikTok:<br>
-
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:8px;margin:8px 0">
-          <div style="background:#111827;padding:8px 10px;border-radius:8px;border:1px solid #1e293b">
-            <div style="font-size:11px;color:#94a3b8;font-weight:700">🔗 Redirect URI (Login Kit — Obrigatório)</div>
-            <div style="display:flex;gap:6px;margin-top:4px">
-              <input id="ttRedirectUriDisplay" readonly style="flex:1;font-family:monospace;font-size:11px;padding:6px 8px;background:#090d16;color:#67e8f9" value="">
-              <button class="ghost" type="button" onclick="copyText(document.getElementById('ttRedirectUriDisplay').value)" style="font-size:11px;padding:5px 9px">📋 Copiar</button>
-            </div>
-          </div>
-          <div style="background:#111827;padding:8px 10px;border-radius:8px;border:1px solid #1e293b">
-            <div style="font-size:11px;color:#94a3b8;font-weight:700">🌐 Web / Desktop URL</div>
-            <div style="display:flex;gap:6px;margin-top:4px">
-              <input id="ttWebUrlDisplay" readonly style="flex:1;font-family:monospace;font-size:11px;padding:6px 8px;background:#090d16;color:#a5b4fc" value="">
-              <button class="ghost" type="button" onclick="copyText(document.getElementById('ttWebUrlDisplay').value)" style="font-size:11px;padding:5px 9px">📋 Copiar</button>
-            </div>
-          </div>
-          <div style="background:#111827;padding:8px 10px;border-radius:8px;border:1px solid #1e293b">
-            <div style="font-size:11px;color:#94a3b8;font-weight:700">📜 Terms of Service URL (Termos)</div>
-            <div style="display:flex;gap:6px;margin-top:4px">
-              <input id="ttTermsUrlDisplay" readonly style="flex:1;font-family:monospace;font-size:11px;padding:6px 8px;background:#090d16;color:#cbd5e1" value="">
-              <button class="ghost" type="button" onclick="copyText(document.getElementById('ttTermsUrlDisplay').value)" style="font-size:11px;padding:5px 9px">📋 Copiar</button>
-            </div>
-          </div>
-          <div style="background:#111827;padding:8px 10px;border-radius:8px;border:1px solid #1e293b">
-            <div style="font-size:11px;color:#94a3b8;font-weight:700">🔒 Privacy Policy URL (Privacidade)</div>
-            <div style="display:flex;gap:6px;margin-top:4px">
-              <input id="ttPrivacyUrlDisplay" readonly style="flex:1;font-family:monospace;font-size:11px;padding:6px 8px;background:#090d16;color:#cbd5e1" value="">
-              <button class="ghost" type="button" onclick="copyText(document.getElementById('ttPrivacyUrlDisplay').value)" style="font-size:11px;padding:5px 9px">📋 Copiar</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- VERIFICADOR AUTOMÁTICO DE DOMÍNIO TIKTOK -->
-        <div style="margin-top:8px;padding:9px 11px;border-radius:9px;background:#0f172a;border:1px dashed #38bdf888">
-          <div style="font-weight:800;color:#7dd3fc;font-size:11.5px">🛡️ O TikTok pediu "Verify Property" (URL Prefix)? Ative aqui em 1 clique:</div>
-          <div style="font-size:11px;color:#94a3b8;margin-top:2px">Se o TikTok pedir para verificar o domínio (aba <b>URL Prefix</b>), cole abaixo o código <code>tiktok-developers-site-verification=...</code> ou envie o arquivo <code>.txt</code> baixado do TikTok e clique em <b>Ativar Verificação</b>:</div>
-          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
-            <input id="ttSiteVerificationInput" placeholder="Cole: tiktok-developers-site-verification=XXXXXX..." style="flex:1;min-width:210px;font-size:11.5px;padding:7px 10px">
-            <button class="ghost" type="button" onclick="document.getElementById('ttVerifyTxtFile').click()" style="font-size:11px;padding:6px 10px">📄 Subir .txt do TikTok</button>
-            <input type="file" id="ttVerifyTxtFile" accept=".txt,text/plain" onchange="onUploadTikTokVerifyFile(this)" style="display:none">
-            <button type="button" onclick="saveTikTokDomainVerification()" style="padding:7px 12px;border:none;border-radius:8px;background:#0284c7;color:#fff;font-weight:800;font-size:11.5px;cursor:pointer">✅ Ativar Verificação</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="row" style="margin-top:10px">
-        <div>
-          <label style="margin-top:0">TikTok Client Key (do seu App / Sandbox)</label>
-          <input id="ttClientKey" value="mnpo08t7m256hkr7" placeholder="Ex: mnpo08t7m256hkr7" onchange="saveTikTokLocalSettings()">
-        </div>
-        <div>
-          <label style="margin-top:0">TikTok Client Secret (já salvo na Vercel ✅)</label>
-          <input id="ttClientSecret" type="password" placeholder="Já configurado na Vercel (opcional alterar)" onchange="saveTikTokLocalSettings()">
-        </div>
-        <div>
-          <label style="margin-top:0">Permissões OAuth solicitadas</label>
-          <select id="ttOAuthScopes" onchange="saveTikTokLocalSettings()">
-            <option value="user.info.basic,video.publish,video.upload" selected>✅ Completo (Direct Post + Caixa de Entrada)</option>
-            <option value="user.info.basic,video.publish">🚀 Apenas Direct Post (video.publish)</option>
-            <option value="user.info.basic,video.upload">📥 Apenas Caixa de Entrada / Inbox (video.upload)</option>
-            <option value="user.info.basic">👤 Apenas Login Básico (user.info.basic)</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="row">
-        <div>
-          <label style="margin-top:0">Access Token Direto (opcional — preenchido automaticamente no Login OAuth)</label>
-          <input id="ttManualToken" type="password" placeholder="act.xxxxx... (ou clique no botão Conectar Conta TikTok abaixo)" onchange="onManualTikTokTokenChange(this.value)">
-        </div>
-        <div>
-          <label style="margin-top:0">🔗 Webhook Automático Make / n8n / Zapier (opcional)</label>
-          <input id="ttWebhookUrl" placeholder="https://hook.us1.make.com/..." onchange="saveTikTokLocalSettings()">
-        </div>
-      </div>
-
-      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-        <button type="button" onclick="startTikTokOAuthLogin(false)" style="padding:12px 18px;border:none;border-radius:10px;font-weight:800;font-size:13.5px;cursor:pointer;color:#fff;background:linear-gradient(135deg,#f43f5e,#ec4899,#8b5cf6);box-shadow:0 6px 20px rgba(236,72,153,.35)">🔗 Salvar Chaves & Conectar Conta TikTok Oficial (OAuth 2.0)</button>
-        <button class="ghost" type="button" onclick="verifyTikTokAccount()" style="font-size:12.5px">🩺 Testar Conexão API TikTok</button>
-      </div>
-
-      <!-- DIAGNÓSTICO DE ERRO client_key NO TIKTOK -->
-      <div id="ttKeyDiagBox" style="margin-top:10px;padding:11px 13px;border-radius:10px;background:#1c1124;border:1px solid #f43f5e88;font-size:12px;line-height:1.65;color:#fecdd3">
-        <b>💡 Apareceu "corrija o seguinte: • client_key" na tela do TikTok? Veja os 3 motivos exatos:</b><br>
-        1️⃣ <b>Chave de Rascunho vs. Sandbox:</b> Se o seu app no <code>developers.tiktok.com</code> está em <i>Draft (Rascunho)</i>, o TikTok bloqueia o <code>Client Key</code> normal até ser revisado! Para funcionar <b>na hora sem revisão</b>, clique no botão <b>"Create Sandbox"</b> no topo do painel do TikTok e copie o <b>Client Key de dentro do Sandbox</b> (geralmente começa com <code>sbaw...</code>).<br>
-        2️⃣ <b>Faltou clicar em "Save" no Login Kit:</b> Dentro do Sandbox, vá em <b>Products → Login Kit</b>, marque a opção <b>Web</b>, cole a Redirect URI <code>https://dubai-pro.vercel.app/api/tiktok</code> e clique no botão <b>Save (Salvar)</b> no canto inferior direito + adicione seu <code>@usuario</code> em <b>Target Users</b>.<br>
-        3️⃣ <b>App ID vs. Client Key:</b> Não cole o <i>App ID</i> (que tem apenas números); copie o campo <b>Client Key</b> (letras e números).<br>
-        <div style="margin-top:6px;color:#a7f3d0;font-weight:700">📲 <b>Quer postar agora no celular sem precisar de Client Key?</b> Use o card <b>⚡ Fábrica 1-Clique 9:16</b> logo abaixo — no celular Android/iPhone ele já envia o vídeo <code>.MP4</code> + legenda viral direto para o seu App TikTok instalado sem precisar de conta de desenvolvedor!</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- CARD NOVO: FÁBRICA AUTOMÁTICA 1-CLIQUE DE VÍDEO VIRAL 9:16 + AUTO-POST -->
-  <div class="card" style="border-color:#a855f766;background:linear-gradient(180deg,#121329,#0d1021)">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
-      <h3 style="margin:0">⚡ Fábrica 1-Clique: Gerar Vídeo Vertical 9:16 + Postar no TikTok</h3>
-      <button class="ghost" type="button" onclick="pickRandomViralTikTokTopic()" style="font-size:11.5px;padding:5px 11px;border-color:#f472b688;color:#fbcfe8">🎲 Sortear Ideia Viral em Alta</button>
-    </div>
-    <p style="margin-top:6px;font-size:12.5px;color:#cbd5e1">Não tem um vídeo pronto agora? Digite apenas um tema abaixo: a IA cria o roteiro hipnótico de retenção, grava a <b>Voz Humana Neural HD</b>, renderiza o vídeo vertical <b>9:16 (.MP4 Fast-Start)</b> com legendas dinâmicas estilo TikTok e <b>publica automaticamente</b>!</p>
-
-    <label style="margin-top:8px">🔥 Tema ou gancho do vídeo TikTok 9:16</label>
-    <input id="ttAutoFactoryTopic" placeholder="Ex: 3 segredos psicológicos que fazem qualquer pessoa respeitar você imediatamente" value="3 segredos da mente de alto desempenho que 99% das pessoas descobrem tarde demais">
-
-    <div class="row">
-      <div>
-        <label>🗣️ Voz Humana Neural HD</label>
-        <select id="ttAutoFactoryVoice">
-          <option value="onyx" selected>🎙️ Antônio HD — Masculina Cinematográfica (PT-BR)</option>
-          <option value="nova">🎙️ Francisca HD — Feminina Natural & Calorosa (PT-BR)</option>
-          <option value="shimmer">🎙️ Thalita HD — Feminina Jovem & Dinâmica (PT-BR)</option>
-          <option value="echo">🎙️ Brian HD — Narrador Épico (Multilíngue)</option>
-          <option value="alloy">🎙️ Ava HD — Apresentadora Clara (Multilíngue)</option>
-        </select>
-      </div>
-      <div>
-        <label>⏱️ Duração do Short/TikTok</label>
-        <select id="ttAutoFactoryDuration">
-          <option value="18">⚡ 18 segundos (Ultra Rápido / Loop Viral)</option>
-          <option value="28" selected>🔥 28 segundos (Retenção Ideal For You)</option>
-          <option value="45">🎬 45 segundos (Storytelling Completo)</option>
-          <option value="62">💰 62 segundos (Monetização Creativity Program 1m+)</option>
-        </select>
-      </div>
-      <div>
-        <label>🎨 Estilo Visual Vertical 9:16</label>
-        <select id="ttAutoFactoryTheme">
-          <option value="cyber" selected>🌆 Neon Cyberpunk & Partículas</option>
-          <option value="gold">👑 Luxo Dourado & Alta Performance</option>
-          <option value="dark">🕵️ Misterioso Dark & Curiosidades</option>
-          <option value="emerald">🚀 Tech Esmeralda & Futuro IA</option>
-        </select>
-      </div>
-    </div>
-
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
-      <button type="button" id="ttFactoryAutoPostBtn" onclick="generateAndAutoPostVerticalTikTok(true)" style="flex:1.5;min-width:240px;padding:13px 16px;border:none;border-radius:11px;font-weight:800;font-size:13.5px;cursor:pointer;color:#fff;background:linear-gradient(135deg,#a855f7,#ec4899,#f43f5e);box-shadow:0 6px 22px rgba(168,85,247,.35)">🚀 GERAR VÍDEO 9:16 + PUBLICAR NO TIKTOK AGORA</button>
-      <button class="ghost" type="button" id="ttFactoryOnlyGenBtn" onclick="generateAndAutoPostVerticalTikTok(false)" style="flex:1;min-width:190px;padding:12px 14px;border-color:#c084fc88;color:#f3e8ff;font-weight:800">🎬 Apenas Gerar Vídeo 9:16 (Ver Prévia)</button>
-    </div>
-  </div>
-
-  <!-- CARD 2: PUBLICADOR + IA DE LEGENDA VIRAL + AGENDADOR -->
-  <div class="card">
-    <h3>🚀 Publicar ou Agendar Vídeo no TikTok</h3>
-
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-      <button class="ghost" type="button" onclick="document.getElementById('ttVideoFileInput').click()" style="border-color:#ec489988;color:#fce7f3">📂 Escolher vídeo do Celular / PC (.MP4, .MOV, .WEBM)</button>
-      <input type="file" id="ttVideoFileInput" accept="video/*,.mp4,.mov,.webm" onchange="onPickTikTokFile(this)" style="display:none">
-      <button class="ghost" type="button" onclick="loadExistingStudioVideoForTikTok('dub')">🌍 Puxar Última Dublagem</button>
-      <button class="ghost" type="button" onclick="loadExistingStudioVideoForTikTok('create')">🎬 Puxar Último Vídeo Criado</button>
-      <button class="ghost" type="button" onclick="loadExistingStudioVideoForTikTok('avatar')">🗣️ Puxar Último Avatar</button>
-    </div>
-
-    <div id="ttSelectedVideoInfo" class="hint" style="margin-top:8px;padding:9px 12px;border-radius:9px;background:#0e1528;border:1px solid #1e293b">
-      📹 Nenhum vídeo selecionado ainda — suba um arquivo acima ou clique em <b>🎵 Postar Automático no TikTok</b> em qualquer vídeo criado ou dublado!
-    </div>
-    <video id="ttPreviewVideo" controls playsinline class="hidden" style="width:100%;max-height:380px;margin-top:10px;border-radius:10px;background:#000"></video>
-
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:12px">
-      <label style="margin:0">📝 Legenda Viral + Gancho + Hashtags TikTok (<span id="ttCaptionLen">0</span>/2200)</label>
-      <div style="display:flex;gap:6px">
-        <button class="ghost" type="button" id="ttAiCaptionBtn" onclick="generateViralTikTokCaptionUI()" style="font-size:12px;padding:5px 11px;border-color:#a855f7;color:#e9d5ff">✨ Gerar Legenda & Hashtags Virais com IA</button>
-        <button class="ghost" type="button" onclick="copyText(document.getElementById('ttCaption').value)" style="font-size:12px;padding:5px 10px">📋 Copiar</button>
-      </div>
-    </div>
-    <textarea id="ttCaption" rows="4" maxlength="2200" oninput="document.getElementById('ttCaptionLen').textContent=this.value.length" placeholder="Ex: 🔥 Ninguém te contou isso antes! Assista até o final e comenta o que achou 👇 #fyp #foryou #viral #tiktokbrasil"></textarea>
-
-    <div class="row">
-      <div>
-        <label>Modo de publicação</label>
-        <select id="ttPublishMode">
-          <option value="auto" selected>🤖 Automático Inteligente (API Direta → Webhook → App 1-Toque)</option>
-          <option value="direct">🚀 API Oficial TikTok — Publicar Direto no Perfil</option>
-          <option value="inbox">📥 API Oficial TikTok — Enviar p/ Caixa de Entrada do App</option>
-          <option value="webhook">🔗 Webhook Automático (Make / n8n / Zapier)</option>
-          <option value="app_share">📲 Enviar Direto pro App TikTok / TikTok Studio (Sem Chave)</option>
-        </select>
-      </div>
-      <div>
-        <label>Privacidade no TikTok</label>
-        <select id="ttPrivacy">
-          <option value="PUBLIC_TO_EVERYONE" selected>🌍 Público (Para Todos / For You)</option>
-          <option value="MUTUAL_FOLLOW_FRIENDS">👥 Amigos Mútuos</option>
-          <option value="FOLLOWER_OF_CREATOR">👤 Apenas Seguidores</option>
-          <option value="SELF_ONLY">🔒 Privado (Só Eu / Teste)</option>
-        </select>
-      </div>
-      <div>
-        <label>Quando publicar</label>
-        <select id="ttScheduleMode" onchange="document.getElementById('ttScheduleRow').classList.toggle('hidden', this.value!=='scheduled')">
-          <option value="now" selected>⚡ Postar Imediatamente Agora</option>
-          <option value="scheduled">⏰ Agendar Horário Automático</option>
-        </select>
-      </div>
-    </div>
-
-    <div id="ttScheduleRow" class="hidden" style="margin-top:8px;padding:10px 12px;border-radius:10px;background:#11172d;border:1px solid #38bdf866">
-      <label style="margin-top:0">📅 Data e hora exata para disparar a postagem automática (mantenha esta aba aberta):</label>
-      <input type="datetime-local" id="ttScheduleTime">
-    </div>
-
-    <div style="display:flex;gap:14px;flex-wrap:wrap;margin:12px 0;font-size:12.5px;color:#cbd5e1">
-      <label style="display:flex;align-items:center;gap:6px;margin:0;cursor:pointer"><input type="checkbox" id="ttAllowComment" checked style="width:15px;height:15px;margin:0"> 💬 Comentários</label>
-      <label style="display:flex;align-items:center;gap:6px;margin:0;cursor:pointer"><input type="checkbox" id="ttAllowDuet" checked style="width:15px;height:15px;margin:0"> 🎭 Dueto</label>
-      <label style="display:flex;align-items:center;gap:6px;margin:0;cursor:pointer"><input type="checkbox" id="ttAllowStitch" checked style="width:15px;height:15px;margin:0"> ✂️ Costurar (Stitch)</label>
-      <label style="display:flex;align-items:center;gap:6px;margin:0;cursor:pointer"><input type="checkbox" id="ttIsAigc" checked style="width:15px;height:15px;margin:0"> 🤖 Rótulo Conteúdo IA</label>
-    </div>
-
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button type="button" id="ttPublishBtn" onclick="publishOrScheduleTikTok()" style="flex:1.5;min-width:230px;padding:15px 18px;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;color:#fff;background:linear-gradient(135deg,#f43f5e,#ec4899,#8b5cf6);box-shadow:0 8px 26px rgba(236,72,153,.35)">🎵 PUBLICAR NO TIKTOK AGORA</button>
-      <button type="button" onclick="shareDirectToTikTokApp()" style="flex:1;min-width:200px;padding:14px 16px;border:1.5px solid #22d3ee;border-radius:12px;font-size:13.5px;font-weight:800;cursor:pointer;color:#ecfeff;background:#0f172a">📲 Abrir Direto no App TikTok (1-Toque)</button>
-    </div>
-
-    <div class="progress-wrap" id="ttProgress" style="margin-top:12px">
-      <div class="progress-bar"><div class="progress-fill" id="ttProgressFill"></div></div>
-    </div>
-    <div class="status" id="ttStatus"></div>
-
-    <!-- FILA AGENDADA + HISTÓRICO -->
-    <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
-      <div style="font-weight:800;font-size:13px;color:#e2e8f0;margin-bottom:8px">📜 Fila Agendada & Histórico de Postagens TikTok</div>
-      <div id="ttHistoryList" style="display:flex;flex-direction:column;gap:8px;font-size:12.5px;color:#94a3b8">Nenhuma postagem realizada ainda nesta sessão.</div>
     </div>
   </div>
 </section>
@@ -1227,13 +952,18 @@ function previewVideo(overrideFile){
   if(!file) return;
   currentDubFile = file;
   lastDubVideoBlob = null;
+  stopDubSyncPreview();
   const expV = document.getElementById('dubExportedVideo');
   if(expV){ expV.classList.add('hidden'); expV.src=''; }
+  const syncV = document.getElementById('dubSyncVideo');
+  if(syncV){ syncV.classList.add('hidden'); syncV.src=''; }
 
   if(previewUrl) URL.revokeObjectURL(previewUrl);
   previewUrl = URL.createObjectURL(file); // Zero cópia em RAM — funciona até com arquivos de 2GB+!
   const isAudio = file.type.startsWith('audio/') || /\.(mp3|wav|m4a|ogg|flac|aac)$/i.test(file.name);
   const v = $('#preview'), a = $('#audioPreview');
+  v.muted = false;
+  v.playbackRate = 1;
   const metaBox = document.getElementById('dubFileMeta');
   if(metaBox){
     metaBox.classList.remove('hidden');
@@ -2016,9 +1746,77 @@ function remixDubBackgroundInstant(){
     aud.currentTime = prevTime;
     if(wasPlaying) aud.play().catch(()=>{});
   }
+  bindSmoothDubSync();
   const dlLink = document.getElementById('dubDownload');
   if(dlLink) dlLink.href = dubAudioURL;
   toast('🎚️ Novo som de fundo aplicado na hora! Pode ouvir ou baixar o .MP4.');
+}
+
+// Remove silêncio morto no início e no fim do áudio TTS (elimina o delay de 150ms–400ms antes da 1ª sílaba!)
+function stripVoiceEdgeSilence(samples, sr){
+  if(!samples || samples.length < Math.floor(sr * 0.08)) return samples;
+  const win = Math.max(64, Math.floor(sr * 0.01)); // janelas de 10ms
+  let peakRms = 0;
+  for(let i = 0; i + win <= samples.length; i += win){
+    let sum = 0;
+    for(let j = 0; j < win; j++){ const v = samples[i + j]; sum += v * v; }
+    const rms = Math.sqrt(sum / win);
+    if(rms > peakRms) peakRms = rms;
+  }
+  if(peakRms < 0.005) return samples;
+  const thresh = Math.max(0.007, peakRms * 0.06);
+
+  let startIdx = 0;
+  for(let i = 0; i + win <= samples.length; i += win){
+    let sum = 0;
+    for(let j = 0; j < win; j++){ const v = samples[i + j]; sum += v * v; }
+    if(Math.sqrt(sum / win) >= thresh){
+      startIdx = Math.max(0, i - Math.floor(sr * 0.015)); // preserva 15ms de ataque natural
+      break;
+    }
+  }
+
+  let endIdx = samples.length;
+  for(let i = samples.length - win; i >= startIdx; i -= win){
+    let sum = 0;
+    for(let j = 0; j < win; j++){ const v = samples[i + j]; sum += v * v; }
+    if(Math.sqrt(sum / win) >= thresh){
+      endIdx = Math.min(samples.length, i + win + Math.floor(sr * 0.025)); // preserva 25ms de cauda natural
+      break;
+    }
+  }
+  return (startIdx > 0 || endIdx < samples.length) ? samples.subarray(startIdx, endIdx) : samples;
+}
+
+// Detecta o instante exato em que a fala começa dentro do bloco original (evita que a voz dublada entre adiantada ou atrasada!)
+function detectOrigSpeechStartOffset(origMono12k, chunkStartSec, chunkEndSec){
+  if(!origMono12k || !origMono12k.length) return 0;
+  const sr = 12000;
+  const s0 = Math.max(0, Math.floor(chunkStartSec * sr));
+  const s1 = Math.min(origMono12k.length, Math.floor(chunkEndSec * sr));
+  if(s1 - s0 < Math.floor(sr * 0.25)) return 0;
+
+  const win = 240; // 20ms @ 12kHz
+  const rmsList = [];
+  let minRms = Infinity, maxRms = 0;
+  for(let i = s0; i + win <= s1; i += win){
+    let sum = 0;
+    for(let j = 0; j < win; j++){ const v = origMono12k[i + j]; sum += v * v; }
+    const r = Math.sqrt(sum / win);
+    rmsList.push(r);
+    if(r < minRms) minRms = r;
+    if(r > maxRms) maxRms = r;
+  }
+  if(maxRms < 0.012 || rmsList.length < 4) return 0;
+  const voiceThresh = Math.max(0.014, minRms * 2.2, maxRms * 0.16);
+  for(let k = 0; k < rmsList.length; k++){
+    if(rmsList[k] >= voiceThresh){
+      const offsetSec = Math.max(0, (k * win) / sr - 0.02);
+      const maxAllowedOffset = Math.min(3.2, (chunkEndSec - chunkStartSec) * 0.40);
+      return Math.min(offsetSec, maxAllowedOffset);
+    }
+  }
+  return 0;
 }
 
 // Monta o Áudio Master 24kHz sincronizado do segundo 0:00 até o fim do vídeo (com timbre humano 100% preservado!)
@@ -2043,12 +1841,17 @@ function assembleDubbedMasterAudio({ chunkOutputs, totalDurationSec, origMono12k
     const seg = chunkOutputs[i];
     if(!seg || !seg.decodedSamples || !seg.decodedSamples.length) continue;
     const nextStart = (i + 1 < chunkOutputs.length) ? chunkOutputs[i + 1].startSec : totalDurationSec;
-    const maxWindowSec = Math.max(0.5, nextStart - seg.startSec);
 
-    // Converte da taxa nativa do decoder para 24kHz exatos (mesma duração, timbre 100% intacto!)
+    // Detecta o início exato da fala no áudio original deste bloco (zero delay labial!)
+    const speechOnsetOffset = detectOrigSpeechStartOffset(origMono12k, seg.startSec, seg.endSec || nextStart);
+    const effectiveStartSec = Math.min(nextStart - 0.3, seg.startSec + speechOnsetOffset);
+    const maxWindowSec = Math.max(0.4, nextStart - effectiveStartSec);
+
+    // Converte da taxa nativa do decoder para 24kHz exatos e remove silêncio morto do TTS
     let voice24k = seg.sampleRate === SR
       ? seg.decodedSamples
       : resampleChannelLinear(seg.decodedSamples, Math.round(seg.decodedSamples.length * (SR / seg.sampleRate)));
+    voice24k = stripVoiceEdgeSilence(voice24k, SR);
 
     // Se a fala traduzida ficou um pouco mais comprida que a janela original:
     // 1º enxuga pausas mortas entre frases; 2º usa WSOLA preservando 100% do grave/timbre humano natural!
@@ -2060,7 +1863,7 @@ function assembleDubbedMasterAudio({ chunkOutputs, totalDurationSec, origMono12k
       voice24k = timeStretchPreservePitch(voice24k, SR, maxSamplesAllowed);
     }
 
-    const offset = Math.max(0, Math.floor(seg.startSec * SR));
+    const offset = Math.max(0, Math.floor(effectiveStartSec * SR));
     const fade = Math.min(360, Math.floor(voice24k.length * 0.05));
     for(let s = 0; s < voice24k.length && (offset + s) < totalSamples; s++){
       let env = 1;
@@ -2069,7 +1872,8 @@ function assembleDubbedMasterAudio({ chunkOutputs, totalDurationSec, origMono12k
       master[offset + s] += voice24k[s] * env;
       speechMask[offset + s] = 1;
     }
-    seg.actualEndSec = Math.min(totalDurationSec, seg.startSec + (voice24k.length / SR));
+    seg.effectiveStartSec = effectiveStartSec;
+    seg.actualEndSec = Math.min(totalDurationSec, effectiveStartSec + (voice24k.length / SR));
   }
 
   // Mixa som ambiente original + Trilha/Som de Fundo Leve com Sidechain Auto-Ducking de Estúdio!
@@ -2111,23 +1915,157 @@ function assembleDubbedMasterAudio({ chunkOutputs, totalDurationSec, origMono12k
 }
 
 let dubAudioURL=null;
-function playDubbed(){
-  const v=document.getElementById('preview');
-  const a=document.getElementById('dubAudio');
-  if(!dubAudioURL) return;
-  if(v && !v.hidden && v.src){
+let activeDubSyncVideoEl=null;
+
+function stopDubSyncPreview(){
+  const a = document.getElementById('dubAudio');
+  const v1 = document.getElementById('preview');
+  const v2 = document.getElementById('dubSyncVideo');
+  if(a){
+    try{ a.pause(); a.playbackRate = 1; }catch(e){}
+    a.onplay = null; a.onpause = null; a.onseeking = null;
+  }
+  [v1, v2].forEach(v => {
+    if(!v) return;
+    v.onplay = null; v.onplaying = null; v.onpause = null;
+    v.onwaiting = null; v.onseeking = null; v.onseeked = null;
+    v.ontimeupdate = null; v.onended = null;
+    try{ v.playbackRate = 1; }catch(e){}
+  });
+  activeDubSyncVideoEl = null;
+}
+
+// Sincronizador Hardware-Smooth Zero-Engasgo:
+// O vídeo roda 100% livre em playbackRate=1.0 (zero seek no vídeo, zero engasgo de decodificador!)
+// enquanto o áudio WAV em RAM segue o relógio do vídeo com micro-ajuste suave de pitch-preserved playbackRate!
+function bindSmoothDubSync(){
+  const a = document.getElementById('dubAudio');
+  const vTop = document.getElementById('preview');
+  const vRes = document.getElementById('dubSyncVideo');
+  if(!a || !dubAudioURL) return;
+
+  a.preservesPitch = true;
+  a.mozPreservesPitch = true;
+  a.webkitPreservesPitch = true;
+
+  const videos = [vRes, vTop].filter(v => v && !v.hidden && !v.classList.contains('hidden') && v.src);
+  videos.forEach(v => {
     v.muted = true;
+    v.playbackRate = 1;
+
+    const syncAudioToVideoNow = () => {
+      if(!dubAudioURL) return;
+      activeDubSyncVideoEl = v;
+      // Pausa o outro player de vídeo caso estivesse aberto
+      videos.forEach(other => { if(other !== v && !other.paused) try{ other.pause(); }catch(e){} });
+      v.muted = true;
+      v.playbackRate = 1;
+      if(v.seeking || v.readyState < 2) return;
+      const targetT = Math.min(a.duration || v.currentTime || 0, Math.max(0, v.currentTime || 0));
+      if(Math.abs((a.currentTime || 0) - targetT) > 0.08){
+        try{ a.currentTime = targetT; }catch(e){}
+      }
+      a.playbackRate = 1;
+      if(a.paused && !v.paused){
+        a.play().catch(()=>{});
+      }
+    };
+
+    v.onplay = () => {
+      activeDubSyncVideoEl = v;
+      v.muted = true;
+      v.playbackRate = 1;
+      if(v.readyState >= 3 && !v.seeking) syncAudioToVideoNow();
+    };
+    v.onplaying = () => syncAudioToVideoNow();
+    v.onwaiting = () => {
+      if(activeDubSyncVideoEl === v && !a.paused){
+        try{ a.pause(); a.playbackRate = 1; }catch(e){}
+      }
+    };
+    v.onpause = () => {
+      if(activeDubSyncVideoEl === v && !a.paused){
+        try{ a.pause(); a.playbackRate = 1; }catch(e){}
+      }
+    };
+    v.onseeking = () => {
+      if(activeDubSyncVideoEl === v && !a.paused){
+        try{ a.pause(); a.playbackRate = 1; }catch(e){}
+      }
+    };
+    v.onseeked = () => {
+      if(activeDubSyncVideoEl === v){
+        const targetT = Math.min(a.duration || v.currentTime || 0, Math.max(0, v.currentTime || 0));
+        try{ a.currentTime = targetT; a.playbackRate = 1; }catch(e){}
+        if(!v.paused) a.play().catch(()=>{});
+      }
+    };
+    v.onended = () => {
+      if(activeDubSyncVideoEl === v){
+        try{ a.pause(); a.playbackRate = 1; }catch(e){}
+      }
+    };
+    v.ontimeupdate = () => {
+      if(activeDubSyncVideoEl !== v || v.paused || v.seeking || v.readyState < 3) return;
+      if(a.paused){
+        a.play().catch(()=>{});
+        return;
+      }
+      const drift = v.currentTime - a.currentTime;
+      // NUNCA faz seek (a.currentTime = ...) para pequenos desvios! Faz micro-lock suave sem corte no som:
+      if(Math.abs(drift) > 0.95){
+        try{ a.currentTime = v.currentTime; a.playbackRate = 1; }catch(e){}
+      } else if(Math.abs(drift) > 0.04){
+        const rate = Math.max(0.94, Math.min(1.06, 1 + drift * 0.38));
+        if(Math.abs(a.playbackRate - rate) > 0.008){
+          try{ a.playbackRate = rate; }catch(e){}
+        }
+      } else if(a.playbackRate !== 1){
+        try{ a.playbackRate = 1; }catch(e){}
+      }
+    };
+  });
+
+  // Se o usuário apertar Play na barra de áudio #dubAudio, inicia o vídeo sincronizado junto!
+  a.onplay = () => {
+    const targetV = (vRes && !vRes.classList.contains('hidden') && vRes.src) ? vRes : vTop;
+    if(targetV && !targetV.hidden && targetV.src && targetV.paused){
+      activeDubSyncVideoEl = targetV;
+      targetV.muted = true;
+      targetV.playbackRate = 1;
+      if(Math.abs((targetV.currentTime || 0) - (a.currentTime || 0)) > 0.15){
+        try{ targetV.currentTime = a.currentTime || 0; }catch(e){}
+      }
+      targetV.play().catch(()=>{});
+    }
+  };
+}
+
+function playDubbed(){
+  const vRes = document.getElementById('dubSyncVideo');
+  const vTop = document.getElementById('preview');
+  const a = document.getElementById('dubAudio');
+  if(!dubAudioURL) return;
+  bindSmoothDubSync();
+  const v = (vRes && !vRes.classList.contains('hidden') && vRes.src) ? vRes : vTop;
+  if(v && !v.hidden && v.src){
+    activeDubSyncVideoEl = v;
+    v.muted = true;
+    v.playbackRate = 1;
     const startAt = lastDubChunksTimeline.length ? (lastDubChunksTimeline[0].startSec || 0) : 0;
-    v.currentTime = startAt;
-    a.currentTime = startAt;
-    v.play().catch(()=>{});
-    a.play().catch(()=>{});
-    v.onplay = () => { if(a.paused) a.play().catch(()=>{}); };
-    v.onpause = () => { if(!a.paused) a.pause(); };
-    v.onseeking = () => { if(Math.abs(a.currentTime - v.currentTime) > 0.25) a.currentTime = v.currentTime; };
-    v.ontimeupdate = () => { if(!v.paused && Math.abs(a.currentTime - v.currentTime) > 0.30) a.currentTime = v.currentTime; };
+    try{ a.pause(); a.currentTime = startAt; a.playbackRate = 1; }catch(e){}
+    const startPlayback = () => {
+      v.removeEventListener('seeked', startPlayback);
+      v.play().catch(()=>{});
+    };
+    if(Math.abs((v.currentTime || 0) - startAt) > 0.08){
+      v.addEventListener('seeked', startPlayback, { once: true });
+      try{ v.currentTime = startAt; }catch(e){ startPlayback(); }
+    } else {
+      startPlayback();
+    }
     v.scrollIntoView({ behavior:'smooth', block:'center' });
-  } else {
+  } else if(a){
     a.currentTime = 0;
     a.play().catch(()=>{});
   }
@@ -2139,10 +2077,11 @@ function downloadDubSRT(){
   for(const seg of lastDubChunksTimeline){
     const txt = String(seg.translation || '').trim();
     if(!txt) continue;
-    const endS = seg.actualEndSec || seg.endSec || (seg.startSec + 4);
-    const localCues = buildTimedCaptions(txt, Math.max(0.8, endS - seg.startSec));
+    const startS = seg.effectiveStartSec ?? seg.startSec ?? 0;
+    const endS = seg.actualEndSec || seg.endSec || (startS + 4);
+    const localCues = buildTimedCaptions(txt, Math.max(0.8, endS - startS));
     for(const c of localCues){
-      srt += `${n}\n${fmtSRT(seg.startSec + c.start)} --> ${fmtSRT(seg.startSec + c.end)}\n${c.text}\n\n`;
+      srt += `${n}\n${fmtSRT(startS + c.start)} --> ${fmtSRT(startS + c.end)}\n${c.text}\n\n`;
       n++;
     }
   }
@@ -2311,9 +2250,12 @@ async function dubVideo(){
     lastDubTotalDuration = Math.max(plan.totalFileDuration, plan.effEnd);
 
     if(dubAudioURL){ URL.revokeObjectURL(dubAudioURL); dubAudioURL = null; }
+    stopDubSyncPreview();
     const wrap = document.getElementById('dubPlayerWrap');
 
     if(anyRealVoice || chunkOutputs.some(c => c.silent)){
+      // Libera thread de UI antes da montagem de áudio para zero travamento na tela
+      await new Promise(r => setTimeout(r, 15));
       const master = assembleDubbedMasterAudio({
         chunkOutputs,
         totalDurationSec: lastDubTotalDuration,
@@ -2323,12 +2265,28 @@ async function dubVideo(){
       lastDubMasterBuffer = master.audioBuffer;
       lastDubAudioBlob = master.wavBlob;
       dubAudioURL = URL.createObjectURL(master.wavBlob);
-      document.getElementById('dubAudio').src = dubAudioURL;
+      const audEl = document.getElementById('dubAudio');
+      audEl.src = dubAudioURL;
+      audEl.load();
+
+      // Configura o player de vídeo sincronizado direto dentro do card de resultado (zero engasgo e zero delay!)
+      const vTop = document.getElementById('preview');
+      const vRes = document.getElementById('dubSyncVideo');
+      if(vTop && !vTop.hidden && vTop.src && vRes){
+        vRes.src = vTop.src;
+        vRes.muted = true;
+        vRes.playbackRate = 1;
+        vRes.classList.remove('hidden');
+      } else if(vRes){
+        vRes.classList.add('hidden');
+      }
+
       const dlLink = document.getElementById('dubDownload');
       const slug = file.name.replace(/\.[^.]+$/, '').replace(/[^a-z0-9_-]+/gi, '-').slice(0, 40) || 'video';
       dlLink.href = dubAudioURL;
       dlLink.download = `${slug}-dublado-${targetLanguage}.wav`;
       wrap.classList.remove('hidden');
+      bindSmoothDubSync();
       const mainBtn = document.getElementById('dubMainDownloadBtn');
       if(mainBtn) mainBtn.textContent = `⬇️ GERAR E BAIXAR VÍDEO DUBLADO COMPLETO (.MP4 / .WEBM • ${fmtClockSec(lastDubTotalDuration)})`;
       document.getElementById('dubTitle').textContent =
@@ -2369,16 +2327,9 @@ async function dubVideo(){
     await loadProjects();
 
     setProgress('dubProgressFill', 100);
-    showStatus('dubStatus', `✅ Vídeo dublado com sucesso do início ao fim (${chunkOutputs.length} ${chunkOutputs.length > 1 ? 'blocos' : 'bloco'} • ${fmtClockSec(lastDubTotalDuration)})! Assista ou clique no botão verde abaixo para baixar.`, 'success');
+    showStatus('dubStatus', `✅ Vídeo dublado com sucesso do início ao fim (${chunkOutputs.length} ${chunkOutputs.length > 1 ? 'blocos' : 'bloco'} • ${fmtClockSec(lastDubTotalDuration)})! Dê Play no vídeo sincronizado abaixo ou clique no botão verde para baixar.`, 'success');
     toast('✅ Dublagem pronta! Clique para assistir ou baixar o vídeo!');
     setTimeout(() => document.getElementById('dubResult').scrollIntoView({ behavior:'smooth', block:'center' }), 200);
-    if(isTikTokAutopostEnabled()){
-      showStatus('dubStatus', '🎵 Auto-Post TikTok ativo: gerando vídeo .MP4 dublado + legenda viral e enviando ao TikTok automaticamente...', 'info');
-      await downloadDubVideo({ silentExport: true });
-      if(lastDubVideoBlob){
-        await autoPostFinishedVideoToTikTok('dub', lastDubVideoBlob, lastDubVideoFilename, fullTranslation || transcriptSummary);
-      }
-    }
   }catch(e){
     showStatus('dubStatus','❌ '+e.message,'error');
     toast('Erro na dublagem: '+e.message,'error');
@@ -2652,50 +2603,117 @@ async function encodeSmoothMp4WithWebCodecs({drawFn, audioBuffer, width=1280, he
       }
     }
   } else {
-    // MODO B: Captura fluida de vídeo nativo (Dublagem) — sem seek forçado, reprodução natural contínua!
+    // MODO B: Captura fluida de vídeo nativo (Dublagem) com requestVideoFrameCallback + timestamps reais por frame (zero engasgo e zero delay!)
     const primaryVid = alsoPlay[0];
     for(const m of alsoPlay){
       m.muted = true;
       m.playbackRate = 1;
       await new Promise(res => {
-        if(m.readyState >= 3 && Math.abs(m.currentTime) < 0.05) return res();
+        if(m.readyState >= 3 && Math.abs(m.currentTime) < 0.04) return res();
         const done = () => { m.removeEventListener('seeked', done); res(); };
         m.addEventListener('seeked', done);
         try{ m.currentTime = 0; }catch(e){ res(); }
-        setTimeout(res, 900);
+        setTimeout(res, 1000);
       });
     }
-    drawFn(ctx, 0);
-    await Promise.all(alsoPlay.map(m => m.play().catch(()=>{})));
 
     let frameIdx = 0;
     let lastTsUs = -1;
-    const tWall0 = performance.now();
-    await new Promise(resolve => {
-      function pump(){
-        if(videoErr){ resolve(); return; }
-        const mediaT = (primaryVid && !primaryVid.paused && isFinite(primaryVid.currentTime))
-          ? primaryVid.currentTime
-          : (performance.now() - tWall0) / 1000;
-        let tsUs = Math.round(Math.max(0, mediaT) * 1_000_000);
-        if(tsUs <= lastTsUs) tsUs = lastTsUs + 33333;
-        lastTsUs = tsUs;
+    let lastMediaT = -1;
 
-        if(vEnc.encodeQueueSize <= 10){
-          drawFn(ctx, mediaT);
-          const vf = new VideoFrame(canvas, { timestamp: tsUs, duration: 33333 });
-          vEnc.encode(vf, { keyFrame: frameIdx % 60 === 0 });
-          vf.close();
-          frameIdx++;
+    // Codifica o quadro inicial em t=0s antes de disparar o play
+    drawFn(ctx, 0);
+    {
+      const vf0 = new VideoFrame(canvas, { timestamp: 0, duration: 33333 });
+      vEnc.encode(vf0, { keyFrame: true });
+      vf0.close();
+      lastTsUs = 0;
+      lastMediaT = 0;
+      frameIdx = 1;
+    }
+
+    await Promise.all(alsoPlay.map(m => m.play().catch(()=>{})));
+
+    await new Promise(resolve => {
+      let finished = false;
+      let backpressurePaused = false;
+      let watchdog = null;
+      const finishCapture = () => {
+        if(finished) return;
+        finished = true;
+        if(watchdog) clearInterval(watchdog);
+        primaryVid.removeEventListener('ended', finishCapture);
+        resolve();
+      };
+      primaryVid.addEventListener('ended', finishCapture, { once: true });
+
+      async function drainBackpressureIfNeeded(){
+        if(vEnc.encodeQueueSize > 6 && !backpressurePaused){
+          backpressurePaused = true;
+          try{ primaryVid.pause(); }catch(e){}
+          while(vEnc.encodeQueueSize > 2 && !videoErr && !finished){
+            await new Promise(r => setTimeout(r, 10));
+          }
+          if(!finished && !videoErr){
+            try{ await primaryVid.play(); }catch(e){}
+          }
+          backpressurePaused = false;
         }
-        if(onProgress) onProgress(Math.min(0.99, mediaT / Math.max(0.5, durationSec)));
-        if(mediaT >= durationSec - 0.03 || (primaryVid && primaryVid.ended)){
-          resolve();
+      }
+
+      function encodeCurrentFrame(mediaSec){
+        if(finished || videoErr){ finishCapture(); return; }
+        const mediaT = Math.max(0, isFinite(mediaSec) ? mediaSec : (primaryVid.currentTime || 0));
+        if(mediaT >= durationSec - 0.02 || primaryVid.ended){
+          finishCapture();
           return;
         }
-        setTimeout(pump, 33);
+        // Só codifica quando o decodificador realmente avançou para um novo quadro (>= 8ms) — NUNCA duplica frame congelado!
+        if(mediaT - lastMediaT >= 0.008){
+          const tsUs = Math.round(mediaT * 1_000_000);
+          if(tsUs > lastTsUs){
+            const durUs = Math.max(16666, Math.min(66666, tsUs - lastTsUs));
+            drawFn(ctx, mediaT);
+            const vf = new VideoFrame(canvas, { timestamp: tsUs, duration: durUs });
+            vEnc.encode(vf, { keyFrame: frameIdx % 60 === 0 });
+            vf.close();
+            lastTsUs = tsUs;
+            lastMediaT = mediaT;
+            frameIdx++;
+            if(onProgress) onProgress(Math.min(0.99, mediaT / Math.max(0.5, durationSec)));
+          }
+        }
       }
-      pump();
+
+      watchdog = setInterval(() => {
+        if(finished || videoErr){ finishCapture(); return; }
+        if(primaryVid.ended || (primaryVid.currentTime || 0) >= durationSec - 0.02){
+          finishCapture();
+        } else if(primaryVid.paused && !backpressurePaused){
+          primaryVid.play().catch(()=>{});
+        }
+      }, 120);
+
+      if(typeof primaryVid.requestVideoFrameCallback === 'function'){
+        const onFrame = async (now, meta) => {
+          if(finished || videoErr){ finishCapture(); return; }
+          const mTime = (meta && isFinite(meta.mediaTime)) ? meta.mediaTime : primaryVid.currentTime;
+          encodeCurrentFrame(mTime);
+          await drainBackpressureIfNeeded();
+          if(!finished){
+            primaryVid.requestVideoFrameCallback(onFrame);
+          }
+        };
+        primaryVid.requestVideoFrameCallback(onFrame);
+      } else {
+        const pump = async () => {
+          if(finished || videoErr){ finishCapture(); return; }
+          encodeCurrentFrame(primaryVid.currentTime || 0);
+          await drainBackpressureIfNeeded();
+          if(!finished) setTimeout(pump, 16);
+        };
+        setTimeout(pump, 16);
+      }
     });
     alsoPlay.forEach(m => { try{ m.pause(); m.playbackRate = 1; }catch(e){} });
   }
@@ -2752,7 +2770,13 @@ async function recordCanvasVideo({drawFn, audioEl, audioBuffer, width=1280, heig
   for(const m of alsoPlay){
     m.muted = true;
     m.playbackRate = 1;
-    try{ m.currentTime = 0; }catch(e){}
+    await new Promise(res => {
+      if(m.readyState >= 3 && Math.abs(m.currentTime) < 0.04) return res();
+      const done = () => { m.removeEventListener('seeked', done); res(); };
+      m.addEventListener('seeked', done);
+      try{ m.currentTime = 0; }catch(e){ res(); }
+      setTimeout(res, 900);
+    });
   }
 
   const mime=pickRecorderMime();
@@ -2761,9 +2785,9 @@ async function recordCanvasVideo({drawFn, audioEl, audioBuffer, width=1280, heig
   const chunks=[];
   rec.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
   const stopped=new Promise(r=>rec.onstop=r);
-  rec.start(); // Gravação contínua sem rec.start(1000) fragmentado!
 
   await Promise.all(alsoPlay.map(m => m.play().catch(()=>{})));
+  rec.start(); // Gravação contínua sem rec.start(1000) fragmentado!
   let audioStartCtxTime = 0;
   if(bufSrc && recAudioCtx){
     audioStartCtxTime = recAudioCtx.currentTime;
@@ -2772,11 +2796,14 @@ async function recordCanvasVideo({drawFn, audioEl, audioBuffer, width=1280, heig
     audioEl.currentTime=0; try{ await audioEl.play(); }catch(e){}
   }
 
+  const primaryVid = alsoPlay[0] || null;
   const t0=performance.now();
   await new Promise(resolve=>{
     function step(){
       let t;
-      if(recAudioCtx && bufSrc){
+      if(primaryVid && !primaryVid.paused && isFinite(primaryVid.currentTime)){
+        t = primaryVid.currentTime;
+      } else if(recAudioCtx && bufSrc){
         t = recAudioCtx.currentTime - audioStartCtxTime;
       } else if(audioEl && !audioEl.paused){
         t = audioEl.currentTime;
@@ -2785,7 +2812,7 @@ async function recordCanvasVideo({drawFn, audioEl, audioBuffer, width=1280, heig
       }
       drawFn(ctx, Math.max(0, t));
       if(onProgress) onProgress(Math.min(1, t/Math.max(0.5, durationSec)));
-      if(t >= durationSec - 0.03 || (audioEl && audioEl.ended)){
+      if(t >= durationSec - 0.03 || (audioEl && audioEl.ended) || (primaryVid && primaryVid.ended)){
         resolve();
         return;
       }
@@ -3567,9 +3594,6 @@ async function buildCreateVideo(){
     showStatus('createStatus', summaryMsg, 'success');
     toast('🎬 Vídeo pronto! Clique no botão verde para baixar!');
     setTimeout(()=> wrap.scrollIntoView({ behavior:'smooth', block:'center' }), 200);
-    if(isTikTokAutopostEnabled()){
-      autoPostFinishedVideoToTikTok('create', videoBlob, lastCreatedVideoFilename, document.getElementById('createScript').innerText || d.title || '');
-    }
   }catch(e){
     document.getElementById('videoBuildMsg').textContent='❌ '+e.message;
     showStatus('createStatus','❌ Erro na montagem: '+e.message,'error');
@@ -3618,13 +3642,44 @@ async function downloadDubVideo(opts = {}){
 
   const mainBtn = document.getElementById('dubMainDownloadBtn');
   if(mainBtn) mainBtn.disabled = true;
-  $('#dubProgress').classList.add('show');
-  showStatus('dubStatus','📼 Renderizando arquivo de VÍDEO com novo áudio dublado (funciona até para vídeos 4K/grandes — aguarde a barra chegar em 100%)...','info');
+  stopDubSyncPreview();
+  const vRes = document.getElementById('dubSyncVideo');
+  if(vRes){ try{ vRes.pause(); }catch(e){} }
+  try{ v.pause(); v.playbackRate = 1; }catch(e){}
 
+  $('#dubProgress').classList.add('show');
+  showStatus('dubStatus','📼 Renderizando arquivo de VÍDEO com novo áudio dublado (100% fluido e sem travamentos — aguarde a barra chegar em 100%)...','info');
+
+  let exportVid = null;
   try{
-    // Escala inteligente de resolução: preserva 100% da proporção (16:9, 9:16, 1:1, 4:3) sem travar em vídeos 4K gigantes!
-    const srcW = v.videoWidth || 1280, srcH = v.videoHeight || 720;
-    const maxEdge = 1280;
+    // Cria um elemento <video> offscreen isolado apenas para a exportação (evita conflitos com a tela e garante decodificação 100% lisa!)
+    exportVid = document.createElement('video');
+    exportVid.src = v.src;
+    exportVid.muted = true;
+    exportVid.playsInline = true;
+    exportVid.preload = 'auto';
+    exportVid.playbackRate = 1;
+    await new Promise((res, rej) => {
+      const ok = () => { cleanup(); res(); };
+      const err = () => { cleanup(); rej(new Error('Falha ao preparar vídeo para exportação.')); };
+      const cleanup = () => {
+        exportVid.removeEventListener('canplay', ok);
+        exportVid.removeEventListener('loadeddata', ok);
+        exportVid.removeEventListener('error', err);
+      };
+      if(exportVid.readyState >= 2) return res();
+      exportVid.addEventListener('canplay', ok, { once: true });
+      exportVid.addEventListener('loadeddata', ok, { once: true });
+      exportVid.addEventListener('error', err, { once: true });
+      exportVid.load();
+      setTimeout(ok, 2500);
+    });
+
+    // Escala inteligente de resolução: preserva 100% da proporção (16:9, 9:16, 1:1, 4:3) com fluidez máxima!
+    const srcW = exportVid.videoWidth || v.videoWidth || 1280;
+    const srcH = exportVid.videoHeight || v.videoHeight || 720;
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+    const maxEdge = isMobile ? 960 : 1280;
     const scale = Math.min(1, maxEdge / Math.max(srcW, srcH));
     const outW = Math.max(2, Math.round((srcW * scale) / 2) * 2);
     const outH = Math.max(2, Math.round((srcH * scale) / 2) * 2);
@@ -3635,35 +3690,25 @@ async function downloadDubVideo(opts = {}){
       for(const seg of lastDubChunksTimeline){
         const txt = String(seg.translation || '').trim();
         if(!txt) continue;
-        const endS = seg.actualEndSec || seg.endSec || (seg.startSec + 4);
-        for(const c of buildTimedCaptions(txt, Math.max(0.8, endS - seg.startSec))){
-          subCues.push({ start: seg.startSec + c.start, end: seg.startSec + c.end, text: c.text });
+        const startS = seg.effectiveStartSec ?? seg.startSec ?? 0;
+        const endS = seg.actualEndSec || seg.endSec || (startS + 4);
+        for(const c of buildTimedCaptions(txt, Math.max(0.8, endS - startS))){
+          subCues.push({ start: startS + c.start, end: startS + c.end, text: c.text });
         }
       }
     }
 
     const totalDur = Math.min(
-      v.duration || lastDubTotalDuration || 10,
+      exportVid.duration || v.duration || lastDubTotalDuration || 10,
       lastDubMasterBuffer ? lastDubMasterBuffer.duration : (lastDubTotalDuration || v.duration || 10)
     );
 
     const draw = (ctx, t) => {
       const cw = ctx.canvas.width, ch = ctx.canvas.height;
-      // Sincronização suave por Phase-Locked Loop (playbackRate) — NUNCA faz seek v.currentTime=t que engasga o decodificador do celular!
-      const drift = t - v.currentTime;
-      if(Math.abs(drift) > 2.8){
-        try{ v.currentTime = t; }catch(e){}
-      } else if(Math.abs(drift) > 0.045){
-        const desiredRate = Math.max(0.92, Math.min(1.08, 1 + drift * 0.6));
-        if(Math.abs(v.playbackRate - desiredRate) > 0.012){
-          try{ v.playbackRate = desiredRate; }catch(e){}
-        }
-      } else if(v.playbackRate !== 1){
-        try{ v.playbackRate = 1; }catch(e){}
-      }
+      // NUNCA altera playbackRate nem currentTime durante o draw — o decodificador roda 100% livre em 1.0x sem engasgos!
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, cw, ch);
-      try{ ctx.drawImage(v, 0, 0, cw, ch); }catch(e){}
+      try{ ctx.drawImage(exportVid, 0, 0, cw, ch); }catch(e){}
 
       if(subCues.length){
         const cue = subCues.find(c => t >= c.start && t < c.end);
@@ -3706,12 +3751,12 @@ async function downloadDubVideo(opts = {}){
       audioEl: lastDubMasterBuffer ? null : audioEl,
       width: outW,
       height: outH,
-      alsoPlay: [v],
+      alsoPlay: [exportVid],
       durationSec: totalDur,
       onProgress: p => {
         const pct = Math.round(p * 100);
         setProgress('dubProgressFill', pct);
-        if(mainBtn) mainBtn.textContent = `⏳ Exportando vídeo dublado... ${pct}% (${fmtClockSec(p * totalDur)} / ${fmtClockSec(totalDur)})`;
+        if(mainBtn) mainBtn.textContent = `⏳ Exportando vídeo dublado liso... ${pct}% (${fmtClockSec(p * totalDur)} / ${fmtClockSec(totalDur)})`;
       }
     });
 
@@ -3724,7 +3769,9 @@ async function downloadDubVideo(opts = {}){
     if(expV){
       expV.src = URL.createObjectURL(blob);
       expV.classList.remove('hidden');
+      if(vRes) vRes.classList.add('hidden');
     }
+    bindSmoothDubSync();
     if(!silentExport){
       triggerBlobDownload(blob, lastDubVideoFilename);
       if(mainBtn) mainBtn.textContent = `⬇️ BAIXAR VÍDEO DUBLADO NOVAMENTE (${lastDubVideoFilename.toUpperCase()})`;
@@ -3733,10 +3780,14 @@ async function downloadDubVideo(opts = {}){
     }
     return blob;
   }catch(e){
+    bindSmoothDubSync();
     showStatus('dubStatus','❌ '+e.message,'error');
     toast(e.message,'error');
     if(mainBtn) mainBtn.textContent = '⬇️ GERAR E BAIXAR VÍDEO DUBLADO COMPLETO (.MP4 / .WEBM)';
   }finally{
+    if(exportVid){
+      try{ exportVid.pause(); exportVid.removeAttribute('src'); exportVid.load(); }catch(e){}
+    }
     if(mainBtn) mainBtn.disabled = false;
     setTimeout(()=>{ $('#dubProgress').classList.remove('show'); setProgress('dubProgressFill',0); }, 1500);
   }
@@ -5293,9 +5344,6 @@ async function renderAvatarVideo(){
     });
     await loadProjects();
     toast('🎬 Vídeo do Avatar pronto para baixar!');
-    if(isTikTokAutopostEnabled()){
-      autoPostFinishedVideoToTikTok('avatar', videoBlob, avFilename, text);
-    }
   }catch(e){
     showStatus('avatarStatus', '❌ Erro ao renderizar avatar: ' + e.message, 'error');
     toast(e.message, 'error');
@@ -5334,1051 +5382,7 @@ function downloadAvatarThumbnail(){
   toast('🖼️ Capa PNG baixada!');
 }
 
-// =========================================================================
-// 🎵 CENTRAL COMPLETA DE POSTAGEM AUTOMÁTICA NO TIKTOK
-// (API Oficial v2 Direct Post + Inbox Draft + OAuth 2.0 PKCE S256 + Webhook Make/n8n + App Share + Fila Agendada)
-// =========================================================================
-const TT_CFG_KEY = 'dubai_tiktok_cfg';
-const TT_AUTH_KEY = 'dubai_tiktok_auth';
-const TT_HIST_KEY = 'dubai_tiktok_history';
-
-let currentTikTokVideoBlob = null;
-let currentTikTokVideoName = 'video-tiktok.mp4';
-let currentTikTokSourceScript = '';
-let tikTokScheduledQueue = [];
-let tikTokServerEnv = { hasEnvClientKey:false, hasEnvAccessToken:false, hasEnvWebhook:false, envClientKey:'' };
-
-function getTikTokCfg(){
-  try{ return JSON.parse(localStorage.getItem(TT_CFG_KEY)) || {}; }catch{ return {}; }
-}
-function getTikTokAuth(){
-  try{ return JSON.parse(localStorage.getItem(TT_AUTH_KEY)) || {}; }catch{ return {}; }
-}
-function getTikTokHistory(){
-  try{ return JSON.parse(localStorage.getItem(TT_HIST_KEY)) || []; }catch{ return []; }
-}
-function saveTikTokHistoryEntry(entry){
-  const list = getTikTokHistory();
-  list.unshift({ id: Date.now().toString(36) + Math.random().toString(36).slice(2,5), ...entry });
-  localStorage.setItem(TT_HIST_KEY, JSON.stringify(list.slice(0, 30)));
-  renderTikTokHistory();
-}
-
-function syncTikTokAutopostChecks(val){
-  document.querySelectorAll('.tt-autopost-chk').forEach(el => { el.checked = !!val; });
-  const cfg = getTikTokCfg();
-  cfg.autopost = !!val;
-  localStorage.setItem(TT_CFG_KEY, JSON.stringify(cfg));
-  toast(val ? '🤖 Piloto Automático TikTok ATIVADO! Todo vídeo finalizado será postado automaticamente.' : 'Piloto Automático TikTok desativado.');
-}
-
-function isTikTokAutopostEnabled(){
-  const chk = document.querySelector('.tt-autopost-chk');
-  return !!(chk && chk.checked);
-}
-
-function saveTikTokLocalSettings(){
-  const cfg = getTikTokCfg();
-  cfg.clientKey = (document.getElementById('ttClientKey')||{}).value?.trim() || '';
-  cfg.clientSecret = (document.getElementById('ttClientSecret')||{}).value?.trim() || '';
-  cfg.webhookUrl = (document.getElementById('ttWebhookUrl')||{}).value?.trim() || '';
-  cfg.scopes = (document.getElementById('ttOAuthScopes')||{}).value || 'user.info.basic,video.publish,video.upload';
-  cfg.siteVerification = (document.getElementById('ttSiteVerificationInput')||{}).value?.trim() || cfg.siteVerification || '';
-  localStorage.setItem(TT_CFG_KEY, JSON.stringify(cfg));
-  fetch('/api/tiktok', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      action: 'save_config',
-      clientKey: cfg.clientKey,
-      clientSecret: cfg.clientSecret,
-      webhookUrl: cfg.webhookUrl,
-      siteVerification: cfg.siteVerification
-    })
-  }).catch(() => {});
-  refreshTikTokBadges();
-}
-
-async function onUploadTikTokVerifyFile(input){
-  const f = input && input.files && input.files[0];
-  if(!f) return;
-  try{
-    const txt = (await f.text()).trim();
-    const inp = document.getElementById('ttSiteVerificationInput');
-    if(inp) inp.value = txt || f.name.replace(/\.txt$/i, '');
-    await saveTikTokDomainVerification();
-  }catch(e){
-    toast('Erro ao ler arquivo .txt: ' + e.message, 'error');
-  }
-}
-
-async function saveTikTokDomainVerification(){
-  const val = (document.getElementById('ttSiteVerificationInput')?.value || '').trim();
-  if(!val){
-    toast('Cole o código tiktok-developers-site-verification=... primeiro!', 'warn');
-    return;
-  }
-  saveTikTokLocalSettings();
-  try{
-    const r = await fetch('/api/tiktok', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'save_config', siteVerification: val })
-    });
-    const d = await r.json();
-    if(r.ok && d.ok){
-      showStatus('ttStatus', `✅ Verificação de Domínio TikTok ativada (${val.slice(0, 48)})! Agora você já pode clicar em "Verify" lá no TikTok Developer Portal.`, 'success');
-      toast('✅ Verificação de domínio TikTok ativada!');
-    }
-  }catch(e){
-    toast('Erro ao salvar verificação: ' + e.message, 'error');
-  }
-}
-
-function onManualTikTokTokenChange(val){
-  const tok = String(val || '').trim();
-  const auth = getTikTokAuth();
-  auth.accessToken = tok;
-  if(tok) auth.expiresAt = Date.now() + 86400 * 1000 * 30;
-  localStorage.setItem(TT_AUTH_KEY, JSON.stringify(auth));
-  fetch('/api/tiktok', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'save_config', accessToken: tok })
-  }).catch(() => {});
-  refreshTikTokBadges();
-  if(tok) toast('🔑 Access Token do TikTok salvo!');
-}
-
-function refreshTikTokBadges(){
-  const auth = getTikTokAuth();
-  const cfg = getTikTokCfg();
-  const badge = document.getElementById('ttAccountBadge');
-  const box = document.getElementById('ttConnectedProfileBox');
-  const info = document.getElementById('ttConnectedProfileInfo');
-  const hasOfficialToken = !!(auth.accessToken || tikTokServerEnv.hasEnvAccessToken);
-  const hasWebhook = !!(cfg.webhookUrl || tikTokServerEnv.hasEnvWebhook);
-
-  if(hasOfficialToken){
-    const rawUser = auth.username || tikTokServerEnv.connectedUsername || '';
-    const rawDisp = auth.displayName || tikTokServerEnv.connectedDisplayName || 'Conta Oficial Conectada';
-    const uname = rawUser ? `@${rawUser}` : rawDisp;
-    if(badge){
-      badge.textContent = `🟢 API Oficial Conectada (${uname})`;
-      badge.style.background = '#064e3b';
-      badge.style.borderColor = '#10b981';
-      badge.style.color = '#d1fae5';
-    }
-    if(box && info){
-      box.classList.remove('hidden');
-      info.innerHTML = `✅ <b>TikTok API v2 Ativa:</b> ${esc(uname)} ${auth.maxDuration ? `• Limite até ${Math.round(auth.maxDuration/60)} min` : ''} • Postagem Direta & Caixa de Entrada prontas!`;
-    }
-  } else if(hasWebhook){
-    if(badge){
-      badge.textContent = '🟣 Automação Webhook Ativa (Make/n8n)';
-      badge.style.background = '#3b0764';
-      badge.style.borderColor = '#a855f7';
-      badge.style.color = '#f3e8ff';
-    }
-    if(box) box.classList.add('hidden');
-  } else {
-    if(badge){
-      badge.textContent = '⚡ Modo Rápido App TikTok Ativo';
-      badge.style.background = '#1e1b4b';
-      badge.style.borderColor = '#6366f188';
-      badge.style.color = '#c7d2fe';
-    }
-    if(box) box.classList.add('hidden');
-  }
-}
-
-function disconnectTikTokAccount(){
-  localStorage.removeItem(TT_AUTH_KEY);
-  const mt = document.getElementById('ttManualToken');
-  if(mt) mt.value = '';
-  fetch('/api/tiktok', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'save_config', accessToken: '' })
-  }).catch(() => {});
-  refreshTikTokBadges();
-  toast('Conta TikTok desconectada.');
-}
-
-// Abre autorização oficial TikTok Login Kit v2 for Web
-async function startTikTokOAuthLogin(forceOpen = false){
-  const keyInp = document.getElementById('ttClientKey');
-  const secInp = document.getElementById('ttClientSecret');
-  if(keyInp) keyInp.value = keyInp.value.trim().replace(/^['"]+|['"]+$/g, '').replace(/\s+/g, '');
-  if(secInp) secInp.value = secInp.value.trim().replace(/^['"]+|['"]+$/g, '').replace(/\s+/g, '');
-
-  saveTikTokLocalSettings();
-  const cfg = getTikTokCfg();
-  const clientKey = cfg.clientKey || tikTokServerEnv.envClientKey || 'mnpo08t7m256hkr7';
-  if(!clientKey){
-    document.getElementById('ttGuideBox')?.classList.remove('hidden');
-    showStatus('ttStatus', '⚠️ Cole primeiro o Client Key e Client Secret do seu App / Sandbox em developers.tiktok.com (veja o guia passo a passo aberto acima!).', 'warn');
-    document.getElementById('ttClientKey')?.focus();
-    return;
-  }
-
-  if(/^\d+$/.test(clientKey)){
-    showStatus('ttStatus', '❌ Você colou o "App ID" (apenas números). No painel developers.tiktok.com, copie o campo "Client Key" (letras e números, ex: sbaw... ou aw...)!', 'error');
-    toast('Use o Client Key (letras e números), não o App ID!', 'error');
-    keyInp?.focus();
-    return;
-  }
-
-  // Pré-validação da chave no servidor antes de redirecionar p/ o TikTok
-  if(!forceOpen){
-    try{
-      showStatus('ttStatus', '🔍 Validando Client Key e Client Secret nos servidores do TikTok...', 'info');
-      const vRes = await fetch('/api/tiktok', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'validate_keys',
-          clientKey,
-          clientSecret: cfg.clientSecret || ''
-        })
-      });
-      const vData = await vRes.json();
-      if(!vRes.ok || vData.ok === false){
-        showStatus('ttStatus', '❌ ' + (vData.error || 'Chave inválida'), 'error');
-        toast(vData.error || 'Verifique o Client Key', 'error');
-        return;
-      }
-      if(vData.tiktokErrorMsg && /invalid_client|client_key/i.test(vData.tiktokErrorMsg)){
-        showStatus('ttStatus', `⚠️ O servidor do TikTok informou (${vData.tiktokErrorMsg}): Confira se você copiou o Client Key de dentro do "Sandbox" no developers.tiktok.com e clicou em "Save" no Login Kit!`, 'warn');
-      }
-    }catch{}
-  }
-
-  const redirectUri = window.location.origin + '/api/tiktok';
-  const scopes = document.getElementById('ttOAuthScopes')?.value || cfg.scopes || 'user.info.basic,video.publish,video.upload';
-
-  // Codifica redirectUri + clientKey no state para funcionar mesmo em abas mobile/in-app browser
-  const statePayload = btoa(JSON.stringify({ v: '', r: redirectUri, k: clientKey }))
-    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  const state = 'st_' + statePayload;
-
-  localStorage.setItem('dubai_tiktok_pkce', JSON.stringify({ codeVerifier: '', state, redirectUri }));
-
-  try{
-    await fetch('/api/tiktok', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'save_config',
-        clientKey,
-        clientSecret: cfg.clientSecret || '',
-        codeVerifier: '',
-        redirectUri
-      })
-    });
-  }catch{}
-
-  const params = new URLSearchParams({
-    client_key: clientKey,
-    scope: scopes,
-    response_type: 'code',
-    redirect_uri: redirectUri,
-    state
-  });
-  const authUrl = `https://www.tiktok.com/v2/auth/authorize/?${params.toString()}`;
-  const popup = window.open(authUrl, 'dubaiTikTokOAuth', 'width=520,height=700');
-  if(!popup){
-    window.location.href = authUrl;
-  } else {
-    showStatus('ttStatus', '🔑 Janela oficial de autorização do TikTok aberta! Aprove o acesso para ativar a postagem 100% automática.', 'info');
-  }
-}
-
-const VIRAL_TIKTOK_TOPICS = [
-  '3 segredos da mente de alto desempenho que 99% das pessoas descobrem tarde demais',
-  'O hábito silencioso de 2 minutos que muda completamente o seu foco e energia diária',
-  'Por que o cérebro humano sabota seus maiores planos e como virar esse jogo hoje',
-  'A regra dos 5 segundos usada por líderes de elite para vencer a procrastinação na hora',
-  '3 sinais sutis de inteligência emocional altíssima que quase ninguém percebe',
-  'A descoberta científica mais curiosa do universo que parece ficção, mas é 100% real'
-];
-
-function pickRandomViralTikTokTopic(){
-  const inp = document.getElementById('ttAutoFactoryTopic');
-  if(!inp) return;
-  const current = inp.value;
-  const pool = VIRAL_TIKTOK_TOPICS.filter(x => x !== current);
-  inp.value = pool[Math.floor(Math.random() * pool.length)] || VIRAL_TIKTOK_TOPICS[0];
-  toast('🎲 Novo tema viral selecionado!');
-}
-
-// Fábrica 1-Clique: Gera Roteiro + Voz Humana Neural HD + Renderiza MP4 9:16 Vertical + Auto-Posta no TikTok!
-async function generateAndAutoPostVerticalTikTok(autoPublishNow = true){
-  const topic = (document.getElementById('ttAutoFactoryTopic')?.value || '').trim();
-  if(!topic){
-    toast('Digite um tema para o seu vídeo TikTok 9:16!', 'warn');
-    return;
-  }
-  const voice = document.getElementById('ttAutoFactoryVoice')?.value || 'onyx';
-  const durationSec = Number(document.getElementById('ttAutoFactoryDuration')?.value) || 28;
-  const theme = document.getElementById('ttAutoFactoryTheme')?.value || 'cyber';
-
-  const btnAuto = document.getElementById('ttFactoryAutoPostBtn');
-  const btnOnly = document.getElementById('ttFactoryOnlyGenBtn');
-  if(btnAuto) btnAuto.disabled = true;
-  if(btnOnly) btnOnly.disabled = true;
-
-  const prog = document.getElementById('ttProgress');
-  prog?.classList.add('show');
-  setProgress('ttProgressFill', 8);
-
-  try{
-    showStatus('ttStatus', '🧠 Passo 1/4: Criando roteiro hipnótico 9:16 + legenda e hashtags virais com IA...', 'info');
-    const scRes = await fetch('/api/tiktok', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'auto_short_script', topic, durationSec })
-    });
-    const scData = await scRes.json();
-    const narrationText = scData.narration || topic;
-    const headlineText = (scData.headline || topic.slice(0, 38)).toUpperCase();
-    const viralCaption = scData.caption || `🔥 ${topic} #fyp #foryou #viral #tiktokbrasil`;
-
-    setProgress('ttProgressFill', 24);
-    showStatus('ttStatus', '🎙️ Passo 2/4: Gravando locução com Voz Humana Neural HD (48kHz)...', 'info');
-    const tts = await synthesizeAvatarSpeech(narrationText, voice, (msg) => {
-      showStatus('ttStatus', '🎙️ ' + msg, 'info');
-    });
-
-    const totalDur = (tts && tts.duration && tts.duration > 2) ? tts.duration : Math.max(10, narrationText.split(/\s+/).length / 2.35);
-    const cues = buildTimedCaptions(narrationText, totalDur);
-
-    setProgress('ttProgressFill', 45);
-    showStatus('ttStatus', `🎬 Passo 3/4: Renderizando vídeo vertical 9:16 (720×1280 Fast-Start MP4 • ${Math.round(totalDur)}s)...`, 'info');
-
-    const palettes = {
-      cyber: { bg1:'#070818', bg2:'#1e1b4b', bg3:'#4c1d95', accent:'#ec4899', glow:'#22d3ee', badge:'#831843' },
-      gold:  { bg1:'#0c0a06', bg2:'#1c1917', bg3:'#422006', accent:'#f59e0b', glow:'#fde047', badge:'#78350f' },
-      dark:  { bg1:'#05070e', bg2:'#0f172a', bg3:'#1e293b', accent:'#38bdf8', glow:'#f43f5e', badge:'#0f172a' },
-      emerald:{ bg1:'#041311', bg2:'#064e3b', bg3:'#0f172a', accent:'#10b981', glow:'#6ee7b7', badge:'#065f46' }
-    };
-    const pal = palettes[theme] || palettes.cyber;
-
-    const drawVerticalFrame = (ctx, W, H, tSec) => {
-      // Fundo dinâmico suave vertical 9:16
-      const shift = Math.sin(tSec * 0.9) * 90;
-      const g = ctx.createLinearGradient(0, 0, W, H + shift);
-      g.addColorStop(0, pal.bg1);
-      g.addColorStop(0.52, pal.bg2);
-      g.addColorStop(1, pal.bg3);
-      ctx.fillStyle = g;
-      ctx.fillRect(0, 0, W, H);
-
-      // Círculos de luz cinematográficos (sem shadowBlur p/ fluidez máxima no celular)
-      const orbY1 = H * 0.28 + Math.sin(tSec * 1.4) * 55;
-      const rg1 = ctx.createRadialGradient(W * 0.5, orbY1, 10, W * 0.5, orbY1, W * 0.62);
-      rg1.addColorStop(0, pal.accent + '44');
-      rg1.addColorStop(1, 'transparent');
-      ctx.fillStyle = rg1;
-      ctx.fillRect(0, 0, W, H);
-
-      // Partículas ascendentes sutis
-      ctx.fillStyle = pal.glow + '55';
-      for(let i = 0; i < 18; i++){
-        const px = ((i * 97 + Math.floor(tSec * 28 * ((i % 3) + 1))) % W);
-        const py = H - ((i * 131 + Math.floor(tSec * 65 * ((i % 4) + 1))) % H);
-        const r = (i % 3) + 2;
-        ctx.beginPath();
-        ctx.arc(px, py, r, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      // Topo: Badge "🔥 VIRAL TIKTOK" + Barra de progresso de retenção
-      const pct = Math.min(1, Math.max(0, tSec / totalDur));
-      ctx.fillStyle = 'rgba(255,255,255,0.14)';
-      ctx.fillRect(48, 56, W - 96, 8);
-      ctx.fillStyle = pal.accent;
-      ctx.fillRect(48, 56, (W - 96) * pct, 8);
-
-      // Card do Título / Hook no topo
-      ctx.fillStyle = 'rgba(9, 12, 26, 0.82)';
-      ctx.strokeStyle = pal.accent;
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.roundRect(44, 96, W - 88, 152, 22);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = pal.glow;
-      ctx.font = '800 22px system-ui, -apple-system, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('⚡ ASSISTA ATÉ O FINAL', W / 2, 136);
-
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '900 28px system-ui, -apple-system, sans-serif';
-      const titleWords = headlineText.split(/\s+/);
-      let line1 = '', line2 = '';
-      for(const w of titleWords){
-        if((line1 + ' ' + w).trim().length <= 24) line1 = (line1 + ' ' + w).trim();
-        else if((line2 + ' ' + w).trim().length <= 26) line2 = (line2 + ' ' + w).trim();
-      }
-      ctx.fillText(line1 || headlineText.slice(0, 24), W / 2, 182);
-      if(line2) ctx.fillText(line2, W / 2, 220);
-
-      // Equalizador central reativo à voz humana
-      const centerY = H * 0.47;
-      const bars = 21;
-      const barW = 14;
-      const gap = 10;
-      const totalBarW = bars * barW + (bars - 1) * gap;
-      const startX = (W - totalBarW) / 2;
-      for(let b = 0; b < bars; b++){
-        const distCenter = Math.abs(b - Math.floor(bars / 2));
-        const wave = Math.abs(Math.sin(tSec * 8.5 + b * 0.55) * Math.cos(tSec * 4.2 - b * 0.3));
-        const barH = Math.max(16, (130 - distCenter * 8) * (0.25 + wave * 0.85));
-        ctx.fillStyle = (b % 2 === 0) ? pal.accent : pal.glow;
-        ctx.beginPath();
-        ctx.roundRect(startX + b * (barW + gap), centerY - barH / 2, barW, barH, 7);
-        ctx.fill();
-      }
-
-      // Legendas dinâmicas grandes estilo TikTok / Hormozi no centro-inferior
-      const activeCue = cues.find(c => tSec >= c.start && tSec <= c.end) || cues[cues.length - 1];
-      if(activeCue && activeCue.text){
-        const words = activeCue.text.split(/\s+/);
-        const cueProgress = Math.max(0, Math.min(0.999, (tSec - activeCue.start) / Math.max(0.2, activeCue.end - activeCue.start)));
-        const activeWordIdx = Math.floor(cueProgress * words.length);
-
-        ctx.fillStyle = 'rgba(7, 10, 22, 0.88)';
-        ctx.strokeStyle = 'rgba(255,255,255,0.18)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.roundRect(42, H * 0.63, W - 84, 250, 26);
-        ctx.fill();
-        ctx.stroke();
-
-        // Quebra as palavras da legenda em linhas de até 18 caracteres
-        const lines = [];
-        let cur = [];
-        let curLen = 0;
-        words.forEach((w, idx) => {
-          if(curLen + w.length > 18 && cur.length > 0){
-            lines.push(cur);
-            cur = [];
-            curLen = 0;
-          }
-          cur.push({ word: w.toUpperCase(), active: idx === activeWordIdx });
-          curLen += w.length + 1;
-        });
-        if(cur.length) lines.push(cur);
-
-        ctx.font = '900 40px system-ui, -apple-system, sans-serif';
-        ctx.textBaseline = 'middle';
-        const lineH = 56;
-        const blockStartY = (H * 0.63 + 125) - ((lines.length - 1) * lineH) / 2;
-
-        lines.slice(0, 4).forEach((ln, lIdx) => {
-          const fullStr = ln.map(x => x.word).join(' ');
-          const totalLineW = ctx.measureText(fullStr).width;
-          let drawX = (W - totalLineW) / 2;
-          const drawY = blockStartY + lIdx * lineH;
-          ctx.textAlign = 'left';
-          ln.forEach((item) => {
-            const wWidth = ctx.measureText(item.word + ' ').width;
-            if(item.active){
-              ctx.fillStyle = pal.accent;
-              ctx.beginPath();
-              ctx.roundRect(drawX - 6, drawY - 24, ctx.measureText(item.word).width + 12, 48, 10);
-              ctx.fill();
-              ctx.fillStyle = '#ffffff';
-            } else {
-              ctx.fillStyle = '#f8fafc';
-            }
-            ctx.fillText(item.word, drawX, drawY);
-            drawX += wWidth;
-          });
-        });
-      }
-
-      // Rodapé CTA
-      ctx.textAlign = 'center';
-      ctx.font = '800 22px system-ui, -apple-system, sans-serif';
-      ctx.fillStyle = 'rgba(255,255,255,0.75)';
-      ctx.fillText('❤️ Curta • 💬 Comente • 🔖 Salve para depois', W / 2, H - 72);
-    };
-
-    const videoBlob = await recordCanvasVideo({
-      drawFn: drawVerticalFrame,
-      audioBuffer: tts ? tts.audioBuffer : null,
-      width: 720,
-      height: 1280,
-      durationSec: totalDur,
-      onProgress: (p) => setProgress('ttProgressFill', Math.round(45 + p * 40))
-    });
-
-    const ext = (videoBlob.type && videoBlob.type.includes('mp4')) ? 'mp4' : 'webm';
-    const fname = `tiktok-9x16-${Date.now().toString(36)}.${ext}`;
-    attachVideoToTikTokComposer(videoBlob, fname, narrationText);
-
-    const capArea = document.getElementById('ttCaption');
-    if(capArea){
-      capArea.value = viralCaption;
-      document.getElementById('ttCaptionLen').textContent = String(viralCaption.length);
-    }
-
-    setProgress('ttProgressFill', 90);
-    if(autoPublishNow){
-      showStatus('ttStatus', '🚀 Passo 4/4: Vídeo 9:16 pronto! Disparando publicação automática no TikTok...', 'info');
-      await publishOrScheduleTikTok();
-    } else {
-      setProgress('ttProgressFill', 100);
-      showStatus('ttStatus', `✅ Vídeo Vertical 9:16 (${Math.round(totalDur)}s) + Legenda Viral prontos! Clique em "PUBLICAR NO TIKTOK AGORA" abaixo quando quiser.`, 'success');
-      toast('🎬 Vídeo 9:16 gerado e carregado no player!');
-    }
-  }catch(e){
-    showStatus('ttStatus', '❌ Erro na Fábrica 9:16: ' + (e.message || e), 'error');
-    toast('Erro: ' + (e.message || e), 'error');
-  }finally{
-    if(btnAuto) btnAuto.disabled = false;
-    if(btnOnly) btnOnly.disabled = false;
-  }
-}
-
-async function ensureFreshTikTokToken(){
-  const auth = getTikTokAuth();
-  const cfg = getTikTokCfg();
-  if(auth.accessToken && auth.refreshToken && auth.expiresAt && Date.now() > (auth.expiresAt - 5 * 60 * 1000)){
-    try{
-      const r = await fetch('/api/tiktok', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'refresh_token',
-          clientKey: cfg.clientKey,
-          clientSecret: cfg.clientSecret,
-          refreshToken: auth.refreshToken
-        })
-      });
-      const d = await r.json();
-      if(r.ok && d.access_token){
-        auth.accessToken = d.access_token;
-        if(d.refresh_token) auth.refreshToken = d.refresh_token;
-        auth.expiresAt = Date.now() + ((Number(d.expires_in) || 86400) * 1000);
-        localStorage.setItem(TT_AUTH_KEY, JSON.stringify(auth));
-      }
-    }catch{}
-  }
-  return auth.accessToken || '';
-}
-
-async function verifyTikTokAccount(){
-  showStatus('ttStatus', '🔍 Verificando conta e permissões na API Oficial do TikTok...', 'info');
-  try{
-    const token = await ensureFreshTikTokToken();
-    const res = await fetch('/api/tiktok', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'creator_info', accessToken: token })
-    });
-    const d = await res.json();
-    if(!res.ok || d.error) throw new Error(d.error || 'Falha ao consultar API TikTok');
-    const auth = getTikTokAuth();
-    auth.username = d.creator?.creator_username || d.user?.username || '';
-    auth.displayName = d.creator?.creator_nickname || d.user?.display_name || 'Criador TikTok';
-    auth.maxDuration = d.creator?.max_video_post_duration_sec || 600;
-    auth.privacies = d.creator?.privacy_level_options || [];
-    localStorage.setItem(TT_AUTH_KEY, JSON.stringify(auth));
-    refreshTikTokBadges();
-    showStatus('ttStatus', `✅ Conectado com sucesso à conta @${auth.username || auth.displayName}! Duração máx: ${Math.round(auth.maxDuration/60)} min.`, 'success');
-    toast(`✅ Conta TikTok @${auth.username || auth.displayName} pronta!`);
-  }catch(e){
-    showStatus('ttStatus', '❌ ' + (e.message || e), 'error');
-    toast(e.message || String(e), 'error');
-  }
-}
-
-function attachVideoToTikTokComposer(blob, fileName, scriptContext = ''){
-  currentTikTokVideoBlob = blob;
-  currentTikTokVideoName = fileName || 'video-tiktok.mp4';
-  if(scriptContext) currentTikTokSourceScript = scriptContext;
-  const info = document.getElementById('ttSelectedVideoInfo');
-  if(info){
-    info.innerHTML = `✅ <b>Vídeo pronto p/ TikTok:</b> ${esc(currentTikTokVideoName)} • <b>${fmtHumanBytes(blob.size)}</b> (${blob.type || 'video/mp4'})`;
-  }
-  const pv = document.getElementById('ttPreviewVideo');
-  if(pv){
-    pv.src = URL.createObjectURL(blob);
-    pv.classList.remove('hidden');
-  }
-}
-
-function onPickTikTokFile(input){
-  const f = input && input.files && input.files[0];
-  if(!f) return;
-  attachVideoToTikTokComposer(f, f.name, f.name.replace(/\.[^.]+$/, ''));
-  toast('📹 Vídeo carregado para o TikTok!');
-}
-
-async function loadExistingStudioVideoForTikTok(kind){
-  if(kind === 'create'){
-    if(!lastCreatedVideoBlob){ toast('Crie/renderize um vídeo na aba Criar primeiro!','warn'); return false; }
-    attachVideoToTikTokComposer(lastCreatedVideoBlob, lastCreatedVideoFilename, document.getElementById('createScript')?.innerText || '');
-  } else if(kind === 'avatar'){
-    if(!lastAvatarVideoBlob){ toast('Renderize um Avatar na aba Avatar primeiro!','warn'); return false; }
-    attachVideoToTikTokComposer(lastAvatarVideoBlob, lastAvatarVideoFilename, document.getElementById('avatarScript')?.value || '');
-  } else if(kind === 'dub'){
-    if(!lastDubVideoBlob){
-      if(!lastDubAudioBlob){ toast('Duble um vídeo na aba Dublar primeiro!','warn'); return false; }
-      toast('⏳ Preparando arquivo .MP4 dublado para o TikTok...','info');
-      await downloadDubVideo({ silentExport: true });
-    }
-    if(!lastDubVideoBlob){ toast('Suba um arquivo de vídeo na dublagem!','warn'); return false; }
-    attachVideoToTikTokComposer(lastDubVideoBlob, lastDubVideoFilename, document.getElementById('dubScript')?.innerText || '');
-  }
-  toast('✅ Vídeo importado! Gerando legenda viral com IA...');
-  await generateViralTikTokCaptionUI();
-  return true;
-}
-
-async function generateViralTikTokCaption(scriptText){
-  try{
-    const res = await fetch('/api/tiktok', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'viral_caption',
-        script: scriptText || currentTikTokSourceScript || currentTikTokVideoName
-      })
-    });
-    const d = await res.json();
-    if(res.ok && d.caption) return d.caption;
-  }catch{}
-  return `🔥 Você precisa ver isso até o final! Comenta o que achou 👇\n#fyp #foryou #viral #tiktokbrasil #fy`;
-}
-
-async function generateViralTikTokCaptionUI(){
-  const btn = document.getElementById('ttAiCaptionBtn');
-  if(btn){ btn.disabled = true; btn.textContent = '⏳ Gerando...'; }
-  try{
-    const cap = await generateViralTikTokCaption(currentTikTokSourceScript || document.getElementById('ttCaption').value || currentTikTokVideoName);
-    const area = document.getElementById('ttCaption');
-    area.value = cap;
-    document.getElementById('ttCaptionLen').textContent = String(cap.length);
-    toast('✨ Legenda e hashtags virais geradas!');
-  }finally{
-    if(btn){ btn.disabled = false; btn.textContent = '✨ Gerar Legenda & Hashtags Virais com IA'; }
-  }
-}
-
-// Compartilhamento Instantâneo 1-Toque pro App TikTok no Celular (copia legenda viral + abre App TikTok / TikTok Studio)
-async function shareDirectToTikTokApp(blobOverride, nameOverride, captionOverride){
-  const blob = blobOverride || currentTikTokVideoBlob;
-  const fname = nameOverride || currentTikTokVideoName || 'video-tiktok.mp4';
-  if(!blob){
-    toast('Selecione ou gere um vídeo primeiro!','warn');
-    showStatus('ttStatus', '⚠️ Escolha um vídeo ou puxe da Dublagem / Criar Vídeo primeiro.', 'warn');
-    return;
-  }
-  let caption = (captionOverride !== undefined ? captionOverride : document.getElementById('ttCaption')?.value || '').trim();
-  if(!caption){
-    caption = await generateViralTikTokCaption(currentTikTokSourceScript || fname);
-    const area = document.getElementById('ttCaption');
-    if(area){ area.value = caption; document.getElementById('ttCaptionLen').textContent = String(caption.length); }
-  }
-  try{ await navigator.clipboard.writeText(caption); }catch{}
-
-  const mime = blob.type && blob.type.includes('webm') ? 'video/webm' : 'video/mp4';
-  const fileObj = new File([blob], fname.endsWith('.mp4') || fname.endsWith('.webm') ? fname : (fname + '.mp4'), { type: mime });
-  if(navigator.canShare && navigator.canShare({ files: [fileObj] })){
-    try{
-      toast('📋 Legenda viral copiada! Selecione o TikTok na gaveta e cole a legenda!');
-      await navigator.share({ files: [fileObj], title: fname, text: caption });
-      saveTikTokHistoryEntry({
-        title: fname,
-        caption,
-        mode: '📲 App TikTok (1-Toque Mobile)',
-        status: '✅ Enviado ao App TikTok (legenda copiada)',
-        createdAt: new Date().toLocaleString('pt-BR')
-      });
-      return;
-    }catch(err){
-      if(err && err.name === 'AbortError') return;
-    }
-  }
-
-  // Em Desktop (PC / Mac): baixa o MP4 pronto, deixa a legenda copiada no Ctrl+V e abre o TikTok Studio Upload!
-  triggerBlobDownload(blob, fname);
-  window.open('https://www.tiktok.com/tiktokstudio/upload?lang=pt-BR', '_blank', 'noopener');
-  const okMsg = '📋 Legenda viral copiada (Ctrl+V) + vídeo baixado + TikTok Studio aberto! Solte o vídeo lá e aperte Publicar!';
-  showStatus('ttStatus', okMsg, 'success');
-  toast('🎵 TikTok Studio aberto + legenda copiada no Ctrl+V!');
-  saveTikTokHistoryEntry({
-    title: fname,
-    caption,
-    mode: '💻 TikTok Studio Upload',
-    status: '✅ Vídeo baixado + Legenda no Ctrl+V + Studio aberto',
-    createdAt: new Date().toLocaleString('pt-BR')
-  });
-}
-
-// Faz upload chunk-a-chunk p/ o servidor oficial do TikTok (direto do navegador + fallback relay p/ CORS)
-async function uploadChunksToTikTokUrl(blob, uploadUrl, chunkPlan, onProgress){
-  const totalSize = blob.size;
-  const chunkSize = chunkPlan.chunk_size;
-  const totalChunks = chunkPlan.total_chunk_count;
-  const contentType = blob.type && blob.type.includes('webm') ? 'video/webm' : 'video/mp4';
-
-  for(let idx = 0; idx < totalChunks; idx++){
-    const start = idx * chunkSize;
-    const endExclusive = (idx === totalChunks - 1) ? totalSize : Math.min(totalSize, start + chunkSize);
-    const slice = blob.slice(start, endExclusive, contentType);
-    const contentRange = `bytes ${start}-${endExclusive - 1}/${totalSize}`;
-
-    let uploadedOk = false;
-    try{
-      const putRes = await fetch(uploadUrl, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': contentType,
-          'Content-Range': contentRange
-        },
-        body: slice
-      });
-      if(putRes.ok || putRes.status === 201 || putRes.status === 206){
-        uploadedOk = true;
-      }
-    }catch{}
-
-    // Fallback sem CORS via Relay Serverless caso o arquivo caiba em <= 4.4MB por bloco
-    if(!uploadedOk && slice.size <= 4.4 * 1024 * 1024){
-      const relayRes = await fetch('/api/tiktok', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': contentType,
-          'X-Video-Mime': contentType,
-          'X-Upload-Url': uploadUrl,
-          'Content-Range': contentRange
-        },
-        body: slice
-      });
-      if(relayRes.ok) uploadedOk = true;
-    }
-
-    if(!uploadedOk){
-      throw new Error(`Falha de rede/CORS no bloco ${idx + 1}/${totalChunks} do upload ao TikTok.`);
-    }
-    if(onProgress) onProgress((idx + 1) / totalChunks);
-  }
-}
-
-async function pollTikTokPublishStatus(publishId, accessToken){
-  for(let attempt = 0; attempt < 10; attempt++){
-    await new Promise(r => setTimeout(r, 3000));
-    try{
-      const r = await fetch('/api/tiktok', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'check_status', publishId, accessToken })
-      });
-      const d = await r.json();
-      const st = d.statusData?.status || '';
-      if(st === 'PUBLISH_COMPLETE'){
-        return { done: true, label: '🎉 PUBLICADO NO TIKTOK COM SUCESSO!' };
-      }
-      if(st === 'SEND_TO_USER_INBOX'){
-        return { done: true, label: '📲 ENVIADO PARA SUA CAIXA DE ENTRADA NO APP TIKTOK! Abra a notificação no TikTok para concluir.' };
-      }
-      if(st === 'FAILED'){
-        return { done: false, label: `❌ TikTok recusou processamento: ${d.statusData?.fail_reason || 'formato inválido'}` };
-      }
-    }catch{}
-  }
-  return { done: true, label: `⏳ Upload 100% recebido pelo TikTok (ID: ${publishId}) — processando publicação nos servidores do TikTok!` };
-}
-
-// Motor Central de Postagem Real (executa API Oficial v2 -> Webhook -> App 1-Toque conforme configuração!)
-async function executeTikTokPublishPipeline({ blob, fileName, caption, selectedMode }){
-  const cfg = getTikTokCfg();
-  const accessToken = await ensureFreshTikTokToken();
-  const hasOfficialApi = !!(accessToken || tikTokServerEnv.hasEnvAccessToken);
-  const hasWebhook = !!(cfg.webhookUrl || tikTokServerEnv.hasEnvWebhook);
-
-  let mode = selectedMode || 'auto';
-  if(mode === 'auto'){
-    if(hasOfficialApi) mode = 'direct';
-    else if(hasWebhook) mode = 'webhook';
-    else mode = 'app_share';
-  }
-
-  if(mode === 'app_share'){
-    await shareDirectToTikTokApp(blob, fileName, caption);
-    return;
-  }
-
-  const prog = document.getElementById('ttProgress');
-  prog?.classList.add('show');
-  setProgress('ttProgressFill', 12);
-
-  // Automação via Webhook (Make.com / n8n / Zapier)
-  if(mode === 'webhook'){
-    showStatus('ttStatus', '🔗 Enviando vídeo + legenda viral para seu Webhook de Automação (Make/n8n/Zapier)...', 'info');
-    let videoBase64 = null;
-    if(blob.size <= 3.2 * 1024 * 1024){
-      const ab = await blob.arrayBuffer();
-      const bytes = new Uint8Array(ab);
-      let bin = '';
-      for(let i = 0; i < bytes.length; i += 0x8000){
-        bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
-      }
-      videoBase64 = btoa(bin);
-    }
-    const r = await fetch('/api/tiktok', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'webhook_post',
-        webhookUrl: cfg.webhookUrl,
-        caption,
-        privacyLevel: document.getElementById('ttPrivacy')?.value || 'PUBLIC_TO_EVERYONE',
-        fileName,
-        videoSize: blob.size,
-        videoBase64
-      })
-    });
-    const d = await r.json();
-    if(!r.ok || d.error) throw new Error(d.error || 'Erro ao disparar Webhook');
-    setProgress('ttProgressFill', 100);
-    showStatus('ttStatus', '✅ Vídeo e legenda disparados com sucesso para sua automação Webhook!', 'success');
-    saveTikTokHistoryEntry({
-      title: fileName,
-      caption,
-      mode: '🔗 Webhook Automático',
-      status: '✅ Entregue ao Webhook (HTTP 200)',
-      createdAt: new Date().toLocaleString('pt-BR')
-    });
-    toast('🚀 Postado via Webhook com sucesso!');
-    return;
-  }
-
-  // API Oficial TikTok Content Posting v2 (Direct Post / Inbox Upload)
-  showStatus('ttStatus', '🎵 Inicializando publicação oficial nos servidores do TikTok (Content Posting API v2)...', 'info');
-  const initRes = await fetch('/api/tiktok', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      action: 'init_post',
-      accessToken,
-      publishMode: mode === 'inbox' ? 'inbox' : 'direct',
-      caption,
-      videoSize: blob.size,
-      privacyLevel: document.getElementById('ttPrivacy')?.value || 'PUBLIC_TO_EVERYONE',
-      allowComment: document.getElementById('ttAllowComment')?.checked !== false,
-      allowDuet: document.getElementById('ttAllowDuet')?.checked !== false,
-      allowStitch: document.getElementById('ttAllowStitch')?.checked !== false,
-      isAigc: document.getElementById('ttIsAigc')?.checked !== false,
-      coverTimestampMs: 1000
-    })
-  });
-  const initData = await initRes.json();
-  if(!initRes.ok || initData.error){
-    throw new Error(initData.error || 'Falha ao iniciar postagem na API do TikTok');
-  }
-
-  setProgress('ttProgressFill', 30);
-  showStatus('ttStatus', `⬆️ Enviando vídeo (${fmtHumanBytes(blob.size)}) para o servidor do TikTok...`, 'info');
-  await uploadChunksToTikTokUrl(blob, initData.uploadUrl, initData.chunkPlan, (p) => {
-    setProgress('ttProgressFill', Math.round(30 + p * 52));
-  });
-
-  setProgress('ttProgressFill', 86);
-  showStatus('ttStatus', '⏳ Upload 100% concluído! Aguardando confirmação de publicação do TikTok...', 'info');
-  const finalCheck = await pollTikTokPublishStatus(initData.publishId, accessToken);
-  setProgress('ttProgressFill', 100);
-
-  const note = initData.fallbackNote ? ` (${initData.fallbackNote})` : '';
-  showStatus('ttStatus', finalCheck.label + note, finalCheck.done ? 'success' : 'warn');
-  saveTikTokHistoryEntry({
-    title: fileName,
-    caption,
-    publishId: initData.publishId,
-    mode: initData.effectiveMode.includes('inbox') ? '📥 Caixa de Entrada Oficial TikTok' : '🚀 API Oficial Direct Post',
-    status: finalCheck.label,
-    createdAt: new Date().toLocaleString('pt-BR')
-  });
-  toast('🎉 Vídeo enviado ao TikTok com sucesso!');
-}
-
-async function publishOrScheduleTikTok(){
-  if(!currentTikTokVideoBlob){
-    showStatus('ttStatus', '⚠️ Selecione um vídeo do aparelho ou puxe da Dublagem / Criar Vídeo primeiro!', 'warn');
-    toast('Escolha um vídeo primeiro!', 'warn');
-    return;
-  }
-  const btn = document.getElementById('ttPublishBtn');
-  btn.disabled = true;
-  try{
-    let caption = (document.getElementById('ttCaption').value || '').trim();
-    if(!caption){
-      showStatus('ttStatus', '✨ Gerando legenda e hashtags virais com IA...', 'info');
-      caption = await generateViralTikTokCaption(currentTikTokSourceScript || currentTikTokVideoName);
-      document.getElementById('ttCaption').value = caption;
-      document.getElementById('ttCaptionLen').textContent = String(caption.length);
-    }
-
-    const schedMode = document.getElementById('ttScheduleMode')?.value || 'now';
-    if(schedMode === 'scheduled'){
-      const dtVal = document.getElementById('ttScheduleTime')?.value;
-      const targetTs = dtVal ? new Date(dtVal).getTime() : 0;
-      if(!targetTs || targetTs <= Date.now()){
-        throw new Error('Escolha uma data e hora no futuro para o agendamento automático!');
-      }
-      const waitMs = targetTs - Date.now();
-      const jobBlob = currentTikTokVideoBlob;
-      const jobName = currentTikTokVideoName;
-      const jobMode = document.getElementById('ttPublishMode')?.value || 'auto';
-      const whenStr = new Date(targetTs).toLocaleString('pt-BR');
-      saveTikTokHistoryEntry({
-        title: jobName,
-        caption,
-        mode: '⏰ Agendado (' + whenStr + ')',
-        status: '⏳ Aguardando horário programado...',
-        createdAt: new Date().toLocaleString('pt-BR')
-      });
-      setTimeout(() => {
-        executeTikTokPublishPipeline({ blob: jobBlob, fileName: jobName, caption, selectedMode: jobMode })
-          .catch(err => toast('Erro no agendamento TikTok: ' + err.message, 'error'));
-      }, waitMs);
-      showStatus('ttStatus', `⏰ Vídeo "${jobName}" agendado com sucesso para ${whenStr}! Mantenha esta aba aberta.`, 'success');
-      toast(`⏰ Postagem agendada para ${whenStr}!`);
-      return;
-    }
-
-    await executeTikTokPublishPipeline({
-      blob: currentTikTokVideoBlob,
-      fileName: currentTikTokVideoName,
-      caption,
-      selectedMode: document.getElementById('ttPublishMode')?.value || 'auto'
-    });
-  }catch(e){
-    showStatus('ttStatus', '❌ ' + (e.message || e), 'error');
-    toast('Erro TikTok: ' + (e.message || e), 'error');
-  }finally{
-    btn.disabled = false;
-  }
-}
-
-// Botão 1-Clique nas telas Criar / Avatar / Dublar -> prepara vídeo + legenda viral e posta direto!
-async function quickPostSourceToTikTok(kind){
-  openTab('tiktok', document.getElementById('tab-tiktok'));
-  const ok = await loadExistingStudioVideoForTikTok(kind);
-  if(ok) await publishOrScheduleTikTok();
-}
-
-// Disparo 100% automático ao finalizar renderização quando o checkbox "Auto-postar no TikTok" está marcado!
-async function autoPostFinishedVideoToTikTok(kind, blob, fileName, scriptText){
-  try{
-    attachVideoToTikTokComposer(blob, fileName, scriptText);
-    const caption = await generateViralTikTokCaption(scriptText || fileName);
-    const area = document.getElementById('ttCaption');
-    if(area){ area.value = caption; document.getElementById('ttCaptionLen').textContent = String(caption.length); }
-    toast('🎵 Auto-Post TikTok iniciado automaticamente!');
-    await executeTikTokPublishPipeline({ blob, fileName, caption, selectedMode: 'auto' });
-  }catch(e){
-    toast('⚠️ Auto-Post TikTok: ' + (e.message || e), 'warn');
-  }
-}
-
-async function refreshSingleTikTokStatus(publishId){
-  try{
-    const accessToken = await ensureFreshTikTokToken();
-    const r = await fetch('/api/tiktok', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'check_status', publishId, accessToken })
-    });
-    const d = await r.json();
-    const st = d.statusData?.status || 'UNKNOWN';
-    toast(`📡 Status TikTok (${publishId.slice(0,12)}...): ${st}`);
-  }catch(e){
-    toast('Erro ao consultar status: ' + e.message, 'error');
-  }
-}
-
-function renderTikTokHistory(){
-  const box = document.getElementById('ttHistoryList');
-  if(!box) return;
-  const list = getTikTokHistory();
-  if(!list.length){
-    box.innerHTML = 'Nenhuma postagem realizada ainda nesta sessão.';
-    return;
-  }
-  box.innerHTML = list.map(item => `
-    <div style="padding:10px 12px;border-radius:10px;background:#0e1427;border:1px solid #1e293b;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-      <div style="flex:1;min-width:200px">
-        <div style="font-weight:800;color:#f1f5f9">${esc(item.title || 'Vídeo TikTok')} <span style="font-weight:600;color:#f472b6;font-size:11px">• ${esc(item.mode || '')}</span></div>
-        <div style="font-size:11.5px;color:#6ee7b7;margin-top:2px">${esc(item.status || '')}</div>
-        <div style="font-size:11px;color:#64748b;margin-top:2px">${esc(item.createdAt || '')} — ${esc(String(item.caption || '').slice(0, 90))}...</div>
-      </div>
-      ${item.publishId ? `<button class="ghost" type="button" onclick="refreshSingleTikTokStatus('${esc(item.publishId)}')" style="font-size:11.5px;padding:6px 10px">🔄 Status API</button>` : ''}
-    </div>
-  `).join('');
-}
-
-async function initTikTokStudio(){
-  const origin = window.location.origin;
-  const redir = document.getElementById('ttRedirectUriDisplay');
-  if(redir) redir.value = origin + '/api/tiktok';
-  const webUrl = document.getElementById('ttWebUrlDisplay');
-  if(webUrl) webUrl.value = origin + '/';
-  const termsUrl = document.getElementById('ttTermsUrlDisplay');
-  if(termsUrl) termsUrl.value = origin + '/terms';
-  const privUrl = document.getElementById('ttPrivacyUrlDisplay');
-  if(privUrl) privUrl.value = origin + '/privacy';
-
-  const cfg = getTikTokCfg();
-  if(cfg.clientKey && document.getElementById('ttClientKey')) document.getElementById('ttClientKey').value = cfg.clientKey;
-  if(cfg.clientSecret && document.getElementById('ttClientSecret')) document.getElementById('ttClientSecret').value = cfg.clientSecret;
-  if(cfg.webhookUrl && document.getElementById('ttWebhookUrl')) document.getElementById('ttWebhookUrl').value = cfg.webhookUrl;
-  if(cfg.scopes && document.getElementById('ttOAuthScopes')) document.getElementById('ttOAuthScopes').value = cfg.scopes;
-  if(cfg.siteVerification && document.getElementById('ttSiteVerificationInput')) document.getElementById('ttSiteVerificationInput').value = cfg.siteVerification;
-
-  const auth = getTikTokAuth();
-  if(auth.accessToken && document.getElementById('ttManualToken')) document.getElementById('ttManualToken').value = auth.accessToken;
-  if(cfg.autopost){
-    document.querySelectorAll('.tt-autopost-chk').forEach(el => { el.checked = true; });
-  }
-  window.addEventListener('message', (ev) => {
-    if(ev.data && ev.data.type === 'DUBAI_TIKTOK_CONNECTED'){
-      refreshTikTokBadges();
-      verifyTikTokAccount();
-    }
-  });
-  renderTikTokHistory();
-  try{
-    const r = await fetch('/api/tiktok', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'config_status' })
-    });
-    const d = await r.json();
-    if(r.ok){
-      tikTokServerEnv = d;
-      if(!cfg.clientKey && d.envClientKey && document.getElementById('ttClientKey')){
-        document.getElementById('ttClientKey').value = d.envClientKey;
-      }
-      if(!cfg.siteVerification && d.siteVerification && document.getElementById('ttSiteVerificationInput')){
-        document.getElementById('ttSiteVerificationInput').value = d.siteVerification;
-      }
-    }
-  }catch{}
-  refreshTikTokBadges();
-  if(window.location.hash === '#tiktok'){
-    openTab('tiktok', document.getElementById('tab-tiktok'));
-  }
-}
-
 // Init
-initTikTokStudio();
 initAvatarPresets();
 checkHealth();
 loadProjects();
