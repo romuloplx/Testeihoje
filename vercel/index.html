@@ -840,11 +840,11 @@ input[type="range"]{
       <div class="row" style="margin-top:10px">
         <div>
           <label style="margin-top:0">TikTok Client Key (do seu App / Sandbox)</label>
-          <input id="ttClientKey" placeholder="Ex: aw1234567890abcdef" onchange="saveTikTokLocalSettings()">
+          <input id="ttClientKey" value="mnpo08t7m256hkr7" placeholder="Ex: mnpo08t7m256hkr7" onchange="saveTikTokLocalSettings()">
         </div>
         <div>
-          <label style="margin-top:0">TikTok Client Secret</label>
-          <input id="ttClientSecret" type="password" placeholder="Ex: Secr3tKey..." onchange="saveTikTokLocalSettings()">
+          <label style="margin-top:0">TikTok Client Secret (já salvo na Vercel ✅)</label>
+          <input id="ttClientSecret" type="password" placeholder="Já configurado na Vercel (opcional alterar)" onchange="saveTikTokLocalSettings()">
         </div>
         <div>
           <label style="margin-top:0">Permissões OAuth solicitadas</label>
@@ -5505,7 +5505,7 @@ function disconnectTikTokAccount(){
   toast('Conta TikTok desconectada.');
 }
 
-// Gera PKCE S256 (exigido pelo Login Kit v2 oficial do TikTok) e abre autorização oficial
+// Abre autorização oficial TikTok Login Kit v2 for Web
 async function startTikTokOAuthLogin(forceOpen = false){
   const keyInp = document.getElementById('ttClientKey');
   const secInp = document.getElementById('ttClientSecret');
@@ -5514,7 +5514,7 @@ async function startTikTokOAuthLogin(forceOpen = false){
 
   saveTikTokLocalSettings();
   const cfg = getTikTokCfg();
-  const clientKey = cfg.clientKey || tikTokServerEnv.envClientKey || '';
+  const clientKey = cfg.clientKey || tikTokServerEnv.envClientKey || 'mnpo08t7m256hkr7';
   if(!clientKey){
     document.getElementById('ttGuideBox')?.classList.remove('hidden');
     showStatus('ttStatus', '⚠️ Cole primeiro o Client Key e Client Secret do seu App / Sandbox em developers.tiktok.com (veja o guia passo a passo aberto acima!).', 'warn');
@@ -5554,21 +5554,15 @@ async function startTikTokOAuthLogin(forceOpen = false){
     }catch{}
   }
 
-  const randBytes = new Uint8Array(32);
-  crypto.getRandomValues(randBytes);
-  const codeVerifier = Array.from(randBytes, b => ('0' + b.toString(16)).slice(-2)).join('');
-  const hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(codeVerifier));
-  const codeChallenge = btoa(String.fromCharCode(...new Uint8Array(hashBuf)))
-    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   const redirectUri = window.location.origin + '/api/tiktok';
   const scopes = document.getElementById('ttOAuthScopes')?.value || cfg.scopes || 'user.info.basic,video.publish,video.upload';
 
-  // Codifica codeVerifier + redirectUri no state para funcionar mesmo em abas mobile/in-app browser
-  const statePayload = btoa(JSON.stringify({ v: codeVerifier, r: redirectUri, k: clientKey }))
+  // Codifica redirectUri + clientKey no state para funcionar mesmo em abas mobile/in-app browser
+  const statePayload = btoa(JSON.stringify({ v: '', r: redirectUri, k: clientKey }))
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   const state = 'st_' + statePayload;
 
-  localStorage.setItem('dubai_tiktok_pkce', JSON.stringify({ codeVerifier, state, redirectUri }));
+  localStorage.setItem('dubai_tiktok_pkce', JSON.stringify({ codeVerifier: '', state, redirectUri }));
 
   try{
     await fetch('/api/tiktok', {
@@ -5578,7 +5572,7 @@ async function startTikTokOAuthLogin(forceOpen = false){
         action: 'save_config',
         clientKey,
         clientSecret: cfg.clientSecret || '',
-        codeVerifier,
+        codeVerifier: '',
         redirectUri
       })
     });
@@ -5586,12 +5580,10 @@ async function startTikTokOAuthLogin(forceOpen = false){
 
   const params = new URLSearchParams({
     client_key: clientKey,
-    response_type: 'code',
     scope: scopes,
+    response_type: 'code',
     redirect_uri: redirectUri,
-    state,
-    code_challenge: codeChallenge,
-    code_challenge_method: 'S256'
+    state
   });
   const authUrl = `https://www.tiktok.com/v2/auth/authorize/?${params.toString()}`;
   const popup = window.open(authUrl, 'dubaiTikTokOAuth', 'width=520,height=700');

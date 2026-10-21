@@ -7,7 +7,7 @@ const TIKTOK_AUTH_BASE = 'https://open.tiktokapis.com/v2';
 // Armazenamento persistente híbrido (Memória Global Fluid Compute + /tmp + data/)
 if (!global.__DUBAI_TIKTOK_STORE) {
   global.__DUBAI_TIKTOK_STORE = {
-    clientKey: process.env.TIKTOK_CLIENT_KEY || '',
+    clientKey: process.env.TIKTOK_CLIENT_KEY || 'mnpo08t7m256hkr7',
     clientSecret: process.env.TIKTOK_CLIENT_SECRET || '',
     accessToken: process.env.TIKTOK_ACCESS_TOKEN || '',
     refreshToken: '',
