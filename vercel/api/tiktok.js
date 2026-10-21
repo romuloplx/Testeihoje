@@ -408,8 +408,9 @@ module.exports = async (req, res) => {
   try {
     const body = await parseJsonBody(req);
     const action = String(body.action || 'config_status');
-    const clientKey = String(body.clientKey || store.clientKey || process.env.TIKTOK_CLIENT_KEY || '').trim();
-    const clientSecret = String(body.clientSecret || store.clientSecret || process.env.TIKTOK_CLIENT_SECRET || '').trim();
+    const cleanKeyStr = (s) => String(s || '').trim().replace(/^['"]+|['"]+$/g, '').replace(/\s+/g, '');
+    const clientKey = cleanKeyStr(body.clientKey || store.clientKey || process.env.TIKTOK_CLIENT_KEY || '');
+    const clientSecret = cleanKeyStr(body.clientSecret || store.clientSecret || process.env.TIKTOK_CLIENT_SECRET || '');
     const accessToken = String(body.accessToken || store.accessToken || process.env.TIKTOK_ACCESS_TOKEN || '').trim();
 
     if (action === 'config_status') {
@@ -422,6 +423,62 @@ module.exports = async (req, res) => {
         siteVerification: store.siteVerification || '',
         connectedUsername: store.username || '',
         connectedDisplayName: store.displayName || ''
+      });
+    }
+
+    // Diagnóstico Inteligente de Client Key + Client Secret antes de abrir o OAuth do TikTok
+    if (action === 'validate_keys') {
+      if (!clientKey) {
+        return send(res, 400, {
+          ok: false,
+          reason: 'missing_key',
+          error: 'Informe o Client Key do seu App/Sandbox no TikTok.'
+        });
+      }
+      if (/^\d+$/.test(clientKey)) {
+        return send(res, 400, {
+          ok: false,
+          reason: 'app_id_instead_of_client_key',
+          error: 'Você colou o "App ID" (apenas números). Volte ao developers.tiktok.com e copie o campo "Client Key" (letras e números, ex: sbaw... ou aw...).'
+        });
+      }
+      if (clientKey.length < 10 || clientKey.length > 40) {
+        return send(res, 400, {
+          ok: false,
+          reason: 'invalid_format',
+          error: `Formato de Client Key incomum (${clientKey.length} caracteres). Copie exatamente o campo Client Key do Sandbox no developers.tiktok.com.`
+        });
+      }
+
+      // Testa credenciais direto no endpoint oficial client_credentials do TikTok v2
+      let clientTokenOk = false;
+      let tiktokErrorMsg = '';
+      if (clientSecret) {
+        try {
+          const params = new URLSearchParams({
+            client_key: clientKey,
+            client_secret: clientSecret,
+            grant_type: 'client_credentials'
+          });
+          const checkResp = await tiktokJsonFetch(`${TIKTOK_AUTH_BASE}/oauth/token/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Cache-Control': 'no-cache' },
+            body: params.toString()
+          });
+          if (checkResp.json && checkResp.json.access_token) {
+            clientTokenOk = true;
+          } else if (checkResp.json && (checkResp.json.error || checkResp.json.error_description)) {
+            tiktokErrorMsg = `${checkResp.json.error || ''}: ${checkResp.json.error_description || ''}`;
+          }
+        } catch {}
+      }
+
+      saveTikTokStore({ clientKey, clientSecret });
+      return send(res, 200, {
+        ok: true,
+        clientKey,
+        clientTokenOk,
+        tiktokErrorMsg
       });
     }
 

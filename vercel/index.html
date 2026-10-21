@@ -869,8 +869,17 @@ input[type="range"]{
       </div>
 
       <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-        <button type="button" onclick="startTikTokOAuthLogin()" style="padding:12px 18px;border:none;border-radius:10px;font-weight:800;font-size:13.5px;cursor:pointer;color:#fff;background:linear-gradient(135deg,#f43f5e,#ec4899,#8b5cf6);box-shadow:0 6px 20px rgba(236,72,153,.35)">🔗 Salvar Chaves & Conectar Conta TikTok Oficial (OAuth 2.0)</button>
+        <button type="button" onclick="startTikTokOAuthLogin(false)" style="padding:12px 18px;border:none;border-radius:10px;font-weight:800;font-size:13.5px;cursor:pointer;color:#fff;background:linear-gradient(135deg,#f43f5e,#ec4899,#8b5cf6);box-shadow:0 6px 20px rgba(236,72,153,.35)">🔗 Salvar Chaves & Conectar Conta TikTok Oficial (OAuth 2.0)</button>
         <button class="ghost" type="button" onclick="verifyTikTokAccount()" style="font-size:12.5px">🩺 Testar Conexão API TikTok</button>
+      </div>
+
+      <!-- DIAGNÓSTICO DE ERRO client_key NO TIKTOK -->
+      <div id="ttKeyDiagBox" style="margin-top:10px;padding:11px 13px;border-radius:10px;background:#1c1124;border:1px solid #f43f5e88;font-size:12px;line-height:1.65;color:#fecdd3">
+        <b>💡 Apareceu "corrija o seguinte: • client_key" na tela do TikTok? Veja os 3 motivos exatos:</b><br>
+        1️⃣ <b>Chave de Rascunho vs. Sandbox:</b> Se o seu app no <code>developers.tiktok.com</code> está em <i>Draft (Rascunho)</i>, o TikTok bloqueia o <code>Client Key</code> normal até ser revisado! Para funcionar <b>na hora sem revisão</b>, clique no botão <b>"Create Sandbox"</b> no topo do painel do TikTok e copie o <b>Client Key de dentro do Sandbox</b> (geralmente começa com <code>sbaw...</code>).<br>
+        2️⃣ <b>Faltou clicar em "Save" no Login Kit:</b> Dentro do Sandbox, vá em <b>Products → Login Kit</b>, marque a opção <b>Web</b>, cole a Redirect URI <code>https://dubai-pro.vercel.app/api/tiktok</code> e clique no botão <b>Save (Salvar)</b> no canto inferior direito + adicione seu <code>@usuario</code> em <b>Target Users</b>.<br>
+        3️⃣ <b>App ID vs. Client Key:</b> Não cole o <i>App ID</i> (que tem apenas números); copie o campo <b>Client Key</b> (letras e números).<br>
+        <div style="margin-top:6px;color:#a7f3d0;font-weight:700">📲 <b>Quer postar agora no celular sem precisar de Client Key?</b> Use o card <b>⚡ Fábrica 1-Clique 9:16</b> logo abaixo — no celular Android/iPhone ele já envia o vídeo <code>.MP4</code> + legenda viral direto para o seu App TikTok instalado sem precisar de conta de desenvolvedor!</div>
       </div>
     </div>
   </div>
@@ -5497,7 +5506,12 @@ function disconnectTikTokAccount(){
 }
 
 // Gera PKCE S256 (exigido pelo Login Kit v2 oficial do TikTok) e abre autorização oficial
-async function startTikTokOAuthLogin(){
+async function startTikTokOAuthLogin(forceOpen = false){
+  const keyInp = document.getElementById('ttClientKey');
+  const secInp = document.getElementById('ttClientSecret');
+  if(keyInp) keyInp.value = keyInp.value.trim().replace(/^['"]+|['"]+$/g, '').replace(/\s+/g, '');
+  if(secInp) secInp.value = secInp.value.trim().replace(/^['"]+|['"]+$/g, '').replace(/\s+/g, '');
+
   saveTikTokLocalSettings();
   const cfg = getTikTokCfg();
   const clientKey = cfg.clientKey || tikTokServerEnv.envClientKey || '';
@@ -5506,6 +5520,38 @@ async function startTikTokOAuthLogin(){
     showStatus('ttStatus', '⚠️ Cole primeiro o Client Key e Client Secret do seu App / Sandbox em developers.tiktok.com (veja o guia passo a passo aberto acima!).', 'warn');
     document.getElementById('ttClientKey')?.focus();
     return;
+  }
+
+  if(/^\d+$/.test(clientKey)){
+    showStatus('ttStatus', '❌ Você colou o "App ID" (apenas números). No painel developers.tiktok.com, copie o campo "Client Key" (letras e números, ex: sbaw... ou aw...)!', 'error');
+    toast('Use o Client Key (letras e números), não o App ID!', 'error');
+    keyInp?.focus();
+    return;
+  }
+
+  // Pré-validação da chave no servidor antes de redirecionar p/ o TikTok
+  if(!forceOpen){
+    try{
+      showStatus('ttStatus', '🔍 Validando Client Key e Client Secret nos servidores do TikTok...', 'info');
+      const vRes = await fetch('/api/tiktok', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'validate_keys',
+          clientKey,
+          clientSecret: cfg.clientSecret || ''
+        })
+      });
+      const vData = await vRes.json();
+      if(!vRes.ok || vData.ok === false){
+        showStatus('ttStatus', '❌ ' + (vData.error || 'Chave inválida'), 'error');
+        toast(vData.error || 'Verifique o Client Key', 'error');
+        return;
+      }
+      if(vData.tiktokErrorMsg && /invalid_client|client_key/i.test(vData.tiktokErrorMsg)){
+        showStatus('ttStatus', `⚠️ O servidor do TikTok informou (${vData.tiktokErrorMsg}): Confira se você copiou o Client Key de dentro do "Sandbox" no developers.tiktok.com e clicou em "Save" no Login Kit!`, 'warn');
+      }
+    }catch{}
   }
 
   const randBytes = new Uint8Array(32);
