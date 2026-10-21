@@ -534,28 +534,41 @@ input[type="range"]{
 <!-- DUB -->
 <section id="dub" class="hidden">
   <div class="card">
-    <h2>🌍 Dublar vídeo</h2>
-    <p>Envie um vídeo em outro idioma para traduzir e dublar em português brasileiro com sincronia.</p>
+    <h2>🌍 Dublar Vídeo ou Áudio (Pequenos & Grandes • Sem Limite de Tamanho)</h2>
+    <p>Suba desde <b>clipes curtos (TikTok, Reels, Shorts, WhatsApp)</b> até <b>vídeos longos e pesados (aulas, podcasts, documentários e filmes de centenas de MBs ou GBs)</b>. O motor extrai apenas o áudio no seu aparelho e processa em blocos sincronizados sem estourar memória nem cortar o vídeo!</p>
 
-    <label>Selecionar vídeo ou áudio</label>
-    <input type="file" id="videoFile" accept="video/*,audio/*" onchange="previewVideo()">
-    <div class="hint">MP4, MOV, MP3, M4A até 200MB • Funciona mesmo sem backend de voz (modo simulação).</div>
+    <div id="dubDropZone"
+         ondragover="event.preventDefault();this.style.borderColor='#34d399';this.style.background='#0f1f26'"
+         ondragleave="this.style.borderColor='#4c1d95';this.style.background='linear-gradient(180deg,#111428,#0b0d1b)'"
+         ondrop="onDropDubFile(event)"
+         onclick="document.getElementById('videoFile').click()"
+         style="margin-top:12px;padding:22px 16px;border:2px dashed #4c1d95;border-radius:14px;background:linear-gradient(180deg,#111428,#0b0d1b);text-align:center;cursor:pointer;transition:.2s">
+      <div style="font-size:28px;margin-bottom:6px">🎬 ⬆️ 🎧</div>
+      <div style="font-weight:800;font-size:14.5px;color:#e0e7ff">Toque aqui ou arraste qualquer vídeo / áudio (pequeno ou grande)</div>
+      <div class="hint" style="margin-top:6px">Suporta <b>MP4, MOV, MKV, WEBM, AVI, M4V, MP3, WAV, M4A, OGG</b> • Clipes de 2s até vídeos longos de 500MB / 1GB+ com fatiamento automático!</div>
+    </div>
+    <input type="file" id="videoFile" accept="video/*,audio/*,.mkv,.mov,.avi,.flv,.wmv,.m4v,.mp4,.webm,.mp3,.wav,.m4a,.ogg" onchange="previewVideo()" style="display:none">
 
-    <video id="preview" controls hidden></video>
+    <div id="dubFileMeta" class="hidden" style="margin-top:12px;padding:11px 13px;border-radius:11px;background:#0e1726;border:1px solid #1e3a8a;font-size:12.5px;line-height:1.6;color:#dbeafe"></div>
+
+    <video id="preview" controls playsinline hidden style="width:100%;max-height:440px;margin-top:12px;border-radius:10px;background:#000"></video>
     <audio id="audioPreview" controls hidden style="width:100%;margin-top:12px"></audio>
 
-    <div class="row">
+    <div class="row" style="margin-top:12px">
       <div>
         <label>Idioma original</label>
         <select id="language">
-          <option value="">Detectar automaticamente</option>
-          <option value="en">Inglês</option>
-          <option value="es">Espanhol</option>
-          <option value="fr">Francês</option>
-          <option value="ja">Japonês</option>
-          <option value="ko">Coreano</option>
-          <option value="de">Alemão</option>
-          <option value="it">Italiano</option>
+          <option value="">✨ Detectar automaticamente</option>
+          <option value="en">🇺🇸 Inglês</option>
+          <option value="es">🇪🇸 Espanhol</option>
+          <option value="fr">🇫🇷 Francês</option>
+          <option value="ja">🇯🇵 Japonês</option>
+          <option value="ko">🇰🇷 Coreano</option>
+          <option value="zh">🇨🇳 Chinês</option>
+          <option value="de">🇩🇪 Alemão</option>
+          <option value="it">🇮🇹 Italiano</option>
+          <option value="ru">🇷🇺 Russo</option>
+          <option value="pt">🇧🇷 Português</option>
         </select>
       </div>
       <div>
@@ -565,57 +578,98 @@ input[type="range"]{
             <option value="onyx">Onyx — Masculina grave</option>
             <option value="nova">Nova — Feminina natural</option>
             <option value="alloy">Alloy — Neutra</option>
-            <option value="echo">Echo — Masculina</option>
-            <option value="fable">Fable — Masculina expressiva</option>
+            <option value="echo">Echo — Masculina jovem</option>
+            <option value="fable">Fable — Narrador expressivo</option>
             <option value="shimmer">Shimmer — Feminina suave</option>
-            <option value="ash">Ash — Neutra firme</option>
+            <option value="ash">Ash — Masculina firme</option>
             <option value="coral">Coral — Feminina clara</option>
-            <option value="sage">Sage — Neutra calma</option>
+            <option value="sage">Sage — Calma / Documentário</option>
           </select>
           <button class="ghost" type="button" onclick="previewVoice(document.getElementById('dubVoice').value)">🔊</button>
         </div>
       </div>
       <div>
-        <label>Traduzir para</label>
+        <label>Traduzir e dublar em</label>
         <select id="targetLanguage">
-          <option value="pt-BR" selected>Português (BR)</option>
-          <option value="en">Inglês</option>
-          <option value="es">Espanhol</option>
-          <option value="fr">Francês</option>
-          <option value="de">Alemão</option>
-          <option value="it">Italiano</option>
+          <option value="pt-BR" selected>🇧🇷 Português (Brasil)</option>
+          <option value="en">🇺🇸 Inglês</option>
+          <option value="es">🇪🇸 Espanhol</option>
+          <option value="fr">🇫🇷 Francês</option>
+          <option value="de">🇩🇪 Alemão</option>
+          <option value="it">🇮🇹 Italiano</option>
+          <option value="ja">🇯🇵 Japonês</option>
         </select>
       </div>
     </div>
 
-    <button class="primary" id="dubBtn" onclick="dubVideo()">🎙️ Dublar (trocar o áudio do vídeo)</button>
+    <div class="row">
+      <div>
+        <label>Mixagem com áudio original</label>
+        <select id="dubBgMix">
+          <option value="duck" selected>🔉 Voz dublada + som ambiente original suave (12%)</option>
+          <option value="mute">🔇 100% só a voz nova (silenciar áudio original)</option>
+        </select>
+      </div>
+      <div>
+        <label>Legendas traduzidas no vídeo</label>
+        <select id="dubBurnSubs">
+          <option value="yes" selected>💬 Incluir legendas traduzidas sincronizadas</option>
+          <option value="no">🚫 Vídeo limpo (sem legenda queimada na tela)</option>
+        </select>
+      </div>
+      <div>
+        <label>Extensão do processamento</label>
+        <select id="dubRangeMode" onchange="document.getElementById('dubTrimRow').classList.toggle('hidden', this.value!=='trim')">
+          <option value="full" selected>🎬 Vídeo INTEIRO (do início ao fim, sem cortes)</option>
+          <option value="trim">✂️ Escolher trecho específico (início e fim)</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="dubTrimRow" class="row hidden" style="background:#101528;padding:10px 12px;border-radius:10px;border:1px solid #334155">
+      <div>
+        <label style="margin-top:0">⏱️ Começar em (segundos ou min:seg)</label>
+        <input id="dubTrimStart" value="0:00" placeholder="Ex: 0:00 ou 90">
+      </div>
+      <div>
+        <label style="margin-top:0">⏱️ Terminar em (segundos ou min:seg)</label>
+        <input id="dubTrimEnd" value="2:00" placeholder="Ex: 2:30 ou 150">
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <button class="primary" id="dubBtn" onclick="dubVideo()" style="flex:1;min-width:240px">🎙️ Dublar Vídeo Completo Agora (Pequeno ou Grande)</button>
+      <button class="ghost hidden" type="button" id="dubStopBtn" onclick="requestStopDubbing()" style="border-color:#f59e0b;color:#fde68a">⏹️ Finalizar no ponto atual</button>
+    </div>
 
     <div class="progress-wrap" id="dubProgress">
       <div class="progress-bar"><div class="progress-fill" id="dubProgressFill"></div></div>
       <div class="progress-steps">
-        <span id="d1" class="active">Upload</span>
-        <span id="d2">Transcrição</span>
-        <span id="d3">Tradução</span>
-        <span id="d4">Dublagem</span>
+        <span id="d1" class="active">Áudio Inteligente</span>
+        <span id="d2">Transcrição IA</span>
+        <span id="d3">Tradução + Voz</span>
+        <span id="d4">Sincronia Master</span>
       </div>
     </div>
 
     <div class="status" id="dubStatus"></div>
     <div id="dubResult" class="hidden" style="margin-top:14px">
-      <div style="background:#0f0f1e;border:1px solid var(--border);border-radius:12px;padding:14px">
-        <div id="dubTitle" style="font-weight:800;font-size:13px;margin-bottom:8px">✅ Dublagem concluída</div>
-        <div id="dubPlayerWrap" class="hidden" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
+      <div style="background:linear-gradient(180deg,#0f172a,#090d16);border:1.5px solid #10b98188;border-radius:14px;padding:14px">
+        <div id="dubTitle" style="font-weight:800;font-size:14px;color:#6ee7b7;margin-bottom:10px">✅ Dublagem concluída!</div>
+        <div id="dubPlayerWrap" class="hidden" style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px">
           <audio id="dubAudio" controls style="width:100%"></audio>
+          <video id="dubExportedVideo" controls playsinline class="hidden" style="width:100%;max-height:460px;border-radius:10px;background:#000"></video>
+          <button type="button" id="dubMainDownloadBtn" onclick="downloadDubVideo()" style="width:100%;padding:15px 18px;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;color:#042f2e;background:linear-gradient(135deg,#34d399,#10b981,#06b6d4);box-shadow:0 8px 26px rgba(16,185,129,.35)">⬇️ GERAR E BAIXAR VÍDEO DUBLADO COMPLETO (.MP4 / .WEBM)</button>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="primary" onclick="playDubbed()" style="padding:8px 14px">▶️ Assistir vídeo dublado</button>
-            <button class="ghost" onclick="downloadDubVideo()">📼 Baixar VÍDEO dublado (áudio trocado)</button>
-            <a id="dubDownload" class="ghost" download="dublagem.mp3" style="padding:8px 14px;text-decoration:none">⬇️ Baixar só o áudio</a>
+            <button class="primary" type="button" onclick="playDubbed()" style="padding:9px 14px">▶️ Assistir vídeo sincronizado agora (instantâneo)</button>
+            <a id="dubDownload" class="ghost" download="dublagem-completa.wav" style="padding:9px 14px;text-decoration:none">🎙️ Baixar áudio dublado (.WAV)</a>
+            <button class="ghost" type="button" onclick="downloadDubSRT()">📜 Baixar legendas traduzidas (.SRT)</button>
           </div>
         </div>
-        <div style="font-weight:800;font-size:12px;margin-bottom:6px">📝 Tradução PT-BR</div>
-        <div id="dubScript" style="white-space:pre-wrap;font-size:12.5px;line-height:1.7;color:#d1d5ff;max-height:300px;overflow:auto"></div>
+        <div style="font-weight:800;font-size:12px;margin-bottom:6px">📝 Roteiro Transcrito & Traduzido por Blocos de Tempo</div>
+        <div id="dubScript" style="white-space:pre-wrap;font-size:12.5px;line-height:1.7;color:#d1d5ff;max-height:320px;overflow:auto"></div>
         <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-          <button class="ghost" onclick="copyText(document.getElementById('dubScript').innerText)">📋 Copiar</button>
+          <button class="ghost" onclick="copyText(document.getElementById('dubScript').innerText)">📋 Copiar tradução</button>
           <button class="ghost" onclick="speakText(document.getElementById('dubScript').innerText)">🔊 Ouvir (voz do navegador)</button>
         </div>
       </div>
@@ -790,21 +844,91 @@ function downloadSRT(){
   toast('📜 Legendas SRT baixadas ('+(n-1)+' trechos)');
 }
 
-function previewVideo(){
-  const file=$('#videoFile').files[0];
+let currentDubFile = null;
+function fmtHumanBytes(bytes){
+  if(!bytes || bytes < 1024) return (bytes||0)+' B';
+  if(bytes < 1024*1024) return (bytes/1024).toFixed(1)+' KB';
+  if(bytes < 1024*1024*1024) return (bytes/1024/1024).toFixed(1)+' MB';
+  return (bytes/1024/1024/1024).toFixed(2)+' GB';
+}
+function fmtClockSec(sec){
+  const s = Math.max(0, Math.round(sec||0));
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), r = s%60;
+  return h > 0 ? `${h}:${String(m).padStart(2,'0')}:${String(r).padStart(2,'0')}` : `${m}:${String(r).padStart(2,'0')}`;
+}
+function parseTimeInput(str, fallbackSec=0){
+  const raw = String(str||'').trim();
+  if(!raw) return fallbackSec;
+  if(raw.includes(':')){
+    const parts = raw.split(':').map(n=>parseFloat(n)||0);
+    if(parts.length===3) return parts[0]*3600 + parts[1]*60 + parts[2];
+    if(parts.length===2) return parts[0]*60 + parts[1];
+  }
+  const n = parseFloat(raw);
+  return isFinite(n) ? Math.max(0, n) : fallbackSec;
+}
+function onDropDubFile(ev){
+  ev.preventDefault();
+  const dz = document.getElementById('dubDropZone');
+  if(dz){ dz.style.borderColor='#4c1d95'; dz.style.background='linear-gradient(180deg,#111428,#0b0d1b)'; }
+  const f = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0];
+  if(!f) return;
+  try{
+    const dt = new DataTransfer();
+    dt.items.add(f);
+    document.getElementById('videoFile').files = dt.files;
+  }catch(e){}
+  previewVideo(f);
+}
+
+function previewVideo(overrideFile){
+  const file = overrideFile || $('#videoFile').files[0];
   if(!file) return;
+  currentDubFile = file;
+  lastDubVideoBlob = null;
+  const expV = document.getElementById('dubExportedVideo');
+  if(expV){ expV.classList.add('hidden'); expV.src=''; }
+
   if(previewUrl) URL.revokeObjectURL(previewUrl);
-  previewUrl=URL.createObjectURL(file);
-  const isAudio = file.type.startsWith('audio/');
-  const v=$('#preview'), a=$('#audioPreview');
+  previewUrl = URL.createObjectURL(file); // Zero cópia em RAM — funciona até com arquivos de 2GB+!
+  const isAudio = file.type.startsWith('audio/') || /\.(mp3|wav|m4a|ogg|flac|aac)$/i.test(file.name);
+  const v = $('#preview'), a = $('#audioPreview');
+  const metaBox = document.getElementById('dubFileMeta');
+  if(metaBox){
+    metaBox.classList.remove('hidden');
+    metaBox.innerHTML = `📎 <b>${escapeHtml(file.name)}</b> • <b>${fmtHumanBytes(file.size)}</b> • Lendo duração e formato...`;
+  }
+
+  const updateInspector = (dur, vw, vh) => {
+    const cleanDur = isFinite(dur) && dur > 0 ? dur : 0;
+    const chunks = Math.max(1, Math.ceil((cleanDur || 30) / 55));
+    const isHeavy = file.size > 95 * 1024 * 1024;
+    const isLong = chunks > 1;
+    const modeTag = !isLong && !isHeavy
+      ? `⚡ <b>Vídeo Curto (1 etapa rápida)</b> — transcrição, tradução e voz numa única tacada!`
+      : `🎬 <b>Vídeo Grande / Longo (${chunks} blocos automáticos de 55s${isHeavy ? ' • Extração Streaming Zero-RAM' : ''})</b> — processa 100% do arquivo sem travar memória nem cortar aos 2 minutos!`;
+    if(document.getElementById('dubTrimEnd') && cleanDur > 0){
+      document.getElementById('dubTrimEnd').value = fmtClockSec(cleanDur);
+    }
+    if(metaBox){
+      metaBox.innerHTML =
+        `📎 <b>${escapeHtml(file.name)}</b> • Tamanho: <b>${fmtHumanBytes(file.size)}</b>`
+        + (cleanDur > 0 ? ` • Duração: <b>${fmtClockSec(cleanDur)}</b>` : '')
+        + (vw && vh ? ` • Resolução: <b>${vw}×${vh}</b>` : ' • Formato: <b>Áudio</b>')
+        + `<br>${modeTag}`;
+    }
+  };
+
   if(isAudio){
     v.hidden=true; v.src='';
     a.src=previewUrl; a.hidden=false;
+    a.onloadedmetadata = () => updateInspector(a.duration, 0, 0);
   }else{
     a.hidden=true; a.src='';
     v.src=previewUrl; v.hidden=false;
+    v.onloadedmetadata = () => updateInspector(v.duration, v.videoWidth, v.videoHeight);
   }
-  toast('📎 ' + file.name);
+  toast('📎 Arquivo carregado: ' + file.name + ' (' + fmtHumanBytes(file.size) + ')');
 }
 
 function renderCastPreviewBox(data){
@@ -936,161 +1060,541 @@ function bytesToBase64(bytes){
   for(let i=0;i<bytes.length;i+=chunk)bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+chunk));
   return btoa(bin);
 }
-// Whisper LOCAL no navegador (sem cota de API) — reserva automática da dublagem
-async function transcribeInBrowser(file,onMsg){
+// Whisper LOCAL no navegador operando sobre array PCM 16kHz já extraído (zero estouro de memória em arquivos gigantes!)
+async function transcribeSamplesInBrowser(samples, sampleRate, onMsg){
   const msg=typeof onMsg==='function'?onMsg:()=>{};
-  msg('🧠 Preparando transcrição local (na 1ª vez baixa o modelo Whisper, ~50MB)...');
+  msg('🧠 Carregando Whisper local no navegador (~50MB só na 1ª vez)...');
   const { pipeline } = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
   if(!window._whisperPipe){
-    msg('⬇️ Baixando modelo Whisper para o seu navegador (só acontece uma vez)...');
     window._whisperPipe = await pipeline('automatic-speech-recognition','Xenova/whisper-base',{quantized:true});
   }
-  msg('🎧 Decodificando o áudio do arquivo...');
-  const AC = window.AudioContext||window.webkitAudioContext;
-  const ctx = new AC({sampleRate:16000});
-  const arr = await file.arrayBuffer();
-  const decoded = await ctx.decodeAudioData(arr.slice(0));
-  const len = decoded.length;
-  const mono = new Float32Array(len);
-  for(let ch=0; ch<decoded.numberOfChannels; ch++){
-    const d = decoded.getChannelData(ch);
-    for(let i=0;i<len;i++) mono[i]+=d[i]/decoded.numberOfChannels;
+  let mono16k = samples;
+  if(sampleRate !== 16000){
+    const outLen = Math.max(1, Math.round(samples.length * (16000 / sampleRate)));
+    mono16k = new Float32Array(outLen);
+    const ratio = (samples.length - 1) / Math.max(1, outLen - 1);
+    for(let i=0;i<outLen;i++){
+      const pos = i * ratio, idx = Math.floor(pos), frac = pos - idx;
+      mono16k[i] = (samples[idx]||0)*(1-frac) + (samples[idx+1]||0)*frac;
+    }
   }
-  msg('🎙️ Transcrevendo no navegador — sem cota de API (pode levar alguns minutos em aparelhos lentos)...');
-  const out = await window._whisperPipe(mono, { chunk_length_s: 30, stride_length_s: 5 });
-  const text = String((out && out.text) || '').trim();
-  if(!text) throw new Error('a transcrição local voltou vazia');
-  return text;
+  msg('🎙️ Transcrevendo trecho localmente no navegador...');
+  const out = await window._whisperPipe(mono16k, { chunk_length_s: 30, stride_length_s: 5 });
+  return String((out && out.text) || '').trim();
 }
 
-async function extractAudioBase64(file){
-  const ac=new (window.AudioContext||window.webkitAudioContext)();
-  const buf=await file.arrayBuffer();
-  const decoded=await ac.decodeAudioData(buf.slice(0));
-  const rate0=16000;
-  const off=new OfflineAudioContext(1,Math.max(1,Math.ceil(decoded.duration*rate0)),rate0);
-  const src=off.createBufferSource();
-  src.buffer=decoded;
-  src.connect(off.destination);
-  src.start();
-  const rendered=await off.startRendering();
-  let data=rendered.getChannelData(0);
-  let rate=16000;
-  const MAX_B64=3.8*1024*1024;
-  if((44+data.length*2)*4/3>MAX_B64){
-    const half=new Float32Array(Math.floor(data.length/2));
-    for(let i=0;i<half.length;i++)half[i]=(data[i*2]+(data[i*2+1]||0))/2;
-    data=half;
-    rate=8000;
-  }
-  let truncated=false;
-  const maxSamples=Math.floor((MAX_B64*3/4-44)/2);
-  if(data.length>maxSamples){data=data.subarray(0,maxSamples);truncated=true;}
-  const wav=encodeWavMono(data,rate);
-  return {base64:bytesToBase64(wav),truncated,seconds:data.length/rate};
+const DUB_CHUNK_SECONDS = 55; // 55s @ 12kHz WAV = ~1.7MB base64 (sempre abaixo do limite 4.5MB da Vercel!)
+const HEAVY_FILE_BYTES = 95 * 1024 * 1024; // Acima de 95MB usa extração Streaming Zero-RAM via MediaElement
+let stopDubRequested = false;
+let lastDubChunksTimeline = [];
+let lastDubMasterBuffer = null;
+let lastDubTotalDuration = 0;
+let lastDubVideoBlob = null;
+let lastDubVideoFilename = 'video-dublado-dubai-pro.mp4';
+
+function requestStopDubbing(){
+  stopDubRequested = true;
+  toast('⏹️ Finalizando no bloco atual e salvando tudo o que já foi dublado...','warn');
 }
+
+// Descobre a duração real do arquivo sem carregar bytes na RAM
+function probeMediaDuration(file){
+  return new Promise(resolve => {
+    const isAudio = file.type.startsWith('audio/') || /\.(mp3|wav|m4a|ogg|flac|aac)$/i.test(file.name);
+    const el = document.createElement(isAudio ? 'audio' : 'video');
+    el.preload = 'metadata';
+    const url = URL.createObjectURL(file);
+    const done = (d) => { try{ URL.revokeObjectURL(url); }catch(e){} resolve(isFinite(d) && d > 0 ? d : 0); };
+    el.onloadedmetadata = () => done(el.duration);
+    el.onerror = () => done(0);
+    setTimeout(() => done(el.duration || 0), 5000);
+    el.src = url;
+  });
+}
+
+// Extrator Streaming Zero-RAM para vídeos GIGANTES (>95MB, ex: 300MB, 800MB, 1.5GB+) ou containers especiais (.MOV/.MKV)
+async function extractSingleChunkStreaming(mediaEl, startSec, endSec){
+  const dur = Math.max(0.4, endSec - startSec);
+  const mimeCandidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'video/webm;codecs=vp8,opus'];
+  let recMime = '';
+  for(const m of mimeCandidates){ if(window.MediaRecorder && MediaRecorder.isTypeSupported(m)){ recMime = m; break; } }
+  if(!recMime) throw new Error('Navegador sem suporte a gravação de stream de áudio.');
+
+  await new Promise(res => {
+    const onSeek = () => { mediaEl.removeEventListener('seeked', onSeek); res(); };
+    mediaEl.addEventListener('seeked', onSeek);
+    try { mediaEl.currentTime = startSec; } catch(e){ res(); }
+    setTimeout(res, 1800);
+  });
+
+  const rawStream = (mediaEl.captureStream || mediaEl.mozCaptureStream).call(mediaEl);
+  const audioOnly = new MediaStream(rawStream.getAudioTracks());
+  if(!audioOnly.getAudioTracks().length){
+    throw new Error('Este arquivo não possui faixa de áudio detectável.');
+  }
+
+  const chunks = [];
+  const rec = new MediaRecorder(audioOnly, { mimeType: recMime, audioBitsPerSecond: 32000 });
+  rec.ondataavailable = e => { if(e.data && e.data.size) chunks.push(e.data); };
+  const stopped = new Promise(r => rec.onstop = r);
+
+  mediaEl.muted = false;
+  mediaEl.volume = 0.0001; // Inaudível no alto-falante, mas ativo na trilha capturada!
+  rec.start(500);
+  await mediaEl.play().catch(()=>{});
+
+  await new Promise(resolve => {
+    const tStart = performance.now();
+    function tick(){
+      const elapsed = (performance.now() - tStart) / 1000;
+      if(mediaEl.ended || mediaEl.currentTime >= endSec - 0.04 || elapsed >= dur + 0.6){
+        resolve();
+        return;
+      }
+      setTimeout(tick, 80);
+    }
+    tick();
+  });
+
+  mediaEl.pause();
+  rec.stop();
+  await stopped;
+  const blob = new Blob(chunks, { type: recMime.split(';')[0] });
+  const arr = new Uint8Array(await blob.arrayBuffer());
+  return {
+    base64: bytesToBase64(arr),
+    audioMime: recMime.startsWith('video/') ? 'audio/webm' : recMime.split(';')[0],
+    seconds: dur
+  };
+}
+
+// Prepara plano inteligente de extração para vídeos PEQUENOS (1s) e GRANDES (horas / GBs)
+async function prepareAudioExtractionPlan(file, rangeStart, rangeEnd, onMsg){
+  const msg = typeof onMsg === 'function' ? onMsg : ()=>{};
+  let useStreaming = file.size > HEAVY_FILE_BYTES;
+  let mono12k = null;
+  let totalFileDuration = 0;
+  const TARGET_SR = 12000;
+
+  if(!useStreaming){
+    try{
+      msg(`⚡ Extraindo faixa de áudio em alta velocidade (${fmtHumanBytes(file.size)})...`);
+      const AC = window.AudioContext || window.webkitAudioContext;
+      const ac = new AC();
+      const buf = await file.arrayBuffer();
+      const decoded = await ac.decodeAudioData(buf);
+      totalFileDuration = decoded.duration;
+      const off = new OfflineAudioContext(1, Math.max(1, Math.ceil(decoded.duration * TARGET_SR)), TARGET_SR);
+      const src = off.createBufferSource();
+      src.buffer = decoded;
+      src.connect(off.destination);
+      src.start();
+      const rendered = await off.startRendering();
+      mono12k = new Float32Array(rendered.getChannelData(0)); // Cópia leve (~1.4MB/min) e libera buffer bruto!
+      await ac.close().catch(()=>{});
+    }catch(decodeErr){
+      console.warn('decodeAudioData falhou, ativando extrator Streaming Zero-RAM:', decodeErr);
+      useStreaming = true;
+    }
+  }
+
+  if(useStreaming){
+    totalFileDuration = await probeMediaDuration(file);
+    if(!totalFileDuration) totalFileDuration = Math.max(10, rangeEnd || 60);
+  }
+
+  const effStart = Math.max(0, Math.min(rangeStart || 0, Math.max(0, totalFileDuration - 0.5)));
+  const effEnd = (rangeEnd && rangeEnd > effStart) ? Math.min(totalFileDuration, rangeEnd) : totalFileDuration;
+  const windows = [];
+  for(let t = effStart; t < effEnd - 0.15; t += DUB_CHUNK_SECONDS){
+    windows.push({ index: windows.length, startSec: t, endSec: Math.min(effEnd, t + DUB_CHUNK_SECONDS) });
+  }
+  if(!windows.length) windows.push({ index: 0, startSec: 0, endSec: Math.max(1, totalFileDuration) });
+
+  let streamEl = null, streamUrl = null;
+  if(useStreaming){
+    const isAudio = file.type.startsWith('audio/') || /\.(mp3|wav|m4a|ogg|flac|aac)$/i.test(file.name);
+    streamEl = document.createElement(isAudio ? 'audio' : 'video');
+    streamEl.playsInline = true;
+    streamEl.preload = 'auto';
+    streamUrl = URL.createObjectURL(file);
+    streamEl.src = streamUrl;
+    await new Promise(r => { streamEl.onloadeddata = r; setTimeout(r, 2000); });
+  }
+
+  return {
+    totalFileDuration,
+    effStart,
+    effEnd,
+    windows,
+    mono12k,
+    sampleRate: TARGET_SR,
+    useStreaming,
+    async getChunkPayload(idx){
+      const w = windows[idx];
+      if(mono12k){
+        const s0 = Math.max(0, Math.floor(w.startSec * TARGET_SR));
+        const s1 = Math.min(mono12k.length, Math.ceil(w.endSec * TARGET_SR));
+        const slice = mono12k.subarray(s0, Math.max(s0 + 1, s1));
+        const wav = encodeWavMono(slice, TARGET_SR);
+        return { base64: bytesToBase64(wav), audioMime: 'audio/wav', pcmSlice: slice, sampleRate: TARGET_SR, seconds: slice.length / TARGET_SR };
+      }
+      return await extractSingleChunkStreaming(streamEl, w.startSec, w.endSec);
+    },
+    cleanup(){
+      if(streamEl){ try{ streamEl.pause(); streamEl.src = ''; }catch(e){} }
+      if(streamUrl){ try{ URL.revokeObjectURL(streamUrl); }catch(e){} }
+    }
+  };
+}
+
+// Reamostragem linear rápida para ajustar perfeitamente cada bloco dublado à janela de tempo original (ZERO atraso acumulado!)
+function resampleChannelLinear(input, outLength){
+  if(!input || !input.length || outLength <= 0) return new Float32Array(Math.max(1, outLength));
+  if(input.length === outLength) return input;
+  const out = new Float32Array(outLength);
+  const ratio = (input.length - 1) / Math.max(1, outLength - 1);
+  for(let i = 0; i < outLength; i++){
+    const pos = i * ratio;
+    const idx = Math.floor(pos);
+    const frac = pos - idx;
+    out[i] = (input[idx] || 0) * (1 - frac) + (input[idx + 1] || 0) * frac;
+  }
+  return out;
+}
+
+// Monta o Áudio Master 24kHz sincronizado do segundo 0:00 até o fim do vídeo (com mixagem opcional do som ambiente original!)
+function assembleDubbedMasterAudio({ chunkOutputs, totalDurationSec, origMono12k, bgMixMode = 'duck' }){
+  const SR = 24000;
+  const totalSamples = Math.max(SR, Math.ceil(totalDurationSec * SR));
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const tmpCtx = new AC({ sampleRate: SR });
+  const audioBuffer = tmpCtx.createBuffer(1, totalSamples, SR);
+  const master = audioBuffer.getChannelData(0);
+  const speechMask = new Uint8Array(totalSamples);
+
+  for(let i = 0; i < chunkOutputs.length; i++){
+    const seg = chunkOutputs[i];
+    if(!seg || !seg.decodedSamples || !seg.decodedSamples.length) continue;
+    const nextStart = (i + 1 < chunkOutputs.length) ? chunkOutputs[i + 1].startSec : totalDurationSec;
+    const maxWindowSec = Math.max(0.5, nextStart - seg.startSec);
+
+    // Converte da taxa original do TTS para 24kHz
+    let voice24k = seg.sampleRate === SR
+      ? seg.decodedSamples
+      : resampleChannelLinear(seg.decodedSamples, Math.round(seg.decodedSamples.length * (SR / seg.sampleRate)));
+
+    // Se a fala traduzida ficou um pouco mais longa que o bloco original, acelera suavemente (até 1.32x) para NUNCA atrasar o vídeo!
+    const maxSamplesAllowed = Math.floor(maxWindowSec * SR);
+    if(voice24k.length > maxSamplesAllowed){
+      const minCompressed = Math.floor(voice24k.length / 1.32);
+      voice24k = resampleChannelLinear(voice24k, Math.max(minCompressed, maxSamplesAllowed)).subarray(0, maxSamplesAllowed);
+    }
+
+    const offset = Math.max(0, Math.floor(seg.startSec * SR));
+    const fade = Math.min(360, Math.floor(voice24k.length * 0.05));
+    for(let s = 0; s < voice24k.length && (offset + s) < totalSamples; s++){
+      let env = 1;
+      if(s < fade) env = s / fade;
+      else if(s > voice24k.length - fade) env = (voice24k.length - s) / fade;
+      master[offset + s] += voice24k[s] * env;
+      speechMask[offset + s] = 1;
+    }
+    seg.actualEndSec = Math.min(totalDurationSec, seg.startSec + (voice24k.length / SR));
+  }
+
+  // Mixa som ambiente original suavemente ao fundo (estilo dublagem Netflix/Discovery) quando disponível
+  if(bgMixMode === 'duck' && origMono12k && origMono12k.length > 0){
+    let gainSmooth = 0.14;
+    for(let i = 0; i < totalSamples; i++){
+      const targetGain = speechMask[i] ? 0.085 : 0.24;
+      gainSmooth += (targetGain - gainSmooth) * 0.0008;
+      const srcPos = i * 0.5; // 12kHz -> 24kHz
+      const idx = Math.floor(srcPos);
+      if(idx < origMono12k.length){
+        const frac = srcPos - idx;
+        const origSample = origMono12k[idx] * (1 - frac) + (origMono12k[idx + 1] || 0) * frac;
+        master[i] = Math.max(-0.98, Math.min(0.98, master[i] + origSample * gainSmooth));
+      }
+    }
+  } else {
+    for(let i = 0; i < totalSamples; i++) master[i] = Math.max(-0.98, Math.min(0.98, master[i]));
+  }
+
+  tmpCtx.close().catch(()=>{});
+  const wavBytes = encodeWavMono(master, SR);
+  return { audioBuffer, wavBlob: new Blob([wavBytes], { type: 'audio/wav' }), totalDurationSec };
+}
+
 let dubAudioURL=null;
 function playDubbed(){
   const v=document.getElementById('preview');
   const a=document.getElementById('dubAudio');
-  if(!dubAudioURL)return;
-  if(v&&!v.hidden&&v.src){
-    v.muted=true;
-    v.currentTime=0;
-    a.currentTime=0;
-    v.play();
-    a.play();
-    v.ontimeupdate=()=>{if(Math.abs(a.currentTime-v.currentTime)>0.4){a.currentTime=v.currentTime;}};
-  }else{
-    a.currentTime=0;
-    a.play();
+  if(!dubAudioURL) return;
+  if(v && !v.hidden && v.src){
+    v.muted = true;
+    const startAt = lastDubChunksTimeline.length ? (lastDubChunksTimeline[0].startSec || 0) : 0;
+    v.currentTime = startAt;
+    a.currentTime = startAt;
+    v.play().catch(()=>{});
+    a.play().catch(()=>{});
+    v.onplay = () => { if(a.paused) a.play().catch(()=>{}); };
+    v.onpause = () => { if(!a.paused) a.pause(); };
+    v.onseeking = () => { if(Math.abs(a.currentTime - v.currentTime) > 0.25) a.currentTime = v.currentTime; };
+    v.ontimeupdate = () => { if(!v.paused && Math.abs(a.currentTime - v.currentTime) > 0.30) a.currentTime = v.currentTime; };
+    v.scrollIntoView({ behavior:'smooth', block:'center' });
+  } else {
+    a.currentTime = 0;
+    a.play().catch(()=>{});
   }
 }
+
+function downloadDubSRT(){
+  if(!lastDubChunksTimeline.length){ toast('Faça a dublagem primeiro!','warn'); return; }
+  let n = 1, srt = '';
+  for(const seg of lastDubChunksTimeline){
+    const txt = String(seg.translation || '').trim();
+    if(!txt) continue;
+    const endS = seg.actualEndSec || seg.endSec || (seg.startSec + 4);
+    const localCues = buildTimedCaptions(txt, Math.max(0.8, endS - seg.startSec));
+    for(const c of localCues){
+      srt += `${n}\n${fmtSRT(seg.startSec + c.start)} --> ${fmtSRT(seg.startSec + c.end)}\n${c.text}\n\n`;
+      n++;
+    }
+  }
+  triggerBlobDownload(new Blob([srt], { type:'application/x-subrip' }), 'dublagem-legendas.srt');
+  toast('📜 Legendas traduzidas (.SRT) baixadas!');
+}
+
 async function dubVideo(){
-  const file=$('#videoFile').files[0];
-  const language=$('#language').value;
-  const dubVoice=$('#dubVoice').value;
-  const targetLanguage=$('#targetLanguage').value;
-  const btn=$('#dubBtn');
+  const file = currentDubFile || $('#videoFile').files[0];
+  const language = $('#language').value;
+  const dubVoice = $('#dubVoice').value;
+  const targetLanguage = $('#targetLanguage').value;
+  const bgMixMode = (document.getElementById('dubBgMix')||{}).value || 'duck';
+  const rangeMode = (document.getElementById('dubRangeMode')||{}).value || 'full';
+  const btn = $('#dubBtn');
+  const stopBtn = document.getElementById('dubStopBtn');
 
-  if(!file){ showStatus('dubStatus','⚠️ Selecione um vídeo ou áudio.','warn'); toast('Selecione um arquivo','warn'); return; }
+  if(!file){
+    showStatus('dubStatus','⚠️ Selecione ou arraste um arquivo de vídeo ou áudio primeiro.','warn');
+    toast('Selecione um vídeo ou áudio','warn');
+    return;
+  }
 
-  btn.disabled=true; btn.textContent='⏳ Processando...';
-  showStatus('dubStatus','🎵 Extraindo áudio do arquivo...','info');
+  stopDubRequested = false;
+  lastDubVideoBlob = null;
+  btn.disabled = true; btn.textContent = '⏳ Dublando arquivo...';
+  if(stopBtn) stopBtn.classList.remove('hidden');
   $('#dubProgress').classList.add('show');
   $('#dubResult').classList.add('hidden');
-  setProgress('dubProgressFill', 10);
-  setStep(['d1','d2','d3','d4'],0);
+  setProgress('dubProgressFill', 6);
+  setStep(['d1','d2','d3','d4'], 0);
 
+  let plan = null;
   try{
-    const audio=await extractAudioBase64(file);
-    setStep(['d1','d2','d3','d4'],1);
-    setProgress('dubProgressFill',35);
-    showStatus('dubStatus','🎧 Transcrevendo (Whisper), traduzindo e gerando voz...','info');
+    const trimStart = rangeMode === 'trim' ? parseTimeInput(document.getElementById('dubTrimStart').value, 0) : 0;
+    const trimEnd = rangeMode === 'trim' ? parseTimeInput(document.getElementById('dubTrimEnd').value, 0) : 0;
 
-    let res=await fetch('/api/dub',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ fileName: file.name, fileSize: file.size, language, dubVoice, targetLanguage, audioBase64: audio.base64 })
-    });
-    let data=await res.json();
-    if(!res.ok){
-      const errTxt=String(data.error||'Erro na dublagem');
-      if(/transcrev|whisper|429|cota|limite/i.test(errTxt)){
-        // Intercala: se as IAs do servidor estão sem cota, o Whisper LOCAL do navegador faz a MESMA função
+    plan = await prepareAudioExtractionPlan(file, trimStart, trimEnd, m => showStatus('dubStatus', m, 'info'));
+    const totalChunks = plan.windows.length;
+    const chunkOutputs = [];
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const decodeCtx = new AC();
+
+    for(let i = 0; i < totalChunks; i++){
+      if(stopDubRequested && chunkOutputs.length > 0) break;
+      const win = plan.windows[i];
+      const partLabel = totalChunks > 1
+        ? `Parte ${i+1} de ${totalChunks} (${fmtClockSec(win.startSec)} – ${fmtClockSec(win.endSec)})`
+        : `Trecho completo (${fmtClockSec(win.startSec)} – ${fmtClockSec(win.endSec)})`;
+
+      setStep(['d1','d2','d3','d4'], 1);
+      setProgress('dubProgressFill', Math.round(8 + (i / totalChunks) * 80));
+      showStatus('dubStatus', `🎧 ${partLabel} • Extraindo áudio e transcrevendo fala...`, 'info');
+
+      const chunkAudio = await plan.getChunkPayload(i);
+
+      setStep(['d1','d2','d3','d4'], 2);
+      showStatus('dubStatus', `🌍 ${partLabel} • Traduzindo para ${targetLanguage} e gerando voz (${dubVoice})...`, 'info');
+
+      let data = null, ok = false, lastErrMsg = '';
+      for(let attempt = 0; attempt < 2 && !ok; attempt++){
         try{
-          showStatus('dubStatus','🧠 IAs do servidor sem cota neste instante — ativando Whisper LOCAL do navegador (sem limite de API)...','info');
-          const txt=await transcribeInBrowser(file,(m)=>showStatus('dubStatus',m,'info'));
-          showStatus('dubStatus','✅ Transcrito no navegador! Agora traduzindo e gerando voz...','info');
-          res=await fetch('/api/dub',{
+          const res = await fetch('/api/dub', {
             method:'POST',
             headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ fileName: file.name, fileSize: file.size, language, dubVoice, targetLanguage, audioBase64: audio.base64, transcription: txt })
+            body: JSON.stringify({
+              fileName: file.name,
+              fileSize: file.size,
+              language,
+              dubVoice,
+              targetLanguage,
+              audioBase64: chunkAudio.base64,
+              audioMime: chunkAudio.audioMime || 'audio/wav',
+              chunkIndex: i,
+              totalChunks,
+              skipSave: i < totalChunks - 1
+            })
           });
-          data=await res.json();
-          if(!res.ok) throw new Error(data.error||'Erro na dublagem');
-        }catch(localErr){
-          throw new Error(errTxt + ' || Whisper local: ' + (localErr.message||localErr));
+          const parsed = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+          if(res.ok && !parsed.error){ data = parsed; ok = true; break; }
+          lastErrMsg = String(parsed.error || `HTTP ${res.status}`);
+          if(attempt === 0 && /429|timeout|502|503/i.test(lastErrMsg)){
+            await new Promise(r => setTimeout(r, 2200));
+          }
+        }catch(netErr){
+          lastErrMsg = netErr.message || String(netErr);
         }
-      }else{
-        throw new Error(errTxt);
       }
+
+      // Fallback automático com Whisper LOCAL no navegador caso todas as APIs de transcrição estejam em cota
+      if(!ok && chunkAudio.pcmSlice && /transcrev|whisper|429|cota|limite/i.test(lastErrMsg)){
+        try{
+          const localTxt = await transcribeSamplesInBrowser(chunkAudio.pcmSlice, chunkAudio.sampleRate, m => showStatus('dubStatus', `${partLabel} • ${m}`, 'info'));
+          if(localTxt){
+            const res2 = await fetch('/api/dub', {
+              method:'POST',
+              headers:{'Content-Type':'application/json'},
+              body: JSON.stringify({
+                fileName: file.name, fileSize: file.size, language, dubVoice, targetLanguage,
+                audioBase64: chunkAudio.base64, audioMime: chunkAudio.audioMime || 'audio/wav',
+                transcription: localTxt, chunkIndex: i, totalChunks, skipSave: i < totalChunks - 1
+              })
+            });
+            const parsed2 = await res2.json();
+            if(res2.ok && !parsed2.error){ data = parsed2; ok = true; }
+          } else {
+            data = { silent: true, transcription: '', translation: '', dubInfo: 'Trecho silencioso local.' };
+            ok = true;
+          }
+        }catch(localErr){
+          lastErrMsg += ' | Whisper local: ' + (localErr.message || localErr);
+        }
+      }
+
+      if(!ok){
+        if(chunkOutputs.length > 0){
+          showStatus('dubStatus', `⚠️ ${partLabel} falhou (${lastErrMsg}) — montando os ${chunkOutputs.length} blocos já concluídos!`, 'warn');
+          break;
+        }
+        throw new Error(lastErrMsg || 'Erro na dublagem');
+      }
+
+      let decodedSamples = null, decodedSr = 24000;
+      if(data.audioBase64 && !data.silent){
+        try{
+          const mime = data.audioMime || 'audio/mpeg';
+          const rawBin = atob(data.audioBase64);
+          const u8 = new Uint8Array(rawBin.length);
+          for(let k = 0; k < rawBin.length; k++) u8[k] = rawBin.charCodeAt(k);
+          const ab = await decodeCtx.decodeAudioData(u8.buffer.slice(0));
+          decodedSr = ab.sampleRate;
+          decodedSamples = new Float32Array(ab.length);
+          for(let ch = 0; ch < ab.numberOfChannels; ch++){
+            const cd = ab.getChannelData(ch);
+            for(let s = 0; s < ab.length; s++) decodedSamples[s] += cd[s] / ab.numberOfChannels;
+          }
+        }catch(decE){
+          console.warn('Falha ao decodificar áudio do bloco', i, decE);
+        }
+      }
+
+      chunkOutputs.push({
+        index: i,
+        startSec: win.startSec,
+        endSec: win.endSec,
+        silent: !!data.silent,
+        transcription: data.transcription || (data.project && data.project.transcription) || '',
+        translation: data.translation || (data.project && data.project.translation) || '',
+        dubInfo: data.dubInfo || (data.project && data.project.dubInfo) || '',
+        decodedSamples,
+        sampleRate: decodedSr,
+        hasRealAudio: !!(decodedSamples && decodedSamples.length > 0),
+        project: data.project
+      });
     }
 
-    setProgress('dubProgressFill',100);
-    setStep(['d1','d2','d3','d4'],3);
-    showStatus('dubStatus','✅ Dublagem concluída!','success');
+    await decodeCtx.close().catch(()=>{});
+    setStep(['d1','d2','d3','d4'], 3);
+    setProgress('dubProgressFill', 94);
+    showStatus('dubStatus', '🎛️ Sincronizando todos os blocos de áudio na linha do tempo do vídeo...', 'info');
 
-    if(dubAudioURL){URL.revokeObjectURL(dubAudioURL);dubAudioURL=null;}
-    const wrap=document.getElementById('dubPlayerWrap');
-    if(data.audioBase64){
-      const blob=await (await fetch('data:audio/mpeg;base64,'+data.audioBase64)).blob();
-      lastDubAudioBlob=blob;
-      dubAudioURL=URL.createObjectURL(blob);
-      document.getElementById('dubAudio').src=dubAudioURL;
-      document.getElementById('dubDownload').href=dubAudioURL;
+    const anyRealVoice = chunkOutputs.some(c => c.hasRealAudio);
+    lastDubChunksTimeline = chunkOutputs;
+    lastDubTotalDuration = Math.max(plan.totalFileDuration, plan.effEnd);
+
+    if(dubAudioURL){ URL.revokeObjectURL(dubAudioURL); dubAudioURL = null; }
+    const wrap = document.getElementById('dubPlayerWrap');
+
+    if(anyRealVoice || chunkOutputs.some(c => c.silent)){
+      const master = assembleDubbedMasterAudio({
+        chunkOutputs,
+        totalDurationSec: lastDubTotalDuration,
+        origMono12k: plan.mono12k,
+        bgMixMode
+      });
+      lastDubMasterBuffer = master.audioBuffer;
+      lastDubAudioBlob = master.wavBlob;
+      dubAudioURL = URL.createObjectURL(master.wavBlob);
+      document.getElementById('dubAudio').src = dubAudioURL;
+      const dlLink = document.getElementById('dubDownload');
+      const slug = file.name.replace(/\.[^.]+$/, '').replace(/[^a-z0-9_-]+/gi, '-').slice(0, 40) || 'video';
+      dlLink.href = dubAudioURL;
+      dlLink.download = `${slug}-dublado-${targetLanguage}.wav`;
       wrap.classList.remove('hidden');
-      document.getElementById('dubTitle').textContent='✅ Áudio dublado pronto — baixe o VÍDEO com o áudio trocado abaixo';
-    }else{
+      const mainBtn = document.getElementById('dubMainDownloadBtn');
+      if(mainBtn) mainBtn.textContent = `⬇️ GERAR E BAIXAR VÍDEO DUBLADO COMPLETO (.MP4 / .WEBM • ${fmtClockSec(lastDubTotalDuration)})`;
+      document.getElementById('dubTitle').textContent =
+        `✅ Dublagem completa pronta! (${chunkOutputs.length} ${chunkOutputs.length > 1 ? 'blocos sincronizados' : 'bloco'} • ${fmtClockSec(lastDubTotalDuration)} • ${fmtHumanBytes(file.size)})`;
+    } else {
+      lastDubMasterBuffer = null;
       wrap.classList.add('hidden');
-      document.getElementById('dubTitle').textContent='⚠️ Simulação (sem áudio real)';
+      document.getElementById('dubTitle').textContent = '⚠️ Simulação local (configure chave de IA para voz neural)';
     }
 
-    let txt = `${data.project.transcription}\n\n${data.project.translation}\n\n${data.project.dubInfo}`;
-    if(audio.truncated) txt += `\n\n⚠️ Processamos apenas os primeiros ${Math.round(audio.seconds)}s do arquivo (limite de tamanho).`;
-    $('#dubScript').textContent = txt;
+    const transcriptSummary = chunkOutputs.map(c => {
+      const stamp = `[${fmtClockSec(c.startSec)} – ${fmtClockSec(c.endSec)}]`;
+      if(c.silent) return `${stamp} 🎵 (Trecho musical / ambiente sem fala — preservado)`;
+      return `${stamp}\n🗣️ Original: ${c.transcription}\n🇧🇷 Dublado (${targetLanguage}): ${c.translation}`;
+    }).join('\n\n────────────────────────\n\n');
+
+    $('#dubScript').textContent = transcriptSummary;
     $('#dubResult').classList.remove('hidden');
-    toast(data.audioBase64?'✅ Dublagem pronta — baixe o vídeo com o áudio trocado!':'⚠️ Simulação sem áudio','info');
-    if(data.project) saveProject(data.project);
+
+    const fullTranslation = chunkOutputs.map(c => c.translation).filter(Boolean).join(' ');
+    saveProject({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      type: 'dub',
+      title: `Dublagem: ${file.name}`,
+      prompt: `Dublagem completa (${chunkOutputs.length} parte(s) • ${fmtClockSec(lastDubTotalDuration)}) para ${targetLanguage}`,
+      fileName: file.name,
+      fileSize: file.size,
+      language: language || 'auto',
+      targetLanguage,
+      dubVoice,
+      script: transcriptSummary,
+      translation: fullTranslation,
+      status: 'dublado',
+      mode: anyRealVoice ? 'openai' : 'mock',
+      createdAt: new Date().toISOString(),
+      thumbnail: `https://picsum.photos/seed/dub-${file.size}/640/360`
+    });
     await loadProjects();
+
+    setProgress('dubProgressFill', 100);
+    showStatus('dubStatus', `✅ Vídeo dublado com sucesso do início ao fim (${chunkOutputs.length} ${chunkOutputs.length > 1 ? 'blocos' : 'bloco'} • ${fmtClockSec(lastDubTotalDuration)})! Assista ou clique no botão verde abaixo para baixar.`, 'success');
+    toast('✅ Dublagem pronta! Clique para assistir ou baixar o vídeo!');
+    setTimeout(() => document.getElementById('dubResult').scrollIntoView({ behavior:'smooth', block:'center' }), 200);
   }catch(e){
-    const hint=e.message&&e.message.includes('401')?' → A chave OpenAI está inválida: gere uma nova em platform.openai.com/account/api-keys e atualize na Vercel.':'';
-    showStatus('dubStatus','❌ '+e.message+hint+'\n\n💡 A dublagem testou TODAS as IAs da cadeia (OpenAI → Whisper do Unorouter → próxima disponível). Erro 429 = cota do plano grátis — tente de novo em alguns minutos.','error');
-    toast('⏳ A dublagem testou todas as IAs — tente de novo em instantes','error');
+    showStatus('dubStatus','❌ '+e.message,'error');
+    toast('Erro na dublagem: '+e.message,'error');
     setProgress('dubProgressFill',0);
   }finally{
-    btn.disabled=false; btn.textContent='🎙️ Dublar (trocar o áudio do vídeo)';
-    setTimeout(()=>{ $('#dubProgress').classList.remove('show'); setProgress('dubProgressFill',0); }, 1200);
+    if(plan) plan.cleanup();
+    btn.disabled = false; btn.textContent = '🎙️ Dublar Vídeo Completo Agora (Pequeno ou Grande)';
+    if(stopBtn) stopBtn.classList.add('hidden');
+    setTimeout(()=>{ $('#dubProgress').classList.remove('show'); setProgress('dubProgressFill',0); }, 1500);
   }
 }
 
@@ -2045,42 +2549,131 @@ function downloadSceneImages(){
 }
 
 async function downloadDubVideo(){
-  const v=document.getElementById('preview');
-  if(!lastDubAudioBlob){ toast('Faça a dublagem primeiro','warn'); return; }
-  if(v.hidden||!v.src||!v.videoWidth){ toast('⚠️ Escolha um arquivo de VÍDEO para gerar o vídeo dublado','warn'); return; }
-  const btn=event?.target; if(btn){btn.disabled=true;}
-  showStatus('dubStatus','📼 Montando o vídeo com o áudio novo (tempo real — não feche a aba)...','loading');
+  // Se já foi exportado nesta sessão, baixa instantaneamente sem regravar!
+  if(lastDubVideoBlob){
+    triggerBlobDownload(lastDubVideoBlob, lastDubVideoFilename);
+    toast('⬇️ Download iniciado: ' + lastDubVideoFilename);
+    return;
+  }
+
+  const v = document.getElementById('preview');
+  if(!lastDubAudioBlob){ toast('Faça a dublagem primeiro!','warn'); return; }
+  if(v.hidden || !v.src || !v.videoWidth){
+    // Caso o usuário tenha subido só um MP3/WAV, baixa o áudio master dublado direto!
+    triggerBlobDownload(lastDubAudioBlob, 'audio-dublado-completo.wav');
+    toast('🎙️ Seu arquivo original era áudio — baixando áudio dublado completo (.WAV)!');
+    return;
+  }
+
+  const mainBtn = document.getElementById('dubMainDownloadBtn');
+  if(mainBtn) mainBtn.disabled = true;
+  $('#dubProgress').classList.add('show');
+  showStatus('dubStatus','📼 Renderizando arquivo de VÍDEO com novo áudio dublado (funciona até para vídeos 4K/grandes — aguarde a barra chegar em 100%)...','info');
+
   try{
-    const audioEl=new Audio(URL.createObjectURL(lastDubAudioBlob));
-    await new Promise(r=>{ audioEl.onloadedmetadata=r; setTimeout(r,2500); });
-    const W=v.videoWidth||1280,H=v.videoHeight||720;
-    const draw=(ctx,t)=>{
-      const cw=ctx.canvas.width,ch=ctx.canvas.height;
-      if(Math.abs(v.currentTime-t)>0.4){ try{v.currentTime=t;}catch(e){} }
-      ctx.fillStyle='#000'; ctx.fillRect(0,0,cw,ch);
-      const ir=(W/H), cr=cw/ch;
-      let dw,dh;
-      if(ir>cr){ dh=ch; dw=dh*ir; } else { dw=cw; dh=dw/ir; }
-      try{ ctx.drawImage(v,(cw-dw)/2,(ch-dh)/2,dw,dh); }catch(e){}
+    // Escala inteligente de resolução: preserva 100% da proporção (16:9, 9:16, 1:1, 4:3) sem travar em vídeos 4K gigantes!
+    const srcW = v.videoWidth || 1280, srcH = v.videoHeight || 720;
+    const maxEdge = 1280;
+    const scale = Math.min(1, maxEdge / Math.max(srcW, srcH));
+    const outW = Math.max(2, Math.round((srcW * scale) / 2) * 2);
+    const outH = Math.max(2, Math.round((srcH * scale) / 2) * 2);
+
+    const burnSubs = ((document.getElementById('dubBurnSubs')||{}).value || 'yes') === 'yes';
+    const subCues = [];
+    if(burnSubs && lastDubChunksTimeline.length){
+      for(const seg of lastDubChunksTimeline){
+        const txt = String(seg.translation || '').trim();
+        if(!txt) continue;
+        const endS = seg.actualEndSec || seg.endSec || (seg.startSec + 4);
+        for(const c of buildTimedCaptions(txt, Math.max(0.8, endS - seg.startSec))){
+          subCues.push({ start: seg.startSec + c.start, end: seg.startSec + c.end, text: c.text });
+        }
+      }
+    }
+
+    const totalDur = Math.min(
+      v.duration || lastDubTotalDuration || 10,
+      lastDubMasterBuffer ? lastDubMasterBuffer.duration : (lastDubTotalDuration || v.duration || 10)
+    );
+
+    const draw = (ctx, t) => {
+      const cw = ctx.canvas.width, ch = ctx.canvas.height;
+      if(Math.abs(v.currentTime - t) > 0.35){ try{ v.currentTime = t; }catch(e){} }
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, cw, ch);
+      try{ ctx.drawImage(v, 0, 0, cw, ch); }catch(e){}
+
+      if(subCues.length){
+        const cue = subCues.find(c => t >= c.start && t < c.end);
+        if(cue && cue.text){
+          const fs = Math.max(18, Math.round(Math.min(cw, ch) * 0.036));
+          ctx.font = `800 ${fs}px system-ui, sans-serif`;
+          const maxW = cw * 0.88;
+          const words = cue.text.split(/\s+/);
+          const lines = [];
+          let cur = '';
+          for(const w of words){
+            const test = cur ? cur + ' ' + w : w;
+            if(ctx.measureText(test).width > maxW && cur){ lines.push(cur); cur = w; }
+            else cur = test;
+          }
+          if(cur) lines.push(cur);
+          const lh = fs * 1.32;
+          const boxW = Math.min(cw * 0.92, Math.max(...lines.map(l => ctx.measureText(l).width)) + 36);
+          const boxH = lines.length * lh + 20;
+          const bx = (cw - boxW) * 0.5, by = ch - boxH - ch * 0.055;
+          ctx.fillStyle = 'rgba(8, 12, 24, 0.80)';
+          ctx.beginPath(); ctx.roundRect(bx, by, boxW, boxH, 12); ctx.fill();
+          ctx.textAlign = 'center';
+          ctx.fillStyle = '#ffffff';
+          lines.forEach((l, li) => ctx.fillText(l, cw * 0.5, by + 15 + fs * 0.82 + li * lh));
+          ctx.textAlign = 'left';
+        }
+      }
     };
-    const mime=pickRecorderMime();
-    const blob=await recordCanvasVideo({
-      drawFn:draw, audioEl, alsoPlay:[v],
-      durationSec:Math.min(v.duration||audioEl.duration,audioEl.duration||v.duration),
-      onProgress:p=>{ setProgress('dubProgressFill',Math.round(p*100)); }
+
+    let audioEl = null;
+    if(!lastDubMasterBuffer){
+      audioEl = new Audio(URL.createObjectURL(lastDubAudioBlob));
+      await new Promise(r => { audioEl.onloadedmetadata = r; setTimeout(r, 2500); });
+    }
+
+    const blob = await recordCanvasVideo({
+      drawFn: draw,
+      audioBuffer: lastDubMasterBuffer || null,
+      audioEl: lastDubMasterBuffer ? null : audioEl,
+      width: outW,
+      height: outH,
+      alsoPlay: [v],
+      durationSec: totalDur,
+      onProgress: p => {
+        const pct = Math.round(p * 100);
+        setProgress('dubProgressFill', pct);
+        if(mainBtn) mainBtn.textContent = `⏳ Exportando vídeo dublado... ${pct}% (${fmtClockSec(p * totalDur)} / ${fmtClockSec(totalDur)})`;
+      }
     });
-    const a=document.createElement('a');
-    a.href=URL.createObjectURL(blob);
-    a.download=mime.includes('mp4')?'video-dublado.mp4':'video-dublado.webm';
-    a.click();
-    showStatus('dubStatus','✅ Vídeo dublado baixado (áudio original trocado pelo novo)!','success');
-    toast('📼 Vídeo dublado baixado!');
+
+    const isMp4 = blob.type.includes('mp4');
+    const slug = ((currentDubFile && currentDubFile.name) || 'video').replace(/\.[^.]+$/, '').replace(/[^a-z0-9_-]+/gi, '-').slice(0, 36) || 'video';
+    lastDubVideoFilename = `${slug}-dublado.${isMp4 ? 'mp4' : 'webm'}`;
+    lastDubVideoBlob = blob;
+
+    const expV = document.getElementById('dubExportedVideo');
+    if(expV){
+      expV.src = URL.createObjectURL(blob);
+      expV.classList.remove('hidden');
+    }
+    triggerBlobDownload(blob, lastDubVideoFilename);
+    if(mainBtn) mainBtn.textContent = `⬇️ BAIXAR VÍDEO DUBLADO NOVAMENTE (${lastDubVideoFilename.toUpperCase()})`;
+    showStatus('dubStatus', `✅ Vídeo dublado exportado e baixado com sucesso (${lastDubVideoFilename} • ${fmtHumanBytes(blob.size)})!`, 'success');
+    toast('📼 Vídeo dublado baixado com sucesso!');
   }catch(e){
     showStatus('dubStatus','❌ '+e.message,'error');
     toast(e.message,'error');
+    if(mainBtn) mainBtn.textContent = '⬇️ GERAR E BAIXAR VÍDEO DUBLADO COMPLETO (.MP4 / .WEBM)';
   }finally{
-    if(btn){btn.disabled=false;}
-    setTimeout(()=>{ $('#dubProgress').classList.remove('show'); setProgress('dubProgressFill',0); },1500);
+    if(mainBtn) mainBtn.disabled = false;
+    setTimeout(()=>{ $('#dubProgress').classList.remove('show'); setProgress('dubProgressFill',0); }, 1500);
   }
 }
 

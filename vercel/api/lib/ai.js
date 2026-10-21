@@ -495,52 +495,96 @@ async function generateSceneImage({ prompt, style }) {
   return { error: errors.join(' | ') || 'nenhum provedor de imagem respondeu' };
 }
 
-// Dublagem real: Whisper (transcrição) + GPT (tradução) + TTS (voz)
-async function dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage = 'pt-BR', transcription: givenText = '' }) {
+// Concatena múltiplos buffers de áudio sem corromper cabeçalhos RIFF/WAV (essencial em vídeos longos!)
+function concatAudioBuffers(buffers) {
+  const list = (buffers || []).filter(b => b && b.length > 0);
+  if (!list.length) return { buffer: Buffer.alloc(0), audioMime: 'audio/wav' };
+  const isWavBuf = b => b.length > 44 && b.subarray(0, 4).toString('ascii') === 'RIFF' && b.subarray(8, 12).toString('ascii') === 'WAVE';
+  if (list.every(isWavBuf)) {
+    const sampleRate = list[0].readUInt32LE(24) || 24000;
+    const pcmParts = list.map(b => {
+      // Localiza o subchunk 'data' com segurança (normalmente offset 36..44)
+      let off = 12;
+      while (off + 8 <= b.length) {
+        const tag = b.subarray(off, off + 4).toString('ascii');
+        const sz = b.readUInt32LE(off + 4);
+        if (tag === 'data') return b.subarray(off + 8, Math.min(b.length, off + 8 + sz));
+        off += 8 + sz + (sz % 2);
+      }
+      return b.subarray(44);
+    });
+    return { buffer: wrapPcmAsWav(Buffer.concat(pcmParts), sampleRate), audioMime: 'audio/wav' };
+  }
+  const firstIsWav = isWavBuf(list[0]);
+  if (list.length === 1) {
+    return { buffer: list[0], audioMime: firstIsWav ? 'audio/wav' : 'audio/mpeg' };
+  }
+  return { buffer: Buffer.concat(list), audioMime: firstIsWav ? 'audio/wav' : 'audio/mpeg' };
+}
+
+// Dublagem real para vídeos pequenos e grandes (suporta WAV, WebM/Opus, MP3, MP4, OGG + trechos musicais/silenciosos)
+async function dubWithOpenAI({ audioBase64, audioMime = 'audio/wav', language, dubVoice, targetLanguage = 'pt-BR', transcription: givenText = '' }) {
   try {
-    const audioBuf = Buffer.from(audioBase64, 'base64');
-    // Transcrição com cadeia: Whisper OpenAI → Whisper/omni via Unorouter → (ou texto já pronto do navegador)
+    const cleanB64 = String(audioBase64 || '').replace(/^data:[^;]+;base64,/, '');
+    const audioBuf = Buffer.from(cleanB64, 'base64');
+    const normMime = /webm/i.test(audioMime) ? 'audio/webm'
+      : /ogg|opus/i.test(audioMime) ? 'audio/ogg'
+      : /mp4|m4a|aac/i.test(audioMime) ? 'audio/mp4'
+      : /mpeg|mp3/i.test(audioMime) ? 'audio/mpeg'
+      : 'audio/wav';
+    const ext = normMime.split('/')[1] || 'wav';
+    const fileLabel = `audio.${ext}`;
+
+    // Transcrição com cadeia: Whisper OpenAI → Gemini 3.1 Multimodal → Whisper/Omni Unorouter → (ou texto local)
     let originalText = String(givenText || '').trim();
     let whisperErr = '';
     let whisperInfo = originalText ? 'navegador (Whisper local)' : '';
-    if (originalText) {
-      // transcrição já veio pronta (fallback local do navegador) — pula direto pra tradução
-    }
+    let heardSilence = false;
+
     try {
       if (!originalText && canUseOfficialOpenAI()) {
         const OpenAI = require('openai');
         const { toFile } = OpenAI;
         const openai = makeOpenAI();
-        const file = await toFile(audioBuf, 'audio.wav', { type: 'audio/wav' });
+        const file = await toFile(audioBuf, fileLabel, { type: normMime });
         const transcription = await openai.audio.transcriptions.create({
           file,
           model: 'whisper-1',
           language: language || undefined
         });
         originalText = (transcription.text || '').trim();
+        if (!originalText) heardSilence = true;
       }
     } catch (e) {
       if (e.status === 401) markOpenAi401();
       whisperErr = 'openai: ' + e.message;
     }
-    // Gemini (multimodal) transcreve áudio com rotação automática nos modelos Gemini 3.x ativos
+
+    // Gemini 3.x (multimodal) — aceita nativamente WAV, WebM/Opus, MP3, OGG, MP4!
     if (!originalText && process.env.GEMINI_API_KEY) {
       try {
-        const t = await geminiTranscribe(audioBuf, language);
-        if (t) { originalText = t; whisperInfo = 'gemini/' + (_gemBest && _gemBest.audio ? _gemBest.audio : gemModel()); }
-        else whisperErr += ' | gemini: resposta vazia';
+        const t = await geminiTranscribe(audioBuf, language, 32000, normMime);
+        if (t === '__SILENCE__') {
+          heardSilence = true;
+        } else if (t) {
+          originalText = t;
+          whisperInfo = 'gemini/' + (_gemBest && _gemBest.audio ? _gemBest.audio : gemModel());
+        } else {
+          whisperErr += ' | gemini: resposta vazia';
+        }
       } catch (e) { whisperErr += ' | gemini: ' + e.message; }
     }
+
     // Unorouter Whisper — chama DIRETO sem gastar o slot de 1 req/min em GET /models
     const uniKeysForAudio = allValidUniKeys();
-    if (!originalText && uniKeysForAudio.length) {
+    if (!originalText && !heardSilence && uniKeysForAudio.length) {
       for (const uKey of uniKeysForAudio) {
         if (originalText) break;
         for (const model of UNI_WHISPER_MODELS) {
           if (originalText) break;
           try {
             const fd = new FormData();
-            fd.append('file', new Blob([audioBuf], { type: 'audio/wav' }), 'audio.wav');
+            fd.append('file', new Blob([audioBuf], { type: normMime }), fileLabel);
             fd.append('model', model);
             if (language) fd.append('language', language);
             const r = await fetch(uniBase() + '/audio/transcriptions', {
@@ -553,13 +597,14 @@ async function dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage =
               const j = await r.json();
               originalText = (j.text || '').trim();
               if (originalText) whisperInfo = 'unorouter/' + model;
+              else heardSilence = true;
             } else {
               const errBody = (await r.text().catch(() => '')).slice(0, 100);
               whisperErr += ` | unorouter/${model}: HTTP ${r.status} ${errBody}`;
               if (r.status === 401) { _deadUniKeys.add(uKey); break; }
               if (r.status === 429 && /allows 1 request|Too many requests/i.test(errBody)) {
                 markUniRateWindow(uKey);
-                break; // não gasta mais chamadas na mesma chave; tenta próxima chave ou OMNI
+                break;
               }
             }
           } catch (e) {
@@ -568,9 +613,10 @@ async function dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage =
         }
       }
     }
+
     // Camada extra: modelos OMNI (aceitam áudio no chat) se houver chave pronta
     const omniKey = pickReadyUniKey();
-    if (!originalText && omniKey && audioBuf.length < 9_000_000) {
+    if (!originalText && !heardSilence && omniKey && audioBuf.length < 9_000_000) {
       for (const model of ['qwen3.8-omni-flash', 'nemotron-3-nano-omni-30b-a3b-reasoning:free']) {
         if (originalText) break;
         try {
@@ -579,8 +625,8 @@ async function dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage =
             body: JSON.stringify({
               model,
               messages: [{ role: 'user', content: [
-                { type: 'input_audio', input_audio: { data: audioBuf.toString('base64'), format: 'wav' } },
-                { type: 'text', text: 'Transcreva este áudio. Responda APENAS com o texto falado, sem comentários.' }
+                { type: 'input_audio', input_audio: { data: audioBuf.toString('base64'), format: ext } },
+                { type: 'text', text: 'Transcreva este áudio. Se não houver fala humana, responda [silêncio]. Responda APENAS com o texto falado.' }
               ] }],
               max_tokens: 4000
             }),
@@ -589,6 +635,7 @@ async function dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage =
           if (r.ok) {
             const j = await r.json();
             const t = (j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content || '').trim();
+            if (/^\[?sil[êe]ncio\]?$/i.test(t)) { heardSilence = true; break; }
             if (t && !/não (consigo|posso|é possível)|cannot|unable/i.test(t)) { originalText = t; whisperInfo = 'unorouter/' + model + ' (omni)'; }
           } else {
             const txt = (await r.text().catch(() => '')).slice(0, 80);
@@ -598,32 +645,24 @@ async function dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage =
         } catch (e) { whisperErr += ` | unorouter/${model}(omni): ${e.message}`; }
       }
     }
-    // Última chance: se tudo foi429 (cota), espera a janela ("retry in 60s") e tenta 1x no melhor modelo
-    if (!originalText && /429/.test(whisperErr) && process.env.UNOROUTER_API_KEY) {
-      await sleep(30000);
-      const ids = await unorouterModels();
-      const best = (ids.find(id => /whisper-large-v3-turbo/i.test(id)) || ids.find(id => /whisper/i.test(id)) || 'whisper-large-v3-turbo:free');
-      try {
-        const fd = new FormData();
-        fd.append('file', new Blob([audioBuf], { type: 'audio/wav' }), 'audio.wav');
-        fd.append('model', best);
-        if (language) fd.append('language', language);
-        const r = await fetch(uniBase() + '/audio/transcriptions', {
-          method: 'POST', headers: { Authorization: uniHeaders().Authorization }, body: fd,
-          signal: AbortSignal.timeout(60000)
-        });
-        if (r.ok) {
-          const j = await r.json();
-          originalText = (j.text || '').trim();
-          if (originalText) whisperInfo = 'unorouter/' + best;
-        } else whisperErr += ` | unorouter/${best} (após espera): HTTP ${r.status}`;
-      } catch (e) { whisperErr += ` | unorouter/${best} (após espera): ${e.message}`; }
+
+    // Se o trecho do vídeo for apenas música/efeitos/silêncio (comum em aberturas e vídeos longos!), preserva sem erro!
+    if (!originalText && heardSilence) {
+      return {
+        silent: true,
+        transcription: '',
+        translation: '',
+        dubInfo: `Trecho instrumental/silencioso detectado (${whisperInfo || 'IA'}) — áudio ambiente preservado.`,
+        audioMp3Base64: null,
+        audioMime: 'audio/wav'
+      };
     }
+
     if (!originalText) throw new Error('Não foi possível transcrever o áudio. ' + whisperErr);
 
-    // Tradução com cadeia de provedores (GPT → IA gratuita)
+    // Tradução natural para locução sincronizada (mesma duração aproximada da fala original!)
     const tr = await chatWithFallback({
-      system: 'Você é um tradutor profissional de dublagem. Traduza a fala para o idioma alvo de forma natural, pronta para locução (TTS). Não adicione comentários nem explicações — devolva APENAS a tradução.',
+      system: 'Você é um diretor de dublagem profissional de cinema/streaming. Traduza a fala para o idioma alvo de forma natural, fluida e com duração de fala equivalente ao original (isocronia de dublagem). Não adicione comentários, notas nem aspas extras — devolva APENAS o texto traduzido pronto para ser falado.',
       user: `Traduza para ${targetLanguage}:\n\n${originalText}`
     });
     if (tr.error) throw new Error('Tradução falhou: ' + tr.error);
@@ -632,26 +671,29 @@ async function dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage =
     const parts = [];
     let current = '';
     for (const sentence of translatedText.split(/(?<=[.!?…])\s+/)) {
-      if (current && (current + ' ' + sentence).length > 3900) { parts.push(current); current = sentence; }
+      if (current && (current + ' ' + sentence).length > 2600) { parts.push(current); current = sentence; }
       else current = current ? current + ' ' + sentence : sentence;
     }
     if (current) parts.push(current);
 
-    // Voz com cadeia de provedores (TTS OpenAI → Google → StreamElements)
-    const mp3Parts = [];
+    // Voz com cadeia de provedores (OpenAI → Gemini 3.1 Neural TTS → Unorouter → Google → StreamElements)
+    const audioParts = [];
     const usedProviders = new Set();
     for (const part of parts) {
       const t = await ttsWithFallback({ text: part, voice: dubVoice, lang: targetLanguage });
       if (t.error) throw new Error('Voz falhou: ' + t.error);
-      mp3Parts.push(t.buffer);
+      audioParts.push(t.buffer);
       usedProviders.add(t.provider);
     }
 
+    const merged = concatAudioBuffers(audioParts);
     return {
+      silent: false,
       transcription: originalText,
       translation: translatedText,
-      dubInfo: `Dublagem em ${targetLanguage} gerada com IA • Transcrição: ${whisperInfo || 'openai/whisper-1'} • Tradução: ${tr.provider || 'IA'} • Voz: ${dubVoice} (${[...usedProviders].join(', ')}) • Áudio pronto para download.`,
-      audioMp3Base64: Buffer.concat(mp3Parts).toString('base64')
+      dubInfo: `Dublagem em ${targetLanguage} • Transcrição: ${whisperInfo || 'IA'} • Tradução: ${tr.provider || 'IA'} • Voz: ${dubVoice} (${[...usedProviders].join(', ')})`,
+      audioMp3Base64: merged.buffer.toString('base64'),
+      audioMime: merged.audioMime
     };
   } catch (e) {
     console.error('OpenAI dub error:', e.message);
@@ -1363,19 +1405,20 @@ async function geminiChat({ system, user, json, maxTokens = 8000, timeout = 2000
     throw new Error(`gemini: ${(e.status ? 'HTTP ' + e.status + ' — ' : '')}${e.message}`);
   }
 }
-// Transcrição de áudio (multimodal) — usa kind: 'audio' para ir direto nos Gemini 3.x multimodais
-async function geminiTranscribe(audioBuf, language, timeout = 30000) {
+// Transcrição de áudio (multimodal) — suporta WAV, WebM/Opus, MP3, OGG, MP4 e sinaliza [silêncio] explicitamente
+async function geminiTranscribe(audioBuf, language, timeout = 30000, audioMime = 'audio/wav') {
   if (!process.env.GEMINI_API_KEY) return null;
   const body = {
     contents: [{ role: 'user', parts: [
-      { inlineData: { mimeType: 'audio/wav', data: Buffer.from(audioBuf).toString('base64') } },
-      { text: 'Transcreva fielmente a fala deste áudio' + (language ? ` no idioma ${language}` : '') + '. Se não houver fala humana audível, responda exatamente: [silêncio]. Responda APENAS com o texto transcrito, sem comentários.' }
+      { inlineData: { mimeType: audioMime || 'audio/wav', data: Buffer.from(audioBuf).toString('base64') } },
+      { text: 'Transcreva fielmente a fala deste áudio' + (language ? ` no idioma ${language}` : '') + '. Se não houver fala humana audível (apenas música, ruído ou silêncio), responda exatamente: [silêncio]. Responda APENAS com o texto transcrito, sem comentários.' }
     ] }],
     generationConfig: { temperature: 0.1 }
   };
   const j = await geminiGenerateTried({ body, timeout, kind: 'audio' });
   const text = gemText(j);
-  return /^\[?sil[êe]ncio\]?$/i.test(text) ? '' : (text || '');
+  if (/^\[?sil[êe]ncio\]?$/i.test(String(text || '').trim())) return '__SILENCE__';
+  return (text || '').trim();
 }
 // Imagem da cena (família Gemini 3 Image)
 async function geminiImage(prompt) {

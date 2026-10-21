@@ -29,8 +29,8 @@ let projects = loadProjects();
 
 // --- Middleware ---
 app.use(cors());
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '250mb' }));
+app.use(express.urlencoded({ extended: true, limit: '250mb' }));
 
 // --- Helpers: Mock AI ---
 function mockScript({ prompt, duration, style, voice }) {
@@ -388,48 +388,79 @@ app.post('/api/scene-image', async (req, res) => {
 
 app.post('/api/dub', async (req, res) => {
   try {
-    const { fileName, fileSize, language = '', dubVoice = 'onyx', targetLanguage = 'pt-BR', audioBase64, transcription } = req.body || {};
+    const {
+      fileName,
+      fileSize,
+      language = '',
+      dubVoice = 'onyx',
+      targetLanguage = 'pt-BR',
+      audioBase64,
+      audioMime = 'audio/wav',
+      transcription,
+      chunkIndex = 0,
+      totalChunks = 1,
+      skipSave = false
+    } = req.body || {};
     if (!fileName) {
-      return res.status(400).json({ error: 'Selecione um vídeo.' });
+      return res.status(400).json({ error: 'Selecione um vídeo ou áudio.' });
     }
 
+    const hasCloudAi = !!(process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY || process.env.UNOROUTER_API_KEY);
     let result = null;
-    if (audioBase64) {
-      result = await require('./vercel/api/lib/ai').dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage, transcription });
+    if ((audioBase64 || transcription) && hasCloudAi) {
+      result = await require('./vercel/api/lib/ai').dubWithOpenAI({ audioBase64, audioMime, language, dubVoice, targetLanguage, transcription });
       if (!result || result.error) {
-        return res.status(502).json({ error: 'Falha na dublagem' + (result && result.error ? `: ${result.error}` : ' (transcrição/tradução/voz)') + '. Tente novamente em instantes.' });
+        return res.status(502).json({
+          error: 'Falha na dublagem' + (result && result.error ? `: ${result.error}` : ' (transcrição/tradução/voz)') + '. Tente novamente em instantes.',
+          chunkIndex
+        });
       }
     }
     const mock = result ? null : mockDubResult({ originalName: fileName, language, dubVoice });
+    const trOrig = result ? result.transcription : mock.transcription;
+    const trDest = result ? result.translation : mock.translation;
+    const info = result ? result.dubInfo : mock.dubInfo;
 
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
     const project = {
       id,
       type: 'dub',
       title: `Dublagem: ${fileName}`,
-      prompt: `Dublagem de ${fileName} para PT-BR`,
+      prompt: `Dublagem de ${fileName} para ${targetLanguage}`,
       fileName,
       fileSize: Number(fileSize) || 0,
       language: language || 'auto',
+      targetLanguage,
       dubVoice,
-      transcription: result ? result.transcription : mock.transcription,
-      translation: result ? result.translation : mock.translation,
-      dubInfo: result ? result.dubInfo : mock.dubInfo,
-      script: result ? `${result.transcription}\n\n${result.translation}\n\n${result.dubInfo}` : `${mock.transcription}\n\n${mock.translation}\n\n${mock.dubInfo}`,
+      transcription: trOrig,
+      translation: trDest,
+      dubInfo: info,
+      script: [trOrig, trDest, info].filter(Boolean).join('\n\n'),
       status: 'dublado',
       mode: result ? 'openai' : 'mock',
       createdAt: new Date().toISOString(),
       thumbnail: `https://picsum.photos/seed/dub-${id}/640/360`
     };
 
-    projects.unshift(project);
-    saveProjects(projects);
+    if (!skipSave) {
+      projects.unshift(project);
+      saveProjects(projects);
+    }
 
     res.json({
       id: project.id,
+      chunkIndex,
+      totalChunks,
+      silent: !!(result && result.silent),
+      transcription: trOrig,
+      translation: trDest,
+      dubInfo: info,
       project,
       audioBase64: result ? result.audioMp3Base64 : null,
-      message: result ? 'Vídeo traduzido e dublado em PT-BR (Whisper + GPT + TTS).' : 'Modo simulação (sem áudio real).'
+      audioMime: (result && result.audioMime) || 'audio/mpeg',
+      message: result
+        ? (result.silent ? 'Trecho instrumental/silencioso preservado.' : `Vídeo traduzido e dublado (${targetLanguage}).`)
+        : 'Modo simulação local ativo.'
     });
   } catch (e) {
     console.error(e);
