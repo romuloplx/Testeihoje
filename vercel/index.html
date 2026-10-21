@@ -1436,10 +1436,10 @@ function trimBreathSilences(samples, sr){
   return outPos > sr * 0.15 ? out.subarray(0, outPos) : samples;
 }
 
-// Aceleração WSOLA / Hann Overlap-Add que PRESERVA 100% O TOM DA VOZ HUMANA (ZERO efeito esquilo/robô!)
+// Aceleração WSOLA / Hann Overlap-Add suave que PRESERVA 100% O TIMBRE E CADÊNCIA DO MESMO DUBLADOR DO INÍCIO AO FIM!
 function timeStretchPreservePitch(samples, sr, targetLen){
   if(!samples || samples.length <= targetLen || targetLen <= 0) return samples;
-  const speed = Math.min(1.30, samples.length / targetLen);
+  const speed = Math.min(1.12, samples.length / targetLen);
   if(speed <= 1.01) return samples.subarray(0, Math.min(samples.length, targetLen));
 
   const grain = Math.floor(sr * 0.030); // janela de 30ms ideal para voz humana
@@ -2221,7 +2221,7 @@ async function dubVideo(){
       showStatus('dubStatus', `🌍 ${partLabel} • Traduzindo para ${targetLanguage} e gerando voz (${dubVoice})...`, 'info');
 
       let data = null, ok = false, lastErrMsg = '';
-      for(let attempt = 0; attempt < 2 && !ok; attempt++){
+      for(let attempt = 0; attempt < 3 && !ok; attempt++){
         try{
           const res = await fetch('/api/dub', {
             method:'POST',
@@ -2242,11 +2242,14 @@ async function dubVideo(){
           const parsed = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
           if(res.ok && !parsed.error){ data = parsed; ok = true; break; }
           lastErrMsg = String(parsed.error || `HTTP ${res.status}`);
-          if(attempt === 0 && /429|timeout|502|503/i.test(lastErrMsg)){
-            await new Promise(r => setTimeout(r, 2200));
+          if(attempt < 2){
+            await new Promise(r => setTimeout(r, 1400 * (attempt + 1)));
           }
         }catch(netErr){
           lastErrMsg = netErr.message || String(netErr);
+          if(attempt < 2){
+            await new Promise(r => setTimeout(r, 1400 * (attempt + 1)));
+          }
         }
       }
 
@@ -3680,17 +3683,17 @@ async function fetchSceneImage(promptOrScene, style, w=896, h=504){
 }
 
 async function fetchSceneAudio(text,voice,emotion=''){
-  for(let attempt=0; attempt<2; attempt++){
+  for(let attempt=0; attempt<3; attempt++){
     try{
       const r=await fetch('/api/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,voice,emotion})});
       const ct=r.headers.get('content-type')||'';
       if(r.ok&&ct.includes('audio')) return { blob: await r.blob(), provider: r.headers.get('x-audio-provider')||'' };
       let msg='resposta inválida do servidor';
       try{ const j=await r.json(); msg=j.error||j.message||msg; }catch(e){}
-      if(attempt===0){ await new Promise(res=>setTimeout(res,700)); continue; }
+      if(attempt<2){ await new Promise(res=>setTimeout(res,700*(attempt+1))); continue; }
       return { error: msg };
     }catch(e){
-      if(attempt===0){ await new Promise(res=>setTimeout(res,700)); continue; }
+      if(attempt<2){ await new Promise(res=>setTimeout(res,700*(attempt+1))); continue; }
       return { error: e.message };
     }
   }
@@ -3770,7 +3773,8 @@ async function buildCreateVideo(){
           action: b.action || '',
           shot: b.shot || (bIdx === 0 ? 'establishing' : 'action'),
           cameraMove: b.cameraMove || sc.cameraMove || 'zoomIn',
-          voice: b.voice || (actor ? actor.voice : narratorVoice) || narratorVoice,
+          // Mesmo dublador travado do começo ao fim do vídeo (nunca muda para outra voz!)
+          voice: narratorVoice,
           text: String(b.text || '').trim(),
           isLastInScene: bIdx === rawBeats.length - 1
         });
@@ -3781,12 +3785,12 @@ async function buildCreateVideo(){
     const decCtx = new AC();
     for(let i = 0; i < flatBeats.length; i += 2){
       const pair = flatBeats.slice(i, i + 2);
-      document.getElementById('videoBuildMsg').textContent = `🎙️ Gravando atuação de voz ${i+1}–${Math.min(flatBeats.length, i+2)} de ${flatBeats.length} (${pair.map(p=>p.speakerName).join(' & ')})...`;
+      document.getElementById('videoBuildMsg').textContent = `🎙️ Gravando dublagem unificada ${i+1}–${Math.min(flatBeats.length, i+2)} de ${flatBeats.length} (${pair.map(p=>p.speakerName).join(' & ')})...`;
       const pct = Math.round(42 + (i / Math.max(1, flatBeats.length)) * 22);
       document.getElementById('videoBuildFill').style.width = pct + '%';
       setProgress('createProgressFill', 55 + Math.round((i / Math.max(1, flatBeats.length)) * 18));
 
-      const audios = await Promise.all(pair.map(b => fetchSceneAudio(b.text, b.voice, b.emotion)));
+      const audios = await Promise.all(pair.map(b => fetchSceneAudio(b.text, narratorVoice, '')));
       for(let j = 0; j < pair.length; j++){
         const a = audios[j];
         if(a && a.blob){

@@ -38,27 +38,20 @@ function mockScript({ prompt, duration, style, voice }) {
   return { title: titulo, script: full, scenes: roteiro, meta: { estilo: estiloMap[style], voz: vozMap[voice], cenas, dur } };
 }
 
-// Seleciona vozes garantidamente distintas para Narrador + Personagens da história
+// Mantém o MESMO dublador / narrador do começo ao fim do vídeo (nunca troca para outra voz no meio!)
 function pickDistinctCastVoices(narratorVoice = 'onyx', chars = [], style = 'cinematic') {
-  const used = new Set([narratorVoice || 'onyx']);
-  const malePool = ['echo', 'fable', 'onyx', 'ash', 'alloy'];
-  const femalePool = ['nova', 'shimmer', 'coral', 'sage', 'alloy'];
+  const lockedVoice = (narratorVoice && TTS_VOICES[narratorVoice]) ? narratorVoice : 'onyx';
   const colors = ['#38bdf8', '#f472b6', '#34d399', '#c084fc'];
   const defPortraitStyle = style === 'animation' ? 'pixar' : 'studio';
   return chars.map((c, idx) => {
     const isFemale = /fem|mulher|garota|menina|dra|ela|woman|girl|female|mãe|mae|princesa|rainha|avó|avo|irmã|irma|amiga|cachorrinha|gatinha|raposa|fada|bruxa|exploradora|investigadora|mentora|engenheira|professora|sofia|luna|helena|maya|lyra|nina|mel|clara|lara|ana|julia|maria|alice|bela/i.test(`${c.gender || ''} ${c.name || ''} ${c.role || ''} ${c.appearance || ''}`);
-    const pool = isFemale ? femalePool : malePool;
-    const chosen = (c.voice && TTS_VOICES[c.voice] && !used.has(c.voice))
-      ? c.voice
-      : (pool.find(v => !used.has(v)) || Object.keys(TTS_VOICES).find(v => !used.has(v)) || (isFemale ? 'nova' : 'echo'));
-    used.add(chosen);
     return {
       id: c.id || `char${idx + 1}`,
       name: String(c.name || (isFemale ? 'Sofia' : 'Kael')).trim(),
       role: String(c.role || (idx === 0 ? 'Protagonista' : 'Companheiro(a) de Jornada')).trim(),
       personality: String(c.personality || (idx === 0 ? 'expressivo, curioso e determinado' : 'observador, leal e espirituoso')).trim(),
       gender: isFemale ? 'female' : 'male',
-      voice: chosen,
+      voice: lockedVoice,
       themeColor: c.themeColor || colors[idx % colors.length],
       portraitStyle: c.portraitStyle || defPortraitStyle,
       appearance: String(c.appearance || (isFemale
@@ -398,13 +391,15 @@ async function generateCreateFull({ prompt, duration, style, voice, cinemaMode =
         if (rawChars.length === 1 && fallbackChars.length >= 2) rawChars.push(fallbackChars[1]);
         const characters = pickDistinctCastVoices(voice || 'onyx', rawChars, style);
 
-        const voiceBySpeaker = { narrator: voice || 'onyx' };
+        const lockedMasterVoice = (voice && TTS_VOICES[voice]) ? voice : 'onyx';
+        const voiceBySpeaker = { narrator: lockedMasterVoice };
         const nameBySpeaker = { narrator: 'Narrador' };
         const charAppearanceSummary = characters.map(c => `${c.name} (${c.appearance})`).join(' and ');
         characters.forEach((c, idx) => {
           const key = `char${idx + 1}`;
           c.id = key;
-          voiceBySpeaker[key] = c.voice;
+          c.voice = lockedMasterVoice;
+          voiceBySpeaker[key] = lockedMasterVoice;
           nameBySpeaker[key] = c.name;
         });
 
@@ -1962,86 +1957,97 @@ function sanitizeTextForHumanSSML(raw) {
   return String(raw || '')
     .replace(/\*\*|__|`|~~/g, '')
     .replace(/^\s*[-•*]\s+/gm, '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    // Micro-pausa orgânica de respiração em travessões e reticências (deixa a fala 100% humana!)
-    .replace(/\s*(?:—|--|\.\.\.|…)\s*/g, ', <break time="160ms"/> ')
+    // Substitui travessões e reticências por vírgula suave (nunca injeta tag <break> crua que derruba o stream!)
+    .replace(/\s*(?:—|--|\.\.\.|…)\s*/g, ', ')
+    .replace(/&/g, ' e ')
+    .replace(/[<>]/g, '')
     .replace(/\s{2,}/g, ' ')
     .trim();
 }
 
-async function edgeNeuralTTS({ text, voice = 'onyx', lang = 'pt-BR', emotion = '' }) {
+async function edgeNeuralTTS({ text, voice = 'onyx', lang = 'pt-BR' }) {
   const { MsEdgeTTS, OUTPUT_FORMAT } = require('msedge-tts');
   const locale = TTS_LANGS[lang] || 'pt-BR';
   const preset = EDGE_VOICE_PRESETS[voice] || EDGE_VOICE_PRESETS.onyx;
   const isFemale = ['nova', 'shimmer', 'coral', 'sage', 'alloy'].includes(voice);
 
-  const emoMod = EMOTION_PROSODY_OFFSET[String(emotion || '').toLowerCase()] || { rateDelta: 0, pitchDelta: 0 };
-  const baseRate = parseInt(preset.rate, 10) || 2;
-  const basePitch = parseInt(preset.pitch, 10) || 0;
-  const finalRate = `${baseRate + emoMod.rateDelta >= 0 ? '+' : ''}${baseRate + emoMod.rateDelta}%`;
-  const finalPitch = `${basePitch + emoMod.pitchDelta >= 0 ? '+' : ''}${basePitch + emoMod.pitchDelta}Hz`;
+  // Timbre, tom e velocidade 100% travados do começo ao fim do vídeo para que o dublador seja sempre o mesmo!
+  const finalRate = preset.rate || '+2%';
+  const finalPitch = preset.pitch || '+0Hz';
 
-  let primaryVoice = preset.voice;
-  if (locale !== 'pt-BR' && !/Multilingual/i.test(primaryVoice) && EDGE_LANG_NATIVE[locale]) {
-    primaryVoice = isFemale ? EDGE_LANG_NATIVE[locale].female : EDGE_LANG_NATIVE[locale].male;
+  let lockedVoice = preset.voice;
+  if (locale !== 'pt-BR' && !/Multilingual/i.test(lockedVoice) && EDGE_LANG_NATIVE[locale]) {
+    lockedVoice = isFemale ? EDGE_LANG_NATIVE[locale].female : EDGE_LANG_NATIVE[locale].male;
   }
-  const fallbackVoice = isFemale ? 'pt-BR-FranciscaNeural' : 'pt-BR-AntonioNeural';
 
-  // Divide textos grandes em parágrafos/frases de até 1600 caracteres para latência ultrarrápida e zero corte
+  // Divide textos grandes em segmentos de até 1500 caracteres para síntese rápida e sem cortes
   const cleanAll = String(text || '').replace(/\s+/g, ' ').trim();
   if (!cleanAll) throw new Error('texto vazio');
   const segments = [];
   let cur = '';
   for (const s of cleanAll.split(/(?<=[.!?…])\s+/)) {
-    if (cur && (cur.length + s.length + 1) > 1600) { segments.push(cur); cur = s; }
+    if (cur && (cur.length + s.length + 1) > 1500) { segments.push(cur); cur = s; }
     else cur = cur ? cur + ' ' + s : s;
   }
   if (cur) segments.push(cur);
 
+  // Sintetiza CADA segmento exclusivamente com o MESMO dublador (lockedVoice), com até 4 tentativas por segmento (NUNCA muda de voz!)
+  const mp3Buffers = [];
   let lastErr = null;
-  for (const candidateVoice of [...new Set([primaryVoice, fallbackVoice])]) {
-    const tts = new MsEdgeTTS({ connectionTimeoutMs: 9000, synthesisTimeoutMs: 22000 });
-    try {
-      const metaOpts = /Multilingual/i.test(candidateVoice) ? { voiceLocale: locale } : {};
-      await tts.setMetadata(candidateVoice, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3, metaOpts);
-      const mp3Buffers = [];
-      for (const seg of segments) {
-        const ssmlSafe = sanitizeTextForHumanSSML(seg);
+  const metaOpts = /Multilingual/i.test(lockedVoice) ? { voiceLocale: locale } : {};
+
+  for (const seg of segments) {
+    const ssmlSafe = sanitizeTextForHumanSSML(seg);
+    if (!ssmlSafe) continue;
+    let segSuccess = false;
+    for (let attempt = 0; attempt < 4 && !segSuccess; attempt++) {
+      const tts = new MsEdgeTTS({ connectionTimeoutMs: 10000, synthesisTimeoutMs: 24000 });
+      try {
+        await tts.setMetadata(lockedVoice, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3, metaOpts);
         const { audioStream } = tts.toStream(ssmlSafe, { rate: finalRate, pitch: finalPitch });
         const segBuf = await new Promise((resolve, reject) => {
           const chunks = [];
           const timer = setTimeout(() => {
             try { audioStream.destroy(); } catch (_) {}
             reject(new Error('timeout de síntese neural'));
-          }, 22000);
+          }, 24000);
           audioStream.on('data', d => chunks.push(Buffer.from(d)));
           audioStream.once('end', () => { clearTimeout(timer); resolve(Buffer.concat(chunks)); });
           audioStream.once('close', () => { clearTimeout(timer); resolve(Buffer.concat(chunks)); });
           audioStream.once('error', err => { clearTimeout(timer); reject(err); });
         });
-        if (!segBuf || segBuf.length < 300) throw new Error('áudio neural curto/vazio');
+        try { tts.close(); } catch (_) {}
+        if (!segBuf || segBuf.length < 250) throw new Error('áudio neural curto/vazio');
         mp3Buffers.push(segBuf);
+        segSuccess = true;
+      } catch (err) {
+        lastErr = err;
+        try { tts.close(); } catch (_) {}
+        if (attempt < 3) await sleep(350 * (attempt + 1));
       }
-      try { tts.close(); } catch (_) {}
-      return { buffer: Buffer.concat(mp3Buffers), provider: `neural-hd/${candidateVoice}` };
-    } catch (err) {
-      lastErr = err;
-      try { tts.close(); } catch (_) {}
+    }
+    if (!segSuccess) {
+      throw lastErr || new Error('falha na síntese neural HD');
     }
   }
-  throw lastErr || new Error('falha na síntese neural HD');
+
+  if (!mp3Buffers.length) throw lastErr || new Error('áudio neural vazio');
+  return { buffer: Buffer.concat(mp3Buffers), provider: `neural-hd/${lockedVoice}` };
 }
 
-// Voz com cadeia 100% HUMANA NEURAL:
-// 1) OpenAI gpt-4o-mini-tts / tts-1-hd (com direção de atuação humana)
-// 2) Microsoft Azure Neural Studio HD (9 vozes humanas reais 24kHz ilimitadas — ZERO voz robótica e ZERO cota 429!)
-// 3) Gemini 3.1 Neural Studio TTS (com direção em PT-BR autêntico)
-// 4) Unorouter Neural TTS
-// 5) Google TTS apenas como último paraquedas de emergência
+// Voz com Dublador 100% Travado do Começo ao Fim (Microsoft Azure Neural Studio HD 24kHz na voz exata escolhida)
 async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR', emotion = '' }) {
   const errors = [];
+
+  // 1) Motor Principal com Dublador Travado (garante SEMPRE a mesma voz do início ao fim do vídeo, sem alternar entre provedores!)
+  try {
+    const edge = await edgeNeuralTTS({ text, voice, lang, emotion });
+    if (edge && edge.buffer && edge.buffer.length > 250) return edge;
+  } catch (e) {
+    errors.push('neural-hd: ' + e.message);
+  }
+
+  // 2) OpenAI oficial apenas se configurada e caso o motor principal esteja inacessível
   if (canUseOfficialOpenAI()) {
     for (const model of ['gpt-4o-mini-tts', 'tts-1-hd', 'tts-1']) {
       try {
@@ -2053,7 +2059,7 @@ async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR', emotion =
           response_format: 'mp3'
         };
         if (model === 'gpt-4o-mini-tts') {
-          opts.instructions = 'Fale como um ator humano brasileiro autêntico, com emoção viva, respiração sutil natural, entonação expressiva de cinema e ritmo fluido. Nunca soe robótico.';
+          opts.instructions = 'Fale como um dublador humano brasileiro autêntico, mantendo sempre o mesmo timbre, tom e cadência do início ao fim.';
         }
         const s = await openai.audio.speech.create(opts);
         const b = Buffer.from(await s.arrayBuffer());
@@ -2066,59 +2072,6 @@ async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR', emotion =
     }
   }
 
-  // Motor Principal Ilimitado: Vozes Humanas Neurais HD de Estúdio com modulação de emoção
-  try {
-    const edge = await edgeNeuralTTS({ text, voice, lang, emotion });
-    if (edge && edge.buffer && edge.buffer.length > 400) return edge;
-  } catch (e) {
-    errors.push('neural-hd: ' + e.message);
-  }
-
-  // Gemini 3.1 Neural Studio TTS com direção em Português Brasileiro autêntico
-  if (process.env.GEMINI_API_KEY) {
-    try {
-      const g = await geminiTTS(text, voice, 20000, lang);
-      if (g && g.buffer) return g;
-      errors.push('gemini/tts: ' + (g && g.error ? g.error : 'sem áudio'));
-    } catch (e) { errors.push(e.message); }
-  }
-
-  // Unorouter Neural TTS — direto sem GET /models
-  const uKey = pickReadyUniKey();
-  if (uKey) {
-    for (const model of UNI_TTS_MODELS) {
-      try {
-        const r = await fetch(uniBase() + '/audio/speech', {
-          method: 'POST', headers: uniHeaders(uKey),
-          body: JSON.stringify({ model, voice: TTS_VOICES[voice] || 'onyx', input: String(text).slice(0, 4096), response_format: 'mp3' }),
-          signal: AbortSignal.timeout(15000)
-        });
-        if (r.ok) {
-          const b = Buffer.from(await r.arrayBuffer());
-          if (b.length > 500) return { buffer: b, provider: 'unorouter/' + model };
-        } else {
-          const txt = (await r.text().catch(() => '')).slice(0, 100);
-          errors.push(`unorouter/${model}: HTTP ${r.status}`);
-          if (r.status === 401) { _deadUniKeys.add(uKey); break; }
-          if (r.status === 429 && /allows 1 request|Too many requests/i.test(txt)) { markUniRateWindow(uKey); break; }
-        }
-      } catch (e) { errors.push(`unorouter/${model}: ${e.message}`); break; }
-    }
-  }
-
-  // Última contingência extrema
-  try {
-    const gLang = (lang || 'pt-BR').split('-')[0] === 'pt' ? 'pt-BR' : (lang || 'pt-BR');
-    const b = await ttsGoogle({ text, lang: gLang });
-    return { buffer: b, provider: 'google-tts(emergency)' };
-  } catch (e) { errors.push('google-tts: ' + e.message); }
-
-  if (/^en/i.test(lang || '')) {
-    try {
-      const b = await ttsStreamElements({ text });
-      return { buffer: b, provider: 'streamelements(en)' };
-    } catch (e) { errors.push('streamelements: ' + e.message); }
-  }
   return { error: errors.join(' | '), errors };
 }
 
