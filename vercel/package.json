@@ -5,6 +5,7 @@
   "description": "DubAI PRO — deploy Vercel (serverless)",
   "dependencies": {
     "@breezystack/lamejs": "^1.2.7",
+    "msedge-tts": "^2.1.0",
     "openai": "^4.104.0"
   }
 }

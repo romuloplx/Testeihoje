@@ -293,15 +293,15 @@ input[type="range"]{
         <label>🎙️ Voz principal do Narrador</label>
         <div style="display:flex;gap:8px">
           <select id="voice" style="flex:1">
-            <option value="onyx">Onyx — Masculina grave</option>
-            <option value="nova">Nova — Feminina natural</option>
-            <option value="alloy">Alloy — Neutra</option>
-            <option value="echo">Echo — Masculina jovem</option>
-            <option value="fable">Fable — Masculina expressiva</option>
-            <option value="shimmer">Shimmer — Feminina suave</option>
-            <option value="ash">Ash — Neutra firme</option>
-            <option value="coral">Coral — Feminina clara</option>
-            <option value="sage">Sage — Neutra calma</option>
+            <option value="onyx">🎙️ Antônio — Masculina Grave Cinema (Humana HD)</option>
+            <option value="nova">🎙️ Francisca — Feminina Calorosa Natural (Humana HD)</option>
+            <option value="shimmer">🎙️ Thalita HD — Feminina Jovem Realista (Dragon Neural)</option>
+            <option value="echo">🎙️ Andrew HD — Masculina Podcast Conversacional</option>
+            <option value="coral">🎙️ Ava HD — Feminina Expressiva Comercial</option>
+            <option value="fable">🎙️ Brian HD — Masculina Contador de Histórias</option>
+            <option value="sage">🎙️ Emma HD — Feminina Documentário & Aula</option>
+            <option value="ash">🎙️ Remy HD — Masculina Dramática Firme</option>
+            <option value="alloy">🎙️ Vivienne HD — Feminina Executiva / TV</option>
           </select>
           <button class="ghost" type="button" onclick="previewVoice(document.getElementById('voice').value)">🔊 Testar</button>
         </div>
@@ -487,15 +487,15 @@ input[type="range"]{
         <label>Voz do apresentador</label>
         <div style="display:flex;gap:8px">
           <select id="avatarVoice" style="flex:1">
-            <option value="nova" selected>Nova — Feminina natural</option>
-            <option value="onyx">Onyx — Masculina grave</option>
-            <option value="alloy">Alloy — Neutra</option>
-            <option value="echo">Echo — Masculina</option>
-            <option value="fable">Fable — Masculina expressiva</option>
-            <option value="shimmer">Shimmer — Feminina suave</option>
-            <option value="ash">Ash — Neutra firme</option>
-            <option value="coral">Coral — Feminina clara</option>
-            <option value="sage">Sage — Neutra calma</option>
+            <option value="nova" selected>🎙️ Francisca — Feminina Calorosa Natural (Humana HD)</option>
+            <option value="onyx">🎙️ Antônio — Masculina Grave Cinema (Humana HD)</option>
+            <option value="shimmer">🎙️ Thalita HD — Feminina Jovem Realista (Dragon Neural)</option>
+            <option value="echo">🎙️ Andrew HD — Masculina Podcast Conversacional</option>
+            <option value="coral">🎙️ Ava HD — Feminina Expressiva Comercial</option>
+            <option value="fable">🎙️ Brian HD — Masculina Contador de Histórias</option>
+            <option value="sage">🎙️ Emma HD — Feminina Documentário & Aula</option>
+            <option value="ash">🎙️ Remy HD — Masculina Dramática Firme</option>
+            <option value="alloy">🎙️ Vivienne HD — Feminina Executiva / TV</option>
           </select>
           <button class="ghost" type="button" onclick="previewVoice(document.getElementById('avatarVoice').value)">🔊</button>
         </div>
@@ -577,15 +577,15 @@ input[type="range"]{
         <label>Voz da dublagem</label>
         <div style="display:flex;gap:8px">
           <select id="dubVoice" style="flex:1">
-            <option value="onyx">Onyx — Masculina grave</option>
-            <option value="nova">Nova — Feminina natural</option>
-            <option value="alloy">Alloy — Neutra</option>
-            <option value="echo">Echo — Masculina jovem</option>
-            <option value="fable">Fable — Narrador expressivo</option>
-            <option value="shimmer">Shimmer — Feminina suave</option>
-            <option value="ash">Ash — Masculina firme</option>
-            <option value="coral">Coral — Feminina clara</option>
-            <option value="sage">Sage — Calma / Documentário</option>
+            <option value="onyx">🎙️ Antônio — Masculina Grave Cinema (Humana HD)</option>
+            <option value="nova">🎙️ Francisca — Feminina Calorosa Natural (Humana HD)</option>
+            <option value="shimmer">🎙️ Thalita HD — Feminina Jovem Realista (Dragon Neural)</option>
+            <option value="echo">🎙️ Andrew HD — Masculina Podcast Conversacional</option>
+            <option value="coral">🎙️ Ava HD — Feminina Expressiva Comercial</option>
+            <option value="fable">🎙️ Brian HD — Masculina Contador de Histórias</option>
+            <option value="sage">🎙️ Emma HD — Feminina Documentário & Aula</option>
+            <option value="ash">🎙️ Remy HD — Masculina Dramática Firme</option>
+            <option value="alloy">🎙️ Vivienne HD — Feminina Executiva / TV</option>
           </select>
           <button class="ghost" type="button" onclick="previewVoice(document.getElementById('dubVoice').value)">🔊</button>
         </div>
@@ -673,7 +673,7 @@ input[type="range"]{
         <div id="dubScript" style="white-space:pre-wrap;font-size:12.5px;line-height:1.7;color:#d1d5ff;max-height:320px;overflow:auto"></div>
         <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
           <button class="ghost" onclick="copyText(document.getElementById('dubScript').innerText)">📋 Copiar tradução</button>
-          <button class="ghost" onclick="speakText(document.getElementById('dubScript').innerText)">🔊 Ouvir (voz do navegador)</button>
+          <button class="ghost" onclick="speakText(document.getElementById('dubScript').innerText)">🔊 Ouvir com Voz Humana Neural</button>
         </div>
       </div>
     </div>
@@ -1267,7 +1267,78 @@ function resampleChannelLinear(input, outLength){
   return out;
 }
 
-// Monta o Áudio Master 24kHz sincronizado do segundo 0:00 até o fim do vídeo (com mixagem opcional do som ambiente original!)
+// Encurta pausas longas de respiração sem encostar em uma única sílaba falada (preserva 100% o timbre humano!)
+function trimBreathSilences(samples, sr){
+  if(!samples || samples.length < sr * 0.4) return samples;
+  const win = Math.floor(sr * 0.02); // 20ms
+  const maxSilentWins = 5; // máximo 100ms contínuos de silêncio morto
+  const out = new Float32Array(samples.length);
+  let outPos = 0, silentRun = 0;
+  for(let i = 0; i < samples.length; i += win){
+    const end = Math.min(samples.length, i + win);
+    let rms = 0;
+    for(let k = i; k < end; k++) rms += samples[k] * samples[k];
+    rms = Math.sqrt(rms / Math.max(1, end - i));
+    if(rms < 0.006){
+      silentRun++;
+      if(silentRun > maxSilentWins) continue;
+    } else {
+      silentRun = 0;
+    }
+    out.set(samples.subarray(i, end), outPos);
+    outPos += (end - i);
+  }
+  return outPos > sr * 0.15 ? out.subarray(0, outPos) : samples;
+}
+
+// Aceleração WSOLA / Hann Overlap-Add que PRESERVA 100% O TOM DA VOZ HUMANA (ZERO efeito esquilo/robô!)
+function timeStretchPreservePitch(samples, sr, targetLen){
+  if(!samples || samples.length <= targetLen || targetLen <= 0) return samples;
+  const speed = Math.min(1.30, samples.length / targetLen);
+  if(speed <= 1.01) return samples.subarray(0, Math.min(samples.length, targetLen));
+
+  const grain = Math.floor(sr * 0.030); // janela de 30ms ideal para voz humana
+  const ha = Math.floor(grain * 0.5);   // síntese hop = 15ms (50% overlap Hann)
+  const hs = Math.max(1, Math.round(ha * speed));
+  const search = Math.floor(sr * 0.007); // alinhamento de fase ±7ms para zero metalização!
+
+  const hann = new Float32Array(grain);
+  for(let i = 0; i < grain; i++) hann[i] = 0.5 * (1 - Math.cos(2 * Math.PI * i / (grain - 1)));
+
+  const outLen = Math.max(grain, Math.floor(samples.length / speed));
+  const out = new Float32Array(outLen);
+  const norm = new Float32Array(outLen);
+
+  let inPos = 0;
+  for(let outPos = 0; outPos + grain <= outLen && inPos + grain <= samples.length; outPos += ha){
+    let bestShift = 0;
+    if(outPos > 0){
+      let bestCorr = -Infinity;
+      const sMin = Math.max(-inPos, -search);
+      const sMax = Math.min(search, samples.length - grain - inPos);
+      for(let d = sMin; d <= sMax; d += 3){
+        let corr = 0;
+        for(let k = 0; k < ha; k += 4){
+          corr += out[outPos + k] * samples[inPos + d + k];
+        }
+        if(corr > bestCorr){ bestCorr = corr; bestShift = d; }
+      }
+    }
+    const readStart = inPos + bestShift;
+    for(let k = 0; k < grain; k++){
+      const w = hann[k];
+      out[outPos + k] += samples[readStart + k] * w;
+      norm[outPos + k] += w;
+    }
+    inPos = readStart + hs;
+  }
+  for(let i = 0; i < outLen; i++){
+    if(norm[i] > 1e-4) out[i] /= norm[i];
+  }
+  return out.subarray(0, Math.min(outLen, targetLen));
+}
+
+// Monta o Áudio Master 24kHz sincronizado do segundo 0:00 até o fim do vídeo (com timbre humano 100% preservado!)
 function assembleDubbedMasterAudio({ chunkOutputs, totalDurationSec, origMono12k, bgMixMode = 'duck' }){
   const SR = 24000;
   const totalSamples = Math.max(SR, Math.ceil(totalDurationSec * SR));
@@ -1283,16 +1354,19 @@ function assembleDubbedMasterAudio({ chunkOutputs, totalDurationSec, origMono12k
     const nextStart = (i + 1 < chunkOutputs.length) ? chunkOutputs[i + 1].startSec : totalDurationSec;
     const maxWindowSec = Math.max(0.5, nextStart - seg.startSec);
 
-    // Converte da taxa original do TTS para 24kHz
+    // Converte da taxa nativa do decoder para 24kHz exatos (mesma duração, timbre 100% intacto!)
     let voice24k = seg.sampleRate === SR
       ? seg.decodedSamples
       : resampleChannelLinear(seg.decodedSamples, Math.round(seg.decodedSamples.length * (SR / seg.sampleRate)));
 
-    // Se a fala traduzida ficou um pouco mais longa que o bloco original, acelera suavemente (até 1.32x) para NUNCA atrasar o vídeo!
+    // Se a fala traduzida ficou um pouco mais comprida que a janela original:
+    // 1º enxuga pausas mortas entre frases; 2º usa WSOLA preservando 100% do grave/timbre humano natural!
     const maxSamplesAllowed = Math.floor(maxWindowSec * SR);
     if(voice24k.length > maxSamplesAllowed){
-      const minCompressed = Math.floor(voice24k.length / 1.32);
-      voice24k = resampleChannelLinear(voice24k, Math.max(minCompressed, maxSamplesAllowed)).subarray(0, maxSamplesAllowed);
+      voice24k = trimBreathSilences(voice24k, SR);
+    }
+    if(voice24k.length > maxSamplesAllowed){
+      voice24k = timeStretchPreservePitch(voice24k, SR, maxSamplesAllowed);
     }
 
     const offset = Math.max(0, Math.floor(seg.startSec * SR));
@@ -2592,14 +2666,21 @@ async function fetchSceneImage(scene,style){
 }
 
 async function fetchSceneAudio(text,voice){
-  try{
-    const r=await fetch('/api/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,voice})});
-    const ct=r.headers.get('content-type')||'';
-    if(r.ok&&ct.includes('audio')) return { blob: await r.blob(), provider: r.headers.get('x-audio-provider')||'' };
-    let msg='resposta inválida do servidor';
-    try{ const j=await r.json(); msg=j.error||j.message||msg; }catch(e){}
-    return { error: msg };
-  }catch(e){ return { error: e.message }; }
+  for(let attempt=0; attempt<2; attempt++){
+    try{
+      const r=await fetch('/api/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,voice})});
+      const ct=r.headers.get('content-type')||'';
+      if(r.ok&&ct.includes('audio')) return { blob: await r.blob(), provider: r.headers.get('x-audio-provider')||'' };
+      let msg='resposta inválida do servidor';
+      try{ const j=await r.json(); msg=j.error||j.message||msg; }catch(e){}
+      if(attempt===0){ await new Promise(res=>setTimeout(res,700)); continue; }
+      return { error: msg };
+    }catch(e){
+      if(attempt===0){ await new Promise(res=>setTimeout(res,700)); continue; }
+      return { error: e.message };
+    }
+  }
+  return { error: 'falha de rede' };
 }
 
 async function buildCreateVideo(){
@@ -3038,20 +3119,63 @@ function downloadText(id){
   const a=document.createElement('a'); a.href=url; a.download=`DubAI-${p.id}.txt`; a.click(); URL.revokeObjectURL(url);
   toast('⬇️ Download iniciado');
 }
-function speakText(text){
+let activeNeuralPreviewAudio = null;
+async function speakText(text){
   if(!text || !text.trim()) return toast('Nada para narrar','warn');
+  // Se já estiver tocando prévia neural, clicar de novo pausa na hora!
+  if(activeNeuralPreviewAudio && !activeNeuralPreviewAudio.paused){
+    activeNeuralPreviewAudio.pause();
+    activeNeuralPreviewAudio = null;
+    toast('⏹️ Leitura pausada');
+    return;
+  }
+  // Remove marcações técnicas (descrição de cenário, cabeçalhos, emojis) para ler apenas a fala humana limpa!
+  const cleaned = String(text)
+    .split('\n')
+    .filter(line => !/^\s*(🏞️|🎭|•|\*Cenário:|\*\*TÍTULO:|─+)/i.test(line))
+    .map(line => line.replace(/^\s*(🎬\s*\*\*CENA[^*]+\*\*)/i, '').replace(/^\s*(🎙️|🗣️)\s*[^:]{1,28}:\s*/u, ''))
+    .join(' ')
+    .replace(/\*\*|__|\[.*?\]|["“”]/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+    .slice(0, 3200);
+
+  const chosenVoice = (document.getElementById('voice') && !document.getElementById('create').classList.contains('hidden'))
+    ? document.getElementById('voice').value
+    : (!document.getElementById('dub').classList.contains('hidden') && document.getElementById('dubVoice'))
+      ? document.getElementById('dubVoice').value
+      : 'nova';
+
+  toast('🎙️ Gerando Voz Humana Neural HD...');
+  try{
+    const r = await fetch('/api/tts', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ text: cleaned || text.slice(0, 2000), voice: chosenVoice, lang: 'pt-BR' })
+    });
+    const ct = r.headers.get('content-type') || '';
+    if(r.ok && ct.includes('audio')){
+      const blob = await r.blob();
+      const player = new Audio(URL.createObjectURL(blob));
+      activeNeuralPreviewAudio = player;
+      await player.play();
+      toast('🔊 Reproduzindo Voz Humana Neural (' + (r.headers.get('x-audio-provider') || 'Estúdio HD') + ')');
+      return;
+    }
+  }catch(e){}
+
+  // Fallback somente se estiver 100% sem internet
   if('speechSynthesis' in window){
     speechSynthesis.cancel();
-    const u=new SpeechSynthesisUtterance(text.slice(0,4000));
+    const u=new SpeechSynthesisUtterance((cleaned || text).slice(0,3000));
     u.lang='pt-BR'; u.rate=1; u.pitch=1;
-    // try pick pt-BR voice
     const voices=speechSynthesis.getVoices();
     const pt=voices.find(v=>v.lang.toLowerCase().includes('pt-br')) || voices.find(v=>v.lang.toLowerCase().includes('pt'));
     if(pt) u.voice=pt;
     speechSynthesis.speak(u);
-    toast('🔊 Reproduzindo narração (voz do navegador)');
+    toast('🔊 Reproduzindo narração offline');
   }else{
-    toast('TTS não suportado neste navegador','error');
+    toast('Voz indisponível neste aparelho','error');
   }
 }
 

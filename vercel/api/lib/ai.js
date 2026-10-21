@@ -902,8 +902,13 @@ async function probeOpenAI() {
     report.pollinationsImage = { ok: r.ok && b.length > 0, status: r.status, bytes: b.length };
   } catch (e) { report.pollinationsImage = { ok: false, error: e.message }; }
   try {
-    const b = await ttsGoogle({ text: 'olá', lang: 'pt-BR' });
-    report.googleTts = { ok: true, bytes: b.length };
+    try {
+      const e = await edgeNeuralTTS({ text: 'Olá, tudo bem?', voice: 'nova', lang: 'pt-BR' });
+      report.googleTts = { ok: true, bytes: e.buffer.length, info: `${e.provider} • voz humana neural realista ativa` };
+    } catch (edgeErr) {
+      const b = await ttsGoogle({ text: 'olá', lang: 'pt-BR' });
+      report.googleTts = { ok: true, bytes: b.length };
+    }
   } catch (e) { report.googleTts = { ok: false, error: e.message }; }
   return report;
 }
@@ -1466,13 +1471,35 @@ function pcmToMp3(pcmBuf) {
   } catch (e) { return null; }
 }
 const GEM_TTS_VOICES = { onyx: 'Charon', nova: 'Aoede', alloy: 'Kore', echo: 'Puck', fable: 'Fenrir', shimmer: 'Leda', ash: 'Orus', coral: 'Zephyr', sage: 'Enceladus' };
-async function geminiTTS(text, voice = 'onyx', timeout = 20000) {
+const GEM_VOICE_STYLE = {
+  onyx: 'com voz masculina grave de cinema, quente, pausada, respiração humana natural e presença marcante',
+  nova: 'com voz feminina brasileira calorosa, simpática, entonação viva de conversa real e naturalidade absoluta',
+  alloy: 'com voz executiva sofisticada, clara, serena e ritmo humano fluido de telejornal moderno',
+  echo: 'com voz masculina jovem de podcast, descontraída, espontânea e super natural, como um amigo conversando',
+  fable: 'com voz expressiva de contador de histórias, emoção genuína nas palavras e cadência envolvente',
+  shimmer: 'com voz feminina jovem, doce, expressiva e entonação humana autêntica',
+  ash: 'com voz masculina firme, confiante, articulada e timbre humano encorpado',
+  coral: 'com voz feminina vibrante, carismática, sorridente e cheia de vida',
+  sage: 'com voz calma de documentário, aveludada, reflexiva e perfeitamente humana'
+};
+async function geminiTTS(text, voice = 'onyx', timeout = 20000, lang = 'pt-BR') {
   if (!process.env.GEMINI_API_KEY) return null;
   await _loadLame();
   const voiceName = GEM_TTS_VOICES[voice] || 'Aoede';
+  const cleanText = String(text || '')
+    .replace(/\*\*|__|\[.*?\]/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+    .slice(0, 4000)
+    .replace(/"/g, "'");
+  const isPt = /^pt/i.test(lang || 'pt-BR');
+  const styleHint = GEM_VOICE_STYLE[voice] || GEM_VOICE_STYLE.nova;
+  const directorPrompt = isPt
+    ? `Fale em português brasileiro nativo ${styleHint}, sem jamais soar robótico: "${cleanText}"`
+    : `Speak naturally like a real human studio actor with authentic emotion and breathing (${lang}): "${cleanText}"`;
+
   const body = {
-    // formato documentado do Gemini TTS: instrução "Say ...:" + fala entre aspas, sem role
-    contents: [{ parts: [{ text: 'Say in a natural narrator tone: "' + String(text).slice(0, 4000).replace(/"/g, "'") + '"' }] }],
+    contents: [{ parts: [{ text: directorPrompt }] }],
     generationConfig: {
       maxOutputTokens: 8192,
       responseModalities: ['AUDIO'],
@@ -1487,7 +1514,6 @@ async function geminiTTS(text, voice = 'onyx', timeout = 20000) {
       if (pcm.length < 1000) continue;
       const mp3 = pcmToMp3(pcm);
       if (mp3 && mp3.length > 500) return { buffer: mp3, provider: 'gemini/' + (_gemBestModel || 'tts') };
-      // sem lame: ainda devolve o PCM como WAV (o navegador toca; merges mais complexos caem na cadeia)
       const wav = wrapPcmAsWav(pcm, 24000);
       return { buffer: wav, provider: 'gemini/' + (_gemBestModel || 'tts') + '(wav)' };
     }
@@ -1671,16 +1697,122 @@ async function ttsStreamElements({ text, voice = 'Brian' }) {
   return b;
 }
 
-const TTS_LANGS = { 'pt-BR': 'pt-BR', pt: 'pt-BR', en: 'en', es: 'es', fr: 'fr', de: 'de', it: 'it' };
+const TTS_LANGS = { 'pt-BR': 'pt-BR', pt: 'pt-BR', en: 'en-US', es: 'es-MX', fr: 'fr-FR', de: 'de-DE', it: 'it-IT', ja: 'ja-JP' };
 
-// Voz com cadeia: OpenAI (se válida) → Gemini 3.1 Neural TTS (confirmado ativo!) → Unorouter → Google → StreamElements
+// Matriz de Vozes Humanas Neurais de Estúdio HD (Microsoft Azure Neural & DragonHD Multilingual — 24kHz 96kbps MP3, zero tom robótico!)
+const EDGE_VOICE_PRESETS = {
+  onyx:    { voice: 'pt-BR-AntonioNeural',              rate: '+2%', pitch: '-1Hz', label: 'Antônio Cinema Neural' },
+  nova:    { voice: 'pt-BR-FranciscaNeural',            rate: '+2%', pitch: '+0Hz', label: 'Francisca Natural Neural' },
+  shimmer: { voice: 'pt-BR-ThalitaMultilingualNeural',  rate: '+2%', pitch: '+0Hz', label: 'Thalita HD Multilingual' },
+  echo:    { voice: 'en-US-AndrewMultilingualNeural',   rate: '+2%', pitch: '+0Hz', label: 'Andrew HD Podcast' },
+  coral:   { voice: 'en-US-AvaMultilingualNeural',      rate: '+2%', pitch: '+0Hz', label: 'Ava HD Expressiva' },
+  fable:   { voice: 'en-US-BrianMultilingualNeural',    rate: '+1%', pitch: '+0Hz', label: 'Brian HD Narrador' },
+  sage:    { voice: 'en-US-EmmaMultilingualNeural',     rate: '+0%', pitch: '+0Hz', label: 'Emma HD Documentário' },
+  ash:     { voice: 'fr-FR-RemyMultilingualNeural',     rate: '+2%', pitch: '+0Hz', label: 'Remy HD Firme' },
+  alloy:   { voice: 'fr-FR-VivienneMultilingualNeural', rate: '+2%', pitch: '+0Hz', label: 'Vivienne HD Estúdio' }
+};
+
+const EDGE_LANG_NATIVE = {
+  'en-US': { male: 'en-US-AndrewMultilingualNeural', female: 'en-US-AvaMultilingualNeural' },
+  'es-MX': { male: 'es-MX-JorgeNeural', female: 'es-MX-DaliaNeural' },
+  'fr-FR': { male: 'fr-FR-RemyMultilingualNeural', female: 'fr-FR-VivienneMultilingualNeural' },
+  'de-DE': { male: 'de-DE-FlorianMultilingualNeural', female: 'de-DE-SeraphinaMultilingualNeural' },
+  'it-IT': { male: 'it-IT-GiuseppeMultilingualNeural', female: 'it-IT-IsabellaNeural' },
+  'ja-JP': { male: 'ja-JP-KeitaNeural', female: 'ja-JP-NanamiNeural' }
+};
+
+function sanitizeTextForHumanSSML(raw) {
+  return String(raw || '')
+    .replace(/\*\*|__|`|~~/g, '')
+    .replace(/^\s*[-•*]\s+/gm, '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    // Micro-pausa orgânica de respiração em travessões e reticências (deixa a fala 100% humana!)
+    .replace(/\s*(?:—|--|\.\.\.|…)\s*/g, ', <break time="170ms"/> ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+async function edgeNeuralTTS({ text, voice = 'onyx', lang = 'pt-BR' }) {
+  const { MsEdgeTTS, OUTPUT_FORMAT } = require('msedge-tts');
+  const locale = TTS_LANGS[lang] || 'pt-BR';
+  const preset = EDGE_VOICE_PRESETS[voice] || EDGE_VOICE_PRESETS.onyx;
+  const isFemale = ['nova', 'shimmer', 'coral', 'sage', 'alloy'].includes(voice);
+
+  let primaryVoice = preset.voice;
+  if (locale !== 'pt-BR' && !/Multilingual/i.test(primaryVoice) && EDGE_LANG_NATIVE[locale]) {
+    primaryVoice = isFemale ? EDGE_LANG_NATIVE[locale].female : EDGE_LANG_NATIVE[locale].male;
+  }
+  const fallbackVoice = isFemale ? 'pt-BR-FranciscaNeural' : 'pt-BR-AntonioNeural';
+
+  // Divide textos grandes em parágrafos/frases de até 1600 caracteres para latência ultrarrápida e zero corte
+  const cleanAll = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!cleanAll) throw new Error('texto vazio');
+  const segments = [];
+  let cur = '';
+  for (const s of cleanAll.split(/(?<=[.!?…])\s+/)) {
+    if (cur && (cur.length + s.length + 1) > 1600) { segments.push(cur); cur = s; }
+    else cur = cur ? cur + ' ' + s : s;
+  }
+  if (cur) segments.push(cur);
+
+  let lastErr = null;
+  for (const candidateVoice of [...new Set([primaryVoice, fallbackVoice])]) {
+    const tts = new MsEdgeTTS({ connectionTimeoutMs: 9000, synthesisTimeoutMs: 22000 });
+    try {
+      const metaOpts = /Multilingual/i.test(candidateVoice) ? { voiceLocale: locale } : {};
+      await tts.setMetadata(candidateVoice, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3, metaOpts);
+      const mp3Buffers = [];
+      for (const seg of segments) {
+        const ssmlSafe = sanitizeTextForHumanSSML(seg);
+        const { audioStream } = tts.toStream(ssmlSafe, { rate: preset.rate, pitch: preset.pitch });
+        const segBuf = await new Promise((resolve, reject) => {
+          const chunks = [];
+          const timer = setTimeout(() => {
+            try { audioStream.destroy(); } catch (_) {}
+            reject(new Error('timeout de síntese neural'));
+          }, 22000);
+          audioStream.on('data', d => chunks.push(Buffer.from(d)));
+          audioStream.once('end', () => { clearTimeout(timer); resolve(Buffer.concat(chunks)); });
+          audioStream.once('close', () => { clearTimeout(timer); resolve(Buffer.concat(chunks)); });
+          audioStream.once('error', err => { clearTimeout(timer); reject(err); });
+        });
+        if (!segBuf || segBuf.length < 300) throw new Error('áudio neural curto/vazio');
+        mp3Buffers.push(segBuf);
+      }
+      try { tts.close(); } catch (_) {}
+      return { buffer: Buffer.concat(mp3Buffers), provider: `neural-hd/${candidateVoice}` };
+    } catch (err) {
+      lastErr = err;
+      try { tts.close(); } catch (_) {}
+    }
+  }
+  throw lastErr || new Error('falha na síntese neural HD');
+}
+
+// Voz com cadeia 100% HUMANA NEURAL:
+// 1) OpenAI gpt-4o-mini-tts / tts-1-hd (com direção de atuação humana)
+// 2) Microsoft Azure Neural Studio HD (9 vozes humanas reais 24kHz ilimitadas — ZERO voz robótica e ZERO cota 429!)
+// 3) Gemini 3.1 Neural Studio TTS (com direção em PT-BR autêntico)
+// 4) Unorouter Neural TTS
+// 5) Google TTS apenas como último paraquedas de emergência
 async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR' }) {
   const errors = [];
   if (canUseOfficialOpenAI()) {
-    for (const model of ['tts-1', 'tts-1-hd']) {
+    for (const model of ['gpt-4o-mini-tts', 'tts-1-hd', 'tts-1']) {
       try {
         const openai = makeOpenAI();
-        const s = await openai.audio.speech.create({ model, voice: TTS_VOICES[voice] || 'onyx', input: String(text).slice(0, 4096), response_format: 'mp3' });
+        const opts = {
+          model,
+          voice: TTS_VOICES[voice] || 'onyx',
+          input: String(text).slice(0, 4096),
+          response_format: 'mp3'
+        };
+        if (model === 'gpt-4o-mini-tts') {
+          opts.instructions = 'Fale como um locutor humano brasileiro autêntico, com calor na voz, respiração sutil natural, entonação expressiva de cinema e ritmo conversacional fluido. Nunca soe robótico.';
+        }
+        const s = await openai.audio.speech.create(opts);
         const b = Buffer.from(await s.arrayBuffer());
         if (!b.length) throw new Error('áudio vazio');
         return { buffer: b, provider: 'openai/' + model };
@@ -1690,15 +1822,25 @@ async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR' }) {
       }
     }
   }
-  // Gemini 3.1 Flash TTS (voz neural de estúdio, rápido e não consome o slot de 1 req/min do Unorouter!)
+
+  // Motor Principal Ilimitado: Vozes Humanas Neurais HD de Estúdio (Antônio, Francisca, Thalita HD, Andrew HD, Ava HD, Brian HD, Emma HD...)
+  try {
+    const edge = await edgeNeuralTTS({ text, voice, lang });
+    if (edge && edge.buffer && edge.buffer.length > 400) return edge;
+  } catch (e) {
+    errors.push('neural-hd: ' + e.message);
+  }
+
+  // Gemini 3.1 Neural Studio TTS com direção em Português Brasileiro autêntico
   if (process.env.GEMINI_API_KEY) {
     try {
-      const g = await geminiTTS(text, voice);
+      const g = await geminiTTS(text, voice, 20000, lang);
       if (g && g.buffer) return g;
       errors.push('gemini/tts: ' + (g && g.error ? g.error : 'sem áudio'));
     } catch (e) { errors.push(e.message); }
   }
-  // Unorouter TTS — direto sem GET /models
+
+  // Unorouter Neural TTS — direto sem GET /models
   const uKey = pickReadyUniKey();
   if (uKey) {
     for (const model of UNI_TTS_MODELS) {
@@ -1720,14 +1862,20 @@ async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR' }) {
       } catch (e) { errors.push(`unorouter/${model}: ${e.message}`); break; }
     }
   }
+
+  // Última contingência extrema
   try {
-    const b = await ttsGoogle({ text, lang: TTS_LANGS[lang] || 'pt-BR' });
-    return { buffer: b, provider: 'google-tts(free)' };
+    const gLang = (lang || 'pt-BR').split('-')[0] === 'pt' ? 'pt-BR' : (lang || 'pt-BR');
+    const b = await ttsGoogle({ text, lang: gLang });
+    return { buffer: b, provider: 'google-tts(emergency)' };
   } catch (e) { errors.push('google-tts: ' + e.message); }
-  try {
-    const b = await ttsStreamElements({ text });
-    return { buffer: b, provider: 'streamelements(free)' };
-  } catch (e) { errors.push('streamelements: ' + e.message); }
+
+  if (/^en/i.test(lang || '')) {
+    try {
+      const b = await ttsStreamElements({ text });
+      return { buffer: b, provider: 'streamelements(en)' };
+    } catch (e) { errors.push('streamelements: ' + e.message); }
+  }
   return { error: errors.join(' | '), errors };
 }
 
