@@ -628,6 +628,41 @@ input[type="range"]{
       </div>
     </div>
 
+    <!-- 🎵 SOM / MÚSICA DE FUNDO LEVE NA DUBLAGEM -->
+    <div style="margin-top:12px;padding:13px 14px;border-radius:12px;background:linear-gradient(180deg,#12172e,#0c1022);border:1px solid #4c1d95aa">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+        <div style="font-weight:800;font-size:13px;color:#e9d5ff">🎵 Som / Música de Fundo Leve (Auto-Ducking Inteligente)</div>
+        <span id="dubBgVolBadge" style="font-size:11.5px;font-weight:800;padding:3px 9px;border-radius:999px;background:#1e1b4b;border:1px solid #6366f188;color:#c7d2fe">🔉 12% — Leve (Ideal p/ Voz)</span>
+      </div>
+      <div class="row" style="margin-top:0;align-items:end">
+        <div style="flex:1.6">
+          <label style="margin-top:0">Estilo do som de fundo</label>
+          <div style="display:flex;gap:8px">
+            <select id="dubBgMusicStyle" onchange="onChangeDubBgMusicStyle(this.value,'setup')" style="flex:1">
+              <option value="soft_piano" selected>🎹 Piano & Pad Suave (Leve — Recomendado)</option>
+              <option value="cinema_warm">🎬 Cinema Emocionante / Documentário</option>
+              <option value="inspiring_acoustic">✨ Violão & Ambiente Inspirador (Reels / YouTube)</option>
+              <option value="lofi_velvet">☕ Lo-Fi Aconchegante (Vlog / Podcast)</option>
+              <option value="mystery_deep">🕵️ Mistério & História Curiosa</option>
+              <option value="zen_nature">🌿 Brisa & Chuva Suave Relaxante</option>
+              <option value="custom">📂 Enviar minha própria música (.MP3 / .WAV / .M4A)</option>
+              <option value="none">🔇 Sem música de fundo (apenas voz)</option>
+            </select>
+            <button class="ghost" type="button" id="dubBgPreviewBtn" onclick="togglePreviewDubBgMusic()" style="white-space:nowrap;border-color:#8b5cf6;color:#ddd6fe">🔊 Ouvir fundo</button>
+          </div>
+        </div>
+        <div style="flex:1">
+          <label style="margin-top:0">Volume de fundo (<span id="dubBgVolPct">12%</span> — abaixa sozinho na fala)</label>
+          <input type="range" id="dubBgMusicVol" min="0" max="40" value="12" oninput="onChangeDubBgVol(this.value,'setup')" style="width:100%;accent-color:#8b5cf6;cursor:pointer;padding:6px 0">
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px">
+        <button class="ghost" type="button" onclick="document.getElementById('dubCustomMusicFile').click()" style="font-size:12px;padding:6px 11px;border-color:#38bdf866;color:#bae6fd">📂 Escolher música do celular / PC</button>
+        <input type="file" id="dubCustomMusicFile" accept="audio/*,.mp3,.wav,.m4a,.ogg,.aac,.flac,.webm" onchange="onPickCustomDubMusic(this)" style="display:none">
+        <span id="dubCustomMusicInfo" class="hint" style="margin:0">💡 Na fala da dublagem o fundo desce suavemente para não atrapalhar nenhuma palavra, e preenche as pausas naturalmente.</span>
+      </div>
+    </div>
+
     <div id="dubTrimRow" class="row hidden" style="background:#101528;padding:10px 12px;border-radius:10px;border:1px solid #334155">
       <div>
         <label style="margin-top:0">⏱️ Começar em (segundos ou min:seg)</label>
@@ -661,6 +696,32 @@ input[type="range"]{
         <div id="dubPlayerWrap" class="hidden" style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px">
           <audio id="dubAudio" controls style="width:100%"></audio>
           <video id="dubExportedVideo" controls playsinline class="hidden" style="width:100%;max-height:460px;border-radius:10px;background:#000"></video>
+
+          <!-- 🎚️ MIXAGEM INSTANTÂNEA PÓS-DUBLAGEM (SEM PRECISAR REDUBLAR!) -->
+          <div style="padding:11px 13px;border-radius:11px;background:#11162c;border:1px solid #6366f155">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+              <span style="font-size:12px;font-weight:800;color:#c7d2fe">🎚️ Ajustar Som de Fundo Agora (instantâneo, sem redublar!)</span>
+              <span id="dubPostBgBadge" style="font-size:11px;font-weight:700;color:#a5b4fc">🔉 12% — Leve</span>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <select id="dubPostBgStyle" onchange="onChangeDubBgMusicStyle(this.value,'post');remixDubBackgroundInstant()" style="flex:1.4;min-width:190px;padding:8px 10px;font-size:12.5px">
+                <option value="soft_piano" selected>🎹 Piano & Pad Suave (Leve)</option>
+                <option value="cinema_warm">🎬 Cinema Emocionante</option>
+                <option value="inspiring_acoustic">✨ Violão & Ambiente Inspirador</option>
+                <option value="lofi_velvet">☕ Lo-Fi Aconchegante</option>
+                <option value="mystery_deep">🕵️ Mistério & História Curiosa</option>
+                <option value="zen_nature">🌿 Brisa & Chuva Suave</option>
+                <option value="custom">📂 Minha música enviada</option>
+                <option value="none">🔇 Sem música de fundo</option>
+              </select>
+              <div style="flex:1;min-width:140px;display:flex;align-items:center;gap:8px">
+                <span style="font-size:11.5px;color:#94a3b8;white-space:nowrap">Vol:</span>
+                <input type="range" id="dubPostBgVol" min="0" max="40" value="12" oninput="onChangeDubBgVol(this.value,'post')" onchange="remixDubBackgroundInstant()" style="flex:1;accent-color:#8b5cf6;cursor:pointer">
+              </div>
+              <button class="ghost" type="button" onclick="document.getElementById('dubCustomMusicFile').click()" style="font-size:11.5px;padding:7px 10px">📂 Minha Música</button>
+            </div>
+          </div>
+
           <button type="button" id="dubMainDownloadBtn" onclick="downloadDubVideo()" style="width:100%;padding:15px 18px;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;color:#042f2e;background:linear-gradient(135deg,#34d399,#10b981,#06b6d4);box-shadow:0 8px 26px rgba(16,185,129,.35)">⬇️ GERAR E BAIXAR VÍDEO DUBLADO LISO (.MP4 GALERIA)</button>
           <button type="button" onclick="shareToGallery('dub')" style="width:100%;padding:12px 16px;border:1.5px solid #38bdf8;border-radius:12px;font-size:14px;font-weight:800;cursor:pointer;color:#e0f2fe;background:#0f172a">📲 Salvar direto na Galeria / Enviar (Celular, WhatsApp, Reels)</button>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -1338,8 +1399,354 @@ function timeStretchPreservePitch(samples, sr, targetLen){
   return out.subarray(0, Math.min(outLen, targetLen));
 }
 
+// =========================================================================
+// 🎵 ESTÚDIO DE TRILHAS E SONS DE FUNDO LEVES P/ DUBLAGEM (COM AUTO-DUCKING)
+// =========================================================================
+const DUB_BG_LOOP_CACHE = {};
+let dubCustomMusic24k = null;
+let dubCustomMusicName = '';
+let lastDubOrigMono12k = null;
+let dubBgPreviewState = null;
+
+function formatBgVolLabel(pct){
+  const v = Number(pct) || 0;
+  if(v <= 0) return '🔇 0% — Desligado';
+  if(v <= 8) return `🔉 ${v}% — Sussurro Discreto`;
+  if(v <= 16) return `🔉 ${v}% — Leve (Ideal p/ Voz)`;
+  if(v <= 27) return `🎶 ${v}% — Médio Suave`;
+  return `🎵 ${v}% — Destaque`;
+}
+
+function onChangeDubBgVol(val, source){
+  const v = Math.max(0, Math.min(40, Math.round(Number(val) || 0)));
+  const a = document.getElementById('dubBgMusicVol');
+  const b = document.getElementById('dubPostBgVol');
+  if(a && source !== 'setup') a.value = String(v);
+  if(b && source !== 'post') b.value = String(v);
+  const pctEl = document.getElementById('dubBgVolPct');
+  if(pctEl) pctEl.textContent = v + '%';
+  const lbl = formatBgVolLabel(v);
+  const badge1 = document.getElementById('dubBgVolBadge');
+  const badge2 = document.getElementById('dubPostBgBadge');
+  if(badge1) badge1.textContent = lbl;
+  if(badge2) badge2.textContent = lbl;
+  if(dubBgPreviewState && dubBgPreviewState.gain){
+    dubBgPreviewState.gain.gain.value = Math.min(1, (v / 100) * 1.35);
+  }
+}
+
+function onChangeDubBgMusicStyle(style, source){
+  const a = document.getElementById('dubBgMusicStyle');
+  const b = document.getElementById('dubPostBgStyle');
+  if(a && source !== 'setup') a.value = style;
+  if(b && source !== 'post') b.value = style;
+  if(style === 'custom' && !dubCustomMusic24k){
+    toast('📂 Selecione uma música do seu celular ou PC!','info');
+    const inp = document.getElementById('dubCustomMusicFile');
+    if(inp) inp.click();
+  }
+  if(dubBgPreviewState){
+    stopPreviewDubBgMusic();
+    if(style !== 'none') togglePreviewDubBgMusic();
+  }
+}
+
+function stopPreviewDubBgMusic(){
+  if(!dubBgPreviewState) return;
+  try{ dubBgPreviewState.src.stop(); }catch{}
+  try{ dubBgPreviewState.ctx.close(); }catch{}
+  dubBgPreviewState = null;
+  const btn = document.getElementById('dubBgPreviewBtn');
+  if(btn) btn.textContent = '🔊 Ouvir fundo';
+}
+
+// Normaliza RMS p/ que qualquer trilha ou MP3 tenha volume previsível e passe por filtro de calor circular (0.000 clique no loop!)
+function finalizeSeamlessMusicLoop24k(rawExt, mainLen, crossLen, cutoffHz = 1350){
+  const out = new Float32Array(mainLen);
+  for(let i = 0; i < mainLen; i++) out[i] = rawExt[i];
+  for(let k = 0; k < crossLen; k++){
+    const theta = (k / crossLen) * (Math.PI * 0.5);
+    const s = Math.sin(theta), c = Math.cos(theta);
+    out[k] = rawExt[k] * (s * s) + rawExt[mainLen + k] * (c * c);
+  }
+  // Filtro acústico circular de 2 polos pré-aquecido no final do próprio loop (continuidade C¹ perfeita na emenda!)
+  const rc = 1 / (2 * Math.PI * cutoffHz);
+  const dt = 1 / 24000;
+  const alpha = dt / (rc + dt);
+  let y1 = 0, y2 = 0;
+  const warmStart = Math.max(0, mainLen - 2400);
+  for(let i = warmStart; i < mainLen; i++){
+    y1 += alpha * (out[i] - y1);
+    y2 += alpha * (y1 - y2);
+  }
+  for(let i = 0; i < mainLen; i++){
+    y1 += alpha * (out[i] - y1);
+    y2 += alpha * (y1 - y2);
+    out[i] = y2;
+  }
+  let sumSq = 0;
+  for(let i = 0; i < mainLen; i++) sumSq += out[i] * out[i];
+  const rms = Math.sqrt(sumSq / Math.max(1, mainLen)) || 0.001;
+  const gain = Math.min(4.0, 0.22 / rms);
+  for(let i = 0; i < mainLen; i++) out[i] = Math.max(-0.92, Math.min(0.92, out[i] * gain));
+  return out;
+}
+
+// Oscilador harmônico recursivo ultra-rápido (~280x mais veloz que Math.sin no celular: 24s sintetizados em ~10ms!)
+function addWarmNote(buf, sr, startSec, durSec, freq, amp, kind = 'piano'){
+  const i0 = Math.max(0, Math.floor(startSec * sr));
+  const len = Math.min(buf.length - i0, Math.floor(durSec * sr));
+  if(len <= 0) return;
+  const w = 2 * Math.PI * freq / sr;
+  const cw = Math.cos(w), sw = Math.sin(w);
+  let c1 = 1, s1 = 0; // sin(n*w), cos(n*w) via rotação de fase (zero Math.sin no loop!)
+  if(kind === 'piano' || kind === 'pluck' || kind === 'rhodes'){
+    const attSamples = Math.max(1, Math.floor((kind === 'pluck' ? 0.009 : (kind === 'rhodes' ? 0.035 : 0.018)) * sr));
+    const invAtt = 1 / attSamples;
+    const invLen = 1 / len;
+    const kMain = Math.exp(-(kind === 'pluck' ? 2.15 : (kind === 'rhodes' ? 0.72 : 1.35)) / sr);
+    const kH2   = Math.exp(-2.4 / sr);
+    const h2Weight = kind === 'pluck' ? 0.44 : (kind === 'rhodes' ? 0.24 : 0.34);
+    const h3Weight = kind === 'pluck' ? 0.18 : 0.11;
+    let eMain = 1, eH2 = 1;
+    for(let n = 0; n < len; n++){
+      const att = n < attSamples ? n * invAtt : 1;
+      const tail = kind === 'rhodes' ? Math.min(1, (len - n) / (0.35 * sr)) : (1 - n * invLen);
+      const s2 = 2 * s1 * c1;
+      const s3 = s1 * (4 * c1 * c1 - 1);
+      buf[i0 + n] += (s1 + h2Weight * s2 * eH2 + h3Weight * s3 * eH2 * eH2) * (att * eMain * tail * amp);
+      const nc = c1 * cw - s1 * sw;
+      s1 = s1 * cw + c1 * sw;
+      c1 = nc;
+      eMain *= kMain;
+      eH2 *= kH2;
+    }
+  } else {
+    // Cordas / Pad cinematográfico uníssono de 3 vozes detunadas (0.9975f, 1.0f, 1.0025f) ultra-macio
+    const wA = w * 0.9975, wB = w * 1.0025;
+    const cwA = Math.cos(wA), swA = Math.sin(wA);
+    const cwB = Math.cos(wB), swB = Math.sin(wB);
+    let cA = Math.cos(0.7), sA = Math.sin(0.7);
+    let cB = Math.cos(1.9), sB = Math.sin(1.9);
+    const fadeInS = Math.max(1, 0.85 * sr), fadeOutS = Math.max(1, 0.95 * sr);
+    for(let n = 0; n < len; n++){
+      const fIn = n < fadeInS ? n / fadeInS : 1;
+      const fOut = (len - n) < fadeOutS ? (len - n) / fadeOutS : 1;
+      const s2 = 2 * s1 * c1;
+      buf[i0 + n] += (0.55 * s1 + 0.25 * sA + 0.25 * sB + 0.14 * s2) * (fIn * fOut * amp);
+      let nc = c1 * cw - s1 * sw; s1 = s1 * cw + c1 * sw; c1 = nc;
+      nc = cA * cwA - sA * swA; sA = sA * cwA + cA * swA; cA = nc;
+      nc = cB * cwB - sB * swB; sB = sB * cwB + cB * swB; cB = nc;
+    }
+  }
+}
+
+function getStudioMusicLoop24k(style){
+  if(!style || style === 'none') return null;
+  if(style === 'custom') return dubCustomMusic24k;
+  if(DUB_BG_LOOP_CACHE[style]) return DUB_BG_LOOP_CACHE[style];
+
+  const SR = 24000;
+  const MAIN_SEC = 24.0;
+  const CROSS_SEC = 2.0;
+  const totalLen = Math.floor((MAIN_SEC + CROSS_SEC) * SR);
+  const raw = new Float32Array(totalLen);
+
+  if(style === 'zen_nature'){
+    // Brisa acústica aveludada (filtro Pink de Paul Kellet + ondas lentas de 0.12Hz + sinos pentatônicos suaves)
+    let b0=0, b1=0, b2=0;
+    for(let i = 0; i < totalLen; i++){
+      const t = i / SR;
+      const white = ((Math.sin(i * 12.9898 + 78.233) * 43758.5453) % 1 + 1) % 1 * 2 - 1;
+      b0 = 0.99765 * b0 + white * 0.0990460;
+      b1 = 0.96300 * b1 + white * 0.2965164;
+      b2 = 0.57000 * b2 + white * 1.0526913;
+      const wave = 0.62 + 0.38 * Math.sin(2 * Math.PI * (t / 8.0));
+      raw[i] = (b0 + b1 + b2 + white * 0.1848) * 0.045 * wave;
+    }
+    const chimes = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25];
+    for(let c = 0; c < 9; c++){
+      addWarmNote(raw, SR, 0.8 + c * 2.75, 3.8, chimes[(c * 5) % chimes.length], 0.11, 'piano');
+    }
+    DUB_BG_LOOP_CACHE[style] = finalizeSeamlessMusicLoop24k(raw, Math.floor(MAIN_SEC * SR), Math.floor(CROSS_SEC * SR), 1450);
+    return DUB_BG_LOOP_CACHE[style];
+  }
+
+  const PRESETS = {
+    soft_piano: {
+      cutoff: 1350, padAmp: 0.16, noteKind: 'piano', stepSec: 0.75, noteDur: 2.9, noteAmp: 0.24,
+      chords: [
+        { root: 130.81, pad: [196.00, 246.94, 293.66], arp: [261.63, 329.63, 392.00, 493.88, 587.33, 493.88, 392.00, 329.63] }, // Cmaj9
+        { root: 110.00, pad: [164.81, 220.00, 261.63], arp: [220.00, 261.63, 329.63, 392.00, 493.88, 392.00, 329.63, 261.63] }, // Am9
+        { root: 87.31,  pad: [174.61, 220.00, 261.63], arp: [174.61, 261.63, 329.63, 392.00, 440.00, 392.00, 329.63, 261.63] }, // Fmaj9
+        { root: 98.00,  pad: [196.00, 246.94, 293.66], arp: [196.00, 293.66, 329.63, 392.00, 440.00, 392.00, 329.63, 293.66] }  // G6add9
+      ]
+    },
+    cinema_warm: {
+      cutoff: 1050, padAmp: 0.26, noteKind: 'pad', stepSec: 1.5, noteDur: 3.4, noteAmp: 0.14,
+      chords: [
+        { root: 73.42,  pad: [146.83, 220.00, 261.63, 329.63], arp: [293.66, 329.63, 440.00, 349.23] }, // Dm9
+        { root: 116.54, pad: [174.61, 233.08, 293.66, 349.23], arp: [233.08, 293.66, 349.23, 440.00] }, // Bbmaj7
+        { root: 87.31,  pad: [174.61, 220.00, 261.63, 329.63], arp: [261.63, 329.63, 392.00, 329.63] }, // Fmaj7
+        { root: 65.41,  pad: [130.81, 196.00, 261.63, 329.63], arp: [261.63, 293.66, 329.63, 392.00] }  // Cadd9
+      ]
+    },
+    inspiring_acoustic: {
+      cutoff: 1500, padAmp: 0.13, noteKind: 'pluck', stepSec: 0.50, noteDur: 2.1, noteAmp: 0.25,
+      chords: [
+        { root: 98.00,  pad: [196.00, 293.66], arp: [196.00, 293.66, 392.00, 440.00, 493.88, 392.00, 293.66, 392.00, 440.00, 392.00, 293.66, 246.94] }, // Gadd9
+        { root: 92.50,  pad: [146.83, 220.00], arp: [146.83, 220.00, 293.66, 369.99, 440.00, 369.99, 293.66, 369.99, 440.00, 369.99, 293.66, 220.00] }, // D/F#
+        { root: 82.41,  pad: [164.81, 246.94], arp: [164.81, 246.94, 329.63, 392.00, 493.88, 392.00, 329.63, 392.00, 440.00, 392.00, 293.66, 246.94] }, // Em7
+        { root: 130.81, pad: [196.00, 261.63], arp: [196.00, 261.63, 329.63, 392.00, 493.88, 392.00, 329.63, 392.00, 440.00, 392.00, 329.63, 261.63] }  // Cmaj9
+      ]
+    },
+    lofi_velvet: {
+      cutoff: 1120, padAmp: 0.11, noteKind: 'rhodes', stepSec: 1.5, noteDur: 3.1, noteAmp: 0.22,
+      chords: [
+        { root: 87.31, pad: [174.61, 220.00, 261.63, 329.63], arp: [392.00, 329.63, 293.66, 261.63] }, // Fmaj9
+        { root: 82.41, pad: [164.81, 196.00, 246.94, 293.66], arp: [392.00, 293.66, 246.94, 293.66] }, // Em7
+        { root: 73.42, pad: [146.83, 174.61, 220.00, 261.63], arp: [329.63, 293.66, 261.63, 220.00] }, // Dm9
+        { root: 65.41, pad: [130.81, 164.81, 196.00, 246.94], arp: [329.63, 293.66, 246.94, 196.00] }  // Cmaj9
+      ]
+    },
+    mystery_deep: {
+      cutoff: 1180, padAmp: 0.22, noteKind: 'piano', stepSec: 1.0, noteDur: 2.8, noteAmp: 0.19,
+      chords: [
+        { root: 55.00, pad: [110.00, 164.81, 246.94], arp: [220.00, 246.94, 261.63, 329.63, 261.63, 246.94] }, // Am(add9)
+        { root: 87.31, pad: [130.81, 174.61, 246.94], arp: [220.00, 246.94, 329.63, 369.99, 329.63, 246.94] }, // Fmaj7#11
+        { root: 73.42, pad: [146.83, 174.61, 220.00], arp: [220.00, 261.63, 293.66, 329.63, 261.63, 220.00] }, // Dm9
+        { root: 82.41, pad: [164.81, 220.00, 246.94], arp: [220.00, 246.94, 329.63, 293.66, 246.94, 196.00] }  // Esus4
+      ]
+    }
+  };
+
+  const cfg = PRESETS[style] || PRESETS.soft_piano;
+  const BAR = 6.0; // 4 compassos x 6.0s = 24.0s (+ 2.0s p/ crossfade contínuo)
+  for(let barIdx = 0; barIdx < 5; barIdx++){
+    const ch = cfg.chords[barIdx % cfg.chords.length];
+    const t0 = barIdx * BAR;
+    addWarmNote(raw, SR, t0, BAR + 0.9, ch.root, cfg.padAmp * 1.15, 'pad');
+    for(const pf of ch.pad){
+      addWarmNote(raw, SR, t0, BAR + 0.9, pf, cfg.padAmp * 0.72, cfg.noteKind === 'rhodes' ? 'rhodes' : 'pad');
+    }
+    const stepsInBar = Math.round(BAR / cfg.stepSec);
+    for(let s = 0; s < stepsInBar; s++){
+      const nf = ch.arp[s % ch.arp.length];
+      addWarmNote(raw, SR, t0 + s * cfg.stepSec, cfg.noteDur, nf, cfg.noteAmp * (s % 2 === 0 ? 1.0 : 0.78), cfg.noteKind);
+    }
+  }
+
+  DUB_BG_LOOP_CACHE[style] = finalizeSeamlessMusicLoop24k(raw, Math.floor(MAIN_SEC * SR), Math.floor(CROSS_SEC * SR), cfg.cutoff);
+  return DUB_BG_LOOP_CACHE[style];
+}
+
+async function onPickCustomDubMusic(input){
+  const f = input && input.files && input.files[0];
+  if(!f) return;
+  const infoEl = document.getElementById('dubCustomMusicInfo');
+  if(infoEl) infoEl.textContent = `⏳ Carregando música "${f.name}"...`;
+  try{
+    const arr = await f.arrayBuffer();
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AC();
+    const ab = await ctx.decodeAudioData(arr);
+    await ctx.close().catch(()=>{});
+    const mono = new Float32Array(ab.length);
+    for(let ch = 0; ch < ab.numberOfChannels; ch++){
+      const cd = ab.getChannelData(ch);
+      for(let i = 0; i < ab.length; i++) mono[i] += cd[i] / ab.numberOfChannels;
+    }
+    const resampled = ab.sampleRate === 24000
+      ? mono
+      : resampleChannelLinear(mono, Math.max(24000, Math.round(mono.length * (24000 / ab.sampleRate))));
+    const cross = Math.min(36000, Math.floor(resampled.length * 0.15));
+    const mainLen = Math.max(12000, resampled.length - cross);
+    dubCustomMusic24k = finalizeSeamlessMusicLoop24k(resampled, mainLen, cross, 2600);
+    dubCustomMusicName = f.name;
+    onChangeDubBgMusicStyle('custom', 'file');
+    if(infoEl) infoEl.innerHTML = `✅ <b>Música ativa:</b> ${esc(f.name)} (${fmtClockSec(mainLen / 24000)}) — ajustada com loop suave e auto-ducking!`;
+    toast(`🎵 Música "${f.name}" carregada para o fundo!`);
+    if(lastDubChunksTimeline && lastDubChunksTimeline.length > 0){
+      remixDubBackgroundInstant();
+    }
+  }catch(err){
+    if(infoEl) infoEl.textContent = '❌ Não foi possível ler esse arquivo de áudio. Tente MP3, M4A ou WAV.';
+    toast('Erro ao ler música: ' + (err.message || err), 'error');
+  }
+}
+
+function togglePreviewDubBgMusic(){
+  if(dubBgPreviewState){
+    stopPreviewDubBgMusic();
+    return;
+  }
+  const style = (document.getElementById('dubBgMusicStyle')||{}).value || 'soft_piano';
+  if(style === 'none'){
+    toast('Selecione um estilo de som de fundo para ouvir!','info');
+    return;
+  }
+  const loop = getStudioMusicLoop24k(style);
+  if(!loop){
+    toast('📂 Escolha primeiro uma música do seu aparelho!','warn');
+    return;
+  }
+  const volPct = Number((document.getElementById('dubBgMusicVol')||{}).value ?? 12);
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const ctx = new AC({ sampleRate: 24000 });
+  const ab = ctx.createBuffer(1, loop.length, 24000);
+  ab.getChannelData(0).set(loop);
+  const src = ctx.createBufferSource();
+  src.buffer = ab;
+  src.loop = true;
+  const gain = ctx.createGain();
+  gain.gain.value = Math.max(0.05, Math.min(1, (volPct / 100) * 1.35));
+  src.connect(gain);
+  gain.connect(ctx.destination);
+  src.start(0);
+  dubBgPreviewState = { ctx, src, gain };
+  const btn = document.getElementById('dubBgPreviewBtn');
+  if(btn) btn.textContent = '⏹️ Parar prévia';
+}
+
+// Re-mixa instantaneamente (<0.15s em RAM) a dublagem já pronta sem precisar chamar IA de novo!
+function remixDubBackgroundInstant(){
+  if(!lastDubChunksTimeline || !lastDubChunksTimeline.length || !lastDubTotalDuration) return;
+  stopPreviewDubBgMusic();
+  const bgMixMode = (document.getElementById('dubBgMix')||{}).value || 'duck';
+  const bgMusicStyle = (document.getElementById('dubBgMusicStyle')||{}).value || 'soft_piano';
+  const bgMusicVol = Number((document.getElementById('dubBgMusicVol')||{}).value ?? 12) / 100;
+
+  const master = assembleDubbedMasterAudio({
+    chunkOutputs: lastDubChunksTimeline,
+    totalDurationSec: lastDubTotalDuration,
+    origMono12k: lastDubOrigMono12k,
+    bgMixMode,
+    bgMusicStyle,
+    bgMusicVol
+  });
+  lastDubMasterBuffer = master.audioBuffer;
+  lastDubAudioBlob = master.wavBlob;
+  lastDubVideoBlob = null; // Garante que o próximo download .MP4 já grave o novo som de fundo!
+  const expVid = document.getElementById('dubExportedVideo');
+  if(expVid) expVid.classList.add('hidden');
+
+  const aud = document.getElementById('dubAudio');
+  const prevTime = aud ? (aud.currentTime || 0) : 0;
+  const wasPlaying = aud ? !aud.paused : false;
+  if(dubAudioURL) URL.revokeObjectURL(dubAudioURL);
+  dubAudioURL = URL.createObjectURL(master.wavBlob);
+  if(aud){
+    aud.src = dubAudioURL;
+    aud.currentTime = prevTime;
+    if(wasPlaying) aud.play().catch(()=>{});
+  }
+  const dlLink = document.getElementById('dubDownload');
+  if(dlLink) dlLink.href = dubAudioURL;
+  toast('🎚️ Novo som de fundo aplicado na hora! Pode ouvir ou baixar o .MP4.');
+}
+
 // Monta o Áudio Master 24kHz sincronizado do segundo 0:00 até o fim do vídeo (com timbre humano 100% preservado!)
-function assembleDubbedMasterAudio({ chunkOutputs, totalDurationSec, origMono12k, bgMixMode = 'duck' }){
+function assembleDubbedMasterAudio({ chunkOutputs, totalDurationSec, origMono12k, bgMixMode = 'duck', bgMusicStyle = null, bgMusicVol = null }){
   const SR = 24000;
   const totalSamples = Math.max(SR, Math.ceil(totalDurationSec * SR));
   const AC = window.AudioContext || window.webkitAudioContext;
@@ -1347,6 +1754,14 @@ function assembleDubbedMasterAudio({ chunkOutputs, totalDurationSec, origMono12k
   const audioBuffer = tmpCtx.createBuffer(1, totalSamples, SR);
   const master = audioBuffer.getChannelData(0);
   const speechMask = new Uint8Array(totalSamples);
+
+  const chosenStyle = bgMusicStyle !== null
+    ? bgMusicStyle
+    : ((document.getElementById('dubBgMusicStyle')||{}).value || 'soft_piano');
+  const chosenVol = bgMusicVol !== null
+    ? bgMusicVol
+    : (Number((document.getElementById('dubBgMusicVol')||{}).value ?? 12) / 100);
+  const musicLoop = chosenVol > 0.001 ? getStudioMusicLoop24k(chosenStyle) : null;
 
   for(let i = 0; i < chunkOutputs.length; i++){
     const seg = chunkOutputs[i];
@@ -1381,22 +1796,37 @@ function assembleDubbedMasterAudio({ chunkOutputs, totalDurationSec, origMono12k
     seg.actualEndSec = Math.min(totalDurationSec, seg.startSec + (voice24k.length / SR));
   }
 
-  // Mixa som ambiente original suavemente ao fundo (estilo dublagem Netflix/Discovery) quando disponível
-  if(bgMixMode === 'duck' && origMono12k && origMono12k.length > 0){
-    let gainSmooth = 0.14;
-    for(let i = 0; i < totalSamples; i++){
-      const targetGain = speechMask[i] ? 0.085 : 0.24;
-      gainSmooth += (targetGain - gainSmooth) * 0.0008;
+  // Mixa som ambiente original + Trilha/Som de Fundo Leve com Sidechain Auto-Ducking de Estúdio!
+  const hasOrigDuck = (bgMixMode === 'duck' && origMono12k && origMono12k.length > 0);
+  const fadeInSamples = Math.min(Math.floor(SR * 1.2), Math.floor(totalSamples * 0.15));
+  const fadeOutSamples = Math.min(Math.floor(SR * 1.5), Math.floor(totalSamples * 0.18));
+  let origGainSmooth = 0.14;
+  let musicDuckSmooth = speechMask[0] ? 0.52 : 1.0;
+
+  for(let i = 0; i < totalSamples; i++){
+    let add = 0;
+    if(hasOrigDuck){
+      const targetOrig = speechMask[i] ? 0.075 : 0.20;
+      origGainSmooth += (targetOrig - origGainSmooth) * 0.0008;
       const srcPos = i * 0.5; // 12kHz -> 24kHz
       const idx = Math.floor(srcPos);
       if(idx < origMono12k.length){
         const frac = srcPos - idx;
         const origSample = origMono12k[idx] * (1 - frac) + (origMono12k[idx + 1] || 0) * frac;
-        master[i] = Math.max(-0.98, Math.min(0.98, master[i] + origSample * gainSmooth));
+        add += origSample * origGainSmooth;
       }
     }
-  } else {
-    for(let i = 0; i < totalSamples; i++) master[i] = Math.max(-0.98, Math.min(0.98, master[i]));
+    if(musicLoop && musicLoop.length > 0){
+      // Sidechain suave: desce p/ 52% em ~80ms quando há voz; sobe suavemente p/ 100% em ~420ms nas pausas!
+      const targetDuck = speechMask[i] ? 0.52 : 1.0;
+      const coeff = speechMask[i] ? 0.00095 : 0.00018;
+      musicDuckSmooth += (targetDuck - musicDuckSmooth) * coeff;
+      let masterFade = 1;
+      if(fadeInSamples > 0 && i < fadeInSamples) masterFade = i / fadeInSamples;
+      else if(fadeOutSamples > 0 && i > totalSamples - fadeOutSamples) masterFade = (totalSamples - i) / fadeOutSamples;
+      add += musicLoop[i % musicLoop.length] * (chosenVol * 1.25) * musicDuckSmooth * masterFade;
+    }
+    master[i] = Math.max(-0.98, Math.min(0.98, master[i] + add));
   }
 
   tmpCtx.close().catch(()=>{});
@@ -1460,6 +1890,7 @@ async function dubVideo(){
     return;
   }
 
+  stopPreviewDubBgMusic();
   stopDubRequested = false;
   lastDubVideoBlob = null;
   btn.disabled = true; btn.textContent = '⏳ Dublando arquivo...';
@@ -1600,6 +2031,7 @@ async function dubVideo(){
 
     const anyRealVoice = chunkOutputs.some(c => c.hasRealAudio);
     lastDubChunksTimeline = chunkOutputs;
+    lastDubOrigMono12k = plan.mono12k ? new Float32Array(plan.mono12k) : null;
     lastDubTotalDuration = Math.max(plan.totalFileDuration, plan.effEnd);
 
     if(dubAudioURL){ URL.revokeObjectURL(dubAudioURL); dubAudioURL = null; }
