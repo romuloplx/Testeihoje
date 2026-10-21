@@ -38,35 +38,152 @@ function mockScript({ prompt, duration, style, voice }) {
   return { title: titulo, script: full, scenes: roteiro, meta: { estilo: estiloMap[style], voz: vozMap[voice], cenas, dur } };
 }
 
+// Seleciona vozes garantidamente distintas para Narrador + Personagens da história
+function pickDistinctCastVoices(narratorVoice = 'onyx', chars = []) {
+  const used = new Set([narratorVoice || 'onyx']);
+  const malePool = ['echo', 'fable', 'onyx', 'ash', 'alloy'];
+  const femalePool = ['nova', 'shimmer', 'coral', 'sage', 'alloy'];
+  const colors = ['#38bdf8', '#f472b6', '#34d399', '#c084fc'];
+  return chars.map((c, idx) => {
+    const isFemale = /fem|mulher|garota|menina|dra|ela|woman|girl|female/i.test(`${c.gender || ''} ${c.role || ''} ${c.appearance || ''}`);
+    const pool = isFemale ? femalePool : malePool;
+    const chosen = (c.voice && TTS_VOICES[c.voice] && !used.has(c.voice))
+      ? c.voice
+      : (pool.find(v => !used.has(v)) || Object.keys(TTS_VOICES).find(v => !used.has(v)) || (isFemale ? 'nova' : 'echo'));
+    used.add(chosen);
+    return {
+      id: c.id || `char${idx + 1}`,
+      name: String(c.name || (isFemale ? 'Helena' : 'Lucas')).trim(),
+      role: String(c.role || (idx === 0 ? 'Protagonista' : 'Especialista')).trim(),
+      gender: isFemale ? 'female' : 'male',
+      voice: chosen,
+      themeColor: c.themeColor || colors[idx % colors.length],
+      portraitStyle: c.portraitStyle || 'studio',
+      appearance: String(c.appearance || (isFemale
+        ? ' expressive 29-year-old Brazilian woman with warm eyes, dark wavy hair, stylish modern jacket'
+        : ' charismatic 32-year-old Brazilian man with short dark hair, expressive eyes, smart casual jacket')).trim()
+    };
+  });
+}
+
+function formatConnectedScript(title, characters, scenes) {
+  const castHeader = characters && characters.length
+    ? `🎭 **ELENCO & VOZES:**\n• 🎙️ Narrador (voz principal)\n` + characters.map(c => `• 🗣️ ${c.name} — ${c.role} (voz ${c.voice})`).join('\n') + '\n\n'
+    : '';
+  const body = scenes.map(s => {
+    const loc = s.locationName ? ` (${s.locationName})` : '';
+    const lines = Array.isArray(s.beats) && s.beats.length
+      ? s.beats.map(b => `${b.speaker === 'narrator' ? '🎙️ Narrador' : '🗣️ ' + (b.speakerName || 'Personagem')}: "${b.text}"`).join('\n')
+      : s.narration;
+    return `🎬 **CENA ${s.i} — ${s.title}${loc}**\n🏞️ *Cenário:* ${s.visual}\n${lines}`;
+  }).join('\n\n');
+  return `${title ? `**TÍTULO:** ${title}\n\n` : ''}${castHeader}${body}`;
+}
+
 function mockCreateFull({ prompt, duration, style, voice }) {
-  const m = mockScript({ prompt, duration, style, voice });
-  const dur = parseInt(duration) || 10;
-  const per = (dur * 60) / 5;
-  const titles = ['Abertura', 'Contexto', 'Desenvolvimento', 'Clímax', 'Encerramento'];
-  const narrations = [
-    `Bem-vindos a uma jornada fascinante sobre ${prompt.toLowerCase()}. Prepare-se para descobrir o que ninguém te contou.`,
-    `Tudo começou quando cientistas perceberam que ${prompt.toLowerCase()} escondia segredos que mudariam nossa visão de mundo. Vamos voltar no tempo para entender o porquê.`,
-    `Com evidências impressionantes e relatos exclusivos, mergulhamos no coração do tema. Cada detalhe revela uma nova camada desta história.`,
-    `E então, a grande revelação: o que parecia impossível se torna claro. ${prompt} nunca mais será visto da mesma forma.`,
-    `Se você gostou, deixe seu like e comente o que achou. Esta foi mais uma produção DubAI PRO — onde sua ideia vira cinema.`
+  const durNum = Math.max(0.5, parseFloat(duration) || 1);
+  const cleanPrompt = String(prompt || 'uma descoberta extraordinária').trim();
+  const characters = pickDistinctCastVoices(voice || 'onyx', [
+    {
+      id: 'char1',
+      name: 'Lucas',
+      role: 'Explorador Curioso',
+      gender: 'male',
+      appearance: 'charismatic 31-year-old Brazilian man wearing dark adventure jacket, short dark hair, warm expressive face'
+    },
+    {
+      id: 'char2',
+      name: 'Helena',
+      role: 'Pesquisadora',
+      gender: 'female',
+      appearance: 'intelligent 29-year-old Brazilian woman wearing modern slate blazer, shoulder-length brown hair, bright eyes'
+    }
+  ]);
+
+  const rawScenes = [
+    {
+      title: 'O Chamado da Descoberta',
+      locationName: 'Ponto de Partida ao Amanhecer',
+      cameraMove: 'zoomIn',
+      atmosphere: 'sunbeams',
+      visual: `Wide establishing cinema shot of ${cleanPrompt} at golden sunrise, atmospheric mist, volumetric light rays, rich environment details, no text`,
+      beats: [
+        { speaker: 'narrator', speakerName: 'Narrador', focus: 'wide', text: `Tudo parecia tranquilo ao amanhecer, até surgir a primeira pista real sobre ${cleanPrompt}.` },
+        { speaker: 'char1', speakerName: 'Lucas', focus: 'dialogue', text: `Helena, olha este lugar! Tudo o que lemos sobre ${cleanPrompt} está acontecendo bem na nossa frente!` },
+        { speaker: 'char2', speakerName: 'Helena', focus: 'dialogue', text: `Impressionante, Lucas. Os sinais mostram que isso vai muito além do que qualquer pessoa imaginava.` }
+      ]
+    },
+    {
+      title: 'A Pista Oculta no Cenário',
+      locationName: 'Coração do Mistério',
+      cameraMove: 'panRight',
+      atmosphere: 'particles',
+      visual: `Detailed wide interior/exterior environment revealing hidden clues of ${cleanPrompt}, dramatic lighting, depth of field, cinematic composition, no text`,
+      beats: [
+        { speaker: 'narrator', speakerName: 'Narrador', focus: 'wide', text: `Avançando pelo cenário principal, cada detalhe ao redor confirmava que as peças finalmente se encaixavam.` },
+        { speaker: 'char2', speakerName: 'Helena', focus: 'dialogue', text: `Repare na estrutura aqui atrás de nós, Lucas. Cada marca conta exatamente como tudo começou.` },
+        { speaker: 'char1', speakerName: 'Lucas', focus: 'dialogue', text: `Então não era lenda! Precisamos registrar isso antes que a luz mude.` }
+      ]
+    },
+    {
+      title: 'A Grande Revelação',
+      locationName: 'Câmara Principal Iluminada',
+      cameraMove: 'zoomIn',
+      atmosphere: 'embers',
+      visual: `Epic climactic wide shot showcasing the main revelation about ${cleanPrompt}, glowing golden and cyan illumination, grand scale scenery, no text`,
+      beats: [
+        { speaker: 'narrator', speakerName: 'Narrador', focus: 'wide', text: `Diante dos dois, o cenário se abriu por completo, revelando o verdadeiro segredo de ${cleanPrompt}.` },
+        { speaker: 'char1', speakerName: 'Lucas', focus: 'dialogue', text: `Eu nunca vi nada tão grandioso na minha vida, Helena! Isso muda completamente a história!` },
+        { speaker: 'char2', speakerName: 'Helena', focus: 'dialogue', text: `E o mais incrível é perceber como cada etapa nos trouxe exatamente até este momento.` }
+      ]
+    },
+    {
+      title: 'Novo Horizonte',
+      locationName: 'Mirante Panorâmico ao Entardecer',
+      cameraMove: 'zoomOut',
+      atmosphere: 'sunbeams',
+      visual: `Breathtaking panoramic sunset vista concluding the story of ${cleanPrompt}, warm horizon glow, cinematic wide angle, no text`,
+      beats: [
+        { speaker: 'narrator', speakerName: 'Narrador', focus: 'wide', text: `Ao cair da tarde, a jornada provou que ${cleanPrompt} guarda lições inesquecíveis para quem ousa explorar.` },
+        { speaker: 'char2', speakerName: 'Helena', focus: 'dialogue', text: `Essa foi apenas a primeira porta que abrimos juntos, Lucas.` },
+        { speaker: 'char1', speakerName: 'Lucas', focus: 'dialogue', text: `Com certeza! E você que acompanhou tudo com a gente, já prepare-se para o próximo capítulo!` }
+      ]
+    }
   ];
-  const scenes = titles.map((t, i) => ({
-    i: i + 1,
-    title: t,
-    narration: narrations[i],
-    visual: `${style} — cena ${i + 1} sobre ${prompt}, cinematográfica, alta qualidade, sem texto`,
-    start: Math.round(i * per),
-    end: Math.round((i + 1) * per)
-  }));
+
+  const chosen = durNum <= 0.6 ? rawScenes.slice(0, 3) : rawScenes;
+  const per = (durNum * 60) / chosen.length;
+  const charVoiceMap = { narrator: voice || 'onyx', char1: characters[0].voice, char2: characters[1].voice };
+  const scenes = chosen.map((s, idx) => {
+    const beats = s.beats.map(b => ({ ...b, voice: charVoiceMap[b.speaker] || voice || 'onyx' }));
+    return {
+      i: idx + 1,
+      title: s.title,
+      locationName: s.locationName,
+      cameraMove: s.cameraMove,
+      atmosphere: s.atmosphere,
+      narration: beats.map(b => b.text).join(' '),
+      beats,
+      visual: `${style || 'cinematic'} — ${s.visual}`,
+      start: Math.round(idx * per),
+      end: Math.round((idx + 1) * per)
+    };
+  });
+
+  const title = `${cleanPrompt.slice(0, 62)}${cleanPrompt.length > 62 ? '…' : ''}`;
   return {
-    script: m.script,
+    title,
+    mood: 'adventure',
+    artStylePrompt: `${style || 'cinematic'} 4K film look, cohesive lighting and color palette`,
+    characters,
+    script: formatConnectedScript(title, characters, scenes),
     scenes,
     seo: {
-      title: `${prompt.slice(0, 70)} | DubAI PRO`,
-      description: `Neste vídeo exploramos ${prompt}. Roteiro, imagens e narração gerados com IA pelo DubAI PRO.\n\n#ia #inteligenciaartificial #youtube`,
-      tags: prompt.split(/\s+/).slice(0, 6).join(', ') + ', ia, inteligência artificial, youtube'
+      title: `${cleanPrompt.slice(0, 65)} | DubAI PRO`,
+      description: `História completa conectando narrador, cenários vivos e personagens sobre ${cleanPrompt}.\n\n#dubaipro #ia #cinema #storytelling`,
+      tags: cleanPrompt.split(/\s+/).slice(0, 6).join(', ') + ', ia, história animada, youtube'
     },
-    meta: m.meta
+    meta: { estilo: style, voz: voice, cenas: scenes.length, dur: durNum }
   };
 }
 
@@ -103,10 +220,129 @@ async function generateWithOpenAI(prompt, duration, style, voice) {
   }
 }
 
-// Roteiro estruturado + cenas + SEO em 2 fases (plano → narração por cena) — robusto em qualquer modelo
-async function generateCreateFull({ prompt, duration, style, voice }) {
-  const dur = parseInt(duration) || 10;
-  const nScenes = Math.max(5, Math.min(10, Math.round(dur / 1.5)));
+// Cinema Conectado (Narrador + Cenários Vivos + Diálogo Entre Personagens) + modo Clássico
+async function generateCreateFull({ prompt, duration, style, voice, cinemaMode = 'connected' }) {
+  const durNum = Math.max(0.5, parseFloat(duration) || 1);
+  const styleAnchorMap = {
+    realistic: '35mm cinema film photography, photorealistic, natural skin texture, dramatic ARRI Alexa lighting, consistent color grading',
+    cinematic: 'epic anamorphic 4K cinema look, volumetric light rays, rich contrast, shallow depth of field, movie still',
+    animation: '3D Pixar and Disney feature film animation style, expressive characters, vibrant warm global illumination, rich detailed environments',
+    documentary: 'National Geographic 4K cinema documentary photography, authentic natural atmosphere, crisp lens detail',
+    images: 'masterpiece digital concept art illustration, cohesive cinematic color palette, atmospheric depth'
+  };
+  const artStylePrompt = styleAnchorMap[style] || styleAnchorMap.cinematic;
+
+  // MODO CINEMA CONECTADO (Padrão): Narrador + Cenário Dinâmico + Diálogo Entre Personagens 100% interligados
+  if (cinemaMode !== 'classic') {
+    const nScenes = durNum <= 0.6 ? 3 : durNum <= 1.2 ? 4 : durNum <= 2.5 ? 5 : Math.min(7, Math.round(durNum * 1.1));
+    const wordsPerBeat = durNum <= 1.2 ? 18 : durNum <= 2.5 ? 24 : 32;
+
+    const cinemaSystem = [
+      'Você é um Diretor de Cinema e Showrunner especialista em vídeos onde NARRADOR, CENÁRIO e DIÁLOGO ENTRE PERSONAGENS se conectam 100%.',
+      'Responda APENAS um objeto JSON válido com esta estrutura exata:',
+      '{',
+      '  "title": "título envolvente em português",',
+      '  "mood": "epic | mystery | warm | tech | adventure",',
+      '  "seo": { "title": "título YouTube até 70 chars", "description": "descrição envolvente com hashtags", "tags": "tag1, tag2, tag3" },',
+      '  "characters": [',
+      '    { "id": "char1", "name": "Nome curto", "role": "Papel na história", "gender": "male | female", "appearance": "detailed English description of face, hair, age, clothing for consistent studio portrait" },',
+      '    { "id": "char2", "name": "Nome curto", "role": "Papel na história", "gender": "female | male", "appearance": "detailed English description of face, hair, age, clothing for consistent studio portrait" }',
+      '  ],',
+      '  "scenes": [',
+      '    {',
+      '      "title": "título curto da cena",',
+      '      "locationName": "Nome exato do local em português",',
+      '      "cameraMove": "zoomIn | panRight | zoomOut | panLeft",',
+      '      "atmosphere": "sunbeams | particles | embers | rain | cyber",',
+      '      "visual": "detailed English description of ONLY the environment/scenery matching 100% what happens and is spoken in this exact scene (objects, weather, lighting, wide shot background without people, no text)",',
+      '      "beats": [',
+      '        { "speaker": "narrator", "speakerName": "Narrador", "focus": "wide", "text": "narração vívida em português descrevendo exatamente o cenário que aparece na tela e a ação" },',
+      '        { "speaker": "char1", "speakerName": "Nome do char1", "focus": "dialogue", "text": "fala natural em português conversando diretamente com char2 sobre o que estão vendo/vivendo neste cenário" },',
+      '        { "speaker": "char2", "speakerName": "Nome do char2", "focus": "dialogue", "text": "resposta natural em português reagindo ao char1 e conectando com o próximo passo da história" }',
+      '      ]',
+      '    }',
+      '  ]',
+      '}',
+      'REGRAS OBRIGATÓRIAS:',
+      `1. Crie exatamente ${nScenes} cenas em continuidade direta (o final de uma cena leva logicamente à próxima).`,
+      `2. Cada fala em "beats" deve ter cerca de ${wordsPerBeat} palavras em português brasileiro natural, sem rubricas entre colchetes e sem emojis.`,
+      '3. O campo "visual" de cada cena DEVE retratar exatamente os elementos, lugares e clima citados pelo narrador e pelos personagens naquela cena.'
+    ].join('\n');
+
+    const cinemaUser = `Tema/pedido do vídeo: "${prompt}"\nEstilo visual: ${style} (${artStylePrompt})\nCrie elenco recorrente (2 personagens que conversam entre si) + narrador + cenários conectados do início ao fim.`;
+
+    const res = await withRetries(() => chatWithFallback({ system: cinemaSystem, user: cinemaUser, json: true, maxTokens: 4500 }), 2);
+    if (!res.error) {
+      const parsed = extractJson(res.text);
+      if (parsed && Array.isArray(parsed.scenes) && parsed.scenes.length) {
+        const characters = pickDistinctCastVoices(voice || 'onyx', Array.isArray(parsed.characters) && parsed.characters.length >= 2
+          ? parsed.characters.slice(0, 2)
+          : [
+              { id: 'char1', name: 'Lucas', role: 'Protagonista', gender: 'male' },
+              { id: 'char2', name: 'Helena', role: 'Parceira de cena', gender: 'female' }
+            ]
+        );
+        const voiceBySpeaker = {
+          narrator: voice || 'onyx',
+          char1: characters[0].voice,
+          char2: characters[1].voice
+        };
+        const nameBySpeaker = {
+          narrator: 'Narrador',
+          char1: characters[0].name,
+          char2: characters[1].name
+        };
+        const per = (durNum * 60) / parsed.scenes.length;
+        const scenes = parsed.scenes.slice(0, nScenes).map((s, idx) => {
+          const rawBeats = Array.isArray(s.beats) && s.beats.length
+            ? s.beats
+            : [{ speaker: 'narrator', speakerName: 'Narrador', focus: 'wide', text: String(s.narration || s.title || prompt) }];
+          const beats = rawBeats
+            .map(b => {
+              const sp = (b.speaker === 'char1' || b.speaker === 'char2') ? b.speaker : 'narrator';
+              return {
+                speaker: sp,
+                speakerName: nameBySpeaker[sp] || String(b.speakerName || 'Narrador'),
+                focus: sp === 'narrator' ? 'wide' : 'dialogue',
+                voice: voiceBySpeaker[sp] || voice || 'onyx',
+                text: String(b.text || '').replace(/\*\*|\[.*?\]/g, '').trim()
+              };
+            })
+            .filter(b => b.text.length > 0);
+          return {
+            i: idx + 1,
+            title: String(s.title || `Cena ${idx + 1}`),
+            locationName: String(s.locationName || s.title || `Cena ${idx + 1}`),
+            cameraMove: ['zoomIn', 'panRight', 'zoomOut', 'panLeft'].includes(s.cameraMove) ? s.cameraMove : (idx % 2 === 0 ? 'zoomIn' : 'panRight'),
+            atmosphere: ['sunbeams', 'particles', 'embers', 'rain', 'cyber'].includes(s.atmosphere) ? s.atmosphere : 'particles',
+            visual: `${artStylePrompt}, ${String(s.visual || s.title || prompt)}, wide shot environment background, no text, no watermark`,
+            beats,
+            narration: beats.map(b => b.text).join(' '),
+            start: Math.round(idx * per),
+            end: Math.round((idx + 1) * per)
+          };
+        });
+        const script = formatConnectedScript(parsed.title || prompt.slice(0, 70), characters, scenes);
+        return {
+          data: {
+            title: parsed.title || prompt.slice(0, 70),
+            mood: parsed.mood || 'cinematic',
+            artStylePrompt,
+            characters,
+            script,
+            scenes,
+            seo: parsed.seo || {}
+          },
+          provider: res.provider
+        };
+      }
+    }
+    // Se algum modelo menor falhar no JSON completo, cai suavemente para o modo em 2 fases abaixo ou mock conectado
+    if (res.error) return { error: res.error };
+  }
+
+  const dur = Math.max(1, Math.round(durNum));
+  const nScenes = Math.max(4, Math.min(10, Math.round(dur / 1.5)));
   const wordsPerScene = Math.round((dur * 130) / nScenes);
 
   // Fase 1: plano (título + SEO + cenas com descrição visual)

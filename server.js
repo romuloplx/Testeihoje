@@ -302,7 +302,7 @@ app.delete('/api/projects/:id', (req, res) => {
 });
 
 app.post('/api/create', async (req, res) => {
-  const { prompt, duration, style, voice } = req.body;
+  const { prompt, duration, style, voice, cinemaMode } = req.body;
 
   if (!prompt || !prompt.trim()) {
     return res.status(400).json({ error: 'Descreva o vídeo primeiro.' });
@@ -311,18 +311,18 @@ app.post('/api/create', async (req, res) => {
     return res.status(400).json({ error: 'Descrição muito longa (máx 2000 caracteres).' });
   }
 
-  // Try OpenAI first, fallback to mock
+  const sharedAi = require('./vercel/api/lib/ai');
   let data = null;
   let mode = 'mock';
   let aiError = null;
 
-  const gen = await require('./vercel/api/lib/ai').generateCreateFull({ prompt, duration, style, voice });
+  const gen = await sharedAi.generateCreateFull({ prompt, duration, style, voice, cinemaMode });
   if (gen && gen.data) {
     data = gen.data;
     mode = 'openai';
   } else {
     aiError = (gen && gen.error) || 'sem OPENAI_API_KEY';
-    data = mockCreateFull({ prompt, duration, style, voice });
+    data = sharedAi.mockCreateFull({ prompt, duration, style, voice });
   }
   const scriptText = data.script;
   const scriptMeta = data.meta || null;
@@ -332,10 +332,14 @@ app.post('/api/create', async (req, res) => {
     id,
     type: 'create',
     prompt: prompt.trim(),
-    title: prompt.trim().slice(0, 80),
-    duration: String(duration || '10'),
+    title: data.title || prompt.trim().slice(0, 80),
+    duration: String(duration || '1'),
     style: style || 'realistic',
     voice: voice || 'onyx',
+    cinemaMode: cinemaMode || 'connected',
+    characters: data.characters || [],
+    mood: data.mood || 'cinematic',
+    artStylePrompt: data.artStylePrompt || '',
     script: scriptText,
     scenes: data.scenes,
     seo: data.seo,
@@ -351,13 +355,17 @@ app.post('/api/create', async (req, res) => {
 
   res.json({
     id: project.id,
+    title: data.title || project.title,
+    characters: data.characters || [],
+    mood: data.mood || 'cinematic',
+    artStylePrompt: data.artStylePrompt || '',
     script: project.script,
     scenes: data.scenes,
     seo: data.seo,
     project,
     mode,
-    warning: mode === 'openai' ? undefined : `A IA real não respondeu (${aiError}). O roteiro abaixo é SIMULADO.`,
-    message: mode === 'openai' ? 'Roteiro + cenas + SEO gerados com GPT-4o' : `⚠️ IA real falhou (${aiError}) — roteiro simulado gerado.`
+    warning: mode === 'openai' ? undefined : `A IA real não respondeu (${aiError}). O roteiro conectado abaixo foi gerado localmente.`,
+    message: mode === 'openai' ? 'Cinema Conectado gerado com IA!' : `⚠️ Modo local ativado (${aiError}).`
   });
 });
 

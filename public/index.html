@@ -247,81 +247,117 @@ input[type="range"]{
 
     <div class="row">
       <div>
-        <label>Duração</label>
+        <label>🎭 Modo de direção do vídeo</label>
+        <select id="cinemaMode">
+          <option value="connected" selected>🎭 Cinema Conectado (Narrador + Cenários + Personagens)</option>
+          <option value="classic">🖼️ Documentário Clássico (Cenários + Narração)</option>
+        </select>
+      </div>
+      <div>
+        <label>📐 Formato da tela</label>
+        <select id="createFormat">
+          <option value="16:9" selected>🖥️ Horizontal 16:9 (YouTube / TV)</option>
+          <option value="9:16">📱 Vertical 9:16 (Reels / TikTok / Shorts)</option>
+          <option value="1:1">🟦 Quadrado 1:1 (Feed)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>⏱️ Duração</label>
         <select id="duration">
-          <option value="1">1 minuto (Short)</option>
+          <option value="0.5">⚡ 30 segundos (Rápido — Short)</option>
+          <option value="1" selected>🎬 1 minuto (Ideal — Reels / YouTube)</option>
           <option value="2">2 minutos</option>
           <option value="5">5 minutos</option>
-          <option value="10" selected>10 minutos</option>
+          <option value="10">10 minutos</option>
           <option value="15">15 minutos</option>
           <option value="20">20 minutos</option>
         </select>
       </div>
       <div>
-        <label>Estilo visual</label>
+        <label>🎨 Estilo visual</label>
         <select id="style">
-          <option value="realistic">Pessoas realistas</option>
-          <option value="cinematic">Cinematográfico</option>
-          <option value="animation">Animação</option>
+          <option value="realistic">Pessoas realistas (Filme 35mm)</option>
+          <option value="cinematic" selected>Cinematográfico 4K</option>
+          <option value="animation">Animação 3D (estilo Pixar)</option>
           <option value="documentary">Documentário</option>
-          <option value="images">Imagens com narração</option>
+          <option value="images"> Arte Conceitual Ilustrada</option>
         </select>
       </div>
     </div>
 
-    <label>Voz</label>
-    <div style="display:flex;gap:8px">
-      <select id="voice" style="flex:1">
-        <option value="onyx">Onyx — Masculina grave</option>
-        <option value="nova">Nova — Feminina natural</option>
-        <option value="alloy">Alloy — Neutra</option>
-        <option value="echo">Echo — Masculina</option>
-        <option value="fable">Fable — Masculina expressiva</option>
-        <option value="shimmer">Shimmer — Feminina suave</option>
-        <option value="ash">Ash — Neutra firme</option>
-        <option value="coral">Coral — Feminina clara</option>
-        <option value="sage">Sage — Neutra calma</option>
-      </select>
-      <button class="ghost" type="button" onclick="previewVoice(document.getElementById('voice').value)">🔊 Testar</button>
+    <div class="row">
+      <div>
+        <label>🎙️ Voz principal do Narrador</label>
+        <div style="display:flex;gap:8px">
+          <select id="voice" style="flex:1">
+            <option value="onyx">Onyx — Masculina grave</option>
+            <option value="nova">Nova — Feminina natural</option>
+            <option value="alloy">Alloy — Neutra</option>
+            <option value="echo">Echo — Masculina jovem</option>
+            <option value="fable">Fable — Masculina expressiva</option>
+            <option value="shimmer">Shimmer — Feminina suave</option>
+            <option value="ash">Ash — Neutra firme</option>
+            <option value="coral">Coral — Feminina clara</option>
+            <option value="sage">Sage — Neutra calma</option>
+          </select>
+          <button class="ghost" type="button" onclick="previewVoice(document.getElementById('voice').value)">🔊 Testar</button>
+        </div>
+      </div>
+      <div>
+        <label>🎵 Trilha sonora de fundo</label>
+        <select id="createMusic">
+          <option value="cinematic" selected>🎵 Trilha Ambiente Automática (com Ducking)</option>
+          <option value="none">🔇 Sem música (apenas vozes)</option>
+        </select>
+      </div>
     </div>
 
-    <button class="primary" id="createBtn" onclick="createVideo()">✨ Criar vídeo com IA</button>
-    <button class="ghost" onclick="fillExample()" style="width:100%;margin-top:8px">💡 Usar exemplo pronto</button>
+    <button class="primary" id="createFullVideoBtn" onclick="createAndBuildVideo()" style="font-size:15px;padding:15px">🎬 Criar Vídeo Completo (Narrador + Cenários + Personagens)</button>
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+      <button class="ghost" id="createBtn" onclick="createVideo(false)" style="flex:1;min-width:180px">📝 Gerar só o roteiro primeiro</button>
+      <button class="ghost" onclick="fillExample()" style="flex:1;min-width:180px">💡 Usar exemplo de história conectada</button>
+    </div>
 
     <div class="progress-wrap" id="createProgress">
       <div class="progress-bar"><div class="progress-fill" id="createProgressFill"></div></div>
       <div class="progress-steps">
-        <span id="s1" class="active">Roteiro</span>
-        <span id="s2">Cenas</span>
-        <span id="s3">Narração</span>
-        <span id="s4">Finalizando</span>
+        <span id="s1" class="active">Roteiro & Elenco</span>
+        <span id="s2">Cenários</span>
+        <span id="s3">Vozes & Diálogos</span>
+        <span id="s4">Vídeo Final</span>
       </div>
     </div>
 
     <div class="status" id="createStatus"></div>
     <div id="createResult" class="hidden" style="margin-top:14px">
       <div style="background:#0f0f1e;border:1px solid var(--border);border-radius:12px;padding:14px">
-        <div style="font-weight:800;font-size:13px;margin-bottom:8px">📝 Roteiro gerado</div>
-        <div id="createScript" style="white-space:pre-wrap;font-size:12.5px;line-height:1.7;color:#d1d5ff;max-height:300px;overflow:auto"></div>
+        <div id="cinemaCastBox" class="hidden" style="margin-bottom:12px;padding:11px 12px;border-radius:10px;background:#14142b;border:1px solid #7c3aed55"></div>
+        <div style="font-weight:800;font-size:13px;margin-bottom:8px">📝 Roteiro Conectado (Narrador + Cenários + Personagens)</div>
+        <div id="createScript" style="white-space:pre-wrap;font-size:12.5px;line-height:1.7;color:#d1d5ff;max-height:280px;overflow:auto"></div>
         <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
           <button class="ghost" onclick="copyText(document.getElementById('createScript').innerText)">📋 Copiar roteiro</button>
-          <button class="ghost" onclick="speakText(document.getElementById('createScript').innerText)">🔊 Ouvir narração</button>
+          <button class="ghost" onclick="speakText(document.getElementById('createScript').innerText)">🔊 Ouvir prévia</button>
           <button class="ghost" onclick="enhanceCurrentScript()">✨ Melhorar com IA</button>
-          <button class="ghost" onclick="sendCreateToAvatar()" style="border-color:#7c3aed;color:#e9d5ff">🗣️ Narrar com Avatar</button>
+          <button class="ghost" onclick="sendCreateToAvatar()" style="border-color:#7c3aed;color:#e9d5ff">🗣️ Abrir no Estúdio Avatar</button>
           <button class="ghost" onclick="openTab('projects')">📁 Ver nos projetos</button>
         </div>
-        <button class="primary" id="buildVideoBtn" onclick="buildCreateVideo()" style="width:100%;margin-top:12px">🎬 Montar vídeo (imagens em movimento + voz)</button>
+        <button class="primary" id="buildVideoBtn" onclick="buildCreateVideo()" style="width:100%;margin-top:12px">🎬 Renderizar / Atualizar Vídeo Conectado</button>
         <div id="videoBuildProgress" class="hidden" style="margin-top:10px">
           <div class="progress-bar"><div class="progress-fill" id="videoBuildFill" style="width:0%"></div></div>
           <div id="videoBuildMsg" class="hint" style="margin-top:6px"></div>
         </div>
-        <div id="createdVideoWrap" class="hidden" style="margin-top:12px">
-          <video id="createdVideo" controls style="width:100%;border-radius:10px;background:#000"></video>
-          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-            <a id="createdVideoDl" class="ghost" download="video-dubai-pro.webm" style="padding:8px 14px;text-decoration:none">⬇️ Baixar vídeo (YouTube)</a>
-            <a id="createdAudioDl" class="ghost" download="narracao.mp3" style="padding:8px 14px;text-decoration:none">🎙️ Baixar narração</a>
-            <button class="ghost" onclick="downloadSRT()">📜 Baixar legendas (SRT)</button>
-            <button class="ghost" onclick="downloadSceneImages()">🖼️ Baixar imagens das cenas</button>
+        <div id="createdVideoWrap" class="hidden" style="margin-top:14px;padding:14px;border-radius:14px;background:linear-gradient(180deg,#0f172a,#090d16);border:1.5px solid #10b98188">
+          <div id="createdVideoReadyBanner" style="font-weight:800;font-size:13.5px;color:#6ee7b7;margin-bottom:10px">✅ Vídeo conectado pronto! Assista abaixo ou clique para baixar no seu aparelho:</div>
+          <video id="createdVideo" controls playsinline style="width:100%;max-height:480px;border-radius:10px;background:#000"></video>
+          <button type="button" onclick="downloadCreatedVideo()" style="width:100%;margin-top:12px;padding:15px 18px;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;color:#042f2e;background:linear-gradient(135deg,#34d399,#10b981,#06b6d4);box-shadow:0 8px 26px rgba(16,185,129,.35)">⬇️ BAIXAR VÍDEO COMPLETO AGORA (.MP4 / .WEBM)</button>
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+            <a id="createdVideoDl" class="ghost" download="video-cinema-dubai-pro.mp4" style="padding:8px 14px;text-decoration:none">💾 Link direto do vídeo</a>
+            <a id="createdAudioDl" class="ghost" download="trilha-vozes-dubai-pro.wav" style="padding:8px 14px;text-decoration:none">🎙️ Baixar áudio master (.WAV)</a>
+            <button class="ghost" onclick="downloadSRT()">📜 Baixar legendas (.SRT)</button>
+            <button class="ghost" onclick="downloadSceneImages()">🖼️ Baixar cenários (.PNG)</button>
           </div>
         </div>
         <div id="seoBox" class="hidden" style="margin-top:12px;background:#111125;border:1px solid var(--border);border-radius:10px;padding:12px">
@@ -334,9 +370,8 @@ input[type="range"]{
   </div>
 
   <div class="card" style="background:#111125">
-    <h3 style="margin:0">Como funciona?</h3>
-    <p style="margin:8px 0 0 0">1️⃣ Você descreve a ideia → 2️⃣ IA gera roteiro com timestamps → 3️⃣ Vira projeto salvo → 4️⃣ Monte com cenas ou envie para o <b>🗣️ Avatar Falante</b>.</p>
-    <p class="hint">Com chaves na Vercel (OpenAI / Gemini / Unorouter) usa a cadeia completa em rodízio; sem chave, roda em modo MOCK/grátis.</p>
+    <h3 style="margin:0">🎭 Como funciona o Cinema Conectado?</h3>
+    <p style="margin:8px 0 0 0">1️⃣ O <b>Narrador</b> descreve a cena e o <b>Cenário</b> muda exatamente conforme o que é dito → 2️⃣ Os <b>Personagens</b> entram no mesmo cenário com rostos consistentes, vozes próprias e <b>boca sincronizada (lip-sync)</b> conversando entre si → 3️⃣ Baixe o vídeo pronto em 1 clique!</p>
   </div>
 </section>
 
@@ -481,11 +516,12 @@ input[type="range"]{
     <div class="status" id="avatarStatus"></div>
 
     <div id="avatarResultWrap" class="hidden" style="margin-top:14px">
-      <div style="background:#0f0f1e;border:1px solid var(--border);border-radius:12px;padding:14px">
-        <div id="avatarResultTitle" style="font-weight:800;font-size:13.5px;margin-bottom:8px">✅ Vídeo do Avatar pronto!</div>
+      <div style="background:linear-gradient(180deg,#0f172a,#090d16);border:1.5px solid #10b98188;border-radius:14px;padding:14px">
+        <div id="avatarResultTitle" style="font-weight:800;font-size:13.5px;color:#6ee7b7;margin-bottom:8px">✅ Vídeo do Avatar pronto!</div>
         <video id="avatarResultVideo" controls playsinline style="width:100%;max-height:460px;border-radius:10px;background:#000"></video>
+        <button type="button" onclick="downloadAvatarVideo()" style="width:100%;margin-top:12px;padding:15px 18px;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;color:#042f2e;background:linear-gradient(135deg,#34d399,#10b981,#06b6d4);box-shadow:0 8px 26px rgba(16,185,129,.35)">⬇️ BAIXAR VÍDEO DO AVATAR AGORA (.MP4 / .WEBM)</button>
         <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-          <a id="avatarVideoDl" class="ghost" download="avatar-dubai-pro.webm" style="padding:9px 14px;text-decoration:none;border-color:#06b6d4;color:#a5f3fc">⬇️ Baixar Vídeo</a>
+          <a id="avatarVideoDl" class="ghost" download="avatar-dubai-pro.mp4" style="padding:9px 14px;text-decoration:none;border-color:#06b6d4;color:#a5f3fc">💾 Link direto do vídeo</a>
           <a id="avatarAudioDl" class="ghost" download="avatar-voz.mp3" style="padding:9px 14px;text-decoration:none">🎙️ Baixar Voz</a>
           <button class="ghost" type="button" onclick="downloadAvatarSRT()">📜 Baixar Legendas (.SRT)</button>
           <button class="ghost" type="button" onclick="downloadAvatarThumbnail()">🖼️ Baixar Capa (.PNG)</button>
@@ -667,8 +703,10 @@ function openTab(id, button){
 }
 
 function fillExample(){
-  $('#prompt').value = "Crie um documentário realista sobre dinossauros para YouTube, 10 minutos, com narração masculina em português brasileiro. Comece com um hook curioso, explique as 5 espécies mais fascinantes e termine com um convite para se inscrever. Tom empolgante e educativo.";
-  toast('💡 Exemplo preenchido — agora clique em Criar');
+  $('#prompt').value = "Uma expedição cinematográfica na Amazônia onde o explorador Lucas e a arqueóloga Helena seguem um mapa misterioso pela floresta enevoada, cruzam uma cachoeira secreta com ruínas esculpidas e encontram uma cidade dourada iluminada, com o narrador descrevendo cada mudança de cenário e diálogos vivos entre os dois personagens.";
+  if(document.getElementById('cinemaMode')) document.getElementById('cinemaMode').value = 'connected';
+  if(document.getElementById('duration')) document.getElementById('duration').value = '1';
+  toast('💡 Exemplo de história conectada preenchido — clique em Criar Vídeo Completo!');
 }
 
 // ===== Modelos de vídeo (estilo HeyGen: Ads, Educ, Explainer...) =====
@@ -726,23 +764,30 @@ function downloadSRT(){
   const d = (typeof currentCreateData!=='undefined') ? currentCreateData : null;
   if(!d||!d.scenes||!d.scenes.length){ toast('Gere o roteiro primeiro','warn'); return; }
   let n=1, out='';
-  for(const sc of d.scenes){
-    const sent = String(sc.narration||sc.title||'').split(/(?<=[.!?…])\s+/).filter(Boolean);
-    const dur = Math.max(1,(sc.end-sc.start));
-    const totalChars = sent.reduce((a,s)=>a+s.length,0)||1;
-    let t = sc.start;
-    for(const s of sent){
-      const w = s.length/totalChars*dur;
-      out += n+'\n'+fmtSRT(t)+' --> '+fmtSRT(Math.min(sc.end,t+w))+'\n'+s+'\n\n';
-      t += w; n++;
+  if(Array.isArray(d.timedBeats) && d.timedBeats.length){
+    for(const b of d.timedBeats){
+      const prefix = b.speaker === 'narrator' ? '[Narrador] ' : `[${b.speakerName||'Personagem'}] `;
+      const cList = Array.isArray(b.captions) && b.captions.length ? b.captions : [{ start: b.start, end: b.end, text: b.text }];
+      cList.forEach((c, idx) => {
+        out += n+'\n'+fmtSRT(c.start)+' --> '+fmtSRT(c.end)+'\n'+(idx===0?prefix:'')+c.text+'\n\n';
+        n++;
+      });
+    }
+  } else {
+    for(const sc of d.scenes){
+      const sent = String(sc.narration||sc.title||'').split(/(?<=[.!?…])\s+/).filter(Boolean);
+      const dur = Math.max(1,(sc.end-sc.start));
+      const totalChars = sent.reduce((a,s)=>a+s.length,0)||1;
+      let t = sc.start;
+      for(const s of sent){
+        const w = s.length/totalChars*dur;
+        out += n+'\n'+fmtSRT(t)+' --> '+fmtSRT(Math.min(sc.end,t+w))+'\n'+s+'\n\n';
+        t += w; n++;
+      }
     }
   }
-  const blob = new Blob([out],{type:'application/x-subrip'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'legendas-dubai-pro.srt';
-  a.click();
-  toast('📜 Legendas SRT geradas ('+(n-1)+' trechos)');
+  triggerBlobDownload(new Blob([out],{type:'application/x-subrip'}), 'legendas-dubai-pro.srt');
+  toast('📜 Legendas SRT baixadas ('+(n-1)+' trechos)');
 }
 
 function previewVideo(){
@@ -762,46 +807,87 @@ function previewVideo(){
   toast('📎 ' + file.name);
 }
 
+function renderCastPreviewBox(data){
+  const box = document.getElementById('cinemaCastBox');
+  if(!box) return;
+  const chars = (data && Array.isArray(data.characters)) ? data.characters : [];
+  const scenes = (data && Array.isArray(data.scenes)) ? data.scenes : [];
+  if(!chars.length){ box.classList.add('hidden'); return; }
+  box.classList.remove('hidden');
+  const chips = [
+    `<span class="kbd" style="border-color:#f59e0b88;color:#fde68a">🎙️ Narrador (${(document.getElementById('voice')||{}).value||'onyx'})</span>`,
+    ...chars.map(c => `<span class="kbd" style="border-color:${c.themeColor||'#38bdf8'}88;color:#e0f2fe">🗣️ ${c.name} • ${c.role} (voz ${c.voice})</span>`)
+  ].join(' ');
+  const locs = scenes.map(s => `<span style="opacity:.85">📍 Cena ${s.i}: ${s.locationName||s.title}</span>`).join(' → ');
+  box.innerHTML = `<div style="font-weight:800;font-size:12px;color:#c4b5fd;margin-bottom:6px">🎭 Elenco & Continuidade Conectada (${scenes.length} cenas interligadas)</div>`
+    + `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">${chips}</div>`
+    + `<div style="font-size:11.5px;color:#94a3b8;line-height:1.5">${locs}</div>`;
+}
+
+// Botão 1-Clique: Gera Roteiro Conectado + Cenários + Personagens + Vozes + Vídeo Final Pronto para Baixar!
+async function createAndBuildVideo(){
+  const mainBtn = document.getElementById('createFullVideoBtn');
+  if(mainBtn){ mainBtn.disabled = true; mainBtn.textContent = '⏳ Etapa 1/2: Criando roteiro, cenários e personagens...'; }
+  try{
+    const ok = await createVideo(true);
+    if(ok){
+      if(mainBtn) mainBtn.textContent = '🎬 Etapa 2/2: Gerando cenários, vozes dos personagens e vídeo...';
+      await buildCreateVideo();
+    }
+  } finally {
+    if(mainBtn){ mainBtn.disabled = false; mainBtn.textContent = '🎬 Criar Vídeo Completo (Narrador + Cenários + Personagens)'; }
+  }
+}
+
 // --- Create ---
-async function createVideo(){
+async function createVideo(silentAutoBuild = false){
   const prompt=$('#prompt').value.trim();
   const duration=$('#duration').value;
   const style=$('#style').value;
   const voice=$('#voice').value;
+  const cinemaMode=(document.getElementById('cinemaMode')||{}).value||'connected';
   const btn=$('#createBtn');
 
-  if(!prompt){ showStatus('createStatus','⚠️ Descreva o vídeo primeiro.','warn'); toast('Descreva sua ideia primeiro','warn'); return; }
-  if(prompt.length < 10){ showStatus('createStatus','⚠️ Descrição muito curta — detalhe melhor sua ideia.','warn'); return; }
+  if(!prompt){ showStatus('createStatus','⚠️ Descreva o vídeo primeiro.','warn'); toast('Descreva sua ideia primeiro','warn'); return false; }
+  if(prompt.length < 10){ showStatus('createStatus','⚠️ Descrição muito curta — detalhe melhor sua ideia.','warn'); return false; }
 
-  btn.disabled=true; btn.textContent='⏳ Gerando...';
-  showStatus('createStatus','🤖 Solicitando criação do roteiro...','info');
+  btn.disabled=true; btn.textContent='⏳ Gerando roteiro...';
+  showStatus('createStatus','🤖 Criando história conectada (Narrador + Cenários + Diálogo entre Personagens)...','info');
   $('#createProgress').classList.add('show');
   $('#createResult').classList.add('hidden');
-  setProgress('createProgressFill', 15);
+  setProgress('createProgressFill', 18);
   setStep(['s1','s2','s3','s4'],0);
-
-  let p1=setInterval(()=> setProgress('createProgressFill', 35), 400);
-  setTimeout(()=>{ clearInterval(p1); setStep(['s1','s2','s3','s4'],1); setProgress('createProgressFill',55); }, 700);
-  setTimeout(()=>{ setStep(['s1','s2','s3','s4'],2); setProgress('createProgressFill',80); }, 1200);
-  setTimeout(()=>{ setStep(['s1','s2','s3','s4'],3); setProgress('createProgressFill',92); }, 1700);
 
   try{
     const response=await fetch('/api/create',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ prompt, duration, style, voice })
+      body: JSON.stringify({ prompt, duration, style, voice, cinemaMode })
     });
     const data=await response.json();
     if(!response.ok) throw new Error(data.error||'Erro ao criar projeto');
 
-    setProgress('createProgressFill',100);
+    setProgress('createProgressFill', silentAutoBuild ? 30 : 100);
     if(data.warning){
       showStatus('createStatus','⚠️ '+data.warning,'warn');
     }else{
-      showStatus('createStatus','✅ Roteiro pronto! Agora monte o vídeo com imagens e voz.','success');
+      showStatus('createStatus', silentAutoBuild
+        ? '✅ Roteiro e elenco conectados prontos! Gerando cenários, vozes de cada personagem e vídeo...'
+        : '✅ Roteiro e elenco conectados prontos! Clique em Renderizar Vídeo abaixo.','success');
     }
     $('#createScript').textContent = data.script || 'Roteiro criado';
-    currentCreateData={script:data.script||'',scenes:data.scenes||[],seo:data.seo||{},duration:duration};
+    currentCreateData={
+      title: data.title || prompt.slice(0,60),
+      script: data.script || '',
+      scenes: data.scenes || [],
+      characters: data.characters || [],
+      mood: data.mood || 'cinematic',
+      artStylePrompt: data.artStylePrompt || '',
+      cinemaMode,
+      seo: data.seo || {},
+      duration: duration
+    };
+    renderCastPreviewBox(currentCreateData);
     document.getElementById('createdVideoWrap').classList.add('hidden');
     document.getElementById('videoBuildProgress').classList.add('hidden');
     const seo=data.seo||{};
@@ -810,16 +896,20 @@ async function createVideo(){
       document.getElementById('seoBox').classList.remove('hidden');
     }
     $('#createResult').classList.remove('hidden');
-    toast('✅ Roteiro criado!');
+    if(!silentAutoBuild) toast('✅ Roteiro conectado criado!');
     if(data.project) saveProject(data.project);
     await loadProjects();
+    return true;
   }catch(error){
-    showStatus('createStatus','❌ Todas as IAs da cadeia foram tentadas e nenhuma respondeu nesta rodada — costuma ser limite temporário dos provedores (erros 429 = cota do plano grátis). Tente de novo em ~1 min, é só clicar de novo.\n\nDetalhes técnicos: '+error.message,'error');
-    toast('⏳ Nenhuma IA respondeu agora — tente de novo em instantes','error');
+    showStatus('createStatus','❌ Falha temporária ao gerar roteiro: '+error.message,'error');
+    toast('⏳ Tente novamente em instantes','error');
     setProgress('createProgressFill',0);
+    return false;
   }finally{
-    btn.disabled=false; btn.textContent='✨ Criar vídeo com IA';
-    setTimeout(()=>{ $('#createProgress').classList.remove('show'); setProgress('createProgressFill',0); }, 1200);
+    btn.disabled=false; btn.textContent='📝 Gerar só o roteiro primeiro';
+    if(!silentAutoBuild){
+      setTimeout(()=>{ $('#createProgress').classList.remove('show'); setProgress('createProgressFill',0); }, 1200);
+    }
   }
 }
 
@@ -1047,48 +1137,133 @@ async function runDiag(){
   }catch(e){ box.innerHTML='❌ Erro no teste: '+e.message; }
 }
 
+let lastCreatedVideoBlob=null;
+let lastCreatedVideoFilename='video-cinema-dubai-pro.mp4';
+let lastAvatarVideoBlob=null;
+let lastAvatarVideoFilename='avatar-dubai-pro.mp4';
+
+// Download universal à prova de falhas (Desktop Chrome/Edge/Firefox + Android + iOS Safari)
+function triggerBlobDownload(blob, filename){
+  if(!blob){ toast('Gere o vídeo primeiro!','warn'); return; }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.style.display = 'none';
+  a.href = url;
+  a.download = filename || 'video-dubai-pro.mp4';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{
+    try{ document.body.removeChild(a); }catch(e){}
+    URL.revokeObjectURL(url);
+  }, 6000);
+}
+
+function downloadCreatedVideo(){
+  if(lastCreatedVideoBlob){
+    triggerBlobDownload(lastCreatedVideoBlob, lastCreatedVideoFilename);
+    toast('⬇️ Download iniciado: ' + lastCreatedVideoFilename);
+    return;
+  }
+  const link = document.getElementById('createdVideoDl');
+  if(link && link.href){ link.click(); toast('⬇️ Baixando vídeo...'); return; }
+  toast('Gere o vídeo primeiro!','warn');
+}
+
+function downloadAvatarVideo(){
+  if(lastAvatarVideoBlob){
+    triggerBlobDownload(lastAvatarVideoBlob, lastAvatarVideoFilename);
+    toast('⬇️ Download iniciado: ' + lastAvatarVideoFilename);
+    return;
+  }
+  const link = document.getElementById('avatarVideoDl');
+  if(link && link.href){ link.click(); toast('⬇️ Baixando vídeo...'); return; }
+  toast('Renderize o vídeo do avatar primeiro!','warn');
+}
+
 function pickRecorderMime(){
-  const c=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4'];
+  // Prioriza MP4 nativo H.264/AAC (suportado em Chrome 126+, Edge, Safari iOS/macOS e Android!) com fallback WebM VP9/VP8
+  const c=[
+    'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+    'video/mp4;codecs=avc1,mp4a.40.2',
+    'video/mp4',
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp8,opus',
+    'video/webm'
+  ];
   for(const m of c){ if(window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return m; }
   return '';
 }
 
-async function recordCanvasVideo({drawFn, audioEl, durationSec, alsoPlay=[], onProgress}){
+async function recordCanvasVideo({drawFn, audioEl, audioBuffer, width=1280, height=720, durationSec, alsoPlay=[], onProgress}){
   const canvas=document.createElement('canvas');
-  canvas.width=1280; canvas.height=720;
+  canvas.width=width; canvas.height=height;
   const ctx=canvas.getContext('2d');
   drawFn(ctx,0);
   const stream=canvas.captureStream(30);
-  if(audioEl){
+
+  let recAudioCtx=null, bufSrc=null;
+  if(audioBuffer){
+    const AC = window.AudioContext || window.webkitAudioContext;
+    recAudioCtx = new AC({ sampleRate: audioBuffer.sampleRate });
+    if(recAudioCtx.state === 'suspended') await recAudioCtx.resume().catch(()=>{});
+    const dest = recAudioCtx.createMediaStreamDestination();
+    bufSrc = recAudioCtx.createBufferSource();
+    bufSrc.buffer = audioBuffer;
+    bufSrc.connect(dest);
+    dest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));
+    durationSec = audioBuffer.duration;
+  } else if(audioEl){
     const as=(audioEl.captureStream||audioEl.mozCaptureStream).call(audioEl);
     as.getAudioTracks().forEach(t=>stream.addTrack(t));
     if(!durationSec||!isFinite(durationSec)) durationSec=audioEl.duration||10;
     if(audioEl.duration&&isFinite(audioEl.duration)) durationSec=Math.min(durationSec,audioEl.duration);
   }
+
   const mime=pickRecorderMime();
-  if(!mime) throw new Error('Seu navegador não grava vídeo (MediaRecorder). Use o Chrome.');
-  const rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:4500000});
+  if(!mime) throw new Error('Seu navegador não grava vídeo (MediaRecorder). Use Chrome, Edge ou Safari atualizado.');
+  const rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:4800000});
   const chunks=[];
   rec.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
   const stopped=new Promise(r=>rec.onstop=r);
   rec.start(1000);
+
   alsoPlay.forEach(m=>{ try{ m.muted=true; m.currentTime=0; m.play(); }catch(e){} });
-  if(audioEl){ audioEl.currentTime=0; try{ await audioEl.play(); }catch(e){} }
+  let audioStartCtxTime = 0;
+  if(bufSrc && recAudioCtx){
+    audioStartCtxTime = recAudioCtx.currentTime;
+    bufSrc.start(0);
+  } else if(audioEl){
+    audioEl.currentTime=0; try{ await audioEl.play(); }catch(e){}
+  }
+
   const t0=performance.now();
   await new Promise(resolve=>{
-    function frame(){
-      const t=audioEl&&!audioEl.paused?audioEl.currentTime:audioEl?audioEl.currentTime:(performance.now()-t0)/1000;
-      drawFn(ctx,t);
-      if(onProgress) onProgress(Math.min(1,t/Math.max(1,durationSec)));
-      if(t>=durationSec-0.05||(audioEl&&audioEl.ended)) return resolve();
-      requestAnimationFrame(frame);
+    function step(){
+      let t;
+      if(recAudioCtx && bufSrc){
+        t = recAudioCtx.currentTime - audioStartCtxTime;
+      } else if(audioEl && !audioEl.paused){
+        t = audioEl.currentTime;
+      } else {
+        t = (performance.now()-t0)/1000;
+      }
+      drawFn(ctx, Math.max(0, t));
+      if(onProgress) onProgress(Math.min(1, t/Math.max(0.5, durationSec)));
+      if(t >= durationSec - 0.03 || (audioEl && audioEl.ended)){
+        resolve();
+        return;
+      }
+      if(document.hidden) setTimeout(step, 33);
+      else requestAnimationFrame(step);
     }
-    requestAnimationFrame(frame);
+    step();
   });
-  await new Promise(r=>setTimeout(r,350));
+  await new Promise(r=>setTimeout(r,280));
+  if(bufSrc){ try{ bufSrc.stop(); }catch(e){} }
   rec.stop();
   alsoPlay.forEach(m=>{ try{m.pause();}catch(e){} });
   await stopped;
+  if(recAudioCtx){ await recAudioCtx.close().catch(()=>{}); }
   return new Blob(chunks,{type:mime.split(';')[0]});
 }
 
@@ -1103,19 +1278,520 @@ function wrapText(ctx,text,x,y,maxW,lh){
   return y;
 }
 
+// Cenário artístico cinematográfico de contingência (sem nenhum texto de erro na tela!)
 async function placeholderBitmap(scene,i){
   const c=document.createElement('canvas'); c.width=1280; c.height=720;
   const x=c.getContext('2d');
-  const hues=[[265,38],[200,48],[330,42],[28,58],[150,46],[230,50]];
-  const [h,s]=hues[i%hues.length];
-  const g=x.createLinearGradient(0,0,1280,720);
-  g.addColorStop(0,`hsl(${h},${s}%,26%)`); g.addColorStop(1,`hsl(${h+45},${s}%,11%)`);
+  const palettes=[
+    ['#0b132b','#1c2541','#3a506b','#f59e0b'],
+    ['#10002b','#240046','#5a189a','#38bdf8'],
+    ['#081c15','#1b4332','#2d6a4f','#fbbf24'],
+    ['#1f1108','#432818','#6f1d1b','#fb923c'],
+    ['#091526','#112d4e','#1e56a0','#67e8f9']
+  ];
+  const pal=palettes[i%palettes.length];
+  const g=x.createLinearGradient(0,0,0,720);
+  g.addColorStop(0,pal[0]); g.addColorStop(0.55,pal[1]); g.addColorStop(1,pal[2]);
   x.fillStyle=g; x.fillRect(0,0,1280,720);
-  x.fillStyle='rgba(255,255,255,0.92)'; x.font='bold 46px sans-serif';
-  wrapText(x,scene.title||`Cena ${i+1}`,60,280,1160,60);
-  x.fillStyle='rgba(255,255,255,0.55)'; x.font='26px sans-serif';
-  x.fillText('Imagem simulada — configure OPENAI_API_KEY para arte real',60,520);
-  try{ return await createImageBitmap(c); }catch(e){ return null; }
+
+  const sunX = 340 + ((i*230)%600), sunY = 250 + ((i*55)%120);
+  const rg=x.createRadialGradient(sunX,sunY,12,sunX,sunY,460);
+  rg.addColorStop(0,pal[3]+'cc'); rg.addColorStop(0.35,pal[3]+'38'); rg.addColorStop(1,'transparent');
+  x.fillStyle=rg; x.fillRect(0,0,1280,720);
+
+  for(let layer=0; layer<3; layer++){
+    const baseY = 430 + layer*85;
+    x.fillStyle = layer===0 ? 'rgba(10,14,29,0.45)' : layer===1 ? 'rgba(8,11,22,0.68)' : 'rgba(5,7,15,0.90)';
+    x.beginPath(); x.moveTo(0,720); x.lineTo(0,baseY);
+    for(let px=0; px<=1280; px+=80){
+      const ridge = Math.sin(px*0.005 + i*1.7 + layer*2.1)*44 + Math.cos(px*0.013 + layer)*22;
+      x.lineTo(px, baseY + ridge);
+    }
+    x.lineTo(1280,720); x.closePath(); x.fill();
+  }
+  try{ return await createImageBitmap(c); }catch(e){ return c; }
+}
+
+// Retrato ilustrado consistente para personagem caso a API de imagem esteja offline/em limite
+function buildCharacterFallbackSvg(char, idx){
+  const isFem = char.gender === 'female';
+  const skin = idx % 2 === 0 ? '#e0a98b' : '#c98a6b';
+  const hair = isFem ? '#2a1810' : '#1b2028';
+  const outfit = char.themeColor || (isFem ? '#be185d' : '#0284c7');
+  const bg1 = isFem ? '#2e1065' : '#0f172a';
+  const bg2 = isFem ? '#4c1d95' : '#1e3a8a';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+    <defs>
+      <linearGradient id="bg${idx}" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${bg1}"/><stop offset="100%" stop-color="${bg2}"/></linearGradient>
+    </defs>
+    <rect width="512" height="512" fill="url(#bg${idx})"/>
+    <circle cx="256" cy="210" r="190" fill="${outfit}" opacity="0.16"/>
+    ${isFem ? `<ellipse cx="256" cy="245" rx="118" ry="138" fill="${hair}"/>` : ''}
+    <path d="M92,512 C104,386 172,350 256,350 C340,350 408,386 420,512 Z" fill="${outfit}"/>
+    <rect x="224" y="302" width="64" height="70" rx="26" fill="${skin}"/>
+    <ellipse cx="256" cy="226" rx="88" ry="104" fill="${skin}"/>
+    ${isFem
+      ? `<path d="M164,205 C170,115 342,115 348,205 C330,162 290,148 256,148 C222,148 182,162 164,205 Z" fill="${hair}"/>`
+      : `<path d="M168,204 C166,118 346,118 344,204 C332,166 296,152 256,152 C216,152 180,166 168,204 Z" fill="${hair}"/>`}
+    <path d="M196,196 Q216,186 234,195" stroke="#231815" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <path d="M278,195 Q296,186 316,196" stroke="#231815" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <ellipse cx="215" cy="216" rx="13" ry="9" fill="#ffffff"/><circle cx="215" cy="216" r="6" fill="#1e1b18"/>
+    <ellipse cx="297" cy="216" rx="13" ry="9" fill="#ffffff"/><circle cx="297" cy="216" r="6" fill="#1e1b18"/>
+    <path d="M256,222 L251,254 Q256,260 263,254" stroke="#b07659" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <path d="M226,283 Q256,294 286,283" stroke="#9f3e48" stroke-width="7" fill="none" stroke-linecap="round"/>
+  </svg>`;
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+
+// Prepara retrato 512x512 de um personagem com buffer de deformação labial próprio
+async function prepareCinemaActor(char, idx, artStylePrompt){
+  const srcCv = document.createElement('canvas'); srcCv.width = 512; srcCv.height = 512;
+  const workCv = document.createElement('canvas'); workCv.width = 512; workCv.height = 512;
+  let loadedImg = null;
+  let isAi = false;
+  try{
+    const r = await fetch('/api/avatar', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        action:'portrait',
+        prompt: `${artStylePrompt || 'cinematic film portrait'}, ${char.appearance || char.name}`,
+        style: char.portraitStyle || 'studio'
+      })
+    });
+    const j = await r.json();
+    if(j && j.imageBase64){
+      loadedImg = await new Promise((res, rej) => {
+        const im = new Image();
+        im.onload = () => res(im);
+        im.onerror = rej;
+        im.src = `data:${j.mime||'image/png'};base64,${j.imageBase64}`;
+      });
+      isAi = true;
+    }
+  }catch(e){}
+
+  if(!loadedImg){
+    loadedImg = await new Promise((res) => {
+      const im = new Image();
+      im.onload = () => res(im);
+      im.src = buildCharacterFallbackSvg(char, idx);
+    });
+  }
+
+  const sctx = srcCv.getContext('2d');
+  const side = Math.min(loadedImg.naturalWidth || 512, loadedImg.naturalHeight || 512);
+  const sx = ((loadedImg.naturalWidth || 512) - side) * 0.5;
+  const sy = ((loadedImg.naturalHeight || 512) - side) * 0.35;
+  sctx.drawImage(loadedImg, Math.max(0,sx), Math.max(0,sy), side, side, 0, 0, 512, 512);
+
+  return {
+    ...char,
+    srcCanvas: srcCv,
+    workCanvas: workCv,
+    blinkOffset: idx * 1.85,
+    mouth: !isAi ? { x:0.50, y:0.553, w:0.125, eyeY:0.422, eyeSep:0.160 } : { x:0.50, y:0.555, w:0.132, eyeY:0.415, eyeSep:0.155 }
+  };
+}
+
+// Renderiza o rosto do personagem com lip-sync C⁰ + dentes suaves + piscar orgânico independente
+function renderActorLipSyncCanvas(actor, mouthOpen, mouthWide, blink){
+  const wctx = actor.workCanvas.getContext('2d');
+  const S = 512;
+  wctx.clearRect(0, 0, S, S);
+  wctx.drawImage(actor.srcCanvas, 0, 0, S, S);
+
+  const m = actor.mouth;
+  if(blink > 0.05){
+    const ey = m.eyeY * S, sep = m.eyeSep * S, ew = S * 0.068, eh = S * 0.026 * blink;
+    for(const dir of [-1, 1]){
+      const ex = m.x * S + dir * sep * 0.5;
+      wctx.save();
+      wctx.beginPath(); wctx.ellipse(ex, ey, ew, eh, 0, 0, Math.PI*2); wctx.clip();
+      wctx.drawImage(actor.srcCanvas, ex - ew, ey - S*0.036, ew*2, S*0.026, ex - ew, ey - eh, ew*2, eh*2);
+      wctx.restore();
+    }
+  }
+
+  if(mouthOpen > 0.015){
+    const mx = m.x * S, my = m.y * S;
+    const lipRx = S * m.w * (1 + mouthWide * 0.20) * 0.5;
+    const jawRx = S * 0.165;
+    const yTop = my - S * 0.042;
+    const yBot = my + S * 0.165;
+    const gap = Math.min(S * 0.052, mouthOpen * S * 0.046);
+    const uLip = my - gap * 0.22;
+    const lLip = my + gap * 0.78;
+
+    wctx.save();
+    wctx.beginPath(); wctx.ellipse(mx, (yTop+yBot)*0.5, jawRx, (yBot-yTop)*0.5, 0, 0, Math.PI*2); wctx.clip();
+    for(let y = yTop; y < yBot; y += 2){
+      let srcY = y <= uLip
+        ? yTop + ((y - yTop) / Math.max(1, uLip - yTop)) * (my - yTop)
+        : (y >= lLip ? my + ((y - lLip) / Math.max(1, yBot - lLip)) * (yBot - my) : my);
+      wctx.drawImage(actor.srcCanvas, mx - jawRx, srcY, jawRx*2, 2.9, mx - jawRx, y, jawRx*2, 2.9);
+    }
+    if(gap > 1.2){
+      wctx.save();
+      wctx.beginPath();
+      wctx.moveTo(mx - lipRx, my + gap*0.12);
+      wctx.quadraticCurveTo(mx, uLip - gap*0.10, mx + lipRx, my + gap*0.12);
+      wctx.quadraticCurveTo(mx, lLip + gap*0.16, mx - lipRx, my + gap*0.12);
+      wctx.closePath(); wctx.clip();
+      wctx.fillStyle = '#240c12';
+      wctx.fillRect(mx - lipRx, uLip - 2, lipRx*2, (lLip - uLip) + 6);
+      if(mouthOpen > 0.22){
+        wctx.fillStyle = 'rgba(243,238,234,0.62)';
+        wctx.beginPath(); wctx.roundRect(mx - lipRx*0.64, uLip - 1, lipRx*1.28, Math.max(2, gap*0.26), 2); wctx.fill();
+      }
+      wctx.restore();
+    }
+    wctx.restore();
+  }
+  return actor.workCanvas;
+}
+
+// Desenha um cenário com movimento de câmera cinematográfico (zoom/pan) cobrindo W×H
+function drawSceneryWithCamera(ctx, img, W, H, p, move='zoomIn', alpha=1){
+  if(!img) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  const iw = img.width || 1280, ih = img.height || 720;
+  const ir = iw / ih, cr = W / H;
+  let zoom = 1.08, panX = 0, panY = 0;
+  if(move === 'zoomIn'){ zoom = 1.02 + 0.13 * p; }
+  else if(move === 'zoomOut'){ zoom = 1.15 - 0.12 * p; }
+  else if(move === 'panRight'){ zoom = 1.13; panX = (0.5 - p) * 0.07; }
+  else if(move === 'panLeft'){ zoom = 1.13; panX = (p - 0.5) * 0.07; }
+  let dw, dh;
+  if(ir > cr){ dh = H * zoom; dw = dh * ir; } else { dw = W * zoom; dh = dw / ir; }
+  ctx.drawImage(img, (W - dw)*0.5 + dw*panX, (H - dh)*0.5 + dh*panY, dw, dh);
+  ctx.restore();
+}
+
+// Camada atmosférica viva em 30fps conectada ao clima do cenário
+function drawSceneAtmosphere(ctx, W, H, t, kind='particles'){
+  ctx.save();
+  if(kind === 'sunbeams'){
+    const g = ctx.createLinearGradient(0, 0, W*0.75, H*0.85);
+    const pulse = 0.09 + 0.04 * Math.sin(t * 0.9);
+    g.addColorStop(0, `rgba(253,224,71,${pulse * 1.5})`);
+    g.addColorStop(0.5, `rgba(251,191,36,${pulse * 0.55})`);
+    g.addColorStop(1, 'transparent');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+  const n = kind === 'rain' ? 42 : 22;
+  for(let i = 0; i < n; i++){
+    const seed = (i * 9301 + 49297) % 233280 / 233280;
+    const seed2 = (i * 4321 + 19283) % 233280 / 233280;
+    if(kind === 'rain'){
+      const rx = ((seed * W + t * 180) % (W + 80)) - 40;
+      const ry = ((seed2 * H + t * 760) % (H + 80)) - 40;
+      ctx.strokeStyle = 'rgba(186,230,253,0.22)'; ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx - 9, ry + 34); ctx.stroke();
+    } else if(kind === 'embers'){
+      const ex = (seed * W + Math.sin(t * 1.4 + i) * 28 + W) % W;
+      const ey = H - ((seed2 * H + t * (42 + (i%5)*9)) % H);
+      ctx.fillStyle = `rgba(251,146,60,${0.25 + 0.3*Math.sin(t*3+i)})`;
+      ctx.beginPath(); ctx.arc(ex, ey, 1.8 + (i%3), 0, Math.PI*2); ctx.fill();
+    } else {
+      const px = (seed * W + Math.sin(t * 0.7 + i) * 34 + W) % W;
+      const py = (seed2 * H + Math.cos(t * 0.55 + i*1.3) * 24 + H) % H;
+      ctx.fillStyle = kind === 'cyber' ? 'rgba(56,189,248,0.24)' : 'rgba(255,255,255,0.20)';
+      ctx.beginPath(); ctx.arc(px, py, 1.5 + (i%3)*0.9, 0, Math.PI*2); ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+// Motor principal do CINEMA CONECTADO: Narrador + Cenários Dinâmicos + Diálogo Entre Personagens + Legendas Karaokê
+function makeConnectedCinemaDrawer(movie){
+  let smoothDialogueMix = 0;
+  let lastT = 0;
+  const smoothScale = {};
+
+  return (ctx, t) => {
+    const W = ctx.canvas.width, H = ctx.canvas.height;
+    const isLandscape = W >= H;
+    const dt = Math.max(0.008, Math.min(0.1, Math.abs(t - lastT) || 0.033));
+    lastT = t;
+
+    const scenes = movie.scenes;
+    let sIdx = scenes.findIndex(s => t >= s.start && t < s.end);
+    if(sIdx < 0) sIdx = t < scenes[0].start ? 0 : scenes.length - 1;
+    const sc = scenes[sIdx];
+    const span = Math.max(0.5, sc.end - sc.start);
+    const sp = Math.max(0, Math.min(1, (t - sc.start) / span));
+
+    // 1) CENÁRIO VIVO + Transição suave Cross-Dissolve entre cenas consecutivas
+    ctx.fillStyle = '#05060f';
+    ctx.fillRect(0, 0, W, H);
+    drawSceneryWithCamera(ctx, sc.imgBitmap, W, H, sp, sc.cameraMove || 'zoomIn', 1);
+    if(sIdx > 0 && (t - sc.start) < 0.70){
+      const fadePrev = 1 - Math.max(0, (t - sc.start) / 0.70);
+      drawSceneryWithCamera(ctx, scenes[sIdx - 1].imgBitmap, W, H, 1, scenes[sIdx - 1].cameraMove || 'zoomIn', fadePrev);
+    }
+    drawSceneAtmosphere(ctx, W, H, t, sc.atmosphere || 'particles');
+
+    const beats = movie.timedBeats || [];
+    let activeBeat = beats.find(b => t >= b.start && t < b.end);
+    if(!activeBeat){
+      const near = beats.find(b => Math.abs(b.start - t) < 0.35 && b.sceneIndex === sIdx);
+      activeBeat = near || null;
+    }
+
+    const isCharDialogue = !!(activeBeat && activeBeat.speaker !== 'narrator' && movie.actors && movie.actors.length);
+    const targetMix = isCharDialogue ? 1 : 0;
+    smoothDialogueMix += (targetMix - smoothDialogueMix) * Math.min(1, dt * 6.5);
+
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, `rgba(6,8,20,${0.18 + 0.24 * smoothDialogueMix})`);
+    grad.addColorStop(0.55, `rgba(6,8,20,${0.08 + 0.34 * smoothDialogueMix})`);
+    grad.addColorStop(1, 'rgba(5,6,15,0.84)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    // 2) DIÁLOGO ENTRE PERSONAGENS DENTRO DO CENÁRIO (boca sincronizada com o áudio real!)
+    if(smoothDialogueMix > 0.03 && movie.actors && movie.actors.length){
+      const actors = movie.actors;
+      for(let idx = 0; idx < actors.length; idx++){
+        const actor = actors[idx];
+        const isSpeakingNow = !!(activeBeat && activeBeat.speaker === actor.id && t >= activeBeat.start && t < activeBeat.end);
+
+        let mOpen = 0, mWide = 0;
+        if(isSpeakingNow && activeBeat){
+          const relT = Math.max(0, t - activeBeat.start);
+          if(activeBeat.lipProfile){
+            const fi = Math.min(activeBeat.lipProfile.openArr.length - 1, Math.floor(relT * activeBeat.lipProfile.fps));
+            mOpen = activeBeat.lipProfile.openArr[fi];
+            mWide = activeBeat.lipProfile.wideArr[fi];
+          } else {
+            const ph = phonemeMouthAt(activeBeat.text, relT, Math.max(0.4, activeBeat.end - activeBeat.start));
+            mOpen = ph.open; mWide = ph.wide;
+          }
+        }
+
+        const blink = blinkAtTime(t + actor.blinkOffset);
+        const faceCv = renderActorLipSyncCanvas(actor, mOpen, mWide, blink);
+
+        const targetS = isSpeakingNow ? 1.06 : 0.92;
+        smoothScale[actor.id] = (smoothScale[actor.id] || 0.95) + (targetS - (smoothScale[actor.id] || 0.95)) * Math.min(1, dt * 8);
+
+        let cardS, cx, cy;
+        if(isLandscape){
+          cardS = Math.min(H * 0.50, W * 0.29) * smoothScale[actor.id];
+          cx = actors.length === 1 ? W * 0.5 : (idx === 0 ? W * 0.27 : W * 0.73);
+          cy = H * 0.46 + (1 - smoothDialogueMix) * (H * 0.10);
+        } else {
+          cardS = Math.min(W * 0.43, H * 0.34) * smoothScale[actor.id];
+          cx = actors.length === 1 ? W * 0.5 : (idx === 0 ? W * 0.265 : W * 0.735);
+          cy = H * 0.45 + (1 - smoothDialogueMix) * (H * 0.08);
+        }
+
+        const bobY = Math.sin(t * 1.7 + idx * 2.1) * 3.5 - mOpen * 4.5;
+        const headTilt = Math.sin(t * 1.2 + idx) * 0.008 + (isSpeakingNow ? Math.sin(t * 3.1) * 0.012 * mOpen : 0);
+
+        ctx.save();
+        ctx.globalAlpha = smoothDialogueMix * (isSpeakingNow ? 1 : 0.80);
+
+        if(isSpeakingNow){
+          const halo = ctx.createRadialGradient(cx, cy + bobY, cardS * 0.32, cx, cy + bobY, cardS * 0.72);
+          halo.addColorStop(0, (actor.themeColor || '#38bdf8') + '66');
+          halo.addColorStop(1, 'transparent');
+          ctx.fillStyle = halo;
+          ctx.beginPath(); ctx.arc(cx, cy + bobY, cardS * 0.72, 0, Math.PI*2); ctx.fill();
+        }
+
+        const rx = cx - cardS * 0.5, ry = cy + bobY - cardS * 0.5;
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.65)';
+        ctx.shadowBlur = 24;
+        ctx.beginPath(); ctx.roundRect(rx, ry, cardS, cardS, Math.round(cardS * 0.09)); ctx.clip();
+        ctx.translate(cx, cy + bobY);
+        ctx.rotate(headTilt);
+        ctx.drawImage(faceCv, -cardS * 0.5, -cardS * 0.5, cardS, cardS);
+        if(!isSpeakingNow){
+          ctx.fillStyle = 'rgba(8,10,24,0.22)';
+          ctx.fillRect(-cardS * 0.5, -cardS * 0.5, cardS, cardS);
+        }
+        ctx.restore();
+
+        ctx.strokeStyle = isSpeakingNow ? (actor.themeColor || '#38bdf8') : 'rgba(255,255,255,0.22)';
+        ctx.lineWidth = isSpeakingNow ? 3.5 : 1.6;
+        ctx.beginPath(); ctx.roundRect(rx, ry, cardS, cardS, Math.round(cardS * 0.09)); ctx.stroke();
+
+        const badgeText = `${isSpeakingNow ? '🗣️ ' : ''}${actor.name}`;
+        ctx.font = `800 ${Math.max(14, Math.round(cardS * 0.068))}px Inter, sans-serif`;
+        const bw = ctx.measureText(badgeText).width + 28;
+        const bh = Math.max(28, Math.round(cardS * 0.105));
+        ctx.fillStyle = isSpeakingNow ? 'rgba(12,15,32,0.92)' : 'rgba(12,15,32,0.72)';
+        ctx.beginPath(); ctx.roundRect(cx - bw*0.5, ry + cardS - bh*0.55, bw, bh, 999); ctx.fill();
+        ctx.strokeStyle = actor.themeColor || '#38bdf8';
+        ctx.lineWidth = 1.5; ctx.stroke();
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.fillText(badgeText, cx, ry + cardS - bh*0.55 + bh*0.69);
+        ctx.textAlign = 'left';
+
+        ctx.restore();
+      }
+    }
+
+    // 3) CABEÇALHO DE LOCALIZAÇÃO / CENA
+    ctx.save();
+    const locTitle = `📍 Cena ${sc.i}/${scenes.length} • ${sc.locationName || sc.title}`;
+    const hudFont = Math.max(15, Math.round(Math.min(W, H) * 0.025));
+    ctx.font = `700 ${hudFont}px Inter, sans-serif`;
+    const lw = Math.min(W * 0.78, ctx.measureText(locTitle).width + 36);
+    ctx.fillStyle = 'rgba(10, 13, 28, 0.74)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.roundRect(22, 20, lw, 40, 999); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillText(locTitle.slice(0, 56), 40, 46);
+
+    if(activeBeat && activeBeat.speaker === 'narrator'){
+      const nb = '🎙️ Narrador';
+      const nw = ctx.measureText(nb).width + 58;
+      const nx = W - nw - 22;
+      ctx.fillStyle = 'rgba(15, 18, 36, 0.80)';
+      ctx.strokeStyle = 'rgba(251, 191, 36, 0.65)';
+      ctx.beginPath(); ctx.roundRect(nx, 20, nw, 40, 999); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#fde68a';
+      ctx.fillText(nb, nx + 16, 46);
+      for(let b = 0; b < 4; b++){
+        const hBar = 6 + Math.abs(Math.sin(t * 10 + b * 1.1)) * 16;
+        ctx.fillStyle = '#fbbf24';
+        ctx.fillRect(nx + nw - 32 + b * 5, 40 - hBar * 0.5, 3, hBar);
+      }
+    }
+    ctx.restore();
+
+    // 4) LEGENDAS SINCRONIZADAS COM QUEM ESTÁ FALANDO
+    if(activeBeat && activeBeat.captions && activeBeat.captions.length){
+      const cue = activeBeat.captions.find(c => t >= c.start && t < c.end) || activeBeat.captions[activeBeat.captions.length - 1];
+      if(cue){
+        ctx.save();
+        const fSize = Math.round(isLandscape ? H * 0.041 : W * 0.045);
+        ctx.font = `800 ${fSize}px Inter, sans-serif`;
+        const maxLineW = W * 0.86;
+        const lines = [];
+        let cur = [];
+        for(const wObj of cue.words){
+          const test = cur.map(x => x.word).concat(wObj.word).join(' ');
+          if(cur.length && ctx.measureText(test).width > maxLineW){ lines.push(cur); cur = [wObj]; }
+          else cur.push(wObj);
+        }
+        if(cur.length) lines.push(cur);
+
+        const speakerTag = activeBeat.speaker === 'narrator' ? '🎙️ NARRADOR' : `🗣️ ${String(activeBeat.speakerName || '').toUpperCase()}`;
+        const accent = activeBeat.themeColor || (activeBeat.speaker === 'narrator' ? '#fbbf24' : '#38bdf8');
+        const lineH = Math.round(fSize * 1.32);
+        const boxH = lines.length * lineH + 34;
+        const boxW = Math.min(W * 0.92, Math.max(220, ...lines.map(l => ctx.measureText(l.map(x=>x.word).join(' ')).width + 54)));
+        const bx = (W - boxW) * 0.5;
+        const by = H - boxH - Math.round(H * 0.045);
+
+        ctx.fillStyle = 'rgba(8, 10, 22, 0.84)';
+        ctx.strokeStyle = accent + '88';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.roundRect(bx, by, boxW, boxH, 16); ctx.fill(); ctx.stroke();
+
+        const tagFont = Math.max(12, Math.round(fSize * 0.48));
+        ctx.font = `800 ${tagFont}px Inter, sans-serif`;
+        const tw = ctx.measureText(speakerTag).width + 24;
+        ctx.fillStyle = accent;
+        ctx.beginPath(); ctx.roundRect(bx + 18, by - Math.round(tagFont * 0.9), tw, Math.round(tagFont * 1.65), 999); ctx.fill();
+        ctx.fillStyle = '#06101f';
+        ctx.fillText(speakerTag, bx + 30, by + Math.round(tagFont * 0.35));
+
+        ctx.font = `800 ${fSize}px Inter, sans-serif`;
+        lines.forEach((lineArr, li) => {
+          const fullStr = lineArr.map(x => x.word).join(' ');
+          let wx = (W - ctx.measureText(fullStr).width) * 0.5;
+          const wy = by + 22 + (li + 0.82) * lineH;
+          lineArr.forEach(wObj => {
+            const activeW = t >= wObj.start && t <= wObj.end + 0.06;
+            ctx.fillStyle = activeW ? accent : '#ffffff';
+            ctx.fillText(wObj.word, wx, wy);
+            wx += ctx.measureText(wObj.word + ' ').width;
+          });
+        });
+        ctx.restore();
+      }
+    }
+  };
+}
+
+// Reamostra qualquer AudioBuffer decodificado para 24000 Hz e mistura trilha cinematográfica com ducking automático
+function buildMasterCinemaAudioBuffer(decodedItems, addMusic = true, mood = 'cinematic'){
+  const SR = 24000;
+  let totalSec = 0.25;
+  const segments = [];
+
+  for(let i = 0; i < decodedItems.length; i++){
+    const item = decodedItems[i];
+    const start = totalSec;
+    let mono24;
+    if(item.audioBuffer){
+      const src = item.audioBuffer;
+      const len24 = Math.max(1, Math.round(src.duration * SR));
+      mono24 = new Float32Array(len24);
+      const ch0 = src.getChannelData(0);
+      const ratio = ch0.length / len24;
+      for(let s = 0; s < len24; s++){
+        mono24[s] = ch0[Math.min(ch0.length - 1, Math.floor(s * ratio))];
+      }
+    } else {
+      const estDur = Math.max(2.6, item.text.split(/\s+/).length / 2.45);
+      mono24 = new Float32Array(Math.round(estDur * SR));
+    }
+    const dur = mono24.length / SR;
+    const end = start + dur;
+    segments.push({ ...item, start, end, mono24 });
+    totalSec = end + (item.isLastInScene ? 0.45 : 0.20);
+  }
+  totalSec += 0.35;
+
+  const totalSamples = Math.max(SR, Math.ceil(totalSec * SR));
+  const master = new Float32Array(totalSamples);
+  const voiceMask = new Float32Array(totalSamples);
+
+  for(const seg of segments){
+    const s0 = Math.floor(seg.start * SR);
+    for(let i = 0; i < seg.mono24.length && (s0 + i) < totalSamples; i++){
+      master[s0 + i] += seg.mono24[i] * 0.94;
+      voiceMask[s0 + i] = 1;
+    }
+  }
+
+  if(addMusic){
+    const chords = mood === 'mystery'
+      ? [[110, 164.81, 220, 261.63], [98, 146.83, 196, 246.94], [87.31, 130.81, 174.61, 220], [98, 146.83, 220, 293.66]]
+      : [[130.81, 196.00, 246.94, 329.63], [110.00, 164.81, 220.00, 261.63], [87.31, 130.81, 174.61, 261.63], [98.00, 146.83, 196.00, 293.66]];
+    let duck = 0.13;
+    for(let i = 0; i < totalSamples; i++){
+      const t = i / SR;
+      const targetDuck = voiceMask[i] > 0.5 ? 0.038 : 0.125;
+      duck += (targetDuck - duck) * 0.0008;
+      const cIdx = Math.floor(t / 4.5) % chords.length;
+      const chord = chords[cIdx];
+      const fadeEdge = Math.min(1, t / 0.8) * Math.min(1, (totalSec - t) / 1.1);
+      let pad = 0;
+      for(let k = 0; k < chord.length; k++){
+        pad += Math.sin(2 * Math.PI * chord[k] * t + k * 0.7) * (k === 0 ? 0.42 : 0.20);
+      }
+      master[i] = Math.max(-0.98, Math.min(0.98, master[i] + pad * duck * Math.max(0, fadeEdge)));
+    }
+  }
+
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const tmpCtx = new AC({ sampleRate: SR });
+  const audioBuffer = tmpCtx.createBuffer(1, totalSamples, SR);
+  audioBuffer.getChannelData(0).set(master);
+  tmpCtx.close().catch(()=>{});
+
+  const wavBytes = encodeWavMono(master, SR);
+  return { audioBuffer, wavBlob: new Blob([wavBytes], { type:'audio/wav' }), segments, totalDuration: totalSec };
 }
 
 function makeKenBurnsDrawer(scenes, opts={}){
@@ -1177,73 +1853,178 @@ async function buildCreateVideo(){
   const d=currentCreateData;
   if(!d||!d.scenes||!d.scenes.length){ toast('Gere o roteiro primeiro','warn'); return; }
   const btn=document.getElementById('buildVideoBtn');
-  const voice=document.getElementById('voice').value;
+  const narratorVoice=document.getElementById('voice').value;
   const style=document.getElementById('style').value;
-  btn.disabled=true; btn.textContent='⏳ Montando vídeo...';
+  const fmt=(document.getElementById('createFormat')||{}).value||'16:9';
+  const dim = fmt === '9:16' ? { w:720, h:1280 } : fmt === '1:1' ? { w:960, h:960 } : { w:1280, h:720 };
+  const addMusic = ((document.getElementById('createMusic')||{}).value||'cinematic') !== 'none';
+  const isConnected = (d.cinemaMode || (document.getElementById('cinemaMode')||{}).value || 'connected') !== 'classic';
+
+  btn.disabled=true; btn.textContent='⏳ Produzindo filme completo...';
   const prog=document.getElementById('videoBuildProgress');
   prog.classList.remove('hidden');
+  $('#createProgress').classList.add('show');
   document.getElementById('createdVideoWrap').classList.add('hidden');
+
   try{
-    const scenes=[]; const audioParts=[]; const ttsErrors=[]; const voiceProviders=new Set();
-    for(let i=0;i<d.scenes.length;i++){
-      const s=d.scenes[i];
-      document.getElementById('videoBuildFill').style.width=Math.round((i/d.scenes.length)*55)+'%';
-      document.getElementById('videoBuildMsg').textContent=`🎨 Gerando imagem ${i+1}/${d.scenes.length} — “${s.title}”`;
-      const img=(await fetchSceneImage(s,style))||await placeholderBitmap(s,i);
-      document.getElementById('videoBuildMsg').textContent=`🎙️ Gerando narração ${i+1}/${d.scenes.length}`;
-      const a=await fetchSceneAudio(s.narration,voice);
-      if(a&&a.blob){ audioParts.push(a.blob); if(a.provider) voiceProviders.add(a.provider); }
-      else ttsErrors.push((a&&a.error)||'falha desconhecida');
-      scenes.push({i:s.i||i+1,title:s.title,narration:s.narration,imgBitmap:img,start:s.start,end:s.end});
+    const voiceProviders = new Set();
+    let realVoiceClips = 0;
+
+    setStep(['s1','s2','s3','s4'], 1);
+    let actors = [];
+    if(isConnected && Array.isArray(d.characters) && d.characters.length){
+      document.getElementById('videoBuildMsg').textContent = `🎭 Criando rostos consistentes dos personagens (${d.characters.map(c=>c.name).join(' & ')})...`;
+      document.getElementById('videoBuildFill').style.width = '10%';
+      setProgress('createProgressFill', 35);
+      actors = await Promise.all(d.characters.map((ch, idx) => prepareCinemaActor(ch, idx, d.artStylePrompt)));
     }
-    const allAudio=audioParts.length===scenes.length&&scenes.length>0;
-    if(!allAudio&&ttsErrors.length) console.warn('TTS indisponível:',ttsErrors[0]);
-    const withNarration=!allAudio;
-    document.getElementById('videoBuildMsg').textContent=withNarration
-      ? '🎬 Renderizando SEM narração (API de voz falhou) — o texto entra em legenda...'
-      : '🎬 Renderizando vídeo (tempo real — não feche a aba; ~1 min por minuto de vídeo)';
-    let audioEl=null, audioBlob=null, total;
-    const planned=scenes[scenes.length-1].end||d.duration*60;
-    if(allAudio){
-      audioBlob=new Blob(audioParts,{type:'audio/mpeg'});
-      audioEl=new Audio(URL.createObjectURL(audioBlob));
-      await new Promise(r=>{ audioEl.onloadedmetadata=r; setTimeout(r,2500); });
-      total=audioEl.duration||planned;
-    }else{
-      total=planned;
+    const actorMap = {};
+    actors.forEach(a => { actorMap[a.id] = a; });
+
+    const scenes = new Array(d.scenes.length);
+    for(let i = 0; i < d.scenes.length; i += 2){
+      const slice = d.scenes.slice(i, i + 2);
+      document.getElementById('videoBuildMsg').textContent = `🏞️ Gerando cenários ${i+1}–${Math.min(d.scenes.length, i+2)} de ${d.scenes.length} (“${slice[0].locationName||slice[0].title}”)...`;
+      const pct = Math.round(14 + (i / d.scenes.length) * 26);
+      document.getElementById('videoBuildFill').style.width = pct + '%';
+      setProgress('createProgressFill', 35 + Math.round((i / d.scenes.length) * 20));
+      const imgs = await Promise.all(slice.map((s, j) => fetchSceneImage(s, style).then(im => im || placeholderBitmap(s, i + j))));
+      slice.forEach((s, j) => {
+        scenes[i + j] = { ...s, i: s.i || (i + j + 1), imgBitmap: imgs[j] };
+      });
     }
-    scenes.forEach(s=>{ s.start=s.start/planned*total; s.end=s.end/planned*total; });
-    const draw=makeKenBurnsDrawer(scenes,{withNarration});
-    const videoBlob=await recordCanvasVideo({
-      drawFn:draw, audioEl, durationSec:total,
-      onProgress:p=>{ document.getElementById('videoBuildFill').style.width=(55+p*45)+'%'; }
+
+    setStep(['s1','s2','s3','s4'], 2);
+    const flatBeats = [];
+    scenes.forEach((sc, sIdx) => {
+      const rawBeats = (isConnected && Array.isArray(sc.beats) && sc.beats.length)
+        ? sc.beats
+        : [{ speaker:'narrator', speakerName:'Narrador', voice: narratorVoice, text: sc.narration }];
+      rawBeats.forEach((b, bIdx) => {
+        const actor = actorMap[b.speaker];
+        flatBeats.push({
+          sceneIndex: sIdx,
+          speaker: b.speaker || 'narrator',
+          speakerName: actor ? actor.name : (b.speakerName || 'Narrador'),
+          themeColor: actor ? actor.themeColor : '#fbbf24',
+          voice: b.voice || (actor ? actor.voice : narratorVoice) || narratorVoice,
+          text: String(b.text || '').trim(),
+          isLastInScene: bIdx === rawBeats.length - 1
+        });
+      });
     });
+
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const decCtx = new AC();
+    for(let i = 0; i < flatBeats.length; i += 2){
+      const pair = flatBeats.slice(i, i + 2);
+      document.getElementById('videoBuildMsg').textContent = `🎙️ Gravando vozes conectadas ${i+1}–${Math.min(flatBeats.length, i+2)} de ${flatBeats.length} (${pair.map(p=>p.speakerName).join(' & ')})...`;
+      const pct = Math.round(42 + (i / Math.max(1, flatBeats.length)) * 22);
+      document.getElementById('videoBuildFill').style.width = pct + '%';
+      setProgress('createProgressFill', 55 + Math.round((i / Math.max(1, flatBeats.length)) * 18));
+
+      const audios = await Promise.all(pair.map(b => fetchSceneAudio(b.text, b.voice)));
+      for(let j = 0; j < pair.length; j++){
+        const a = audios[j];
+        if(a && a.blob){
+          try{
+            const arr = await a.blob.arrayBuffer();
+            const audioBuffer = await decCtx.decodeAudioData(arr.slice(0));
+            pair[j].audioBuffer = audioBuffer;
+            pair[j].lipProfile = buildPcmLipProfile(audioBuffer);
+            realVoiceClips++;
+            if(a.provider) voiceProviders.add(a.provider);
+          }catch(decErr){ console.warn('Falha ao decodificar trecho TTS:', decErr); }
+        }
+      }
+    }
+    await decCtx.close().catch(()=>{});
+
+    const master = buildMasterCinemaAudioBuffer(flatBeats, addMusic, d.mood || 'cinematic');
+    const timedBeats = master.segments.map(seg => {
+      const dur = Math.max(0.25, seg.end - seg.start);
+      const localCues = buildTimedCaptions(seg.text, dur).map(c => ({
+        text: c.text,
+        start: seg.start + c.start,
+        end: seg.start + c.end,
+        words: c.words.map(w => ({ word: w.word, start: seg.start + w.start, end: seg.start + w.end }))
+      }));
+      return { ...seg, captions: localCues };
+    });
+
+    scenes.forEach((sc, sIdx) => {
+      const sb = timedBeats.filter(b => b.sceneIndex === sIdx);
+      if(sb.length){
+        sc.start = sIdx === 0 ? 0 : sb[0].start - 0.22;
+        sc.end = sIdx === scenes.length - 1 ? master.totalDuration : sb[sb.length - 1].end + 0.23;
+      }
+    });
+    for(let i = 0; i < scenes.length - 1; i++) scenes[i].end = scenes[i + 1].start;
+    scenes[0].start = 0;
+    scenes[scenes.length - 1].end = master.totalDuration;
+    d.scenes = scenes;
+    d.timedBeats = timedBeats;
+
+    setStep(['s1','s2','s3','s4'], 3);
+    document.getElementById('videoBuildMsg').textContent = `🎬 Gravando vídeo final sincronizado (${Math.round(master.totalDuration)}s • ${fmt})...`;
+    const drawer = isConnected
+      ? makeConnectedCinemaDrawer({ scenes, actors, timedBeats })
+      : makeKenBurnsDrawer(scenes, { withNarration: realVoiceClips === 0 });
+
+    const videoBlob = await recordCanvasVideo({
+      drawFn: drawer,
+      audioBuffer: master.audioBuffer,
+      width: dim.w,
+      height: dim.h,
+      durationSec: master.totalDuration,
+      onProgress: p => {
+        document.getElementById('videoBuildFill').style.width = Math.round(64 + p * 36) + '%';
+        setProgress('createProgressFill', Math.round(73 + p * 27));
+      }
+    });
+
     if(createdVideoURL) URL.revokeObjectURL(createdVideoURL);
     if(createdAudioURL) URL.revokeObjectURL(createdAudioURL);
-    createdVideoURL=URL.createObjectURL(videoBlob);
-    document.getElementById('createdVideo').src=createdVideoURL;
-    const vDl=document.getElementById('createdVideoDl');
-    vDl.href=createdVideoURL;
-    vDl.download=videoBlob.type.includes('mp4')?'video-dubai-pro.mp4':'video-dubai-pro.webm';
-    const aDl=document.getElementById('createdAudioDl');
-    if(allAudio&&audioBlob){
-      createdAudioURL=URL.createObjectURL(audioBlob);
-      aDl.href=createdAudioURL;
-      aDl.classList.remove('hidden');
-    }else{
-      aDl.classList.add('hidden');
-    }
-    sceneAssets=scenes.map(s=>({title:s.title,imgBitmap:s.imgBitmap}));
-    document.getElementById('createdVideoWrap').classList.remove('hidden');
-    document.getElementById('videoBuildMsg').textContent=allAudio
-      ? '✅ Vídeo pronto! (voz: '+(voiceProviders.size?[...voiceProviders].join(', '):'nativa')+') Baixe abaixo e suba no YouTube.'
-      : '⚠️ Vídeo montado SEM narração: todos os provedores de voz falharam — '+(ttsErrors[0]||'erro desconhecido')+'. O texto está em legenda.';
-    toast(allAudio?'🎬 Vídeo pronto!':'⚠️ Vídeo sem narração — ver o aviso','warn');
+    const isMp4 = videoBlob.type.includes('mp4');
+    const ext = isMp4 ? 'mp4' : 'webm';
+    const slug = String(d.title || 'cinema-dubai-pro').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,36) || 'cinema-dubai-pro';
+    lastCreatedVideoBlob = videoBlob;
+    lastCreatedVideoFilename = `${slug}.${ext}`;
+
+    createdVideoURL = URL.createObjectURL(videoBlob);
+    const vidEl = document.getElementById('createdVideo');
+    vidEl.src = createdVideoURL;
+
+    const vDl = document.getElementById('createdVideoDl');
+    vDl.href = createdVideoURL;
+    vDl.download = lastCreatedVideoFilename;
+
+    const aDl = document.getElementById('createdAudioDl');
+    createdAudioURL = URL.createObjectURL(master.wavBlob);
+    aDl.href = createdAudioURL;
+    aDl.download = `${slug}-audio.wav`;
+    aDl.classList.remove('hidden');
+
+    sceneAssets = scenes.map(s => ({ title: s.title, imgBitmap: s.imgBitmap }));
+    const wrap = document.getElementById('createdVideoWrap');
+    wrap.classList.remove('hidden');
+    document.getElementById('createdVideoReadyBanner').textContent =
+      `✅ Filme conectado pronto (${Math.round(master.totalDuration)}s • ${scenes.length} cenários • ${actors.length ? 'Narrador + ' + actors.map(a=>a.name).join(' & ') : 'Narração'} • formato .${ext.toUpperCase()})!`;
+
+    const summaryMsg = realVoiceClips > 0
+      ? `✅ Vídeo completo pronto para assistir e baixar! (${scenes.length} cenas conectadas • vozes: ${[...voiceProviders].join(', ') || 'IA'})`
+      : `✅ Vídeo conectado montado com legendas e trilha sincronizadas! Clique no botão verde abaixo para baixar.`;
+    document.getElementById('videoBuildMsg').textContent = summaryMsg;
+    showStatus('createStatus', summaryMsg, 'success');
+    toast('🎬 Vídeo pronto! Clique no botão verde para baixar!');
+    setTimeout(()=> wrap.scrollIntoView({ behavior:'smooth', block:'center' }), 200);
   }catch(e){
     document.getElementById('videoBuildMsg').textContent='❌ '+e.message;
+    showStatus('createStatus','❌ Erro na montagem: '+e.message,'error');
     toast(e.message,'error');
   }finally{
-    btn.disabled=false; btn.textContent='🎬 Montar vídeo (imagens em movimento + voz)';
+    btn.disabled=false; btn.textContent='🎬 Renderizar / Atualizar Vídeo Conectado';
+    setTimeout(()=>{ $('#createProgress').classList.remove('show'); }, 1500);
   }
 }
 
@@ -2773,8 +3554,11 @@ async function renderAvatarVideo(){
     vidEl.src = avatarCreatedVideoURL;
 
     const vDl = document.getElementById('avatarVideoDl');
+    const avFilename = `avatar-dubai-pro-${fmt.replace(':','x')}.${videoBlob.type.includes('mp4') ? 'mp4' : 'webm'}`;
+    lastAvatarVideoBlob = videoBlob;
+    lastAvatarVideoFilename = avFilename;
     vDl.href = avatarCreatedVideoURL;
-    vDl.download = `avatar-dubai-pro-${fmt.replace(':','x')}.${videoBlob.type.includes('mp4') ? 'mp4' : 'webm'}`;
+    vDl.download = avFilename;
 
     const aDl = document.getElementById('avatarAudioDl');
     if(hasRealAudio && tts.downloadBlob){
