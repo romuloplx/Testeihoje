@@ -2,12 +2,12 @@ const { mockCreateFull, generateCreateFull, getBody, send } = require('./lib/ai'
 module.exports = async (req, res) => {
   try {
     if (req.method !== 'POST') return send(res, 405, { error: 'Método não permitido. Use POST.' });
-    const { prompt, duration, style, voice, cinemaMode, customCharacters } = await getBody(req);
+    const { prompt, duration, style, voice, cinemaMode, customCharacters, aiModel } = await getBody(req);
     if (!prompt || !prompt.trim()) return send(res, 400, { error: 'Descreva o vídeo primeiro.' });
     if (prompt.length > 8000) return send(res, 400, { error: 'Descrição muito longa (máx 8000 caracteres).' });
 
     let data = null, mode = 'mock', aiError = null, provider = 'local';
-    const gen = await generateCreateFull({ prompt, duration, style, voice, cinemaMode, customCharacters });
+    const gen = await generateCreateFull({ prompt, duration, style, voice, cinemaMode, customCharacters, aiModel });
     if (gen && gen.data) {
       data = gen.data;
       provider = gen.provider || 'ia';

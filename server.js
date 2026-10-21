@@ -303,7 +303,7 @@ app.delete('/api/projects/:id', (req, res) => {
 
 app.post('/api/create', async (req, res) => {
   try {
-    const { prompt, duration, style, voice, cinemaMode, customCharacters } = req.body || {};
+    const { prompt, duration, style, voice, cinemaMode, customCharacters, aiModel } = req.body || {};
 
     if (!prompt || !prompt.trim()) {
       return res.status(400).json({ error: 'Descreva o vídeo primeiro.' });
@@ -318,7 +318,7 @@ app.post('/api/create', async (req, res) => {
     let aiError = null;
     let provider = 'local';
 
-    const gen = await sharedAi.generateCreateFull({ prompt, duration, style, voice, cinemaMode, customCharacters });
+    const gen = await sharedAi.generateCreateFull({ prompt, duration, style, voice, cinemaMode, customCharacters, aiModel });
     if (gen && gen.data) {
       data = gen.data;
       provider = gen.provider || 'ia';

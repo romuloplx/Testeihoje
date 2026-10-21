@@ -320,7 +320,7 @@ async function generateWithOpenAI(prompt, duration, style, voice) {
 }
 
 // Cinema Conectado & Histórias com Personagens Vivos (Narrador + Cenários Multi-Plano + Personagens Atuando na Cena)
-async function generateCreateFull({ prompt, duration, style, voice, cinemaMode = 'connected', customCharacters = '' }) {
+async function generateCreateFull({ prompt, duration, style, voice, cinemaMode = 'connected', customCharacters = '', aiModel = 'auto-router' }) {
   const durNum = Math.max(0.5, parseFloat(duration) || 1);
   const styleAnchorMap = {
     realistic: '35mm cinema film photography, photorealistic characters and environment, natural skin texture, dramatic ARRI Alexa lighting, rich color grading',
@@ -381,7 +381,7 @@ async function generateCreateFull({ prompt, duration, style, voice, cinemaMode =
 
     const cinemaUser = `Pedido da história/vídeo: "${prompt}"${customCharHint}\nEstilo visual: ${style} (${artStylePrompt})\nCrie os personagens da história, os cenários em múltiplos ângulos ("visual" e "actionVisual" com os personagens em ação no cenário) e os diálogos cheios de vida.`;
 
-    const res = await withRetries(() => chatWithFallback({ system: cinemaSystem, user: cinemaUser, json: true, maxTokens: 4500 }), 2);
+    const res = await withRetries(() => chatWithFallback({ system: cinemaSystem, user: cinemaUser, json: true, maxTokens: 4500, preferredModel: aiModel }), 2);
     if (!res.error) {
       const parsed = extractJson(res.text);
       if (parsed && Array.isArray(parsed.scenes) && parsed.scenes.length) {
@@ -1122,12 +1122,19 @@ let _openAiDeadKey = null;
 let _openAiRedirectedToUni = false;
 const _deadUniKeys = new Set();
 const _uniKeyCooldown = {};
+const _uniModelCooldown = {};
 let _lastUniProbeCache = null;
 
-const UNI_CHAT_MODELS = ['agnes-2.5-flash:free', 'gemini-3.1-flash-lite:free', 'cohere-command-a:free', 'deepseek-r1-distill-qwen-32b:free'];
+// Modelos principais do Multi-IA Router (Unorouter — 265+ IAs integradas), ordenados pelos melhores para Criar Histórias & Personagens
+const UNI_CHAT_MODELS = [
+  'cohere-command-a:free',
+  'gemini-3.1-flash-lite:free',
+  'agnes-2.5-flash:free',
+  'deepseek-r1-distill-qwen-32b:free'
+];
 const UNI_WHISPER_MODELS = ['whisper-large-v3-turbo:free', 'whisper:free'];
 const UNI_TTS_MODELS = ['gpt-4o-mini-tts:free', 'aura-1:free'];
-const UNI_IMG_MODELS = ['sdxl:free'];
+const UNI_IMG_MODELS = ['sdxl:free', 'flux.2', 'gpt-image-2.5'];
 
 function makeOpenAI() {
   const OpenAI = require('openai');
@@ -1848,9 +1855,101 @@ async function chatViaHackClub({ system, user, json }) {
   return text;
 }
 
-// Chat com cadeia: OpenAI (se válida) → Gemini 3.1 / Gemma 3 → Unorouter → Pollinations Free AI → HackClub Free AI
-async function chatWithFallback({ system, user, json = false, maxTokens = 8000 }) {
+// Orquestrador Multi-IA do Unorouter: puxa o modelo escolhido ou rotaciona entre as melhores IAs do router
+async function unorouterSmartChat({ system, user, json = false, preferredModel = '', maxTokens = 4500 }) {
+  const uKeys = allValidUniKeys();
+  if (!uKeys.length) return { error: 'unorouter: sem UNOROUTER_API_KEY' };
+
+  const now = Date.now();
+  const baseList = [...UNI_CHAT_MODELS];
+  if (_uniModels && _uniModels.length) {
+    for (const m of uniPickModels(_uniModels)) {
+      if (!baseList.includes(m)) baseList.push(m);
+    }
+  }
+
+  // Rotaciona ponto de partida no modo automático para distribuir carga entre os modelos de elite do router
+  const rotIdx = (_uniCursor++) % baseList.length;
+  const rotated = [...baseList.slice(rotIdx), ...baseList.slice(0, rotIdx)];
+
+  let orderedModels = [
+    ...rotated.filter(m => now >= (_uniModelCooldown[m] || 0)),
+    ...rotated.filter(m => now < (_uniModelCooldown[m] || 0))
+  ];
+  const cleanPref = String(preferredModel || '').trim();
+  if (cleanPref && cleanPref !== 'auto-router' && cleanPref !== 'gemini-direct') {
+    orderedModels = [cleanPref, ...orderedModels.filter(m => m !== cleanPref)];
+  }
+
   const errors = [];
+  for (const uKey of uKeys) {
+    if (Date.now() < (_uniKeyCooldown[uKey] || 0)) {
+      errors.push('unorouter: chave em janela de 1 req/min');
+      continue;
+    }
+    let triedCount = 0;
+    for (const model of orderedModels) {
+      if (triedCount >= 4) break;
+      triedCount++;
+      try {
+        const text = await unorouterChat({ system, user, json, model, maxTokens, apiKey: uKey });
+        if (json && !extractJson(text)) {
+          errors.push(`unorouter/${model}: JSON incompleto`);
+          continue;
+        }
+        delete _uniModelCooldown[model];
+        return { text, provider: 'unorouter/' + model };
+      } catch (e) {
+        const msg = `${(e.status ? 'HTTP ' + e.status + ' — ' : '')}${e.message}`;
+        errors.push(`unorouter/${model}: ${msg}`);
+        if (e.status === 401) {
+          _deadUniKeys.add(uKey);
+          break;
+        }
+        if (e.status === 429) {
+          _uniModelCooldown[model] = Date.now() + 45000;
+          // Se o limite for global da conta (1 req/min), pula para o próximo provedor da cadeia sem travar
+          if (/allows 1 request per minute/i.test(e.message)) {
+            markUniRateWindow(uKey);
+            break;
+          }
+          continue;
+        }
+      }
+    }
+  }
+  return { error: errors.join(' | ') || 'unorouter indisponível' };
+}
+
+// Chat com cadeia inteligente Multi-IA: Unorouter Multi-IA (265+ modelos) ↔ Gemini 3.1 / Gemma 3 27B → OpenAI → Pollinations GPT-4o/DeepSeek → HackClub Llama 3.3 70B
+async function chatWithFallback({ system, user, json = false, maxTokens = 8000, preferredModel = '' }) {
+  const errors = [];
+  const preferGeminiFirst = preferredModel === 'gemini-direct';
+
+  // 1) Se o usuário não pediu Gemini direto, puxa PRIMEIRO o Multi-IA Router (Unorouter: Cohere Command-A + Gemini 3.1 + Agnes 2.5 + DeepSeek R1)
+  if (!preferGeminiFirst && allValidUniKeys().length) {
+    const uni = await unorouterSmartChat({ system, user, json, preferredModel, maxTokens });
+    if (uni && uni.text) return uni;
+    if (uni && uni.error) errors.push(uni.error);
+  }
+
+  // 2) Gemini 3.1 / Gemma 3 27B — alta velocidade e cota generosa (14.400 req/dia no Gemma 3!)
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      const g = await geminiChat({ system, user, json, maxTokens });
+      if (g && (!json || extractJson(g.text))) return g;
+      errors.push('gemini: resposta vazia ou chave rejeitada');
+    } catch (e) { errors.push(e.message); }
+  } else errors.push('gemini: sem GEMINI_API_KEY');
+
+  // 3) Se preferGeminiFirst estava ativo e Gemini falhou, tenta o Multi-IA Router (Unorouter) agora
+  if (preferGeminiFirst && allValidUniKeys().length) {
+    const uni = await unorouterSmartChat({ system, user, json, preferredModel: 'auto-router', maxTokens });
+    if (uni && uni.text) return uni;
+    if (uni && uni.error) errors.push(uni.error);
+  }
+
+  // 4) OpenAI oficial (se configurada e válida)
   if (canUseOfficialOpenAI()) {
     for (const model of ['gpt-4o-mini', 'gpt-4o']) {
       try {
@@ -1872,40 +1971,19 @@ async function chatWithFallback({ system, user, json = false, maxTokens = 8000 }
       }
     }
   }
-  // Gemini 3.1 / Gemma 3 — alta velocidade e cota generosa (14.400 req/dia no Gemma 3!)
-  if (process.env.GEMINI_API_KEY) {
-    try {
-      const g = await geminiChat({ system, user, json, maxTokens });
-      if (g) return g;
-      errors.push('gemini: chave rejeitada (401/403)');
-    } catch (e) { errors.push(e.message); }
-  } else errors.push('gemini: sem GEMINI_API_KEY');
-  // Unorouter — NUNCA chama GET /models antes (preserva 100% da janela de 1 req/min para geração real!)
-  const uKeys = allValidUniKeys();
-  if (uKeys.length) {
-    for (const uKey of uKeys) {
-      if (Date.now() < (_uniKeyCooldown[uKey] || 0)) continue;
-      const model = UNI_CHAT_MODELS[(_uniCursor++) % UNI_CHAT_MODELS.length];
-      try {
-        const text = await unorouterChat({ system, user, json, model, maxTokens, apiKey: uKey });
-        return { text, provider: 'unorouter/' + model };
-      } catch (e) {
-        errors.push(`unorouter/${model}: ${(e.status ? 'HTTP ' + e.status + ' — ' : '')}${e.message}`);
-        if (e.status === 401) { _deadUniKeys.add(uKey); continue; }
-      }
-    }
-  } else errors.push('unorouter: sem UNOROUTER_API_KEY');
-  // Pollinations Multi-Model Free AI (GPT-4o-mini / DeepSeek / Mistral)
+
+  // 5) Pollinations Multi-Model Free AI (GPT-4o-large / GPT-4o-mini / DeepSeek V3 / Mistral / Llama 3.3)
   try {
     const text = await chatViaPollinations({ system, user, json });
-    return { text, provider: 'pollinations-ai(free)' };
+    return { text, provider: 'pollinations-ai(multi-llm)' };
   } catch (e) {
     errors.push('pollinations: ' + e.message);
   }
-  // HackClub Free AI (Llama 3.3 70B)
+
+  // 6) HackClub Free AI (Llama 3.3 70B)
   try {
     const text = await chatViaHackClub({ system, user, json });
-    return { text, provider: 'hackclub-ai(free)' };
+    return { text, provider: 'hackclub-ai(llama-70b)' };
   } catch (e) {
     errors.push('hackclub: ' + e.message);
   }
