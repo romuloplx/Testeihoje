@@ -1,10 +1,18 @@
-const { generateAvatarPortrait, generateAvatarScript, generateAvatarVideo, getBody, send } = require('./lib/ai');
+const { generateAvatarPortrait, generateAvatarScript, generateAvatarVideo, detectAvatarFaceLandmarks, getBody, send } = require('./lib/ai');
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return send(res, 405, { error: 'Método não permitido. Use POST.' });
   try {
     const body = await getBody(req);
     const action = String(body.action || 'portrait');
+
+    if (action === 'detect_face') {
+      const out = await detectAvatarFaceLandmarks({
+        imageBase64: body.imageBase64,
+        mime: body.mime || 'image/jpeg'
+      });
+      return send(res, 200, out);
+    }
 
     if (action === 'portrait') {
       const out = await generateAvatarPortrait({ prompt: body.prompt, style: body.style });

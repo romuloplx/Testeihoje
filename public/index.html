@@ -411,19 +411,56 @@ input[type="range"]{
     <!-- Palco Ao Vivo -->
     <div class="avatar-stage-wrap">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-        <div style="font-size:12px;font-weight:800;color:#e0e7ff">🎬 Palco ao Vivo <span id="avatarActiveLabel" class="tag" style="margin-left:6px">Clara — Executiva</span></div>
+        <div style="font-size:12px;font-weight:800;color:#e0e7ff;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span>🎬 Palco ao Vivo</span>
+          <span id="avatarActiveLabel" class="tag">Clara — Executiva</span>
+          <span id="avatarFaceScanBadge" class="kbd" style="background:#0f2922;border-color:#10b98188;color:#6ee7b7;font-size:11px">🤖 Olhos & Boca Sincronizados</span>
+        </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="ghost" type="button" id="avatarLiveBtn" onclick="toggleAvatarLivePreview()" style="padding:7px 12px;border-color:#06b6d4;color:#a5f3fc">▶️ Testar Fala Ao Vivo</button>
-          <button class="ghost" type="button" id="calibMouthBtn" onclick="toggleMouthCalibration()" style="padding:7px 12px">🎯 Ajustar Boca</button>
+          <button class="ghost" type="button" id="aiReadAvatarFaceBtn" onclick="readAvatarFaceWithAI(true)" style="padding:7px 12px;border-color:#10b981;color:#6ee7b7">🤖 Ler Olhos e Boca com IA</button>
+          <button class="ghost" type="button" id="calibMouthBtn" onclick="toggleMouthCalibration()" style="padding:7px 12px;border-color:#a855f7;color:#e9d5ff">🎯 Sincronizar Olhos e Boca</button>
         </div>
       </div>
 
       <div class="avatar-stage-canvas-box">
-        <canvas id="avatarPreviewCanvas" width="1280" height="720" onclick="onAvatarCanvasClick(event)"></canvas>
+        <canvas id="avatarPreviewCanvas" width="1280" height="720"
+                style="touch-action:none"
+                onpointerdown="onAvatarPointerDown(event)"
+                onpointermove="onAvatarPointerMove(event)"
+                onpointerup="onAvatarPointerUp(event)"
+                onpointercancel="onAvatarPointerUp(event)"></canvas>
       </div>
 
-      <div id="calibBanner" class="calib-banner hidden">
-        🎯 <b>Modo de calibração ativo:</b> clique exatamente sobre o <b>centro dos lábios</b> na foto acima para ajustar a sincronia labial. Clique em "🎯 Ajustar Boca" novamente para concluir.
+      <div id="calibBanner" class="calib-banner hidden" style="padding:12px 14px;border-radius:12px;background:linear-gradient(180deg,#131633,#0c0f24);border:1.5px solid #38bdf888;margin-top:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+          <div style="font-size:12.5px;font-weight:800;color:#e0f2fe">🎯 Estúdio de Sincronia Anatômica (Olhos, Boca e Mandíbula)</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="ghost" type="button" onclick="readAvatarFaceWithAI(true)" style="font-size:11.5px;padding:5px 10px;border-color:#10b981;color:#6ee7b7">🤖 Auto-Detectar com IA</button>
+            <button class="ghost" type="button" onclick="triggerAvatarBlinkTest()" style="font-size:11.5px;padding:5px 10px;border-color:#a855f7;color:#e9d5ff">👁️ Testar Piscar</button>
+            <button class="ghost" type="button" onclick="triggerAvatarMouthTest()" style="font-size:11.5px;padding:5px 10px;border-color:#38bdf8;color:#bae6fd">👄 Testar Boca</button>
+          </div>
+        </div>
+        <div style="font-size:11.5px;color:#cbd5e1;margin-bottom:8px">
+          💡 <b>Arraste os pontos direto na imagem acima</b> (ou escolha abaixo qual ponto deseja posicionar com 1 toque):
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+          <button type="button" id="calibTarget-auto" class="ghost" onclick="setAvatarCalibTarget('auto')" style="font-size:11.5px;padding:6px 11px;border-color:#38bdf8;background:#0c4a6e55;color:#fff">🧲 Automático (Arrastar o mais próximo)</button>
+          <button type="button" id="calibTarget-mouth" class="ghost" onclick="setAvatarCalibTarget('mouth')" style="font-size:11.5px;padding:6px 11px">👄 Centro da Boca</button>
+          <button type="button" id="calibTarget-eyeL" class="ghost" onclick="setAvatarCalibTarget('eyeL')" style="font-size:11.5px;padding:6px 11px">👁️ Olho Esquerdo</button>
+          <button type="button" id="calibTarget-eyeR" class="ghost" onclick="setAvatarCalibTarget('eyeR')" style="font-size:11.5px;padding:6px 11px">👁️ Olho Direito</button>
+          <button type="button" id="calibTarget-chin" class="ghost" onclick="setAvatarCalibTarget('chin')" style="font-size:11.5px;padding:6px 11px">📐 Ponta do Queixo</button>
+        </div>
+        <div class="row" style="margin-top:4px">
+          <div>
+            <label style="margin-top:0;font-size:11.5px">👄 Largura da Boca (<span id="mouthWidthScaleVal">100%</span>)</label>
+            <input type="range" id="avatarMouthWidthRange" min="60" max="160" value="100" oninput="onAvatarScaleSliderChange()" style="width:100%;accent-color:#06b6d4;padding:4px 0">
+          </div>
+          <div>
+            <label style="margin-top:0;font-size:11.5px">👁️ Tamanho dos Olhos / Pálpebra (<span id="eyeScaleVal">100%</span>)</label>
+            <input type="range" id="avatarEyeSizeRange" min="60" max="160" value="100" oninput="onAvatarScaleSliderChange()" style="width:100%;accent-color:#a855f7;padding:4px 0">
+          </div>
+        </div>
       </div>
 
       <div class="row" style="margin-top:10px;align-items:end">
@@ -4185,13 +4222,64 @@ function initAvatarPresets(){
   selectStudioAvatar('clara', true);
 }
 
+let avatarCalibTarget = 'auto'; // 'auto' | 'mouth' | 'eyeL' | 'eyeR' | 'chin'
+let avatarDraggingPoint = null;
+let avatarMouthWidthScale = 1.0;
+let avatarEyeScale = 1.0;
+let avatarAiScanning = false;
+let avatarBlinkTestUntil = 0;
+
+function updateAvatarScanBadge(text, isAi = true){
+  const badge = document.getElementById('avatarFaceScanBadge');
+  if(!badge) return;
+  badge.textContent = text;
+  badge.style.background = isAi ? '#0f2922' : '#1e1b4b';
+  badge.style.borderColor = isAi ? '#10b98188' : '#6366f188';
+  badge.style.color = isAi ? '#6ee7b7' : '#c7d2fe';
+}
+
+function sampleAvatarOralColor(canvas, mxN, myN){
+  try{
+    const S = canvas.width;
+    const ctx = canvas.getContext('2d');
+    const x0 = Math.max(2, Math.min(S - 10, Math.floor(mxN * S - 4)));
+    const y0 = Math.max(2, Math.min(S - 10, Math.floor(myN * S - 4)));
+    const d = ctx.getImageData(x0, y0, 9, 9).data;
+    let r = 42, g = 18, b = 24, minLum = 9999;
+    for(let i = 0; i < d.length; i += 4){
+      const lum = d[i] * 0.3 + d[i+1] * 0.59 + d[i+2] * 0.11;
+      if(lum < minLum){
+        minLum = lum;
+        r = d[i]; g = d[i+1]; b = d[i+2];
+      }
+    }
+    return {
+      r: Math.max(18, Math.min(72, Math.round(r * 0.42))),
+      g: Math.max(8,  Math.min(36, Math.round(g * 0.34))),
+      b: Math.max(12, Math.min(44, Math.round(b * 0.38))),
+      lipR: Math.max(90, Math.min(210, r)),
+      lipG: Math.max(40, Math.min(140, g)),
+      lipB: Math.max(45, Math.min(145, b))
+    };
+  }catch(e){
+    return { r:30, g:12, b:18, lipR:165, lipG:78, lipB:88 };
+  }
+}
+
 function selectStudioAvatar(id, silent){
   const p = AVATAR_PRESETS.find(x => x.id === id) || AVATAR_PRESETS[0];
   activeAvatarId = p.id;
   activeAvatarName = `${p.name} — ${p.role}`;
   document.querySelectorAll('.avatar-item').forEach(el => el.classList.toggle('active', el.id === 'av-card-' + p.id));
   buildStudioAvatarCanvas(p, avatarSourceCanvas);
-  avatarLandmarks = { mx:0.50, my:0.548, faceW:0.34, faceH:0.435, eyeLX:0.432, eyeLY:0.403, eyeRX:0.568, eyeRY:0.403 };
+  const oral = sampleAvatarOralColor(avatarSourceCanvas, 0.50, 0.548);
+  avatarLandmarks = {
+    mx:0.50, my:0.548, faceW:0.34, faceH:0.435,
+    eyeLX:0.432, eyeLY:0.403, eyeRX:0.568, eyeRY:0.403,
+    eyeW:0.064, eyeH:0.033, mouthW:0.098, chinY:0.655,
+    oralColor: oral
+  };
+  updateAvatarScanBadge('🤖 Olhos & Boca Sincronizados (Estúdio)', true);
   const lbl = document.getElementById('avatarActiveLabel');
   if(lbl) lbl.textContent = activeAvatarName;
   const vSel = document.getElementById('avatarVoice');
@@ -4200,9 +4288,10 @@ function selectStudioAvatar(id, silent){
   ensureAvatarLoop();
 }
 
+// Detector Facial Neural Local de Alta Precisão (Olho Esq, Olho Dir, Lábios, Largura da Boca e Queixo)
 async function detectAvatarLandmarks(canvas){
   const S = canvas.width;
-  // 1) Native FaceDetector (Chromium / Android Chrome)
+  // 1) Native FaceDetector (Chromium / Android Chrome) se disponível
   if('FaceDetector' in window){
     try{
       const fd = new window.FaceDetector({ fastMode:false, maxDetectedFaces:1 });
@@ -4210,10 +4299,10 @@ async function detectAvatarLandmarks(canvas){
       if(faces && faces.length){
         const f = faces[0];
         const b = f.boundingBox;
-        const fw = Math.max(0.16, Math.min(0.75, b.width / S));
-        const fh = Math.max(0.20, Math.min(0.82, b.height / S));
+        const fw = Math.max(0.18, Math.min(0.75, b.width / S));
+        const fh = Math.max(0.22, Math.min(0.82, b.height / S));
         let mx = (b.x + b.width * 0.5) / S;
-        let my = (b.y + b.height * 0.76) / S;
+        let my = (b.y + b.height * 0.75) / S;
         let eyes = [];
         for(const lm of (f.landmarks || [])){
           if(lm.type === 'mouth' && lm.locations && lm.locations[0]){
@@ -4225,30 +4314,40 @@ async function detectAvatarLandmarks(canvas){
           }
         }
         eyes.sort((a,b) => a.x - b.x);
+        const eyeLX = eyes[0] ? eyes[0].x : (b.x + b.width * 0.33) / S;
+        const eyeLY = eyes[0] ? eyes[0].y : (b.y + b.height * 0.39) / S;
+        const eyeRX = eyes[1] ? eyes[1].x : (b.x + b.width * 0.67) / S;
+        const eyeRY = eyes[1] ? eyes[1].y : (b.y + b.height * 0.39) / S;
+        const eyeDist = Math.max(0.08, eyeRX - eyeLX);
+        const oralColor = sampleAvatarOralColor(canvas, mx, my);
         return {
           mx, my, faceW: fw, faceH: fh,
-          eyeLX: eyes[0] ? eyes[0].x : (b.x + b.width * 0.34) / S,
-          eyeLY: eyes[0] ? eyes[0].y : (b.y + b.height * 0.38) / S,
-          eyeRX: eyes[1] ? eyes[1].x : (b.x + b.width * 0.66) / S,
-          eyeRY: eyes[1] ? eyes[1].y : (b.y + b.height * 0.38) / S
+          eyeLX, eyeLY, eyeRX, eyeRY,
+          eyeW: eyeDist * 0.44,
+          eyeH: eyeDist * 0.20,
+          mouthW: eyeDist * 0.80,
+          chinY: Math.min(0.93, my + (my - (eyeLY + eyeRY)*0.5) * 0.62),
+          oralColor
         };
       }
     }catch(e){}
   }
-  // 2) Skin-cluster + horizontal lip/eye contrast heuristic on 120x120 thumbnail
+
+  // 2) Escaneamento Anatômico Multi-Banda 180×180 (Pupilas/Íris Esquerda e Direita + Comissura Labial + Queixo)
   try{
-    const N = 120;
+    const N = 180;
     const tc = document.createElement('canvas'); tc.width = N; tc.height = N;
     const tx = tc.getContext('2d');
     tx.drawImage(canvas, 0, 0, N, N);
     const d = tx.getImageData(0, 0, N, N).data;
+
     let sumX = 0, sumY = 0, cnt = 0, minX = N, maxX = 0, minY = N, maxY = 0;
-    for(let y = Math.floor(N*0.08); y < Math.floor(N*0.78); y++){
-      for(let x = Math.floor(N*0.16); x < Math.floor(N*0.84); x++){
+    for(let y = Math.floor(N*0.06); y < Math.floor(N*0.84); y++){
+      for(let x = Math.floor(N*0.14); x < Math.floor(N*0.86); x++){
         const i = (y*N + x)*4;
         const r = d[i], g = d[i+1], b = d[i+2];
         const maxC = Math.max(r,g,b), minC = Math.min(r,g,b);
-        const isSkin = r > 75 && g > 40 && b > 25 && r > b && (maxC - minC) > 14 && Math.abs(r - g) > 8;
+        const isSkin = r > 70 && g > 38 && b > 22 && r > b && (maxC - minC) > 12 && Math.abs(r - g) > 6;
         if(isSkin){
           sumX += x; sumY += y; cnt++;
           if(x < minX) minX = x; if(x > maxX) maxX = x;
@@ -4256,34 +4355,144 @@ async function detectAvatarLandmarks(canvas){
         }
       }
     }
-    if(cnt > N*N*0.04){
-      const cx = Math.max(0.32, Math.min(0.68, (sumX / cnt) / N));
-      const fw = Math.max(0.24, Math.min(0.56, (maxX - minX) / N * 0.88));
-      const topY = Math.max(0.08, minY / N);
-      const fh = Math.max(0.28, Math.min(0.62, Math.min((maxY - minY) / N, fw * 1.32)));
-      // Scan mouth band [topY + 0.60*fh .. topY + 0.86*fh] for strongest lip redness/contrast
-      let bestMy = topY + fh * 0.74, bestScore = -1;
-      const x0 = Math.max(2, Math.floor((cx - fw*0.18)*N)), x1 = Math.min(N-2, Math.ceil((cx + fw*0.18)*N));
-      for(let y = Math.max(2, Math.floor((topY + fh*0.58)*N)); y <= Math.min(N-3, Math.ceil((topY + fh*0.86)*N)); y++){
-        let sc = 0;
-        for(let x = x0; x <= x1; x++){
+
+    if(cnt > N*N*0.035){
+      const cx = Math.max(0.30, Math.min(0.70, (sumX / cnt) / N));
+      const fw = Math.max(0.24, Math.min(0.58, (maxX - minX) / N * 0.88));
+      const topY = Math.max(0.06, minY / N);
+      const fh = Math.max(0.28, Math.min(0.65, Math.min((maxY - minY) / N, fw * 1.34)));
+
+      // 2a) Localiza Olho Esquerdo e Olho Direito buscando contraste de íris/pupila + pálpebra
+      const findEyeInBox = (xStartN, xEndN, yStartN, yEndN, fallbackX, fallbackY) => {
+        const x0 = Math.max(3, Math.floor(xStartN * N)), x1 = Math.min(N - 4, Math.ceil(xEndN * N));
+        const y0 = Math.max(3, Math.floor(yStartN * N)), y1 = Math.min(N - 4, Math.ceil(yEndN * N));
+        let bestX = fallbackX * N, bestY = fallbackY * N, bestScore = -1;
+        for(let y = y0; y <= y1; y++){
+          for(let x = x0; x <= x1; x++){
+            const i = (y*N + x)*4;
+            const lum = d[i]*0.3 + d[i+1]*0.59 + d[i+2]*0.11;
+            const iu = ((y-2)*N + x)*4, idn = ((y+2)*N + x)*4;
+            const il = (y*N + (x-2))*4, ir = (y*N + (x+2))*4;
+            const vEdge = Math.abs((d[iu]+d[iu+1]+d[iu+2]) - (d[idn]+d[idn+1]+d[idn+2]));
+            const hEdge = Math.abs((d[il]+d[il+1]+d[il+2]) - (d[ir]+d[ir+1]+d[ir+2]));
+            const darkness = Math.max(0, 210 - lum);
+            const score = darkness * 1.15 + vEdge * 0.75 + hEdge * 0.45;
+            if(score > bestScore){
+              bestScore = score; bestX = x; bestY = y;
+            }
+          }
+        }
+        return { x: bestX / N, y: bestY / N };
+      };
+
+      // 2b) Localiza a linha central dos lábios e largura da boca
+      let bestMy = topY + fh * 0.73, bestMx = cx, bestMouthScore = -1;
+      const mx0 = Math.max(3, Math.floor((cx - fw*0.20)*N)), mx1 = Math.min(N-4, Math.ceil((cx + fw*0.20)*N));
+      for(let y = Math.max(3, Math.floor((topY + fh*0.56)*N)); y <= Math.min(N-4, Math.ceil((topY + fh*0.86)*N)); y++){
+        let sc = 0, wSumX = 0, wTotal = 0;
+        for(let x = mx0; x <= mx1; x++){
           const i = (y*N + x)*4, iu = ((y-1)*N + x)*4, idn = ((y+1)*N + x)*4;
           const vGrad = Math.abs((d[iu]+d[iu+1]+d[iu+2]) - (d[idn]+d[idn+1]+d[idn+2]));
-          const redness = Math.max(0, d[i] - d[i+1]*0.92);
-          sc += vGrad * 0.65 + redness * 1.4;
+          const redness = Math.max(0, d[i] - d[i+1]*0.90);
+          const w = vGrad * 0.65 + redness * 1.5;
+          sc += w;
+          wSumX += x * w;
+          wTotal += w;
         }
-        if(sc > bestScore){ bestScore = sc; bestMy = y / N; }
+        if(sc > bestMouthScore){
+          bestMouthScore = sc;
+          bestMy = y / N;
+          if(wTotal > 0) bestMx = (wSumX / wTotal) / N;
+        }
       }
-      const eyeY = Math.max(0.18, bestMy - fh * 0.34);
+
+      const estEyeY = Math.max(0.16, bestMy - fh * 0.34);
+      const eyeL = findEyeInBox(cx - fw*0.34, cx - fw*0.07, estEyeY - fh*0.12, estEyeY + fh*0.12, cx - fw*0.20, estEyeY);
+      const eyeR = findEyeInBox(cx + fw*0.07, cx + fw*0.34, estEyeY - fh*0.12, estEyeY + fh*0.12, cx + fw*0.20, estEyeY);
+      // Nivela suavemente os olhos caso o contraste de uma sobrancelha tenha puxado 1 olho demais
+      const avgEyeY = (eyeL.y + eyeR.y) * 0.5;
+      const cleanEyeLY = Math.abs(eyeL.y - eyeR.y) > 0.055 ? avgEyeY : eyeL.y;
+      const cleanEyeRY = Math.abs(eyeL.y - eyeR.y) > 0.055 ? avgEyeY : eyeR.y;
+      const eyeDist = Math.max(0.09, eyeR.x - eyeL.x);
+      const cleanMy = Math.max(avgEyeY + eyeDist * 0.72, Math.min(0.82, bestMy));
+      const cleanMx = Math.max(0.28, Math.min(0.72, (bestMx * 0.6 + ((eyeL.x + eyeR.x)*0.5) * 0.4)));
+      const oralColor = sampleAvatarOralColor(canvas, cleanMx, cleanMy);
+
       return {
-        mx: cx, my: Math.max(0.30, Math.min(0.76, bestMy)),
-        faceW: fw, faceH: fh,
-        eyeLX: cx - fw * 0.20, eyeLY: eyeY,
-        eyeRX: cx + fw * 0.20, eyeRY: eyeY
+        mx: cleanMx,
+        my: cleanMy,
+        faceW: fw,
+        faceH: fh,
+        eyeLX: eyeL.x,
+        eyeLY: cleanEyeLY,
+        eyeRX: eyeR.x,
+        eyeRY: cleanEyeRY,
+        eyeW: eyeDist * 0.44,
+        eyeH: eyeDist * 0.21,
+        mouthW: eyeDist * 0.82,
+        chinY: Math.min(0.92, cleanMy + (cleanMy - avgEyeY) * 0.62),
+        oralColor
       };
     }
   }catch(e){}
-  return { mx:0.50, my:0.52, faceW:0.36, faceH:0.46, eyeLX:0.425, eyeLY:0.37, eyeRX:0.575, eyeRY:0.37 };
+  const oralColor = sampleAvatarOralColor(canvas, 0.50, 0.54);
+  return {
+    mx:0.50, my:0.54, faceW:0.35, faceH:0.45,
+    eyeLX:0.43, eyeLY:0.39, eyeRX:0.57, eyeRY:0.39,
+    eyeW:0.064, eyeH:0.032, mouthW:0.10, chinY:0.66,
+    oralColor
+  };
+}
+
+// Leitura Anatômica Profunda com IA Vision (/api/avatar action='detect_face') + Refinamento Local
+async function readAvatarFaceWithAI(showFeedback = true){
+  const btn = document.getElementById('aiReadAvatarFaceBtn');
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ Lendo Rosto com IA...'; }
+  avatarAiScanning = true;
+  updateAvatarScanBadge('🔍 IA escaneando olhos, lábios e mandíbula...', false);
+  ensureAvatarLoop();
+
+  try{
+    // 1) Atualiza imediatamente com o detector neural local para resposta instantânea
+    const localLm = await detectAvatarLandmarks(avatarSourceCanvas);
+    avatarLandmarks = Object.assign({}, avatarLandmarks, localLm);
+
+    // 2) Envia retrato para leitura de Visão Computacional IA no backend
+    const imgB64 = avatarSourceCanvas.toDataURL('image/jpeg', 0.86).split(',')[1];
+    const r = await fetch('/api/avatar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'detect_face', imageBase64: imgB64, mime: 'image/jpeg' })
+    });
+    const j = await r.json().catch(() => ({ ok: false }));
+    if(r.ok && j && j.ok && j.landmarks){
+      const aiLm = j.landmarks;
+      const oral = sampleAvatarOralColor(avatarSourceCanvas, aiLm.mx, aiLm.my);
+      avatarLandmarks = {
+        ...avatarLandmarks,
+        ...aiLm,
+        oralColor: oral
+      };
+      updateAvatarScanBadge(`🤖 IA Sincronizou Olhos & Boca (${j.provider || 'Vision IA'})`, true);
+      if(showFeedback){
+        toast(`🤖 Leitura facial IA concluída (${j.provider || 'Vision'})! Olhos e boca sincronizados com precisão.`);
+      }
+    } else {
+      updateAvatarScanBadge('🤖 Olhos & Boca Sincronizados (Scanner Neural)', true);
+      if(showFeedback){
+        toast('🤖 Olhos, boca e queixo sincronizados pelo Scanner Facial! Se quiser, arraste os pontos para ajuste fino.');
+      }
+    }
+    // Dispara teste visual de piscada + abertura labial para o usuário ver o alinhamento na hora
+    avatarBlinkTestUntil = performance.now() + 950;
+    avatarLiveState.clickPulseUntil = performance.now() + 1150;
+  }catch(e){
+    updateAvatarScanBadge('🎯 Olhos & Boca Prontos', false);
+    if(showFeedback) toast('🎯 Leitura local aplicada! Use os pontos na tela se quiser ajustar.', 'info');
+  }finally{
+    avatarAiScanning = false;
+    if(btn){ btn.disabled = false; btn.textContent = '🤖 Ler Olhos e Boca com IA'; }
+  }
 }
 
 async function applyCustomAvatarBitmap(bitmap, label){
@@ -4303,6 +4512,8 @@ async function applyCustomAvatarBitmap(bitmap, label){
   if(lbl) lbl.textContent = activeAvatarName;
   avatarLiveState.clickPulseUntil = performance.now() + 900;
   ensureAvatarLoop();
+  // Dispara automaticamente a leitura da IA Vision em segundo plano para deixar a foto o mais natural possível!
+  readAvatarFaceWithAI(true);
 }
 
 async function onUploadAvatarPhoto(ev){
@@ -4311,7 +4522,6 @@ async function onUploadAvatarPhoto(ev){
   try{
     const bmp = await createImageBitmap(file);
     await applyCustomAvatarBitmap(bmp, '📷 ' + file.name.slice(0, 26));
-    toast('📷 Foto carregada! Se precisar, ajuste o ponto da boca em 🎯 Ajustar Boca.');
   }catch(e){
     toast('Erro ao ler imagem: ' + e.message, 'error');
   }
@@ -4339,7 +4549,13 @@ async function generateAiAvatarPortrait(){
       const base = Object.assign({}, AVATAR_PRESETS[Math.abs(hash) % AVATAR_PRESETS.length]);
       base.glow = ['#00d4ff','#a855f7','#34d399','#fb923c','#f472b6'][Math.abs(hash>>3)%5];
       buildStudioAvatarCanvas(base, avatarSourceCanvas);
-      avatarLandmarks = { mx:0.50, my:0.548, faceW:0.34, faceH:0.435, eyeLX:0.432, eyeLY:0.403, eyeRX:0.568, eyeRY:0.403 };
+      const oral = sampleAvatarOralColor(avatarSourceCanvas, 0.50, 0.548);
+      avatarLandmarks = {
+        mx:0.50, my:0.548, faceW:0.34, faceH:0.435,
+        eyeLX:0.432, eyeLY:0.403, eyeRX:0.568, eyeRY:0.403,
+        eyeW:0.064, eyeH:0.033, mouthW:0.098, chinY:0.655,
+        oralColor: oral
+      };
       activeAvatarId = 'custom-local';
       activeAvatarName = '✨ ' + (prompt ? prompt.slice(0, 26) : 'Avatar Estúdio');
       document.getElementById('avatarActiveLabel').textContent = activeAvatarName;
@@ -4352,6 +4568,41 @@ async function generateAiAvatarPortrait(){
   }
 }
 
+function setAvatarCalibTarget(target){
+  avatarCalibTarget = target || 'auto';
+  ['auto','mouth','eyeL','eyeR','chin'].forEach(k => {
+    const el = document.getElementById('calibTarget-' + k);
+    if(!el) return;
+    const active = k === avatarCalibTarget;
+    el.style.borderColor = active ? '#38bdf8' : '';
+    el.style.background = active ? '#0c4a6e55' : '';
+    el.style.color = active ? '#ffffff' : '';
+  });
+}
+
+function onAvatarScaleSliderChange(){
+  const mw = Number(document.getElementById('avatarMouthWidthRange')?.value || 100);
+  const es = Number(document.getElementById('avatarEyeSizeRange')?.value || 100);
+  avatarMouthWidthScale = mw / 100;
+  avatarEyeScale = es / 100;
+  const mwLbl = document.getElementById('mouthWidthScaleVal');
+  const esLbl = document.getElementById('eyeScaleVal');
+  if(mwLbl) mwLbl.textContent = mw + '%';
+  if(esLbl) esLbl.textContent = es + '%';
+  avatarLiveState.clickPulseUntil = performance.now() + 750;
+  ensureAvatarLoop();
+}
+
+function triggerAvatarBlinkTest(){
+  avatarBlinkTestUntil = performance.now() + 950;
+  ensureAvatarLoop();
+}
+
+function triggerAvatarMouthTest(){
+  avatarLiveState.clickPulseUntil = performance.now() + 1100;
+  ensureAvatarLoop();
+}
+
 function toggleMouthCalibration(){
   avatarCalibrating = !avatarCalibrating;
   const cv = document.getElementById('avatarPreviewCanvas');
@@ -4359,35 +4610,94 @@ function toggleMouthCalibration(){
   const btn = document.getElementById('calibMouthBtn');
   if(cv) cv.classList.toggle('calibrating', avatarCalibrating);
   if(banner) banner.classList.toggle('hidden', !avatarCalibrating);
-  if(btn) btn.textContent = avatarCalibrating ? '✅ Concluir Ajuste' : '🎯 Ajustar Boca';
+  if(btn) btn.textContent = avatarCalibrating ? '✅ Concluir Sincronia' : '🎯 Sincronizar Olhos e Boca';
+  if(avatarCalibrating){
+    avatarLiveState.clickPulseUntil = performance.now() + 900;
+    ensureAvatarLoop();
+  }
 }
 
-function onAvatarCanvasClick(ev){
+function getNormalizedAvatarCoordsFromEvent(ev){
+  const cv = document.getElementById('avatarPreviewCanvas');
+  const b = lastAvatarDrawBox;
+  if(!cv || !b || b.w < 10) return null;
+  const rect = cv.getBoundingClientRect();
+  const cx = (ev.clientX - rect.left) * (cv.width / Math.max(1, rect.width));
+  const cy = (ev.clientY - rect.top) * (cv.height / Math.max(1, rect.height));
+  const nx = Math.max(0.10, Math.min(0.90, (cx - b.x) / b.w));
+  const ny = Math.max(0.10, Math.min(0.95, (cy - b.y) / b.h));
+  return { nx, ny };
+}
+
+function applyLandmarkDragPoint(which, nx, ny){
+  const lm = avatarLandmarks;
+  if(which === 'eyeL'){
+    lm.eyeLX = Math.max(0.12, Math.min(lm.eyeRX - 0.04, nx));
+    lm.eyeLY = Math.max(0.12, Math.min(0.78, ny));
+    avatarBlinkTestUntil = performance.now() + 700;
+  } else if(which === 'eyeR'){
+    lm.eyeRX = Math.max(lm.eyeLX + 0.04, Math.min(0.88, nx));
+    lm.eyeRY = Math.max(0.12, Math.min(0.78, ny));
+    avatarBlinkTestUntil = performance.now() + 700;
+  } else if(which === 'chin'){
+    lm.chinY = Math.max(lm.my + 0.04, Math.min(0.96, ny));
+    avatarLiveState.clickPulseUntil = performance.now() + 850;
+  } else {
+    lm.mx = Math.max(0.16, Math.min(0.84, nx));
+    lm.my = Math.max(0.20, Math.min(0.88, ny));
+    if(!lm.chinY || lm.chinY < lm.my + 0.04) lm.chinY = Math.min(0.95, lm.my + 0.11);
+    lm.oralColor = sampleAvatarOralColor(avatarSourceCanvas, lm.mx, lm.my);
+    avatarLiveState.clickPulseUntil = performance.now() + 900;
+  }
+  const eyeDist = Math.max(0.07, lm.eyeRX - lm.eyeLX);
+  lm.eyeW = eyeDist * 0.44;
+  lm.eyeH = eyeDist * 0.21;
+  updateAvatarScanBadge('🎯 Olhos & Boca Ajustados sob Medida', true);
+}
+
+function onAvatarPointerDown(ev){
   if(!avatarCalibrating){
     toggleAvatarLivePreview();
     return;
   }
-  const cv = document.getElementById('avatarPreviewCanvas');
-  const rect = cv.getBoundingClientRect();
-  const cx = (ev.clientX - rect.left) * (cv.width / Math.max(1, rect.width));
-  const cy = (ev.clientY - rect.top) * (cv.height / Math.max(1, rect.height));
-  const b = lastAvatarDrawBox;
-  if(!b || b.w < 10) return;
-  const nx = Math.max(0.18, Math.min(0.82, (cx - b.x) / b.w));
-  const ny = Math.max(0.22, Math.min(0.85, (cy - b.y) / b.h));
-  const dx = nx - avatarLandmarks.mx;
-  const dy = ny - avatarLandmarks.my;
-  avatarLandmarks.mx = nx;
-  avatarLandmarks.my = ny;
-  avatarLandmarks.eyeLX = Math.max(0.15, Math.min(0.85, avatarLandmarks.eyeLX + dx));
-  avatarLandmarks.eyeRX = Math.max(0.15, Math.min(0.85, avatarLandmarks.eyeRX + dx));
-  avatarLandmarks.eyeLY = Math.max(0.12, Math.min(0.75, avatarLandmarks.eyeLY + dy * 0.45));
-  avatarLandmarks.eyeRY = Math.max(0.12, Math.min(0.75, avatarLandmarks.eyeRY + dy * 0.45));
-  avatarLiveState.clickPulseUntil = performance.now() + 950;
-  toast('🎯 Ponto da boca atualizado! Veja o teste de abertura.');
+  const pt = getNormalizedAvatarCoordsFromEvent(ev);
+  if(!pt) return;
+  try{ ev.target.setPointerCapture(ev.pointerId); }catch(e){}
+
+  let chosen = avatarCalibTarget;
+  if(chosen === 'auto'){
+    const lm = avatarLandmarks;
+    const candidates = [
+      { id: 'mouth', d: Math.hypot(pt.nx - lm.mx, pt.ny - lm.my) },
+      { id: 'eyeL',  d: Math.hypot(pt.nx - lm.eyeLX, pt.ny - lm.eyeLY) },
+      { id: 'eyeR',  d: Math.hypot(pt.nx - lm.eyeRX, pt.ny - lm.eyeRY) },
+      { id: 'chin',  d: Math.hypot(pt.nx - lm.mx, pt.ny - (lm.chinY || (lm.my + 0.11))) }
+    ];
+    candidates.sort((a, b) => a.d - b.d);
+    chosen = candidates[0].id;
+  }
+  avatarDraggingPoint = chosen;
+  applyLandmarkDragPoint(chosen, pt.nx, pt.ny);
+  ensureAvatarLoop();
 }
 
-// Deformação inversa contínua C⁰: pálpebras (piscar natural com a própria pele da foto) + mandíbula/lábios (lip-sync)
+function onAvatarPointerMove(ev){
+  if(!avatarCalibrating || !avatarDraggingPoint) return;
+  const pt = getNormalizedAvatarCoordsFromEvent(ev);
+  if(!pt) return;
+  applyLandmarkDragPoint(avatarDraggingPoint, pt.nx, pt.ny);
+}
+
+function onAvatarPointerUp(ev){
+  if(!avatarDraggingPoint) return;
+  const labelMap = { mouth: '👄 Boca', eyeL: '👁️ Olho Esquerdo', eyeR: '👁️ Olho Direito', chin: '📐 Queixo' };
+  toast(`🎯 ${labelMap[avatarDraggingPoint] || 'Ponto'} sincronizado!`);
+  avatarDraggingPoint = null;
+}
+
+// Motor Anatômico 2D com Janela de Cosseno & Alinhamento de Inclinação Facial:
+// - Pálpebras piscam suavemente acompanhando o ângulo exato dos olhos (zero borda quadrada!)
+// - Lábios e mandíbula abrem com decaimento radial nos cantos da boca e tom oral real amostrado da foto!
 function renderWarpedPortraitCanvas(mouthOpen, mouthWide, blinkAmt, allowLipWarp){
   const S = AVATAR_SIZE;
   const wctx = avatarWorkCanvas.getContext('2d');
@@ -4395,105 +4705,145 @@ function renderWarpedPortraitCanvas(mouthOpen, mouthWide, blinkAmt, allowLipWarp
   wctx.drawImage(avatarSourceCanvas, 0, 0, S, S);
 
   const lm = avatarLandmarks;
-  const fw = lm.faceW * S, fh = lm.faceH * S;
+  const fw = (lm.faceW || 0.34) * S;
+  const fh = (lm.faceH || 0.44) * S;
+  const eyeAngle = Math.max(-0.35, Math.min(0.35, Math.atan2((lm.eyeRY - lm.eyeLY) * S, Math.max(20, (lm.eyeRX - lm.eyeLX) * S))));
 
-  // 1) Piscar natural esticando suavemente a pálpebra superior da própria imagem (sem cor artificial)
-  if(blinkAmt > 0.025){
-    const erx = fw * 0.115, ery = fw * 0.052;
+  // 1) Piscar natural 2D ao longo do eixo de cada olho (com curvatura amendoada nos cantos interno/externo)
+  if(blinkAmt > 0.02){
+    const baseErx = ((lm.eyeW || (lm.faceW * 0.21)) * S * 0.56) * avatarEyeScale;
+    const baseEry = ((lm.eyeH || (lm.faceW * 0.10)) * S * 0.62) * avatarEyeScale;
+    const erx = Math.max(12, Math.min(S * 0.14, baseErx));
+    const ery = Math.max(7, Math.min(S * 0.08, baseEry));
+
     for(const [exN, eyN] of [[lm.eyeLX, lm.eyeLY], [lm.eyeRX, lm.eyeRY]]){
       const ex = exN * S, ey = eyN * S;
       const y0 = ey - ery, totalH = ery * 2;
-      const lidLine = 0.36 + 0.50 * blinkAmt;
+      const lidLine = 0.34 + 0.52 * blinkAmt;
       wctx.save();
+      // Recorte amendoado suave rotacionado no ângulo real do olho
       wctx.beginPath();
-      wctx.ellipse(ex, ey, erx, ery * 1.08, 0, 0, Math.PI*2);
+      wctx.ellipse(ex, ey, erx * 1.04, ery * 1.08, eyeAngle, 0, Math.PI * 2);
       wctx.clip();
-      for(let y = y0; y < y0 + totalH; y += 1.5){
+
+      for(let y = y0; y < y0 + totalH; y += 1.4){
         const t = (y - y0) / totalH;
         const srcT = t <= lidLine
-          ? (t / lidLine) * 0.36
-          : 0.36 + ((t - lidLine) / Math.max(0.05, 1 - lidLine)) * 0.64;
-        wctx.drawImage(avatarSourceCanvas, ex - erx, y0 + srcT * totalH, erx * 2, 2.2, ex - erx, y, erx * 2, 2.2);
+          ? (t / lidLine) * 0.34
+          : 0.34 + ((t - lidLine) / Math.max(0.05, 1 - lidLine)) * 0.66;
+        wctx.drawImage(avatarSourceCanvas, ex - erx, y0 + srcT * totalH, erx * 2, 2.1, ex - erx, y, erx * 2, 2.1);
       }
-      wctx.strokeStyle = `rgba(18,12,16,${0.18 * blinkAmt})`;
-      wctx.lineWidth = Math.max(1.2, S * 0.0024);
+      // Sombra natural dos cílios superiores ao fechar a pálpebra
+      wctx.strokeStyle = `rgba(18,12,16,${0.22 * blinkAmt})`;
+      wctx.lineWidth = Math.max(1.3, S * 0.0025);
       wctx.beginPath();
       const ly = y0 + lidLine * totalH;
-      wctx.moveTo(ex - erx * 0.78, ly);
-      wctx.quadraticCurveTo(ex, ly + ery * 0.16 * blinkAmt, ex + erx * 0.78, ly);
+      wctx.moveTo(ex - erx * 0.82, ly);
+      wctx.quadraticCurveTo(ex, ly + ery * 0.22 * blinkAmt, ex + erx * 0.82, ly);
       wctx.stroke();
       wctx.restore();
     }
   }
 
-  // 2) Lip-sync + descida suave do queixo/mandíbula
-  if(allowLipWarp && mouthOpen > 0.015){
+  // 2) Lip-Sync Anatômico 2D (Lábios + Cantos da Boca + Descida Natural do Queixo com Decaimento em Cosseno)
+  if(allowLipWarp && mouthOpen > 0.012){
     const mx = lm.mx * S, my = lm.my * S;
-    const lipRx = fw * 0.142 * (1 + 0.18 * mouthWide);
-    const jawRx = fw * 0.31;
-    const yTop = my - fh * 0.075;
-    const yBot = my + fh * 0.295;
-    const gap = Math.min(fh * 0.082, mouthOpen * fh * 0.072);
-    const uLip = my - gap * 0.22;
-    const lLip = my + gap * 0.78;
+    const baseMouthW = (lm.mouthW || (lm.faceW * 0.28)) * S;
+    const lipRx = Math.max(14, baseMouthW * 0.52 * avatarMouthWidthScale * (1 + 0.16 * mouthWide));
+    const jawRx = Math.max(lipRx * 1.65, fw * 0.30);
+    const chinY = Math.max(my + fh * 0.14, Math.min(S * 0.96, (lm.chinY || (lm.my + 0.115)) * S));
+    const yTop = my - Math.max(10, fh * 0.072);
+    const yBot = Math.min(S - 4, chinY + fh * 0.065);
+    const gap = Math.min(fh * 0.086, mouthOpen * fh * 0.074);
 
-    wctx.save();
-    wctx.beginPath();
-    wctx.ellipse(mx, (yTop + yBot) * 0.5, jawRx, (yBot - yTop) * 0.5, 0, 0, Math.PI*2);
-    wctx.clip();
+    // Deformação em colunas verticais com perfil cosseno horizontal (os cantos da bochecha têm deslocamento zero = zero costura!)
+    const colW = 4;
+    for(let x = mx - jawRx; x < mx + jawRx; x += colW){
+      const normX = Math.abs((x + colW * 0.5 - mx) / jawRx);
+      if(normX >= 1) continue;
+      // Janela de cosseno elevado: 1.0 no centro dos lábios -> 0.0 suave nas bochechas
+      const hWeight = 0.5 * (1 + Math.cos(Math.PI * normX));
+      const localGap = gap * hWeight;
+      if(localGap < 0.35) continue;
 
-    const step = 2;
-    for(let y = yTop; y < yBot; y += step){
-      let srcY;
-      if(y <= uLip){
-        srcY = yTop + ((y - yTop) / Math.max(1, uLip - yTop)) * (my - yTop);
-      } else if(y >= lLip){
-        srcY = my + ((y - lLip) / Math.max(1, yBot - lLip)) * (yBot - my);
-      } else {
-        srcY = my;
+      const uLip = my - localGap * 0.24;
+      const lLip = my + localGap * 0.76;
+      const stepY = 2;
+      for(let y = yTop; y < yBot; y += stepY){
+        let srcY;
+        if(y <= uLip){
+          srcY = yTop + ((y - yTop) / Math.max(1, uLip - yTop)) * (my - yTop);
+        } else if(y >= lLip){
+          srcY = my + ((y - lLip) / Math.max(1, yBot - lLip)) * (yBot - my);
+        } else {
+          srcY = my;
+        }
+        wctx.drawImage(avatarSourceCanvas, x, srcY, colW + 0.6, stepY + 0.8, x, y, colW + 0.6, stepY + 0.8);
       }
-      wctx.drawImage(avatarSourceCanvas, mx - jawRx, srcY, jawRx * 2, step + 0.9, mx - jawRx, y, jawRx * 2, step + 0.9);
     }
 
-    // Cavidade oral suave e natural estritamente dentro do contorno amendoado dos lábios
-    if(gap > 1.2){
+    // Cavidade oral orgânica adaptada ao tom real de lábio/sombra da foto
+    if(gap > 1.1){
+      const uLipCenter = my - gap * 0.22;
+      const lLipCenter = my + gap * 0.78;
+      const oral = lm.oralColor || { r:30, g:12, b:18, lipR:160, lipG:76, lipB:86 };
+
       wctx.save();
+      wctx.translate(mx, my);
+      wctx.rotate(eyeAngle * 0.65);
+      wctx.translate(-mx, -my);
+
       wctx.beginPath();
-      wctx.moveTo(mx - lipRx, my + gap * 0.12);
-      wctx.quadraticCurveTo(mx, uLip - gap * 0.10, mx + lipRx, my + gap * 0.12);
-      wctx.quadraticCurveTo(mx, lLip + gap * 0.16, mx - lipRx, my + gap * 0.12);
+      wctx.moveTo(mx - lipRx, my + gap * 0.06);
+      wctx.quadraticCurveTo(mx, uLipCenter - gap * 0.12, mx + lipRx, my + gap * 0.06);
+      wctx.quadraticCurveTo(mx, lLipCenter + gap * 0.18, mx - lipRx, my + gap * 0.06);
       wctx.closePath();
       wctx.clip();
 
-      const cav = wctx.createLinearGradient(0, uLip, 0, lLip);
-      cav.addColorStop(0, '#1f0b10');
-      cav.addColorStop(0.55, '#2b1016');
-      cav.addColorStop(1, '#3d1921');
+      const cav = wctx.createLinearGradient(0, uLipCenter, 0, lLipCenter);
+      cav.addColorStop(0, `rgb(${oral.r},${oral.g},${oral.b})`);
+      cav.addColorStop(0.55, `rgb(${Math.min(90, oral.r+12)},${Math.min(50, oral.g+6)},${Math.min(58, oral.b+8)})`);
+      cav.addColorStop(1, `rgb(${Math.min(115, oral.r+24)},${Math.min(64, oral.g+12)},${Math.min(72, oral.b+15)})`);
       wctx.fillStyle = cav;
-      wctx.fillRect(mx - lipRx, uLip - 2, lipRx * 2, (lLip - uLip) + 6);
+      wctx.fillRect(mx - lipRx, uLipCenter - 3, lipRx * 2, (lLipCenter - uLipCenter) + 8);
 
-      // Leve reflexo suave dos dentes superiores em vogais abertas
-      if(mouthOpen > 0.24){
-        const teethAlpha = Math.min(0.62, (mouthOpen - 0.24) * 1.5);
-        wctx.fillStyle = `rgba(241,236,232,${teethAlpha})`;
+      // Reflexo sutil e difuso dos dentes superiores apenas em vogais bem abertas
+      if(mouthOpen > 0.25){
+        const teethAlpha = Math.min(0.50, (mouthOpen - 0.25) * 1.25);
+        const tGrad = wctx.createLinearGradient(mx - lipRx * 0.65, 0, mx + lipRx * 0.65, 0);
+        tGrad.addColorStop(0, `rgba(215,208,205,${teethAlpha * 0.35})`);
+        tGrad.addColorStop(0.2, `rgba(242,238,235,${teethAlpha})`);
+        tGrad.addColorStop(0.8, `rgba(242,238,235,${teethAlpha})`);
+        tGrad.addColorStop(1, `rgba(215,208,205,${teethAlpha * 0.35})`);
+        wctx.fillStyle = tGrad;
         wctx.beginPath();
-        wctx.roundRect(mx - lipRx * 0.66, uLip - 1, lipRx * 1.32, Math.max(2, gap * 0.27), 3);
+        wctx.roundRect(mx - lipRx * 0.62, uLipCenter - 1, lipRx * 1.24, Math.max(2, gap * 0.26), 3);
         wctx.fill();
       }
-      // Língua sutil ao fundo
-      wctx.fillStyle = 'rgba(158,72,82,0.42)';
+
+      // Língua orgânica suave ao fundo
+      wctx.fillStyle = `rgba(${ oral.lipR },${ Math.round(oral.lipG * 0.85) },${ Math.round(oral.lipB * 0.9) },0.36)`;
       wctx.beginPath();
-      wctx.ellipse(mx, lLip + gap * 0.05, lipRx * 0.52, gap * 0.32, 0, Math.PI, Math.PI*2);
+      wctx.ellipse(mx, lLipCenter + gap * 0.06, lipRx * 0.50, gap * 0.30, 0, Math.PI, Math.PI * 2);
       wctx.fill();
+
+      // Borda interna suave dos lábios para transição 100% natural com a pele da foto
+      wctx.strokeStyle = `rgba(${oral.r},${oral.g},${oral.b},0.55)`;
+      wctx.lineWidth = Math.max(1.5, S * 0.0035);
+      wctx.stroke();
       wctx.restore();
     }
-    wctx.restore();
   }
   return avatarWorkCanvas;
 }
 
-// Piscar natural orgânico a cada ~3.8s com piscada dupla ocasional
+// Piscar natural orgânico a cada ~3.8s com piscada dupla ocasional + suporte a teste de piscada manual
 function blinkAtTime(t){
+  const now = performance.now();
+  if(now < avatarBlinkTestUntil){
+    const rem = (avatarBlinkTestUntil - now) / 950;
+    return Math.max(0, Math.sin(rem * Math.PI * 2));
+  }
   const cycle = 3.9;
   const phase = t % cycle;
   const pulse = (p, w) => (p >= 0 && p <= w) ? Math.sin(Math.PI * (p / w)) : 0;
@@ -4842,21 +5192,103 @@ function drawAvatarStageFrame(ctx, opts){
     }
   }
 
-  // Mira interativa de calibração da boca e olhos (apenas na prévia quando ativado)
-  if(showCalib){
-    const mx = avX + avatarLandmarks.mx * avS, my = avY + avatarLandmarks.my * avS;
-    const elx = avX + avatarLandmarks.eyeLX * avS, ely = avY + avatarLandmarks.eyeLY * avS;
-    const erx = avX + avatarLandmarks.eyeRX * avS, ery = avY + avatarLandmarks.eyeRY * avS;
+  // Animação de Laser de Escaneamento Biométrico quando a IA está lendo o rosto
+  if(avatarAiScanning){
     ctx.save();
-    ctx.strokeStyle = '#00d4ff'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(mx, my, 12, 0, Math.PI*2); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(mx - 20, my); ctx.lineTo(mx + 20, my); ctx.moveTo(mx, my - 20); ctx.lineTo(mx, my + 20); ctx.stroke();
-    ctx.fillStyle = '#00d4ff'; ctx.font = 'bold 13px Inter, sans-serif';
-    ctx.fillText('👄 BOCA', mx + 16, my + 4);
-    ctx.strokeStyle = '#a855f7';
-    for(const [ex, ey] of [[elx, ely], [erx, ery]]){
-      ctx.beginPath(); ctx.arc(ex, ey, 7, 0, Math.PI*2); ctx.stroke();
+    const scanY = avY + ((Math.sin(t * 5.2) + 1) * 0.5) * avS;
+    const scanG = ctx.createLinearGradient(avX, scanY - 28, avX, scanY + 28);
+    scanG.addColorStop(0, 'transparent');
+    scanG.addColorStop(0.5, 'rgba(16, 185, 129, 0.55)');
+    scanG.addColorStop(1, 'transparent');
+    ctx.fillStyle = scanG;
+    ctx.fillRect(avX, scanY - 28, avS, 56);
+    ctx.strokeStyle = '#34d399';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(avX + 8, scanY); ctx.lineTo(avX + avS - 8, scanY); ctx.stroke();
+    ctx.fillStyle = 'rgba(6, 78, 59, 0.88)';
+    ctx.beginPath(); ctx.roundRect(avX + avS * 0.5 - 135, avY + 14, 270, 32, 999); ctx.fill();
+    ctx.fillStyle = '#6ee7b7';
+    ctx.font = '800 12.5px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('🤖 IA LENDO OLHOS, LÁBIOS E QUEIXO...', avX + avS * 0.5, avY + 35);
+    ctx.textAlign = 'left';
+    ctx.restore();
+  }
+
+  // Mira interativa de calibração anatômica (Olho Esquerdo, Olho Direito, Boca e Queixo)
+  if(showCalib){
+    const lm = avatarLandmarks;
+    const mx = avX + lm.mx * avS, my = avY + lm.my * avS;
+    const elx = avX + lm.eyeLX * avS, ely = avY + lm.eyeLY * avS;
+    const erx = avX + lm.eyeRX * avS, ery = avY + lm.eyeRY * avS;
+    const chinY = avY + (lm.chinY || (lm.my + 0.115)) * avS;
+    const eyeAngle = Math.max(-0.35, Math.min(0.35, Math.atan2(ery - ely, Math.max(12, erx - elx))));
+    const eyeRxPx = Math.max(10, ((lm.eyeW || 0.064) * avS * 0.56) * avatarEyeScale);
+    const eyeRyPx = Math.max(6,  ((lm.eyeH || 0.032) * avS * 0.62) * avatarEyeScale);
+    const lipRxPx = Math.max(14, ((lm.mouthW || 0.10) * avS * 0.52) * avatarMouthWidthScale);
+
+    ctx.save();
+    // Linha de eixo inter-ocular pontilhada
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = 'rgba(168, 85, 247, 0.55)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(elx, ely); ctx.lineTo(erx, ery);
+    ctx.moveTo((elx + erx) * 0.5, (ely + ery) * 0.5); ctx.lineTo(mx, my);
+    ctx.lineTo(mx, chinY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Contorno dos Olhos (Esquerdo e Direito)
+    for(const [ex, ey, tag] of [[elx, ely, '👁️ ESQ'], [erx, ery, '👁️ DIR']]){
+      ctx.strokeStyle = '#c084fc';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(ex, ey, eyeRxPx, eyeRyPx, eyeAngle, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = '#a855f7';
+      ctx.beginPath(); ctx.arc(ex, ey, 4.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(15, 12, 32, 0.82)';
+      ctx.beginPath(); ctx.roundRect(ex - 26, ey - eyeRyPx - 22, 52, 17, 6); ctx.fill();
+      ctx.fillStyle = '#e9d5ff';
+      ctx.font = '800 10.5px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(tag, ex, ey - eyeRyPx - 10);
     }
+
+    // Contorno da Boca (mostrando largura labial calibrada)
+    ctx.strokeStyle = '#00d4ff';
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.ellipse(mx, my, lipRxPx, Math.max(7, lipRxPx * 0.34), eyeAngle * 0.65, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(mx - lipRxPx - 6, my); ctx.lineTo(mx + lipRxPx + 6, my);
+    ctx.moveTo(mx, my - 12); ctx.lineTo(mx, my + 12);
+    ctx.stroke();
+    ctx.fillStyle = '#00d4ff';
+    ctx.beginPath(); ctx.arc(mx, my, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(8, 20, 38, 0.85)';
+    ctx.beginPath(); ctx.roundRect(mx + lipRxPx + 8, my - 10, 62, 20, 6); ctx.fill();
+    ctx.fillStyle = '#67e8f9';
+    ctx.font = '800 11px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('👄 BOCA', mx + lipRxPx + 13, my + 4);
+
+    // Marcador do Queixo / Mandíbula
+    ctx.strokeStyle = '#34d399';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(mx, chinY, 6, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(mx, chinY - 8, lipRxPx * 0.85, 0.2 * Math.PI, 0.8 * Math.PI);
+    ctx.stroke();
+    ctx.fillStyle = '#6ee7b7';
+    ctx.font = '800 10.5px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('📐 QUEIXO', mx, chinY + 18);
+    ctx.textAlign = 'left';
     ctx.restore();
   }
 }

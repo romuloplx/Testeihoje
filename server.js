@@ -474,6 +474,10 @@ app.post('/api/avatar', async (req, res) => {
     const ai = require('./vercel/api/lib/ai');
     const body = req.body || {};
     const action = String(body.action || 'portrait');
+    if (action === 'detect_face') {
+      const out = await ai.detectAvatarFaceLandmarks({ imageBase64: body.imageBase64, mime: body.mime || 'image/jpeg' });
+      return res.json(out);
+    }
     if (action === 'portrait') {
       const out = await ai.generateAvatarPortrait({ prompt: body.prompt, style: body.style });
       if (!out || !out.imageBase64) {

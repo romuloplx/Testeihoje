@@ -2065,10 +2065,175 @@ async function generateAvatarVideo({ imageBase64, prompt = '', duration = 5 }) {
   }
 }
 
+// Leitura Facial por Visão Computacional IA (Gemini Vision / GPT-4o Vision / Unorouter Vision)
+// Detecta coordenadas normalizadas (0.000 a 1.000) de olho esquerdo, olho direito, boca, largura labial e queixo
+async function detectAvatarFaceLandmarks({ imageBase64, mime = 'image/jpeg' }) {
+  const cleanB64 = String(imageBase64 || '').replace(/^data:[^;]+;base64,/, '').trim();
+  if (!cleanB64 || cleanB64.length < 100) {
+    return { ok: false, error: 'Imagem inválida para leitura facial.' };
+  }
+
+  const visionPrompt = `Analyze this square portrait image (1:1 aspect ratio, where x=0.0 is left edge, x=1.0 is right edge, y=0.0 is top edge, y=1.0 is bottom edge).
+Return ONLY a valid JSON object with the exact normalized coordinates (numbers between 0.05 and 0.95 with 3 decimal places) of the subject's face for lip-sync and eye-blink animation:
+{
+  "eyeLX": <x of center of the eye on the viewer's LEFT side>,
+  "eyeLY": <y of center of the eye on the viewer's LEFT side>,
+  "eyeRX": <x of center of the eye on the viewer's RIGHT side>,
+  "eyeRY": <y of center of the eye on the viewer's RIGHT side>,
+  "eyeW": <width of one eye from inner to outer corner divided by image width, typically 0.055 to 0.110>,
+  "eyeH": <vertical opening height of one eye divided by image height, typically 0.024 to 0.055>,
+  "mx": <x of exact center of the mouth where upper and lower lips meet>,
+  "my": <y of exact center of the mouth where upper and lower lips meet>,
+  "mouthW": <total horizontal width of mouth from left corner to right corner divided by image width, typically 0.085 to 0.190>,
+  "chinY": <y of bottom tip of the chin>,
+  "faceW": <width of the face from left cheek to right cheek divided by image width, typically 0.25 to 0.65>,
+  "faceH": <height of the face from forehead hairline to chin tip divided by image height, typically 0.30 to 0.75>
+}
+Ensure eyeLX < eyeRX and eyeLY < my < chinY. Output JSON only.`;
+
+  const sanitizeLandmarks = (rawObj, provider) => {
+    if (!rawObj || typeof rawObj !== 'object') return null;
+    const num = (v, def, min, max) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? Math.max(min, Math.min(max, n)) : def;
+    };
+    let eyeLX = num(rawObj.eyeLX, 0.432, 0.15, 0.80);
+    let eyeRX = num(rawObj.eyeRX, 0.568, 0.20, 0.85);
+    if (eyeLX > eyeRX) { const t = eyeLX; eyeLX = eyeRX; eyeRX = t; }
+    if (eyeRX - eyeLX < 0.05) {
+      const mid = (eyeLX + eyeRX) * 0.5;
+      eyeLX = mid - 0.06;
+      eyeRX = mid + 0.06;
+    }
+    const eyeDist = eyeRX - eyeLX;
+    const eyeLY = num(rawObj.eyeLY, 0.403, 0.12, 0.72);
+    const eyeRY = num(rawObj.eyeRY, eyeLY, 0.12, 0.72);
+    const meanEyeY = (eyeLY + eyeRY) * 0.5;
+    const mx = num(rawObj.mx, (eyeLX + eyeRX) * 0.5, 0.18, 0.82);
+    const my = num(rawObj.my, Math.min(0.84, meanEyeY + eyeDist * 1.08), meanEyeY + 0.05, 0.88);
+    const faceW = num(rawObj.faceW, Math.max(0.24, eyeDist * 2.35), 0.18, 0.78);
+    const faceH = num(rawObj.faceH, Math.max(0.28, (my - meanEyeY) * 2.85), 0.22, 0.85);
+    const eyeW = num(rawObj.eyeW, eyeDist * 0.44, 0.035, 0.16);
+    const eyeH = num(rawObj.eyeH, eyeW * 0.44, 0.018, 0.085);
+    const mouthW = num(rawObj.mouthW, eyeDist * 0.82, 0.055, 0.26);
+    const chinY = num(rawObj.chinY, Math.min(0.94, my + (my - meanEyeY) * 0.62), my + 0.03, 0.96);
+
+    return {
+      ok: true,
+      provider,
+      landmarks: { eyeLX, eyeLY, eyeRX, eyeRY, eyeW, eyeH, mx, my, mouthW, chinY, faceW, faceH }
+    };
+  };
+
+  const errors = [];
+
+  // 1) Gemini Vision (gemini-2.5-flash / gemini-2.0-flash)
+  if (process.env.GEMINI_API_KEY) {
+    const models = [process.env.GEMINI_MODEL || 'gemini-2.5-flash', 'gemini-2.0-flash'];
+    for (const mdl of [...new Set(models)]) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${mdl}:generateContent?key=${process.env.GEMINI_API_KEY}`;
+        const r = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: visionPrompt },
+                { inline_data: { mime_type: mime || 'image/jpeg', data: cleanB64 } }
+              ]
+            }],
+            generationConfig: { temperature: 0.1, responseMimeType: 'application/json' }
+          }),
+          signal: AbortSignal.timeout(12000)
+        });
+        if (r.ok) {
+          const j = await r.json();
+          const txt = j?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          const m = txt.match(/\{[\s\S]*\}/);
+          if (m) {
+            const parsed = sanitizeLandmarks(JSON.parse(m[0]), `gemini/${mdl}`);
+            if (parsed) return parsed;
+          }
+        } else {
+          errors.push(`gemini/${mdl}: HTTP ${r.status}`);
+        }
+      } catch (e) {
+        errors.push(`gemini/${mdl}: ${e.message}`);
+      }
+    }
+  }
+
+  // 2) OpenAI Vision (gpt-4o-mini)
+  if (canUseOfficialOpenAI()) {
+    try {
+      const openai = makeOpenAI();
+      const resp = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        temperature: 0.1,
+        response_format: { type: 'json_object' },
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: visionPrompt },
+            { type: 'image_url', image_url: { url: `data:${mime || 'image/jpeg'};base64,${cleanB64}`, detail: 'low' } }
+          ]
+        }]
+      });
+      const txt = resp.choices?.[0]?.message?.content || '';
+      const m = txt.match(/\{[\s\S]*\}/);
+      if (m) {
+        const parsed = sanitizeLandmarks(JSON.parse(m[0]), 'openai/gpt-4o-mini');
+        if (parsed) return parsed;
+      }
+    } catch (e) {
+      errors.push('openai/vision: ' + e.message);
+    }
+  }
+
+  // 3) Unorouter Vision
+  const uKey = pickReadyUniKey();
+  if (uKey) {
+    for (const mdl of ['gpt-4o-mini', 'gemini-2.0-flash']) {
+      try {
+        const r = await fetch(uniBase() + '/chat/completions', {
+          method: 'POST',
+          headers: uniHeaders(uKey),
+          body: JSON.stringify({
+            model: mdl,
+            temperature: 0.1,
+            messages: [{
+              role: 'user',
+              content: [
+                { type: 'text', text: visionPrompt },
+                { type: 'image_url', image_url: { url: `data:${mime || 'image/jpeg'};base64,${cleanB64}` } }
+              ]
+            }]
+          }),
+          signal: AbortSignal.timeout(12000)
+        });
+        if (r.ok) {
+          const j = await r.json();
+          const txt = j?.choices?.[0]?.message?.content || '';
+          const m = txt.match(/\{[\s\S]*\}/);
+          if (m) {
+            const parsed = sanitizeLandmarks(JSON.parse(m[0]), `unorouter/${mdl}`);
+            if (parsed) return parsed;
+          }
+        }
+      } catch (e) {
+        errors.push(`unorouter/${mdl}: ${e.message}`);
+      }
+    }
+  }
+
+  return { ok: false, error: errors.join(' | ') || 'Visão IA indisponível no momento (usando detector neural local)' };
+}
+
 module.exports = {
   TTS_VOICES, mockScript, mockCreateFull, mockDubResult,
   generateWithOpenAI, generateCreateFull, generateSceneImage, dubWithOpenAI, enhanceScript,
-  generateAvatarPortrait, generateAvatarScript, generateAvatarVideo,
+  generateAvatarPortrait, generateAvatarScript, generateAvatarVideo, detectAvatarFaceLandmarks,
   chatWithFallback, ttsWithFallback, chatViaPollinations, ttsGoogle, ttsStreamElements,
   probeOpenAI, fullPipelineProbe, candidatesProbe, unorouterProbe, unorouterVideoProbe, getBody, send
 };
