@@ -302,7 +302,7 @@ app.delete('/api/projects/:id', (req, res) => {
 });
 
 app.post('/api/create', async (req, res) => {
-  const { prompt, duration, style, voice, cinemaMode } = req.body;
+  const { prompt, duration, style, voice, cinemaMode, customCharacters } = req.body;
 
   if (!prompt || !prompt.trim()) {
     return res.status(400).json({ error: 'Descreva o vídeo primeiro.' });
@@ -315,14 +315,17 @@ app.post('/api/create', async (req, res) => {
   let data = null;
   let mode = 'mock';
   let aiError = null;
+  let provider = 'local';
 
-  const gen = await sharedAi.generateCreateFull({ prompt, duration, style, voice, cinemaMode });
+  const gen = await sharedAi.generateCreateFull({ prompt, duration, style, voice, cinemaMode, customCharacters });
   if (gen && gen.data) {
     data = gen.data;
-    mode = 'openai';
+    provider = gen.provider || 'ia';
+    mode = provider === 'story-engine-fallback' ? 'mock' : 'openai';
+    aiError = gen.error || null;
   } else {
-    aiError = (gen && gen.error) || 'sem OPENAI_API_KEY';
-    data = sharedAi.mockCreateFull({ prompt, duration, style, voice });
+    aiError = (gen && gen.error) || 'sem provedores ativos';
+    data = sharedAi.mockCreateFull({ prompt, duration, style, voice, customCharacters });
   }
   const scriptText = data.script;
   const scriptMeta = data.meta || null;
@@ -345,6 +348,7 @@ app.post('/api/create', async (req, res) => {
     seo: data.seo,
     meta: scriptMeta,
     mode,
+    provider,
     status: 'roteiro_pronto',
     createdAt: new Date().toISOString(),
     thumbnail: `https://picsum.photos/seed/${id}/640/360`
@@ -364,20 +368,21 @@ app.post('/api/create', async (req, res) => {
     seo: data.seo,
     project,
     mode,
-    warning: mode === 'openai' ? undefined : `A IA real não respondeu (${aiError}). O roteiro conectado abaixo foi gerado localmente.`,
-    message: mode === 'openai' ? 'Cinema Conectado gerado com IA!' : `⚠️ Modo local ativado (${aiError}).`
+    provider,
+    warning: mode === 'openai' ? undefined : `Roteiro de história e personagens gerados localmente (${aiError}).`,
+    message: mode === 'openai' ? `História e personagens criados com IA (${provider})!` : `⚡ História com personagens pronta!`
   });
 });
 
 app.post('/api/scene-image', async (req, res) => {
   try {
-    const { prompt, style } = req.body || {};
+    const { prompt, style, width, height } = req.body || {};
     if (!prompt || !prompt.trim()) {
       return res.status(400).json({ error: 'Descreva a cena.' });
     }
-    const img = await require('./vercel/api/lib/ai').generateSceneImage({ prompt, style });
+    const img = await require('./vercel/api/lib/ai').generateSceneImage({ prompt, style, width, height });
     if (!img || !img.imageBase64) {
-      return res.json({ imageBase64: null, mock: true, error: img && img.error, message: 'Geração de imagem falhou' + (img && img.error ? ` (${img.error})` : '') + ' — placeholder será usado.' });
+      return res.json({ imageBase64: null, mock: true, error: img && img.error, message: 'Geração de imagem falhou' + (img && img.error ? ` (${img.error})` : '') + ' — usando renderizador direto.' });
     }
     res.json({ imageBase64: img.imageBase64, mime: img.mime, model: img.model });
   } catch (e) {
@@ -515,13 +520,13 @@ app.post('/api/enhance', async (req, res) => {
   }
 });
 
-// TTS endpoint — cadeia de provedores (OpenAI → Google → StreamElements)
+// TTS endpoint — cadeia de provedores (OpenAI → Neural HD → Gemini → Unorouter → Google)
 app.post('/api/tts', async (req, res) => {
-  const { text, voice = 'onyx', lang = 'pt-BR' } = req.body;
+  const { text, voice = 'onyx', lang = 'pt-BR', emotion = '' } = req.body;
   if (!text) return res.status(400).json({ error: 'Texto vazio' });
 
   try {
-    const out = await require('./vercel/api/lib/ai').ttsWithFallback({ text, voice, lang });
+    const out = await require('./vercel/api/lib/ai').ttsWithFallback({ text, voice, lang, emotion });
     if (out.error) {
       return res.status(502).json({ error: 'Voz falhou em todos os provedores: ' + out.error, fallback: 'browser' });
     }

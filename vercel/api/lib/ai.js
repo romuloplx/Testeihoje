@@ -39,13 +39,14 @@ function mockScript({ prompt, duration, style, voice }) {
 }
 
 // Seleciona vozes garantidamente distintas para Narrador + Personagens da história
-function pickDistinctCastVoices(narratorVoice = 'onyx', chars = []) {
+function pickDistinctCastVoices(narratorVoice = 'onyx', chars = [], style = 'cinematic') {
   const used = new Set([narratorVoice || 'onyx']);
   const malePool = ['echo', 'fable', 'onyx', 'ash', 'alloy'];
   const femalePool = ['nova', 'shimmer', 'coral', 'sage', 'alloy'];
   const colors = ['#38bdf8', '#f472b6', '#34d399', '#c084fc'];
+  const defPortraitStyle = style === 'animation' ? 'pixar' : 'studio';
   return chars.map((c, idx) => {
-    const isFemale = /fem|mulher|garota|menina|dra|ela|woman|girl|female/i.test(`${c.gender || ''} ${c.role || ''} ${c.appearance || ''}`);
+    const isFemale = /fem|mulher|garota|menina|dra|ela|woman|girl|female|mãe|mae|princesa|rainha|avó|avo|irmã|irma|amiga|cachorrinha|gatinha|raposa|fada|bruxa|exploradora|investigadora|mentora|engenheira|professora|sofia|luna|helena|maya|lyra|nina|mel|clara|lara|ana|julia|maria|alice|bela/i.test(`${c.gender || ''} ${c.name || ''} ${c.role || ''} ${c.appearance || ''}`);
     const pool = isFemale ? femalePool : malePool;
     const chosen = (c.voice && TTS_VOICES[c.voice] && !used.has(c.voice))
       ? c.voice
@@ -53,118 +54,223 @@ function pickDistinctCastVoices(narratorVoice = 'onyx', chars = []) {
     used.add(chosen);
     return {
       id: c.id || `char${idx + 1}`,
-      name: String(c.name || (isFemale ? 'Helena' : 'Lucas')).trim(),
-      role: String(c.role || (idx === 0 ? 'Protagonista' : 'Especialista')).trim(),
+      name: String(c.name || (isFemale ? 'Sofia' : 'Kael')).trim(),
+      role: String(c.role || (idx === 0 ? 'Protagonista' : 'Companheiro(a) de Jornada')).trim(),
+      personality: String(c.personality || (idx === 0 ? 'expressivo, curioso e determinado' : 'observador, leal e espirituoso')).trim(),
       gender: isFemale ? 'female' : 'male',
       voice: chosen,
       themeColor: c.themeColor || colors[idx % colors.length],
-      portraitStyle: c.portraitStyle || 'studio',
+      portraitStyle: c.portraitStyle || defPortraitStyle,
       appearance: String(c.appearance || (isFemale
-        ? ' expressive 29-year-old Brazilian woman with warm eyes, dark wavy hair, stylish modern jacket'
-        : ' charismatic 32-year-old Brazilian man with short dark hair, expressive eyes, smart casual jacket')).trim()
+        ? 'expressive young woman with warm bright eyes, dark wavy hair, wearing a stylish adventure jacket, cinematic lighting'
+        : 'charismatic young man with short dark hair, expressive eyes, wearing a rugged travel jacket, cinematic lighting')).trim()
     };
   });
 }
 
 function formatConnectedScript(title, characters, scenes) {
   const castHeader = characters && characters.length
-    ? `🎭 **ELENCO & VOZES:**\n• 🎙️ Narrador (voz principal)\n` + characters.map(c => `• 🗣️ ${c.name} — ${c.role} (voz ${c.voice})`).join('\n') + '\n\n'
+    ? `🎭 **PERSONAGENS DA HISTÓRIA & VOZES:**\n• 🎙️ Narrador (voz cinematográfica)\n` + characters.map(c => `• 🗣️ **${c.name}** — ${c.role}${c.personality ? ` (${c.personality})` : ''} [voz: ${c.voice}]`).join('\n') + '\n\n'
     : '';
   const body = scenes.map(s => {
     const loc = s.locationName ? ` (${s.locationName})` : '';
     const lines = Array.isArray(s.beats) && s.beats.length
-      ? s.beats.map(b => `${b.speaker === 'narrator' ? '🎙️ Narrador' : '🗣️ ' + (b.speakerName || 'Personagem')}: "${b.text}"`).join('\n')
+      ? s.beats.map(b => {
+          const emoTag = b.emotion && b.emotion !== 'storyteller' ? ` [${b.emotion}]` : '';
+          const actTag = b.action ? ` *(${b.action})*` : '';
+          return `${b.speaker === 'narrator' ? '🎙️ Narrador' : '🗣️ ' + (b.speakerName || 'Personagem')}${emoTag}:${actTag} "${b.text}"`;
+        }).join('\n')
       : s.narration;
-    return `🎬 **CENA ${s.i} — ${s.title}${loc}**\n🏞️ *Cenário:* ${s.visual}\n${lines}`;
+    return `🎬 **CENA ${s.i} — ${s.title}${loc}**\n🏞️ *Cenário em Ação:* ${s.sceneSummaryPt || s.locationName || s.title}\n${lines}`;
   }).join('\n\n');
   return `${title ? `**TÍTULO:** ${title}\n\n` : ''}${castHeader}${body}`;
 }
 
-function mockCreateFull({ prompt, duration, style, voice }) {
-  const durNum = Math.max(0.5, parseFloat(duration) || 1);
-  const cleanPrompt = String(prompt || 'uma descoberta extraordinária').trim();
-  const characters = pickDistinctCastVoices(voice || 'onyx', [
+// Extrai personagens sugeridos pelo usuário ou cria protagonistas ricos baseados no tema da história
+function inferCharactersFromPrompt(prompt = '', customCharacters = '', style = 'cinematic') {
+  const rawCustom = String(customCharacters || '').trim();
+  const text = `${rawCustom} ${prompt}`.trim();
+  const isAnim = style === 'animation';
+  const styleTag = isAnim ? '3D Pixar Disney animated character' : 'photorealistic cinematic film character';
+
+  if (rawCustom) {
+    const parts = rawCustom.split(/\s*(?:,|;|\be\b|\+|\/)\s*/i).map(s => s.trim()).filter(Boolean).slice(0, 3);
+    if (parts.length >= 1) {
+      const list = parts.map((p, i) => {
+        const m = p.match(/^([A-À-ÿa-z0-9_ -]{2,26}?)(?:\s*[\(:,-]\s*(.+?)\)?$|$)/);
+        const name = (m && m[1] ? m[1].trim() : `Personagem ${i + 1}`).slice(0, 24);
+        const desc = (m && m[2] ? m[2].trim() : p).slice(0, 120);
+        const isFem = /fem|mulher|menina|garota|ela|mãe|mae|princesa|rainha|amiga|cachorrinha|gatinha|raposa|fada|exploradora|investigadora|mentora|engenheira|sofia|ana|julia|lara|helena|maria|luna|clara|alice|nina|mel|maya|lyra|bela/i.test(p);
+        return {
+          id: `char${i + 1}`,
+          name,
+          role: desc || (i === 0 ? 'Protagonista' : 'Co-protagonista'),
+          personality: i === 0 ? 'corajoso, expressivo e cheio de vida' : 'inteligente, leal e carismático',
+          gender: isFem ? 'female' : 'male',
+          portraitStyle: isAnim ? 'pixar' : 'studio',
+          appearance: `${styleTag}, ${name} (${desc}), expressive face, detailed hair and signature outfit, cinematic lighting`
+        };
+      });
+      if (list.length === 1) {
+        const firstFem = list[0].gender === 'female';
+        list.push({
+          id: 'char2',
+          name: firstFem ? 'Leo' : 'Clara',
+          role: 'Parceiro(a) de Aventura',
+          personality: 'curioso, espontâneo e leal',
+          gender: firstFem ? 'male' : 'female',
+          portraitStyle: isAnim ? 'pixar' : 'studio',
+          appearance: `${styleTag}, ${firstFem ? 'charismatic young man Leo with warm eyes and adventure jacket' : 'expressive young woman Clara with bright eyes and stylish jacket'}, cinematic lighting`
+        });
+      }
+      return list;
+    }
+  }
+
+  // Detecta arquétipos pela história pedida
+  if (/crian[çc]a|menino|menina|infantil|f[áa]bula|brinquedo|escola|cachorro|gato|le[ãa]o|floresta encantada/i.test(text)) {
+    return [
+      {
+        id: 'char1', name: 'Theo', role: 'Jovem Aventureiro', personality: 'curioso, sonhador e corajoso', gender: 'male',
+        portraitStyle: isAnim ? 'pixar' : 'studio',
+        appearance: `${styleTag}, 11-year-old boy with messy brown hair, wide curious eyes, wearing a bright red hoodie and explorer backpack`
+      },
+      {
+        id: 'char2', name: 'Luna', role: 'Melhor Amiga Destemida', personality: 'esperta, bem-humorada e criativa', gender: 'female',
+        portraitStyle: isAnim ? 'pixar' : 'studio',
+        appearance: `${styleTag}, 11-year-old girl with curly dark hair, warm smile, wearing a denim jacket with star pins and glowing lantern`
+      }
+    ];
+  }
+  if (/detetive|crime|mist[ée]rio|suspense|terror|noite|sombra|investiga|segredo/i.test(text)) {
+    return [
+      {
+        id: 'char1', name: 'Dante', role: 'Investigador', personality: 'perspicaz, intenso e destemido', gender: 'male',
+        portraitStyle: isAnim ? 'pixar' : 'studio',
+        appearance: `${styleTag}, sharp 34-year-old detective man with dark coat, intense expressive eyes, dramatic noir lighting`
+      },
+      {
+        id: 'char2', name: 'Maya', role: 'Especialista em Pistas', personality: 'analítica, corajosa e direta', gender: 'female',
+        portraitStyle: isAnim ? 'pixar' : 'studio',
+        appearance: `${styleTag}, intelligent 29-year-old woman with dark hair pulled back, leather jacket, observant eyes, dramatic lighting`
+      }
+    ];
+  }
+  if (/futuro|rob[ôo]|espa[çc]o|gal[áa]xia|nave|cyber|ia|tecnologia|planeta/i.test(text)) {
+    return [
+      {
+        id: 'char1', name: 'Kael', role: 'Piloto Explorador', personality: 'audacioso, curioso e carismático', gender: 'male',
+        portraitStyle: isAnim ? 'pixar' : 'studio',
+        appearance: `${styleTag}, 27-year-old sci-fi explorer man with glowing cyan collar flight jacket, tousled dark hair, expressive face`
+      },
+      {
+        id: 'char2', name: 'Lyra', role: 'Engenheira Estelar', personality: 'brilhante, sarcástica e corajosa', gender: 'female',
+        portraitStyle: isAnim ? 'pixar' : 'studio',
+        appearance: `${styleTag}, 26-year-old sci-fi woman with silver-streaked dark hair, sleek futuristic suit, bright expressive eyes`
+      }
+    ];
+  }
+  return [
     {
-      id: 'char1',
-      name: 'Lucas',
-      role: 'Explorador Curioso',
-      gender: 'male',
-      appearance: 'charismatic 31-year-old Brazilian man wearing dark adventure jacket, short dark hair, warm expressive face'
+      id: 'char1', name: 'Gabriel', role: 'Protagonista da História', personality: 'expressivo, determinado e carismático', gender: 'male',
+      portraitStyle: isAnim ? 'pixar' : 'studio',
+      appearance: `${styleTag}, charismatic 28-year-old man with short dark hair, expressive eyes, wearing a modern dark olive jacket`
     },
     {
-      id: 'char2',
-      name: 'Helena',
-      role: 'Pesquisadora',
-      gender: 'female',
-      appearance: 'intelligent 29-year-old Brazilian woman wearing modern slate blazer, shoulder-length brown hair, bright eyes'
+      id: 'char2', name: 'Sofia', role: 'Protagonista & Parceira', personality: 'viva, inteligente e emocionante', gender: 'female',
+      portraitStyle: isAnim ? 'pixar' : 'studio',
+      appearance: `${styleTag}, expressive 26-year-old woman with warm brown eyes, wavy dark hair, wearing a stylish amber jacket`
     }
-  ]);
+  ];
+}
+
+function mockCreateFull({ prompt, duration, style, voice, customCharacters = '' }) {
+  const durNum = Math.max(0.5, parseFloat(duration) || 1);
+  const cleanPrompt = String(prompt || 'uma aventura inesquecível').trim();
+  const baseChars = inferCharactersFromPrompt(cleanPrompt, customCharacters, style);
+  const characters = pickDistinctCastVoices(voice || 'onyx', baseChars, style);
+  const c1 = characters[0];
+  const c2 = characters[1] || characters[0];
 
   const rawScenes = [
     {
-      title: 'O Chamado da Descoberta',
-      locationName: 'Ponto de Partida ao Amanhecer',
+      title: 'Onde Tudo Começa',
+      locationName: 'Cenário Inicial da História',
+      sceneSummaryPt: `${c1.name} e ${c2.name} entram no cenário principal de ${cleanPrompt}`,
       cameraMove: 'zoomIn',
       atmosphere: 'sunbeams',
-      visual: `Wide establishing cinema shot of ${cleanPrompt} at golden sunrise, atmospheric mist, volumetric light rays, rich environment details, no text`,
+      visual: `Cinematic wide shot of the environment of ${cleanPrompt}, featuring ${c1.appearance} and ${c2.appearance} arriving in the scene, rich atmospheric lighting, detailed background, no text`,
+      actionVisual: `Medium dynamic cinema shot inside the scenario of ${cleanPrompt}, ${c1.appearance} looking amazed and pointing forward alongside ${c2.appearance}, shallow depth of field, dramatic lighting, no text`,
       beats: [
-        { speaker: 'narrator', speakerName: 'Narrador', focus: 'wide', text: `Tudo parecia tranquilo ao amanhecer, até surgir a primeira pista real sobre ${cleanPrompt}.` },
-        { speaker: 'char1', speakerName: 'Lucas', focus: 'dialogue', text: `Helena, olha este lugar! Tudo o que lemos sobre ${cleanPrompt} está acontecendo bem na nossa frente!` },
-        { speaker: 'char2', speakerName: 'Helena', focus: 'dialogue', text: `Impressionante, Lucas. Os sinais mostram que isso vai muito além do que qualquer pessoa imaginava.` }
+        { speaker: 'narrator', speakerName: 'Narrador', emotion: 'storyteller', shot: 'establishing', cameraMove: 'zoomIn', action: 'câmera abre revelando o cenário', text: `O vento soprava forte quando ${c1.name} e ${c2.name} deram o primeiro passo diante daquele cenário que mudaria tudo: ${cleanPrompt}.` },
+        { speaker: 'char1', speakerName: c1.name, emotion: 'excited', shot: 'action', cameraMove: 'dollyIn', action: `${c1.name} olha ao redor impressionado`, text: `${c2.name}, você está vendo isso?! Não é só uma história, está acontecendo de verdade bem na nossa frente!` },
+        { speaker: 'char2', speakerName: c2.name, emotion: 'curious', shot: 'action', cameraMove: 'panRight', action: `${c2.name} se aproxima para observar de perto`, text: `Calma, ${c1.name}... olha aquele brilho ali no fundo. Se a gente quiser descobrir a verdade, precisa ir até lá agora!` }
       ]
     },
     {
-      title: 'A Pista Oculta no Cenário',
-      locationName: 'Coração do Mistério',
+      title: 'O Mistério se Revela',
+      locationName: 'Interior do Cenário Principal',
+      sceneSummaryPt: `${c1.name} e ${c2.name} exploram os detalhes e enfrentam o primeiro desafio`,
       cameraMove: 'panRight',
       atmosphere: 'particles',
-      visual: `Detailed wide interior/exterior environment revealing hidden clues of ${cleanPrompt}, dramatic lighting, depth of field, cinematic composition, no text`,
+      visual: `Detailed cinematic environment showing the heart of ${cleanPrompt}, with ${c1.appearance} and ${c2.appearance} walking through the dramatic scenery, volumetric rays, no text`,
+      actionVisual: `Dramatic close-medium action shot of ${c2.appearance} and ${c1.appearance} discovering a glowing clue inside ${cleanPrompt}, emotional expressions, cinematic lighting, no text`,
       beats: [
-        { speaker: 'narrator', speakerName: 'Narrador', focus: 'wide', text: `Avançando pelo cenário principal, cada detalhe ao redor confirmava que as peças finalmente se encaixavam.` },
-        { speaker: 'char2', speakerName: 'Helena', focus: 'dialogue', text: `Repare na estrutura aqui atrás de nós, Lucas. Cada marca conta exatamente como tudo começou.` },
-        { speaker: 'char1', speakerName: 'Lucas', focus: 'dialogue', text: `Então não era lenda! Precisamos registrar isso antes que a luz mude.` }
+        { speaker: 'narrator', speakerName: 'Narrador', emotion: 'tense', shot: 'establishing', cameraMove: 'panRight', action: 'os personagens avançam pelo cenário', text: `A cada passo lá dentro, o ambiente ao redor se transformava, revelando detalhes que ninguém jamais havia testemunhado.` },
+        { speaker: 'char2', speakerName: c2.name, emotion: 'surprised', shot: 'action', cameraMove: 'zoomIn', action: `${c2.name} toca em um detalhe misterioso do local`, text: `Espera aí! Olha só para isso aqui, ${c1.name}! Tudo neste lugar foi construído para guardar esse segredo!` },
+        { speaker: 'char1', speakerName: c1.name, emotion: 'determined', shot: 'action', cameraMove: 'panLeft', action: `${c1.name} segura firme e toma a frente`, text: `Eu sabia que não estávamos loucos! Vamos continuar, não dá para voltar atrás agora!` }
       ]
     },
     {
-      title: 'A Grande Revelação',
-      locationName: 'Câmara Principal Iluminada',
+      title: 'O Momento Decisivo',
+      locationName: 'Ápice da Aventura',
+      sceneSummaryPt: `O clímax emocionante em que o cenário se transforma diante de ${c1.name} e ${c2.name}`,
       cameraMove: 'zoomIn',
       atmosphere: 'embers',
-      visual: `Epic climactic wide shot showcasing the main revelation about ${cleanPrompt}, glowing golden and cyan illumination, grand scale scenery, no text`,
+      visual: `Epic climactic wide cinema shot of ${cleanPrompt} in full glory, ${c1.appearance} and ${c2.appearance} standing at the center of the action, dramatic golden and cyan light, no text`,
+      actionVisual: `Intense emotional cinema shot of ${c1.appearance} and ${c2.appearance} reacting with awe during the climax of ${cleanPrompt}, dynamic camera angle, sparks and light, no text`,
       beats: [
-        { speaker: 'narrator', speakerName: 'Narrador', focus: 'wide', text: `Diante dos dois, o cenário se abriu por completo, revelando o verdadeiro segredo de ${cleanPrompt}.` },
-        { speaker: 'char1', speakerName: 'Lucas', focus: 'dialogue', text: `Eu nunca vi nada tão grandioso na minha vida, Helena! Isso muda completamente a história!` },
-        { speaker: 'char2', speakerName: 'Helena', focus: 'dialogue', text: `E o mais incrível é perceber como cada etapa nos trouxe exatamente até este momento.` }
+        { speaker: 'narrator', speakerName: 'Narrador', emotion: 'excited', shot: 'establishing', cameraMove: 'zoomIn', action: 'luz intensa ilumina todo o cenário', text: `De repente, um som profundo ecoou por todo o lugar, e o momento mais aguardado finalmente aconteceu diante dos dois.` },
+        { speaker: 'char1', speakerName: c1.name, emotion: 'surprised', shot: 'action', cameraMove: 'dollyIn', action: `${c1.name} abre um sorriso emocionado`, text: `Inacreditável, ${c2.name}! Olha o tamanho disso! É muito mais extraordinário do que nos nossos melhores sonhos!` },
+        { speaker: 'char2', speakerName: c2.name, emotion: 'happy', shot: 'action', cameraMove: 'zoomOut', action: `${c2.name} comemora ao lado de ${c1.name}`, text: `Conseguimos, ${c1.name}! Cada desafio no caminho valeu a pena para viver esse instante!` }
       ]
     },
     {
-      title: 'Novo Horizonte',
-      locationName: 'Mirante Panorâmico ao Entardecer',
+      title: 'Um Novo Começo',
+      locationName: 'Horizonte Iluminado',
+      sceneSummaryPt: `${c1.name} e ${c2.name} contemplam o cenário transformado no desfecho da jornada`,
       cameraMove: 'zoomOut',
       atmosphere: 'sunbeams',
-      visual: `Breathtaking panoramic sunset vista concluding the story of ${cleanPrompt}, warm horizon glow, cinematic wide angle, no text`,
+      visual: `Breathtaking panoramic sunset shot of ${cleanPrompt}, ${c1.appearance} and ${c2.appearance} looking out over the horizon together, warm cinematic glow, no text`,
+      actionVisual: `Warm cinematic two-shot of ${c1.appearance} and ${c2.appearance} smiling at each other at sunset in ${cleanPrompt}, golden hour rim light, no text`,
       beats: [
-        { speaker: 'narrator', speakerName: 'Narrador', focus: 'wide', text: `Ao cair da tarde, a jornada provou que ${cleanPrompt} guarda lições inesquecíveis para quem ousa explorar.` },
-        { speaker: 'char2', speakerName: 'Helena', focus: 'dialogue', text: `Essa foi apenas a primeira porta que abrimos juntos, Lucas.` },
-        { speaker: 'char1', speakerName: 'Lucas', focus: 'dialogue', text: `Com certeza! E você que acompanhou tudo com a gente, já prepare-se para o próximo capítulo!` }
+        { speaker: 'narrator', speakerName: 'Narrador', emotion: 'warm', shot: 'establishing', cameraMove: 'zoomOut', action: 'pôr do sol dourado envolve os protagonistas', text: `Quando a luz suave do entardecer cobriu o horizonte, nada mais era como antes. A história havia deixado sua marca para sempre.` },
+        { speaker: 'char2', speakerName: c2.name, emotion: 'warm', shot: 'action', cameraMove: 'panRight', action: `${c2.name} olha para o horizonte com gratidão`, text: `Sabe do que eu tenho certeza agora, ${c1.name}? Essa foi só a primeira de muitas aventuras que ainda vamos viver.` },
+        { speaker: 'char1', speakerName: c1.name, emotion: 'excited', shot: 'action', cameraMove: 'zoomIn', action: `${c1.name} olha para a câmera convidando o público`, text: `Pode apostar que sim! E para você que viveu cada segundo dessa história com a gente, nos vemos no próximo episódio!` }
       ]
     }
   ];
 
   const chosen = durNum <= 0.6 ? rawScenes.slice(0, 3) : rawScenes;
   const per = (durNum * 60) / chosen.length;
-  const charVoiceMap = { narrator: voice || 'onyx', char1: characters[0].voice, char2: characters[1].voice };
+  const charVoiceMap = { narrator: voice || 'onyx', char1: c1.voice, char2: c2.voice };
   const scenes = chosen.map((s, idx) => {
-    const beats = s.beats.map(b => ({ ...b, voice: charVoiceMap[b.speaker] || voice || 'onyx' }));
+    const beats = s.beats.map(b => ({
+      ...b,
+      focus: b.speaker === 'narrator' ? 'wide' : 'dialogue',
+      voice: charVoiceMap[b.speaker] || voice || 'onyx'
+    }));
     return {
       i: idx + 1,
       title: s.title,
       locationName: s.locationName,
+      sceneSummaryPt: s.sceneSummaryPt,
       cameraMove: s.cameraMove,
       atmosphere: s.atmosphere,
       narration: beats.map(b => b.text).join(' '),
       beats,
       visual: `${style || 'cinematic'} — ${s.visual}`,
+      actionVisual: `${style || 'cinematic'} — ${s.actionVisual || s.visual}`,
       start: Math.round(idx * per),
       end: Math.round((idx + 1) * per)
     };
@@ -180,8 +286,8 @@ function mockCreateFull({ prompt, duration, style, voice }) {
     scenes,
     seo: {
       title: `${cleanPrompt.slice(0, 65)} | DubAI PRO`,
-      description: `História completa conectando narrador, cenários vivos e personagens sobre ${cleanPrompt}.\n\n#dubaipro #ia #cinema #storytelling`,
-      tags: cleanPrompt.split(/\s+/).slice(0, 6).join(', ') + ', ia, história animada, youtube'
+      description: `História animada com personagens vivos e cenários cinematográficos sobre ${cleanPrompt}.\n\n#dubaipro #ia #cinema #historia`,
+      tags: cleanPrompt.split(/\s+/).slice(0, 6).join(', ') + ', ia, história com personagens, animação, youtube'
     },
     meta: { estilo: style, voz: voice, cenas: scenes.length, dur: durNum }
   };
@@ -220,102 +326,134 @@ async function generateWithOpenAI(prompt, duration, style, voice) {
   }
 }
 
-// Cinema Conectado (Narrador + Cenários Vivos + Diálogo Entre Personagens) + modo Clássico
-async function generateCreateFull({ prompt, duration, style, voice, cinemaMode = 'connected' }) {
+// Cinema Conectado & Histórias com Personagens Vivos (Narrador + Cenários Multi-Plano + Personagens Atuando na Cena)
+async function generateCreateFull({ prompt, duration, style, voice, cinemaMode = 'connected', customCharacters = '' }) {
   const durNum = Math.max(0.5, parseFloat(duration) || 1);
   const styleAnchorMap = {
-    realistic: '35mm cinema film photography, photorealistic, natural skin texture, dramatic ARRI Alexa lighting, consistent color grading',
-    cinematic: 'epic anamorphic 4K cinema look, volumetric light rays, rich contrast, shallow depth of field, movie still',
-    animation: '3D Pixar and Disney feature film animation style, expressive characters, vibrant warm global illumination, rich detailed environments',
+    realistic: '35mm cinema film photography, photorealistic characters and environment, natural skin texture, dramatic ARRI Alexa lighting, rich color grading',
+    cinematic: 'epic anamorphic 4K cinema movie still, volumetric light rays, expressive characters in scene, rich contrast, shallow depth of field',
+    animation: '3D Pixar and Disney feature film animation style, expressive animated characters acting in rich detailed 3D environments, warm global illumination',
     documentary: 'National Geographic 4K cinema documentary photography, authentic natural atmosphere, crisp lens detail',
-    images: 'masterpiece digital concept art illustration, cohesive cinematic color palette, atmospheric depth'
+    images: 'masterpiece digital concept art illustration, expressive characters in rich environment, cohesive cinematic color palette'
   };
   const artStylePrompt = styleAnchorMap[style] || styleAnchorMap.cinematic;
+  const fallbackChars = inferCharactersFromPrompt(prompt, customCharacters, style);
 
-  // MODO CINEMA CONECTADO (Padrão): Narrador + Cenário Dinâmico + Diálogo Entre Personagens 100% interligados
+  // MODO HISTÓRIA COM PERSONAGENS / CINEMA CONECTADO (Padrão)
   if (cinemaMode !== 'classic') {
     const nScenes = durNum <= 0.6 ? 3 : durNum <= 1.2 ? 4 : durNum <= 2.5 ? 5 : Math.min(7, Math.round(durNum * 1.1));
-    const wordsPerBeat = durNum <= 1.2 ? 18 : durNum <= 2.5 ? 24 : 32;
+    const wordsPerBeat = durNum <= 1.2 ? 19 : durNum <= 2.5 ? 25 : 32;
+    const isPureStory = cinemaMode === 'story';
+
+    const customCharHint = String(customCharacters || '').trim()
+      ? `\nPERSONAGENS DEFINIDOS PELO USUÁRIO (OBRIGATÓRIO USAR ESTES PERSONAGENS): "${String(customCharacters).trim()}"`
+      : '\nSe o pedido do usuário citar nomes ou tipos de personagens (ex: um menino, um cachorro, um detetive, um rei, dois irmãos, etc.), CRIE EXATAMENTE esses personagens! Caso contrário, crie 2 protagonistas carismáticos que vivem a história na prática.';
 
     const cinemaSystem = [
-      'Você é um Diretor de Cinema e Showrunner especialista em vídeos onde NARRADOR, CENÁRIO e DIÁLOGO ENTRE PERSONAGENS se conectam 100%.',
-      'Responda APENAS um objeto JSON válido com esta estrutura exata:',
+      'Você é um Diretor de Animação (estilo Pixar / Netflix) e Roteirista Dramático de Histórias Cinematográficas.',
+      'PROIBIDO criar textos robóticos, didáticos ou genéricos do tipo "Bem-vindos a uma jornada sobre..." ou comentaristas de estúdio dizendo "Olha este lugar!".',
+      'Você deve criar uma HISTÓRIA VIVA COM PERSONAGENS REAIS que estão DENTRO do cenário vivendo a ação, sentindo emoções reais (surpresa, medo, alegria, curiosidade, urgência, coragem) e interagindo com os elementos do ambiente.',
+      'Responda APENAS um objeto JSON válido (sem markdown e sem comentários) com esta estrutura exata:',
       '{',
-      '  "title": "título envolvente em português",',
-      '  "mood": "epic | mystery | warm | tech | adventure",',
+      '  "title": "título envolvente da história em português",',
+      '  "mood": "adventure | mystery | epic | warm | tech",',
       '  "seo": { "title": "título YouTube até 70 chars", "description": "descrição envolvente com hashtags", "tags": "tag1, tag2, tag3" },',
       '  "characters": [',
-      '    { "id": "char1", "name": "Nome curto", "role": "Papel na história", "gender": "male | female", "appearance": "detailed English description of face, hair, age, clothing for consistent studio portrait" },',
-      '    { "id": "char2", "name": "Nome curto", "role": "Papel na história", "gender": "female | male", "appearance": "detailed English description of face, hair, age, clothing for consistent studio portrait" }',
+      '    { "id": "char1", "name": "Nome do protagonista 1", "role": "Quem ele é na história", "personality": "traço emocional marcante", "gender": "male | female", "appearance": "concise English visual description of character face, age, hair, and signature outfit (e.g. 12yo boy with curly brown hair and red hoodie)" },',
+      '    { "id": "char2", "name": "Nome do protagonista 2", "role": "Quem ele é na história", "personality": "traço emocional marcante", "gender": "female | male", "appearance": "concise English visual description of character face, age, hair, and signature outfit" }',
       '  ],',
       '  "scenes": [',
       '    {',
-      '      "title": "título curto da cena",',
-      '      "locationName": "Nome exato do local em português",',
-      '      "cameraMove": "zoomIn | panRight | zoomOut | panLeft",',
+      '      "title": "título dramático curto da cena",',
+      '      "locationName": "Local exato onde a cena acontece em português",',
+      '      "sceneSummaryPt": "Resumo em 1 frase em português do que os personagens estão fazendo neste cenário",',
+      '      "cameraMove": "zoomIn | panRight | zoomOut | panLeft | dollyIn",',
       '      "atmosphere": "sunbeams | particles | embers | rain | cyber",',
-      '      "visual": "detailed English description of ONLY the environment/scenery matching 100% what happens and is spoken in this exact scene (objects, weather, lighting, wide shot background without people, no text)",',
+      '      "visual": "English visual prompt (max 38 words) showing the FULL SCENARIO/ENVIRONMENT AND the characters (using their exact appearance) arriving or acting inside this location, cinematic lighting, no text",',
+      '      "actionVisual": "English visual prompt (max 38 words) showing a CLOSER DYNAMIC CAMERA ANGLE in the SAME scenario with the characters performing the key action or emotional reaction of this scene, no text",',
       '      "beats": [',
-      '        { "speaker": "narrator", "speakerName": "Narrador", "focus": "wide", "text": "narração vívida em português descrevendo exatamente o cenário que aparece na tela e a ação" },',
-      '        { "speaker": "char1", "speakerName": "Nome do char1", "focus": "dialogue", "text": "fala natural em português conversando diretamente com char2 sobre o que estão vendo/vivendo neste cenário" },',
-      '        { "speaker": "char2", "speakerName": "Nome do char2", "focus": "dialogue", "text": "resposta natural em português reagindo ao char1 e conectando com o próximo passo da história" }',
+      '        { "speaker": "narrator", "speakerName": "Narrador", "emotion": "storyteller | tense | warm | excited", "shot": "establishing", "cameraMove": "zoomIn", "action": "ação visual que acontece no cenário", "text": "narração cinematográfica envolvente em português contando o que acontece na cena (nunca robótica)" },',
+      '        { "speaker": "char1", "speakerName": "Nome do char1", "emotion": "excited | curious | surprised | tense | happy | sad | determined", "shot": "action", "cameraMove": "dollyIn", "action": "o que char1 faz fisicamente na cena", "text": "fala viva, humana e cheia de emoção em português brasileiro natural" },',
+      '        { "speaker": "char2", "speakerName": "Nome do char2", "emotion": "curious | surprised | excited | tense | happy | warm | determined", "shot": "action", "cameraMove": "panRight", "action": "reação física de char2 no cenário", "text": "resposta natural e expressiva em português fazendo a história avançar" }',
       '      ]',
       '    }',
       '  ]',
       '}',
-      'REGRAS OBRIGATÓRIAS:',
-      `1. Crie exatamente ${nScenes} cenas em continuidade direta (o final de uma cena leva logicamente à próxima).`,
-      `2. Cada fala em "beats" deve ter cerca de ${wordsPerBeat} palavras em português brasileiro natural, sem rubricas entre colchetes e sem emojis.`,
-      '3. O campo "visual" de cada cena DEVE retratar exatamente os elementos, lugares e clima citados pelo narrador e pelos personagens naquela cena.'
+      'REGRAS OBRIGATÓRIAS DE FLUIDEZ E NATURALIDADE:',
+      `1. Crie exatamente ${nScenes} cenas com início intrigante, desenvolvimento cheio de ação/descoberta, clímax emocionante e desfecho memorável.`,
+      `2. Cada fala em "beats" deve ter cerca de ${wordsPerBeat} palavras em português brasileiro falado, com emoção humana real, contrações naturais e ritmo fluido, sem rubricas entre colchetes no campo "text" e sem emojis.`,
+      '3. Os campos "visual" e "actionVisual" DEVEM incluir os personagens atuando DENTRO do cenário descrito (nunca gere cenários vazios sem os personagens da história).',
+      isPureStory ? '4. Como o modo escolhido é História Pura, a primeira fala da cena pode ser uma narração curta de 1 frase situando a ação, seguida de diálogo intenso e expressivo entre os personagens.' : '4. Conecte 100% o que o narrador descreve com o que aparece no cenário e com o que os personagens falam e fazem.'
     ].join('\n');
 
-    const cinemaUser = `Tema/pedido do vídeo: "${prompt}"\nEstilo visual: ${style} (${artStylePrompt})\nCrie elenco recorrente (2 personagens que conversam entre si) + narrador + cenários conectados do início ao fim.`;
+    const cinemaUser = `Pedido da história/vídeo: "${prompt}"${customCharHint}\nEstilo visual: ${style} (${artStylePrompt})\nCrie os personagens da história, os cenários em múltiplos ângulos ("visual" e "actionVisual" com os personagens em ação no cenário) e os diálogos cheios de vida.`;
 
     const res = await withRetries(() => chatWithFallback({ system: cinemaSystem, user: cinemaUser, json: true, maxTokens: 4500 }), 2);
     if (!res.error) {
       const parsed = extractJson(res.text);
       if (parsed && Array.isArray(parsed.scenes) && parsed.scenes.length) {
-        const characters = pickDistinctCastVoices(voice || 'onyx', Array.isArray(parsed.characters) && parsed.characters.length >= 2
-          ? parsed.characters.slice(0, 2)
-          : [
-              { id: 'char1', name: 'Lucas', role: 'Protagonista', gender: 'male' },
-              { id: 'char2', name: 'Helena', role: 'Parceira de cena', gender: 'female' }
-            ]
-        );
-        const voiceBySpeaker = {
-          narrator: voice || 'onyx',
-          char1: characters[0].voice,
-          char2: characters[1].voice
-        };
-        const nameBySpeaker = {
-          narrator: 'Narrador',
-          char1: characters[0].name,
-          char2: characters[1].name
-        };
+        const rawChars = Array.isArray(parsed.characters) && parsed.characters.length >= 1
+          ? parsed.characters.slice(0, 3)
+          : fallbackChars;
+        if (rawChars.length === 1 && fallbackChars.length >= 2) rawChars.push(fallbackChars[1]);
+        const characters = pickDistinctCastVoices(voice || 'onyx', rawChars, style);
+
+        const voiceBySpeaker = { narrator: voice || 'onyx' };
+        const nameBySpeaker = { narrator: 'Narrador' };
+        const charAppearanceSummary = characters.map(c => `${c.name} (${c.appearance})`).join(' and ');
+        characters.forEach((c, idx) => {
+          const key = `char${idx + 1}`;
+          c.id = key;
+          voiceBySpeaker[key] = c.voice;
+          nameBySpeaker[key] = c.name;
+        });
+
         const per = (durNum * 60) / parsed.scenes.length;
+        const validMoves = ['zoomIn', 'panRight', 'zoomOut', 'panLeft', 'dollyIn', 'tiltUp'];
+        const validEmotions = ['storyteller', 'excited', 'curious', 'tense', 'happy', 'sad', 'surprised', 'determined', 'warm'];
         const scenes = parsed.scenes.slice(0, nScenes).map((s, idx) => {
           const rawBeats = Array.isArray(s.beats) && s.beats.length
             ? s.beats
-            : [{ speaker: 'narrator', speakerName: 'Narrador', focus: 'wide', text: String(s.narration || s.title || prompt) }];
+            : [{ speaker: 'narrator', speakerName: 'Narrador', emotion: 'storyteller', shot: 'establishing', text: String(s.narration || s.title || prompt) }];
           const beats = rawBeats
-            .map(b => {
-              const sp = (b.speaker === 'char1' || b.speaker === 'char2') ? b.speaker : 'narrator';
+            .map((b, bIdx) => {
+              let sp = String(b.speaker || 'narrator').toLowerCase();
+              if (!voiceBySpeaker[sp]) {
+                // Tenta casar pelo nome do personagem caso a IA tenha colocado o nome no campo speaker
+                const byName = characters.find(c => c.name.toLowerCase() === String(b.speakerName || b.speaker || '').toLowerCase());
+                sp = byName ? byName.id : (sp.includes('1') ? 'char1' : sp.includes('2') ? 'char2' : sp.includes('3') && voiceBySpeaker.char3 ? 'char3' : 'narrator');
+              }
+              const emo = validEmotions.includes(String(b.emotion || '').toLowerCase())
+                ? String(b.emotion).toLowerCase()
+                : (sp === 'narrator' ? 'storyteller' : (bIdx % 2 === 1 ? 'excited' : 'curious'));
+              const shot = b.shot === 'action' || (sp !== 'narrator' && bIdx >= 1) ? 'action' : 'establishing';
+              const move = validMoves.includes(b.cameraMove) ? b.cameraMove : validMoves[(idx + bIdx) % validMoves.length];
               return {
                 speaker: sp,
                 speakerName: nameBySpeaker[sp] || String(b.speakerName || 'Narrador'),
                 focus: sp === 'narrator' ? 'wide' : 'dialogue',
+                emotion: emo,
+                shot,
+                cameraMove: move,
+                action: String(b.action || '').trim(),
                 voice: voiceBySpeaker[sp] || voice || 'onyx',
                 text: String(b.text || '').replace(/\*\*|\[.*?\]/g, '').trim()
               };
             })
             .filter(b => b.text.length > 0);
+
+          const baseVisual = String(s.visual || `${s.locationName || s.title} with ${charAppearanceSummary} in the scene`).trim();
+          const baseActionVisual = String(s.actionVisual || `Medium close-up dynamic shot in ${s.locationName || s.title}, ${charAppearanceSummary} acting with expressive emotion, ${s.title}`).trim();
+
           return {
             i: idx + 1,
             title: String(s.title || `Cena ${idx + 1}`),
             locationName: String(s.locationName || s.title || `Cena ${idx + 1}`),
-            cameraMove: ['zoomIn', 'panRight', 'zoomOut', 'panLeft'].includes(s.cameraMove) ? s.cameraMove : (idx % 2 === 0 ? 'zoomIn' : 'panRight'),
+            sceneSummaryPt: String(s.sceneSummaryPt || s.locationName || s.title || ''),
+            cameraMove: validMoves.includes(s.cameraMove) ? s.cameraMove : (idx % 2 === 0 ? 'zoomIn' : 'panRight'),
             atmosphere: ['sunbeams', 'particles', 'embers', 'rain', 'cyber'].includes(s.atmosphere) ? s.atmosphere : 'particles',
-            visual: `${artStylePrompt}, ${String(s.visual || s.title || prompt)}, wide shot environment background, no text, no watermark`,
+            visual: `${artStylePrompt}, ${baseVisual}, cinematic scene, no text, no watermark`,
+            actionVisual: `${artStylePrompt}, ${baseActionVisual}, dynamic angle, expressive characters in scene, no text, no watermark`,
             beats,
             narration: beats.map(b => b.text).join(' '),
             start: Math.round(idx * per),
@@ -326,7 +464,7 @@ async function generateCreateFull({ prompt, duration, style, voice, cinemaMode =
         return {
           data: {
             title: parsed.title || prompt.slice(0, 70),
-            mood: parsed.mood || 'cinematic',
+            mood: parsed.mood || 'adventure',
             artStylePrompt,
             characters,
             script,
@@ -337,8 +475,13 @@ async function generateCreateFull({ prompt, duration, style, voice, cinemaMode =
         };
       }
     }
-    // Se algum modelo menor falhar no JSON completo, cai suavemente para o modo em 2 fases abaixo ou mock conectado
-    if (res.error) return { error: res.error };
+    // Se algum provedor falhou no JSON, usa o construtor dinâmico de história com personagens (nunca perde os personagens!)
+    const dynamicFallback = mockCreateFull({ prompt, duration, style, voice, customCharacters });
+    return {
+      data: dynamicFallback,
+      provider: 'story-engine-fallback',
+      error: res.error
+    };
   }
 
   const dur = Math.max(1, Math.round(durNum));
@@ -346,7 +489,7 @@ async function generateCreateFull({ prompt, duration, style, voice, cinemaMode =
   const wordsPerScene = Math.round((dur * 130) / nScenes);
 
   // Fase 1: plano (título + SEO + cenas com descrição visual)
-  const outlineSystem = 'Você é roteirista de vídeos para YouTube. Responda APENAS JSON válido neste formato: {"title":"título do vídeo","seo":{"title":"título para YouTube (até 70 caracteres)","description":"descrição com hashtags","tags":"tag1, tag2, tag3"},"scenes":[{"title":"título curto da cena","visual":"descrição visual detalhada para gerar uma imagem da cena"}]}.';
+  const outlineSystem = 'Você é roteirista de vídeos para YouTube. Responda APENAS JSON válido neste formato: {"title":"título do vídeo","seo":{"title":"título para YouTube (até 70 caracteres)","description":"descrição com hashtags","tags":"tag1, tag2, tag3"},"scenes":[{"title":"título curto da cena","visual":"descrição visual detalhada em inglês para gerar uma imagem da cena"}]}.';
   const outlineUser = `Crie o plano de um vídeo de ${dur} minutos sobre "${prompt}". Estilo visual: ${style}. Exatamente ${nScenes} cenas em ordem cronológica. Idioma: português brasileiro.`;
   const res = await withRetries(() => chatWithFallback({ system: outlineSystem, user: outlineUser, json: true, maxTokens: 3000 }), 2);
   if (res.error) return { error: res.error };
@@ -366,14 +509,13 @@ async function generateCreateFull({ prompt, duration, style, voice, cinemaMode =
       const idx = i + j;
       if (j > 0) await new Promise(r => setTimeout(r, 1200)); // desloca o lote
       return withRetries(() => chatWithFallback({
-        system: 'Você é narrador profissional de vídeos. Escreva APENAS o texto da narração, sem título, sem aspas, sem comentários.',
-        user: `Vídeo sobre: "${prompt}". Cena ${idx + 1} de ${scenesPlan.length}: "${s.title}" (${s.visual || ''}). Escreva a narração desta cena em português brasileiro, com aproximadamente ${wordsPerScene} palavras, em tom envolvente.`
+        system: 'Você é um contador de histórias cinematográfico. Escreva APENAS o texto da narração fluida e envolvente, sem título, sem aspas, sem comentários.',
+        user: `Vídeo sobre: "${prompt}". Cena ${idx + 1} de ${scenesPlan.length}: "${s.title}" (${s.visual || ''}). Escreva a narração desta cena em português brasileiro, com aproximadamente ${wordsPerScene} palavras, em tom vivo e nunca robótico.`
       }), 2);
     }));
     for (let j = 0; j < results.length; j++) {
       const r = results[j];
       if (r.error) {
-        // segunda chance individual, depois do lote, com prompt mais curto
         const retry = await withRetries(() => chatWithFallback({
           system: 'Escreva APENAS a narração da cena, sem comentários.',
           user: `Narre em português (~${Math.round(wordsPerScene * 0.7)} palavras) a cena "${scenesPlan[i + j].title}" do vídeo sobre "${prompt}".`
@@ -396,6 +538,7 @@ async function generateCreateFull({ prompt, duration, style, voice, cinemaMode =
     title: String(s.title || `Cena ${idx + 1}`),
     narration: narrations[idx],
     visual: String(s.visual || s.title || prompt),
+    actionVisual: `${String(s.visual || s.title || prompt)}, closer dramatic camera angle, detailed focus`,
     start: Math.round(idx * per),
     end: Math.round((idx + 1) * per)
   }));
@@ -403,10 +546,15 @@ async function generateCreateFull({ prompt, duration, style, voice, cinemaMode =
   return { data: { script, scenes, seo: outline.seo || {}, title: outline.title || '' }, provider: [...providers].join(' + ') };
 }
 
-// Imagem de uma cena: OpenAI (se válida) → Gemini → Unorouter → Pollinations
-async function generateSceneImage({ prompt, style }) {
+// Imagem de uma cena: Pollinations Flux HD (Grátis & Rápido) + OpenAI + Gemini + Unorouter
+async function generateSceneImage({ prompt, style, width = 1024, height = 576 }) {
   const errors = [];
-  const fullPrompt = `${style || 'cinematográfico'}, ${prompt}, 16:9 video scene, high quality, detailed, no text, no watermark, no captions`;
+  const cleanScenePrompt = String(prompt || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 340);
+  const fullPrompt = `${cleanScenePrompt}, masterpiece cinematic scene, rich lighting, no text, no watermark`.slice(0, 390);
+
   if (canUseOfficialOpenAI()) {
     const openai = makeOpenAI();
     const attempts = [
@@ -426,15 +574,61 @@ async function generateSceneImage({ prompt, style }) {
       }
     }
   }
-  // Gemini (Google) — imagem da cena
+
+  // Escolha inteligente do modelo Flux gratuito conforme o estilo visual da história
+  const fluxModel = style === 'animation' ? 'flux-3d'
+    : (style === 'realistic' || style === 'documentary') ? 'flux-realism'
+    : 'flux';
+
+  const targetW = Math.min(1024, Math.max(512, Number(width) || 1024));
+  const targetH = Math.min(1024, Math.max(512, Number(height) || 576));
+
+  // 1) Pollinations Flux AI (Grátis, sem chave, alta fidelidade de cenário + personagens, timeout ágil)
+  const ladder = [
+    { model: fluxModel, w: targetW, h: targetH },
+    { model: 'flux', w: 768, h: 432 },
+    { model: 'turbo', w: 768, h: 432 },
+    { model: '', w: 640, h: 360 }
+  ];
+  for (const opt of ladder) {
+    try {
+      const seed = Math.floor(Math.random() * 900000) + 10000;
+      const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=${opt.w}&height=${opt.h}&nologo=true&enhance=true&safe=false&seed=${seed}` + (opt.model ? `&model=${opt.model}` : '');
+      const r = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+          'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8'
+        },
+        signal: AbortSignal.timeout(12500)
+      });
+      if (r.ok) {
+        const buf = Buffer.from(await r.arrayBuffer());
+        if (buf.length > 1500) {
+          return {
+            imageBase64: buf.toString('base64'),
+            mime: r.headers.get('content-type') || 'image/jpeg',
+            model: `pollinations/${opt.model || 'flux'}-${opt.w}x${opt.h}`
+          };
+        }
+      } else {
+        errors.push(`pollinations(${opt.model || 'std'}): HTTP ${r.status}`);
+      }
+    } catch (e) {
+      errors.push(`pollinations(${opt.model || 'std'}): ${e.message}`);
+      if (/fetch failed|ENOTFOUND|ECONNREFUSED/i.test(e.message)) break;
+    }
+  }
+
+  // 2) Gemini (Google) — imagem da cena com timeout curto para nunca travar a serverless function
   if (process.env.GEMINI_API_KEY) {
     try {
-      const g = await geminiImage(fullPrompt);
+      const g = await geminiImage(fullPrompt, 10000);
       if (g) return g;
       errors.push('gemini/image: sem imagem retornada');
     } catch (e) { errors.push('gemini/image: ' + e.message); }
   }
-  // Unorouter images — direto nos modelos conhecidos sem gastar cota em GET /models
+
+  // 3) Unorouter images — se houver chave pronta fora de cooldown
   const uKey = pickReadyUniKey();
   if (uKey) {
     for (const model of UNI_IMG_MODELS) {
@@ -442,7 +636,7 @@ async function generateSceneImage({ prompt, style }) {
         const r = await fetch(uniBase() + '/images/generations', {
           method: 'POST', headers: uniHeaders(uKey),
           body: JSON.stringify({ model, prompt: fullPrompt, n: 1, size: '1024x1024', response_format: 'b64_json' }),
-          signal: AbortSignal.timeout(22000)
+          signal: AbortSignal.timeout(10000)
         });
         if (r.ok) {
           const j = await r.json();
@@ -450,7 +644,7 @@ async function generateSceneImage({ prompt, style }) {
           const url = j && j.data && j.data[0] && j.data[0].url;
           if (b64) return { imageBase64: b64, mime: 'image/png', model: 'unorouter/' + model };
           if (url) {
-            const fr = await fetch(url, { signal: AbortSignal.timeout(20000) });
+            const fr = await fetch(url, { signal: AbortSignal.timeout(9000) });
             if (fr.ok) {
               const buf = Buffer.from(await fr.arrayBuffer());
               if (buf.length > 100) return { imageBase64: buf.toString('base64'), mime: fr.headers.get('content-type') || 'image/png', model: 'unorouter/' + model };
@@ -464,32 +658,6 @@ async function generateSceneImage({ prompt, style }) {
           if (r.status === 429 && /allows 1 request|Too many requests/i.test(txt)) { markUniRateWindow(uKey); break; }
         }
       } catch (e) { errors.push(`unorouter/${model}: ${e.message}`); }
-    }
-  }
-  // Fallback gratuito: Pollinations — escada de tamanhos (só o menor tier é grátis agora)
-  const ladder = [
-    { model: 'flux', w: 1280, h: 720 },
-    { model: '', w: 1024, h: 576 },
-    { model: '', w: 768, h: 432 },
-    { model: '', w: 512, h: 288 },
-    { model: '', w: 256, h: 256 }
-  ];
-  for (const opt of ladder) {
-    for (let tent = 0; tent < 1; tent++) {
-      try {
-        const seed = Math.floor(Math.random() * 100000);
-        const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=${opt.w}&height=${opt.h}&nologo=true&seed=${seed}` + (opt.model ? `&model=${opt.model}` : '');
-        const r = await fetch(url, { signal: AbortSignal.timeout(20000) });
-        if (r.status === 429 || r.status === 402) { await sleep(2000); continue; }
-        if (!r.ok) { errors.push(`pollinations ${opt.w}x${opt.h}: HTTP ${r.status}`); break; }
-        const buf = Buffer.from(await r.arrayBuffer());
-        if (!buf.length) { await sleep(1000); continue; }
-        return { imageBase64: buf.toString('base64'), mime: r.headers.get('content-type') || 'image/jpeg', model: `pollinations-${opt.w}x${opt.h}(free)` };
-      } catch (e) {
-        errors.push(`pollinations ${opt.w}x${opt.h}: ${e.message}`);
-        if (/fetch failed|ENOTFOUND|ECONNREFUSED/i.test(e.message)) return { error: errors.join(' | ') };
-        await sleep(1500);
-      }
     }
   }
   return { error: errors.join(' | ') || 'nenhum provedor de imagem respondeu' };
@@ -1426,14 +1594,14 @@ async function geminiTranscribe(audioBuf, language, timeout = 30000, audioMime =
   return (text || '').trim();
 }
 // Imagem da cena (família Gemini 3 Image)
-async function geminiImage(prompt) {
+async function geminiImage(prompt, timeout = 12000) {
   if (!process.env.GEMINI_API_KEY) return null;
   try {
     const body = {
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       generationConfig: { responseModalities: ['IMAGE', 'TEXT'] }
     };
-    const j = await geminiGenerateTried({ body, timeout: 45000, kind: 'image' });
+    const j = await geminiGenerateTried({ body, timeout, kind: 'image' });
     const parts = (j && j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts) || [];
     for (const p of parts) {
       if (p.inlineData && p.inlineData.data) {
@@ -1540,55 +1708,81 @@ async function withRetries(fn, times = 2) {
     last = await fn();
     if (!last.error) return last;
     if (/sem OPENAI_API_KEY.*sem GEMINI_API_KEY.*sem UNOROUTER_API_KEY.*fetch failed/i.test(last.error)) return last;
-    if (i < times - 1) await sleep(2500);
+    if (i < times - 1) await sleep(2000);
   }
   return last;
 }
 
 function extractJson(text) {
   if (!text) return null;
-  try { return JSON.parse(text); } catch (e) {}
-  const m = String(text).match(/\{[\s\S]*\}/);
-  if (m) { try { return JSON.parse(m[0]); } catch (e) {} }
+  let clean = String(text)
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/```json\s*/gi, '')
+    .replace(/```\s*/g, '')
+    .trim();
+  try { return JSON.parse(clean); } catch (e) {}
+  const m = clean.match(/\{[\s\S]*\}/);
+  if (m) {
+    const rawObj = m[0];
+    try { return JSON.parse(rawObj); } catch (e) {}
+    // Repara vírgulas finais antes de } ou ] e quebras de linha literais
+    const repaired = rawObj
+      .replace(/,\s*([}\]])/g, '$1')
+      .replace(/[\u0000-\u0019]+/g, ' ');
+    try { return JSON.parse(repaired); } catch (e) {}
+  }
   return null;
 }
 
-// Texto gratuito (sem chave): Pollinations — POST primeiro (sem limite de URL), GET como reserva
+// IA Gratuita 1 (Sem Chave): Pollinations OpenAI-Compatible Multi-Model (GPT-4o-mini / DeepSeek / Mistral / Llama)
 async function chatViaPollinations({ system, user, json }) {
-  const prompt = (system ? system + '\n\n' : '') + user + (json ? '\n\nResponda APENAS JSON válido, sem comentários nem markdown.' : '');
+  const sysMsg = (system ? system : 'Você é um diretor de cinema e contador de histórias.') + (json ? '\nResponda APENAS um objeto JSON válido, sem blocos markdown e sem comentários.' : '');
   let lastErr = new Error('pollinations indisponível');
-  // POST (OpenAI-compatible) — vários modelos do próprio Pollinations (se um limita, outro faz)
-  const polModels = ['openai', 'mistral', 'llama'];
-  for (let pass = 0; pass < 2; pass++) {
-    for (const model of polModels) {
+  const polModels = ['openai', 'openai-large', 'deepseek', 'mistral', 'llama'];
+  for (const model of polModels) {
+    try {
+      const seed = Math.floor(Math.random() * 900000) + 1000;
+      const payload = {
+        model,
+        seed,
+        messages: [
+          { role: 'system', content: sysMsg },
+          { role: 'user', content: user }
+        ],
+        temperature: 0.82
+      };
+      if (json) payload.jsonMode = true;
+      const r = await fetch('https://text.pollinations.ai/openai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 DubAI-Studio/2.0' },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(22000)
+      });
+      if (r.status === 429) { lastErr = new Error('HTTP 429 (limite de uso)'); await sleep(1200); continue; }
+      if (!r.ok) { lastErr = new Error('HTTP ' + r.status); continue; }
+      const rawTxt = await r.text().catch(() => '');
+      let text = '';
       try {
-        const r = await fetch('https://text.pollinations.ai/openai', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }] }),
-          signal: AbortSignal.timeout(25000)
-        });
-        if (r.status === 429) { lastErr = new Error('HTTP 429 (limite de uso)'); await sleep(2000); continue; }
-        if (!r.ok) { lastErr = new Error('HTTP ' + r.status); continue; }
-        const j = await r.json().catch(() => null);
-        const text = j && j.choices && j.choices[0] && j.choices[0].message ? String(j.choices[0].message.content || '').trim() : '';
-        if (!text) { lastErr = new Error('resposta vazia'); continue; }
-        return text;
-      } catch (e) {
-        lastErr = e;
-        if (/fetch failed|ENOTFOUND|ECONNREFUSED/i.test(e.message)) throw lastErr;
-        await sleep(1500);
+        const j = JSON.parse(rawTxt);
+        text = j && j.choices && j.choices[0] && j.choices[0].message ? String(j.choices[0].message.content || '').trim() : rawTxt.trim();
+      } catch (_) {
+        text = rawTxt.trim();
       }
+      if (!text) { lastErr = new Error('resposta vazia'); continue; }
+      return text;
+    } catch (e) {
+      lastErr = e;
+      if (/fetch failed|ENOTFOUND|ECONNREFUSED/i.test(e.message)) throw lastErr;
     }
   }
-  // GET (só para prompts curtos)
-  const short = prompt.slice(0, 900);
+  // GET fallback para prompts curtos
+  const short = ((system ? system + '\n\n' : '') + user).slice(0, 900);
   for (const url of [
-    'https://text.pollinations.ai/' + encodeURIComponent(short) + '?model=openai',
+    'https://text.pollinations.ai/' + encodeURIComponent(short) + '?model=openai&seed=' + Math.floor(Math.random() * 9999),
     'https://text.pollinations.ai/' + encodeURIComponent(short)
   ]) {
     try {
-      const r = await fetch(url, { signal: AbortSignal.timeout(30000) });
+      const r = await fetch(url, { signal: AbortSignal.timeout(20000) });
       if (!r.ok) { lastErr = new Error('HTTP ' + r.status); continue; }
       const text = (await r.text()).trim();
       if (!text) { lastErr = new Error('resposta vazia'); continue; }
@@ -1598,7 +1792,29 @@ async function chatViaPollinations({ system, user, json }) {
   throw lastErr;
 }
 
-// Chat com cadeia: OpenAI (se válida) → Gemini 3.1 / Gemma 3 → Unorouter (direto sem /models) → Pollinations
+// IA Gratuita 2 (Sem Chave): HackClub Free AI Endpoint (Llama 3.3 70B / Qwen)
+async function chatViaHackClub({ system, user, json }) {
+  const sysMsg = (system ? system : 'Você é um diretor de cinema e contador de histórias.') + (json ? '\nResponda APENAS um objeto JSON válido, sem markdown.' : '');
+  const r = await fetch('https://ai.hackclub.com/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 DubAI-Studio/2.0' },
+    body: JSON.stringify({
+      messages: [
+        { role: 'system', content: sysMsg },
+        { role: 'user', content: user }
+      ],
+      temperature: 0.8
+    }),
+    signal: AbortSignal.timeout(20000)
+  });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const j = await r.json();
+  const text = j && j.choices && j.choices[0] && j.choices[0].message ? String(j.choices[0].message.content || '').trim() : '';
+  if (!text) throw new Error('resposta vazia');
+  return text;
+}
+
+// Chat com cadeia: OpenAI (se válida) → Gemini 3.1 / Gemma 3 → Unorouter → Pollinations Free AI → HackClub Free AI
 async function chatWithFallback({ system, user, json = false, maxTokens = 8000 }) {
   const errors = [];
   if (canUseOfficialOpenAI()) {
@@ -1645,11 +1861,19 @@ async function chatWithFallback({ system, user, json = false, maxTokens = 8000 }
       }
     }
   } else errors.push('unorouter: sem UNOROUTER_API_KEY');
+  // Pollinations Multi-Model Free AI (GPT-4o-mini / DeepSeek / Mistral)
   try {
     const text = await chatViaPollinations({ system, user, json });
-    return { text, provider: 'pollinations(free)' };
+    return { text, provider: 'pollinations-ai(free)' };
   } catch (e) {
     errors.push('pollinations: ' + e.message);
+  }
+  // HackClub Free AI (Llama 3.3 70B)
+  try {
+    const text = await chatViaHackClub({ system, user, json });
+    return { text, provider: 'hackclub-ai(free)' };
+  } catch (e) {
+    errors.push('hackclub: ' + e.message);
   }
   return { error: errors.join(' | '), errors };
 }
@@ -1703,13 +1927,26 @@ const TTS_LANGS = { 'pt-BR': 'pt-BR', pt: 'pt-BR', en: 'en-US', es: 'es-MX', fr:
 const EDGE_VOICE_PRESETS = {
   onyx:    { voice: 'pt-BR-AntonioNeural',              rate: '+2%', pitch: '-1Hz', label: 'Antônio Cinema Neural' },
   nova:    { voice: 'pt-BR-FranciscaNeural',            rate: '+2%', pitch: '+0Hz', label: 'Francisca Natural Neural' },
-  shimmer: { voice: 'pt-BR-ThalitaMultilingualNeural',  rate: '+2%', pitch: '+0Hz', label: 'Thalita HD Multilingual' },
-  echo:    { voice: 'en-US-AndrewMultilingualNeural',   rate: '+2%', pitch: '+0Hz', label: 'Andrew HD Podcast' },
-  coral:   { voice: 'en-US-AvaMultilingualNeural',      rate: '+2%', pitch: '+0Hz', label: 'Ava HD Expressiva' },
-  fable:   { voice: 'en-US-BrianMultilingualNeural',    rate: '+1%', pitch: '+0Hz', label: 'Brian HD Narrador' },
-  sage:    { voice: 'en-US-EmmaMultilingualNeural',     rate: '+0%', pitch: '+0Hz', label: 'Emma HD Documentário' },
-  ash:     { voice: 'fr-FR-RemyMultilingualNeural',     rate: '+2%', pitch: '+0Hz', label: 'Remy HD Firme' },
+  shimmer: { voice: 'pt-BR-ThalitaMultilingualNeural',  rate: '+3%', pitch: '+1Hz', label: 'Thalita HD Multilingual' },
+  echo:    { voice: 'en-US-AndrewMultilingualNeural',   rate: '+3%', pitch: '+0Hz', label: 'Andrew HD Podcast' },
+  coral:   { voice: 'en-US-AvaMultilingualNeural',      rate: '+3%', pitch: '+1Hz', label: 'Ava HD Expressiva' },
+  fable:   { voice: 'en-US-BrianMultilingualNeural',    rate: '+2%', pitch: '+0Hz', label: 'Brian HD Narrador' },
+  sage:    { voice: 'en-US-EmmaMultilingualNeural',     rate: '+1%', pitch: '+0Hz', label: 'Emma HD Documentário' },
+  ash:     { voice: 'fr-FR-RemyMultilingualNeural',     rate: '+2%', pitch: '-1Hz', label: 'Remy HD Firme' },
   alloy:   { voice: 'fr-FR-VivienneMultilingualNeural', rate: '+2%', pitch: '+0Hz', label: 'Vivienne HD Estúdio' }
+};
+
+// Modulação dramática de emoção para que os personagens atuem de verdade (nunca robótico!)
+const EMOTION_PROSODY_OFFSET = {
+  excited:     { rateDelta: 5,  pitchDelta: 3 },
+  surprised:   { rateDelta: 6,  pitchDelta: 4 },
+  happy:       { rateDelta: 4,  pitchDelta: 2 },
+  warm:        { rateDelta: 1,  pitchDelta: 1 },
+  curious:     { rateDelta: 2,  pitchDelta: 2 },
+  determined:  { rateDelta: 4,  pitchDelta: -1 },
+  tense:       { rateDelta: -2, pitchDelta: -2 },
+  sad:         { rateDelta: -5, pitchDelta: -3 },
+  storyteller: { rateDelta: 0,  pitchDelta: -1 }
 };
 
 const EDGE_LANG_NATIVE = {
@@ -1729,16 +1966,22 @@ function sanitizeTextForHumanSSML(raw) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     // Micro-pausa orgânica de respiração em travessões e reticências (deixa a fala 100% humana!)
-    .replace(/\s*(?:—|--|\.\.\.|…)\s*/g, ', <break time="170ms"/> ')
+    .replace(/\s*(?:—|--|\.\.\.|…)\s*/g, ', <break time="160ms"/> ')
     .replace(/\s{2,}/g, ' ')
     .trim();
 }
 
-async function edgeNeuralTTS({ text, voice = 'onyx', lang = 'pt-BR' }) {
+async function edgeNeuralTTS({ text, voice = 'onyx', lang = 'pt-BR', emotion = '' }) {
   const { MsEdgeTTS, OUTPUT_FORMAT } = require('msedge-tts');
   const locale = TTS_LANGS[lang] || 'pt-BR';
   const preset = EDGE_VOICE_PRESETS[voice] || EDGE_VOICE_PRESETS.onyx;
   const isFemale = ['nova', 'shimmer', 'coral', 'sage', 'alloy'].includes(voice);
+
+  const emoMod = EMOTION_PROSODY_OFFSET[String(emotion || '').toLowerCase()] || { rateDelta: 0, pitchDelta: 0 };
+  const baseRate = parseInt(preset.rate, 10) || 2;
+  const basePitch = parseInt(preset.pitch, 10) || 0;
+  const finalRate = `${baseRate + emoMod.rateDelta >= 0 ? '+' : ''}${baseRate + emoMod.rateDelta}%`;
+  const finalPitch = `${basePitch + emoMod.pitchDelta >= 0 ? '+' : ''}${basePitch + emoMod.pitchDelta}Hz`;
 
   let primaryVoice = preset.voice;
   if (locale !== 'pt-BR' && !/Multilingual/i.test(primaryVoice) && EDGE_LANG_NATIVE[locale]) {
@@ -1766,7 +2009,7 @@ async function edgeNeuralTTS({ text, voice = 'onyx', lang = 'pt-BR' }) {
       const mp3Buffers = [];
       for (const seg of segments) {
         const ssmlSafe = sanitizeTextForHumanSSML(seg);
-        const { audioStream } = tts.toStream(ssmlSafe, { rate: preset.rate, pitch: preset.pitch });
+        const { audioStream } = tts.toStream(ssmlSafe, { rate: finalRate, pitch: finalPitch });
         const segBuf = await new Promise((resolve, reject) => {
           const chunks = [];
           const timer = setTimeout(() => {
@@ -1797,7 +2040,7 @@ async function edgeNeuralTTS({ text, voice = 'onyx', lang = 'pt-BR' }) {
 // 3) Gemini 3.1 Neural Studio TTS (com direção em PT-BR autêntico)
 // 4) Unorouter Neural TTS
 // 5) Google TTS apenas como último paraquedas de emergência
-async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR' }) {
+async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR', emotion = '' }) {
   const errors = [];
   if (canUseOfficialOpenAI()) {
     for (const model of ['gpt-4o-mini-tts', 'tts-1-hd', 'tts-1']) {
@@ -1810,7 +2053,7 @@ async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR' }) {
           response_format: 'mp3'
         };
         if (model === 'gpt-4o-mini-tts') {
-          opts.instructions = 'Fale como um locutor humano brasileiro autêntico, com calor na voz, respiração sutil natural, entonação expressiva de cinema e ritmo conversacional fluido. Nunca soe robótico.';
+          opts.instructions = 'Fale como um ator humano brasileiro autêntico, com emoção viva, respiração sutil natural, entonação expressiva de cinema e ritmo fluido. Nunca soe robótico.';
         }
         const s = await openai.audio.speech.create(opts);
         const b = Buffer.from(await s.arrayBuffer());
@@ -1823,9 +2066,9 @@ async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR' }) {
     }
   }
 
-  // Motor Principal Ilimitado: Vozes Humanas Neurais HD de Estúdio (Antônio, Francisca, Thalita HD, Andrew HD, Ava HD, Brian HD, Emma HD...)
+  // Motor Principal Ilimitado: Vozes Humanas Neurais HD de Estúdio com modulação de emoção
   try {
-    const edge = await edgeNeuralTTS({ text, voice, lang });
+    const edge = await edgeNeuralTTS({ text, voice, lang, emotion });
     if (edge && edge.buffer && edge.buffer.length > 400) return edge;
   } catch (e) {
     errors.push('neural-hd: ' + e.message);
@@ -1904,18 +2147,18 @@ function send(res, status, obj) {
 
 // ============ AVATAR FALANTE (estilo HeyGen — Fase 2 + ponte Fase 3) ============
 
-// Retrato frontal de apresentador com lábios fechados/neutros — ideal para animação labial (lip-sync)
+// Retrato frontal de apresentador/personagem com lábios fechados/neutros — ideal para animação labial (lip-sync)
 async function generateAvatarPortrait({ prompt = '', style = 'studio' }) {
   const styleDesc = {
-    studio: 'photorealistic studio portrait photography, 85mm lens, soft key and rim lighting, clean modern studio bokeh background',
+    studio: 'photorealistic cinema character portrait, 85mm lens, soft key and rim lighting, atmospheric depth background',
     news: 'photorealistic TV news anchor portrait, broadcast newsroom studio background, crisp lighting, professional blazer',
-    creator: 'photorealistic YouTube creator portrait in cozy RGB podcast studio with soft warm lamps, natural friendly expression',
+    creator: 'photorealistic creator portrait in cozy RGB studio with soft warm lamps, natural friendly expression',
     exec: 'photorealistic executive portrait in bright modern glass office, confident approachable expression',
-    pixar: '3D Pixar / Disney stylized character portrait, expressive eyes, warm soft lighting, clean gradient studio backdrop'
-  }[style] || 'photorealistic studio portrait photography, soft studio lighting';
+    pixar: '3D Pixar and Disney stylized animated character portrait, expressive eyes, warm soft illumination, rich backdrop'
+  }[style] || 'photorealistic cinema character portrait, soft studio lighting';
 
-  const subject = String(prompt || '').trim() || 'apresentador carismático brasileiro de 30 anos';
-  const fullPrompt = `${styleDesc}, ${subject}, centered front-facing head and shoulders portrait, looking directly straight into the camera lens, symmetrical face centered in frame, relaxed natural closed mouth with gentle pleasant expression, both eyes clearly visible, no hands near face, no microphone covering mouth, no text, no watermark`;
+  const subject = String(prompt || '').replace(/\s+/g, ' ').trim().slice(0, 220) || 'charismatic Brazilian story protagonist';
+  const fullPrompt = `${styleDesc}, ${subject}, centered front-facing head and shoulders portrait, looking straight at camera, symmetrical face centered in frame, relaxed closed mouth, both eyes clearly visible, no hands near face, no text, no watermark`.slice(0, 380);
 
   const errors = [];
   if (canUseOfficialOpenAI()) {
@@ -1935,9 +2178,32 @@ async function generateAvatarPortrait({ prompt = '', style = 'studio' }) {
       }
     }
   }
+
+  // 1) Pollinations Flux Portrait (Grátis, rápido e consistente com a estética do personagem)
+  const fluxPortraitModel = style === 'pixar' ? 'flux-3d' : 'flux-realism';
+  for (const [w, h, mdl] of [[768, 768, fluxPortraitModel], [768, 768, 'flux'], [512, 512, 'turbo']]) {
+    try {
+      const seed = Math.floor(Math.random() * 900000) + 10000;
+      const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=${w}&height=${h}&nologo=true&enhance=true&safe=false&seed=${seed}` + (mdl ? `&model=${mdl}` : '');
+      const r = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+          'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8'
+        },
+        signal: AbortSignal.timeout(12000)
+      });
+      if (!r.ok) { errors.push(`pollinations ${w}x${h}: HTTP ${r.status}`); continue; }
+      const buf = Buffer.from(await r.arrayBuffer());
+      if (buf.length > 1000) return { imageBase64: buf.toString('base64'), mime: r.headers.get('content-type') || 'image/jpeg', model: `pollinations/${mdl || 'flux'}-${w}x${h}` };
+    } catch (e) {
+      errors.push(`pollinations ${w}x${h}: ${e.message}`);
+      if (/fetch failed|ENOTFOUND|ECONNREFUSED/i.test(e.message)) break;
+    }
+  }
+
   if (process.env.GEMINI_API_KEY) {
     try {
-      const g = await geminiImage(fullPrompt);
+      const g = await geminiImage(fullPrompt, 10000);
       if (g && g.imageBase64) return g;
       errors.push('gemini/image: sem imagem');
     } catch (e) { errors.push('gemini/image: ' + e.message); }

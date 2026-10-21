@@ -228,29 +228,34 @@ input[type="range"]{
 <!-- CREATE -->
 <section id="create">
   <div class="card">
-    <h2>🎥 Criar vídeo com IA</h2>
-    <p>Descreva o vídeo que deseja produzir. A IA cria roteiro, cenas e narração prontas para virar vídeo.</p>
+    <h2>🎥 Criar História & Vídeo com IA (Personagens Vivos + Cenários em Ação)</h2>
+    <p>Peça qualquer história, aventura, fábula ou vídeo: a IA cria os <b>personagens com aparência consistente</b>, mostra os <b>cenários mudando com os personagens em ação</b> e dá vida aos diálogos com emoção humana real (zero narração robótica!).</p>
 
-    <label>Descrição do vídeo</label>
-    <textarea id="prompt" placeholder="Exemplo: Crie um documentário realista sobre dinossauros, com narração masculina em português brasileiro."></textarea>
-    <div class="hint">Dica: seja específico. Ex: “vídeo de 10min sobre buracos negros para iniciantes, tom divertido + exemplos”</div>
+    <label>📖 Descreva a história ou o vídeo que você quer criar</label>
+    <textarea id="prompt" placeholder="Exemplo: Crie uma história emocionante sobre o menino Theo e sua amiga Luna que encontram um portal brilhante numa floresta antiga e precisam atravessar uma ponte mágica antes do pôr do sol."></textarea>
+    <div class="hint">💡 Dica: diga onde a história se passa e o que acontece. A IA cria os personagens, os cenários com eles em cena e as falas com emoção!</div>
 
-    <label>🎨 Modelos prontos (estilo HeyGen)</label>
+    <label style="margin-top:10px">🎭 Personagens da História <span style="font-weight:400;color:var(--muted)">(opcional — ou deixe em branco para a IA criar sozinha)</span></label>
+    <input type="text" id="createCharactersInput" placeholder="Ex: Theo (menino curioso de moletom vermelho) e Luna (menina corajosa com lanterna dourada)" style="width:100%;padding:11px 13px;border-radius:10px;border:1px solid var(--border);background:#0c0d1c;color:#f8fafc;font-size:13.5px" />
+
+    <label style="margin-top:12px">🎨 Modelos prontos de Histórias & Vídeos</label>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="ghost" type="button" onclick="applyTemplate('ads')">📢 Ads & Promo</button>
-      <button class="ghost" type="button" onclick="applyTemplate('edu')">🎓 Educacional</button>
-      <button class="ghost" type="button" onclick="applyTemplate('explainer')">💡 Explainer</button>
-      <button class="ghost" type="button" onclick="applyTemplate('howto')">🛠️ Dicas & Como-fazer</button>
-      <button class="ghost" type="button" onclick="applyTemplate('news')">📰 Notícias</button>
-      <button class="ghost" type="button" onclick="applyTemplate('podcast')">🎙️ Podcast</button>
+      <button class="ghost" type="button" onclick="applyTemplate('adventure')" style="border-color:#7c3aed88;color:#e9d5ff">📖 História & Aventura</button>
+      <button class="ghost" type="button" onclick="applyTemplate('fable')" style="border-color:#38bdf888;color:#bae6fd">🧒 Fábula / Animação Pixar</button>
+      <button class="ghost" type="button" onclick="applyTemplate('mystery')" style="border-color:#f59e0b88;color:#fde68a">🕵️ Mistério & Suspense</button>
+      <button class="ghost" type="button" onclick="applyTemplate('scifi')" style="border-color:#10b98188;color:#a7f3d0">🚀 Ficção & Fantasia</button>
+      <button class="ghost" type="button" onclick="applyTemplate('inspiring')">💪 História de Superação</button>
+      <button class="ghost" type="button" onclick="applyTemplate('edu')">🎓 Documentário Vivo</button>
+      <button class="ghost" type="button" onclick="applyTemplate('ads')">📢 Comercial com Personagens</button>
     </div>
 
     <div class="row">
       <div>
-        <label>🎭 Modo de direção do vídeo</label>
+        <label>🎭 Modo de direção da história</label>
         <select id="cinemaMode">
-          <option value="connected" selected>🎭 Cinema Conectado (Narrador + Cenários + Personagens)</option>
-          <option value="classic">🖼️ Documentário Clássico (Cenários + Narração)</option>
+          <option value="story" selected>🎭 História Viva com Personagens (Protagonistas em Cena + Diálogos Expressivos)</option>
+          <option value="connected">🎬 Cinema Narrado + Personagens (Narrador + Cenários Multi-Plano + Elenco)</option>
+          <option value="classic">🖼️ Documentário Clássico (Cenários Dinâmicos + Narração)</option>
         </select>
       </div>
       <div>
@@ -277,28 +282,28 @@ input[type="range"]{
         </select>
       </div>
       <div>
-        <label>🎨 Estilo visual</label>
+        <label>🎨 Estilo visual dos personagens & cenários</label>
         <select id="style">
-          <option value="realistic">Pessoas realistas (Filme 35mm)</option>
-          <option value="cinematic" selected>Cinematográfico 4K</option>
-          <option value="animation">Animação 3D (estilo Pixar)</option>
-          <option value="documentary">Documentário</option>
-          <option value="images"> Arte Conceitual Ilustrada</option>
+          <option value="animation" selected>Animação 3D (estilo Pixar / Disney)</option>
+          <option value="cinematic">Cinematográfico 4K (Filme Épico)</option>
+          <option value="realistic">Pessoas Realistas (Filme 35mm)</option>
+          <option value="images">Arte Conceitual Ilustrada / Anime</option>
+          <option value="documentary">Documentário Realista</option>
         </select>
       </div>
     </div>
 
     <div class="row">
       <div>
-        <label>🎙️ Voz principal do Narrador</label>
+        <label>🎙️ Voz do Contador de Histórias (os personagens ganham vozes próprias!)</label>
         <div style="display:flex;gap:8px">
           <select id="voice" style="flex:1">
+            <option value="fable" selected>🎙️ Brian HD — Contador de Histórias Emocionante</option>
             <option value="onyx">🎙️ Antônio — Masculina Grave Cinema (Humana HD)</option>
             <option value="nova">🎙️ Francisca — Feminina Calorosa Natural (Humana HD)</option>
             <option value="shimmer">🎙️ Thalita HD — Feminina Jovem Realista (Dragon Neural)</option>
             <option value="echo">🎙️ Andrew HD — Masculina Podcast Conversacional</option>
             <option value="coral">🎙️ Ava HD — Feminina Expressiva Comercial</option>
-            <option value="fable">🎙️ Brian HD — Masculina Contador de Histórias</option>
             <option value="sage">🎙️ Emma HD — Feminina Documentário & Aula</option>
             <option value="ash">🎙️ Remy HD — Masculina Dramática Firme</option>
             <option value="alloy">🎙️ Vivienne HD — Feminina Executiva / TV</option>
@@ -309,16 +314,16 @@ input[type="range"]{
       <div>
         <label>🎵 Trilha sonora de fundo</label>
         <select id="createMusic">
-          <option value="cinematic" selected>🎵 Trilha Ambiente Automática (com Ducking)</option>
+          <option value="cinematic" selected>🎵 Trilha Cinematográfica Automática (com Ducking)</option>
           <option value="none">🔇 Sem música (apenas vozes)</option>
         </select>
       </div>
     </div>
 
-    <button class="primary" id="createFullVideoBtn" onclick="createAndBuildVideo()" style="font-size:15px;padding:15px">🎬 Criar Vídeo Completo (Narrador + Cenários + Personagens)</button>
+    <button class="primary" id="createFullVideoBtn" onclick="createAndBuildVideo()" style="font-size:15px;padding:15px">🎬 Criar História & Vídeo Completo (Personagens + Cenários Vivos)</button>
     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-      <button class="ghost" id="createBtn" onclick="createVideo(false)" style="flex:1;min-width:180px">📝 Gerar só o roteiro primeiro</button>
-      <button class="ghost" onclick="fillExample()" style="flex:1;min-width:180px">💡 Usar exemplo de história conectada</button>
+      <button class="ghost" id="createBtn" onclick="createVideo(false)" style="flex:1;min-width:180px">📝 Gerar roteiro & personagens primeiro</button>
+      <button class="ghost" onclick="fillExample()" style="flex:1;min-width:180px">💡 Usar exemplo de história com personagens</button>
     </div>
 
     <div class="progress-wrap" id="createProgress">
@@ -860,20 +865,51 @@ function openTab(id, button){
 }
 
 function fillExample(){
-  $('#prompt').value = "Uma expedição cinematográfica na Amazônia onde o explorador Lucas e a arqueóloga Helena seguem um mapa misterioso pela floresta enevoada, cruzam uma cachoeira secreta com ruínas esculpidas e encontram uma cidade dourada iluminada, com o narrador descrevendo cada mudança de cenário e diálogos vivos entre os dois personagens.";
-  if(document.getElementById('cinemaMode')) document.getElementById('cinemaMode').value = 'connected';
+  $('#prompt').value = "Uma história emocionante onde o jovem inventor Theo e sua amiga corajosa Luna encontram um relógio antigo que abre uma passagem luminosa na floresta ao entardecer. Eles atravessam uma ponte suspensa sobre águas cristalinas, ativam engrenagens douradas numa torre esquecida e salvam o vale antes da tempestade chegar, com diálogos vivos e cheios de emoção.";
+  if(document.getElementById('createCharactersInput')) document.getElementById('createCharactersInput').value = "Theo (menino curioso de 12 anos com moletom vermelho e mochila) e Luna (menina destemida de 12 anos com jaqueta jeans e lanterna dourada)";
+  if(document.getElementById('cinemaMode')) document.getElementById('cinemaMode').value = 'story';
+  if(document.getElementById('style')) document.getElementById('style').value = 'animation';
   if(document.getElementById('duration')) document.getElementById('duration').value = '1';
-  toast('💡 Exemplo de história conectada preenchido — clique em Criar Vídeo Completo!');
+  toast('💡 Exemplo de história com personagens preenchido — clique em Criar História & Vídeo Completo!');
 }
 
-// ===== Modelos de vídeo (estilo HeyGen: Ads, Educ, Explainer...) =====
+// ===== Modelos de Histórias & Vídeos com Personagens =====
 const TEMPLATES = {
-  ads: { style:'cinematic', duration:'1', prompt:'Crie um vídeo promocional curto para [SEU PRODUTO/SERVIÇO]: ganchos rápidos nos primeiros 3 segundos, 3 benefícios claros, prova social e call-to-action forte no final. Tom energético, estilo comercial profissional.' },
-  edu: { style:'documentary', duration:'5', prompt:'Crie um vídeo educacional sobre [TEMA] para iniciantes: objetivo de aprendizagem no início, explicação passo a passo com exemplos do dia a dia, resumo final e pergunta para a seção de comentários. Tom didático e acolhedor.' },
-  explainer: { style:'animation', duration:'5', prompt:'Crie um vídeo explicativo sobre [CONCEITO/PRODUTO]: comece com o problema, explique o "como funciona" de forma visual e simples, mostre benefícios e encerre com um resumo em 3 pontos. Tom claro e direto.' },
-  howto: { style:'realistic', duration:'5', prompt:'Crie um vídeo de dicas e como-fazer sobre [ASSUNTO]: liste 5 a 7 dicas práticas em ordem, com exemplos rápidos e erros comuns a evitar. Tom de especialista amigo, ritmo ágil.' },
-  news: { style:'documentary', duration:'5', prompt:'Crie um vídeo de notícias sobre [TEMA]: o que aconteceu (fatos), por que importa, contexto curto, o que vem a seguir e fontes/cuidados. Tom jornalístico neutro e objetivo.' },
-  podcast: { style:'images', duration:'10', prompt:'Crie um episódio de podcast em vídeo sobre [TEMA]: abertura acolhedora, 3 blocos de discussão com histórias e opiniões, momentos de reflexão e encerramento com convite para seguir o canal. Tom conversacional e natural.' }
+  adventure: {
+    style:'cinematic', duration:'1', mode:'story',
+    chars:'Gabriel (aventureiro corajoso de jaqueta escura) e Sofia (exploradora brilhante de jaqueta âmbar)',
+    prompt:'Crie uma história de aventura emocionante onde Gabriel e Sofia encontram um mapa misterioso sobre [TEMA / TESOURO / LUGAR], enfrentam perigos reais no cenário, descobrem um segredo guardado há séculos e vivem uma grande reviravolta no final.'
+  },
+  fable: {
+    style:'animation', duration:'1', mode:'story',
+    chars:'Theo (menino sonhador de 10 anos de moletom vermelho) e Nina (menina criativa de 10 anos com óculos redondos)',
+    prompt:'Crie uma história encantadora estilo animação Pixar onde Theo e Nina vivem uma aventura mágica envolvendo [TEMA DA HISTÓRIA], com cenários coloridos cheios de vida, diálogos espontâneos e uma lição emocionante no final.'
+  },
+  mystery: {
+    style:'cinematic', duration:'1', mode:'story',
+    chars:'Dante (detetive perspicaz de sobretudo escuro) e Maya (investigadora corajosa)',
+    prompt:'Crie uma história de mistério e suspense onde Dante e Maya investigam [MISTÉRIO / CASO] durante uma noite chuvosa, encontram pistas escondidas em cada cenário e revelam uma verdade surpreendente no clímax.'
+  },
+  scifi: {
+    style:'cinematic', duration:'1', mode:'story',
+    chars:'Kael (piloto explorador espacial) e Lyra (engenheira estelar)',
+    prompt:'Crie uma história épica de ficção e fantasia onde Kael e Lyra pousam em um mundo desconhecido ligado a [TEMA], exploram paisagens grandiosas e precisam tomar uma decisão corajosa para voltar para casa.'
+  },
+  inspiring: {
+    style:'realistic', duration:'1', mode:'story',
+    chars:'Lucas (jovem sonhador determinado) e Helena (mentora inspiradora)',
+    prompt:'Crie uma história emocionante de superação na vida real sobre [DESAFIO / SONHO], mostrando as dificuldades iniciais, o apoio decisivo nos momentos difíceis e a conquista emocionante no cenário final.'
+  },
+  edu: {
+    style:'documentary', duration:'2', mode:'connected',
+    chars:'',
+    prompt:'Crie uma história documental envolvente sobre [TEMA], onde os personagens viajam pelos cenários reais do assunto, conversam de forma natural e revelam curiosidades impressionantes sem parecer robótico.'
+  },
+  ads: {
+    style:'realistic', duration:'0.5', mode:'story',
+    chars:'',
+    prompt:'Crie uma mini-história comercial sobre [SEU PRODUTO/SERVIÇO]: mostre um personagem passando por um problema real no dia a dia, descobrindo a solução na prática e comemorando a transformação.'
+  }
 };
 function applyTemplate(kind){
   const t = TEMPLATES[kind];
@@ -881,7 +917,9 @@ function applyTemplate(kind){
   $('#prompt').value = t.prompt;
   $('#style').value = t.style;
   $('#duration').value = t.duration;
-  toast('🎨 Modelo aplicado — personalize entre [COLCHETES] e clique em Criar');
+  if(document.getElementById('cinemaMode') && t.mode) document.getElementById('cinemaMode').value = t.mode;
+  if(document.getElementById('createCharactersInput') && typeof t.chars === 'string') document.getElementById('createCharactersInput').value = t.chars;
+  toast('🎨 Modelo de história aplicado — personalize o tema entre [COLCHETES] e clique em Criar!');
   $('#prompt').focus();
 }
 
@@ -1046,28 +1084,32 @@ function renderCastPreviewBox(data){
   const scenes = (data && Array.isArray(data.scenes)) ? data.scenes : [];
   if(!chars.length){ box.classList.add('hidden'); return; }
   box.classList.remove('hidden');
-  const chips = [
-    `<span class="kbd" style="border-color:#f59e0b88;color:#fde68a">🎙️ Narrador (${(document.getElementById('voice')||{}).value||'onyx'})</span>`,
-    ...chars.map(c => `<span class="kbd" style="border-color:${c.themeColor||'#38bdf8'}88;color:#e0f2fe">🗣️ ${c.name} • ${c.role} (voz ${c.voice})</span>`)
-  ].join(' ');
-  const locs = scenes.map(s => `<span style="opacity:.85">📍 Cena ${s.i}: ${s.locationName||s.title}</span>`).join(' → ');
-  box.innerHTML = `<div style="font-weight:800;font-size:12px;color:#c4b5fd;margin-bottom:6px">🎭 Elenco & Continuidade Conectada (${scenes.length} cenas interligadas)</div>`
-    + `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">${chips}</div>`
-    + `<div style="font-size:11.5px;color:#94a3b8;line-height:1.5">${locs}</div>`;
+  const charCards = chars.map(c => {
+    const color = c.themeColor || '#38bdf8';
+    return `<div style="flex:1;min-width:190px;padding:9px 11px;border-radius:10px;background:#0d1024;border:1px solid ${color}66">`
+      + `<div style="font-weight:800;font-size:12.5px;color:${color}">🗣️ ${escapeHtml(c.name)} <span style="font-weight:600;font-size:11px;color:#cbd5e1">• ${escapeHtml(c.role||'Protagonista')}</span></div>`
+      + (c.personality ? `<div style="font-size:11px;color:#a5b4fc;margin-top:2px">✨ Personalidade: ${escapeHtml(c.personality)}</div>` : '')
+      + `<div style="font-size:10.5px;color:#64748b;margin-top:3px">🎙️ Voz: ${escapeHtml(c.voice)}</div>`
+      + `</div>`;
+  }).join('');
+  const locs = scenes.map(s => `<span style="display:inline-block;padding:3px 8px;border-radius:6px;background:#090b18;border:1px solid #1e293b;margin:2px">📍 <b>Cena ${s.i}:</b> ${escapeHtml(s.locationName||s.title)}${s.sceneSummaryPt ? ` <i style="color:#94a3b8">(${escapeHtml(s.sceneSummaryPt)})</i>` : ''}</span>`).join(' ');
+  box.innerHTML = `<div style="font-weight:800;font-size:12.5px;color:#c4b5fd;margin-bottom:8px">🎭 Elenco da História & Storyboard de Cenários (${scenes.length} cenas multi-ângulo)</div>`
+    + `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">${charCards}</div>`
+    + `<div style="font-size:11px;color:#cbd5e1;line-height:1.5">${locs}</div>`;
 }
 
 // Botão 1-Clique: Gera Roteiro Conectado + Cenários + Personagens + Vozes + Vídeo Final Pronto para Baixar!
 async function createAndBuildVideo(){
   const mainBtn = document.getElementById('createFullVideoBtn');
-  if(mainBtn){ mainBtn.disabled = true; mainBtn.textContent = '⏳ Etapa 1/2: Criando roteiro, cenários e personagens...'; }
+  if(mainBtn){ mainBtn.disabled = true; mainBtn.textContent = '⏳ Etapa 1/2: Criando história, personagens e cenários...'; }
   try{
     const ok = await createVideo(true);
     if(ok){
-      if(mainBtn) mainBtn.textContent = '🎬 Etapa 2/2: Gerando cenários, vozes dos personagens e vídeo...';
+      if(mainBtn) mainBtn.textContent = '🎬 Etapa 2/2: Gerando cenários em ação, vozes expressivas e vídeo...';
       await buildCreateVideo();
     }
   } finally {
-    if(mainBtn){ mainBtn.disabled = false; mainBtn.textContent = '🎬 Criar Vídeo Completo (Narrador + Cenários + Personagens)'; }
+    if(mainBtn){ mainBtn.disabled = false; mainBtn.textContent = '🎬 Criar História & Vídeo Completo (Personagens + Cenários Vivos)'; }
   }
 }
 
@@ -1077,14 +1119,15 @@ async function createVideo(silentAutoBuild = false){
   const duration=$('#duration').value;
   const style=$('#style').value;
   const voice=$('#voice').value;
-  const cinemaMode=(document.getElementById('cinemaMode')||{}).value||'connected';
+  const cinemaMode=(document.getElementById('cinemaMode')||{}).value||'story';
+  const customCharacters=(document.getElementById('createCharactersInput')||{}).value||'';
   const btn=$('#createBtn');
 
-  if(!prompt){ showStatus('createStatus','⚠️ Descreva o vídeo primeiro.','warn'); toast('Descreva sua ideia primeiro','warn'); return false; }
-  if(prompt.length < 10){ showStatus('createStatus','⚠️ Descrição muito curta — detalhe melhor sua ideia.','warn'); return false; }
+  if(!prompt){ showStatus('createStatus','⚠️ Descreva a história ou o vídeo primeiro.','warn'); toast('Descreva sua ideia primeiro','warn'); return false; }
+  if(prompt.length < 8){ showStatus('createStatus','⚠️ Descrição muito curta — detalhe melhor sua história.','warn'); return false; }
 
-  btn.disabled=true; btn.textContent='⏳ Gerando roteiro...';
-  showStatus('createStatus','🤖 Criando história conectada (Narrador + Cenários + Diálogo entre Personagens)...','info');
+  btn.disabled=true; btn.textContent='⏳ Criando história & personagens...';
+  showStatus('createStatus','🤖 Criando personagens da história, cenários em múltiplos planos e diálogos com emoção humana...','info');
   $('#createProgress').classList.add('show');
   $('#createResult').classList.add('hidden');
   setProgress('createProgressFill', 18);
@@ -1094,7 +1137,7 @@ async function createVideo(silentAutoBuild = false){
     const response=await fetch('/api/create',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ prompt, duration, style, voice, cinemaMode })
+      body: JSON.stringify({ prompt, duration, style, voice, cinemaMode, customCharacters })
     });
     const data=await response.json();
     if(!response.ok) throw new Error(data.error||'Erro ao criar projeto');
@@ -1104,8 +1147,8 @@ async function createVideo(silentAutoBuild = false){
       showStatus('createStatus','⚠️ '+data.warning,'warn');
     }else{
       showStatus('createStatus', silentAutoBuild
-        ? '✅ Roteiro e elenco conectados prontos! Gerando cenários, vozes de cada personagem e vídeo...'
-        : '✅ Roteiro e elenco conectados prontos! Clique em Renderizar Vídeo abaixo.','success');
+        ? `✅ História e personagens criados (${data.provider||'IA'})! Gerando cenários em ação, vozes expressivas e vídeo...`
+        : `✅ História e personagens prontos (${data.provider||'IA'})! Clique em Renderizar Vídeo abaixo.`,'success');
     }
     $('#createScript').textContent = data.script || 'Roteiro criado';
     currentCreateData={
@@ -1113,7 +1156,7 @@ async function createVideo(silentAutoBuild = false){
       script: data.script || '',
       scenes: data.scenes || [],
       characters: data.characters || [],
-      mood: data.mood || 'cinematic',
+      mood: data.mood || 'adventure',
       artStylePrompt: data.artStylePrompt || '',
       cinemaMode,
       seo: data.seo || {},
@@ -1128,7 +1171,7 @@ async function createVideo(silentAutoBuild = false){
       document.getElementById('seoBox').classList.remove('hidden');
     }
     $('#createResult').classList.remove('hidden');
-    if(!silentAutoBuild) toast('✅ Roteiro conectado criado!');
+    if(!silentAutoBuild) toast('✅ História e personagens criados!');
     if(data.project) saveProject(data.project);
     await loadProjects();
     return true;
@@ -2878,37 +2921,122 @@ function wrapText(ctx,text,x,y,maxW,lh){
   return y;
 }
 
-// Cenário artístico cinematográfico de contingência (sem nenhum texto de erro na tela!)
+// Carregador direto de imagem IA gratuita no navegador (Pollinations Flux CDN — usa o IP residencial do usuário sem limite de servidor!)
+async function fetchFreeAiImageDirect(promptText, style='cinematic', w=896, h=504){
+  const clean = String(promptText || '').replace(/\s+/g, ' ').trim().slice(0, 320);
+  if(!clean) return null;
+  const fluxModel = style === 'animation' || style === 'pixar' ? 'flux-3d'
+    : (style === 'realistic' || style === 'documentary' || style === 'studio') ? 'flux-realism'
+    : 'flux';
+  const full = `${clean}, masterpiece cinematic lighting, detailed, no text, no watermark`.slice(0, 360);
+  const modelsToTry = [fluxModel, 'turbo'];
+
+  for(const mdl of modelsToTry){
+    try{
+      const seed = Math.floor(Math.random() * 900000) + 10000;
+      const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(full)}?width=${w}&height=${h}&nologo=true&enhance=true&safe=false&seed=${seed}&model=${mdl}`;
+      const img = await new Promise((resolve, reject) => {
+        const im = new Image();
+        im.crossOrigin = 'anonymous';
+        const timer = setTimeout(() => { im.src = ''; reject(new Error('timeout')); }, 13500);
+        im.onload = () => { clearTimeout(timer); resolve(im); };
+        im.onerror = (err) => { clearTimeout(timer); reject(err || new Error('erro img')); };
+        im.src = url;
+      });
+      if(img && (img.naturalWidth || img.width) > 64){
+        const cv = document.createElement('canvas');
+        cv.width = w; cv.height = h;
+        cv.getContext('2d').drawImage(img, 0, 0, w, h);
+        try{ return await createImageBitmap(cv); }catch(_){ return cv; }
+      }
+    }catch(e){}
+  }
+  return null;
+}
+
+// Cenário artístico contextual rico caso o dispositivo esteja 100% offline (desenha floresta, cidade, castelo, mar, espaço + silhuetas em ação!)
 async function placeholderBitmap(scene,i){
   const c=document.createElement('canvas'); c.width=1280; c.height=720;
   const x=c.getContext('2d');
+  const desc = `${scene.locationName||''} ${scene.title||''} ${scene.visual||''}`.toLowerCase();
+  const isForest = /floresta|selva|mata|bosque|árvore|arvore|jungle|forest|tree|jardim|vale|ponte/i.test(desc);
+  const isCity = /cidade|rua|prédio|predio|noite|cyber|futur|city|street|urban|neon|escritório|laboratório/i.test(desc);
+  const isCastle = /castelo|torre|ruína|ruina|templo|caverna|palácio|portal|castle|tower|temple|ancient/i.test(desc);
+  const isOcean = /mar|oceano|praia|rio|cachoeira|água|agua|ilha|barco|ocean|beach|river|waterfall/i.test(desc);
+
   const palettes=[
-    ['#0b132b','#1c2541','#3a506b','#f59e0b'],
-    ['#10002b','#240046','#5a189a','#38bdf8'],
-    ['#081c15','#1b4332','#2d6a4f','#fbbf24'],
-    ['#1f1108','#432818','#6f1d1b','#fb923c'],
-    ['#091526','#112d4e','#1e56a0','#67e8f9']
+    ['#0b132b','#1e293b','#334155','#fbbf24'],
+    ['#120924','#2e1065','#4c1d95','#38bdf8'],
+    ['#062019','#134e4a','#115e59','#fcd34d'],
+    ['#1f1209','#432818','#7c2d12','#fb923c'],
+    ['#091526','#112d4e','#1e40af','#67e8f9']
   ];
-  const pal=palettes[i%palettes.length];
+  const pal = isForest ? palettes[2] : isCity ? palettes[1] : isCastle ? palettes[3] : isOcean ? palettes[4] : palettes[i%palettes.length];
   const g=x.createLinearGradient(0,0,0,720);
   g.addColorStop(0,pal[0]); g.addColorStop(0.55,pal[1]); g.addColorStop(1,pal[2]);
   x.fillStyle=g; x.fillRect(0,0,1280,720);
 
-  const sunX = 340 + ((i*230)%600), sunY = 250 + ((i*55)%120);
-  const rg=x.createRadialGradient(sunX,sunY,12,sunX,sunY,460);
-  rg.addColorStop(0,pal[3]+'cc'); rg.addColorStop(0.35,pal[3]+'38'); rg.addColorStop(1,'transparent');
+  const sunX = 380 + ((i*210)%520), sunY = 230 + ((i*45)%110);
+  const rg=x.createRadialGradient(sunX,sunY,14,sunX,sunY,480);
+  rg.addColorStop(0,pal[3]+'dd'); rg.addColorStop(0.35,pal[3]+'44'); rg.addColorStop(1,'transparent');
   x.fillStyle=rg; x.fillRect(0,0,1280,720);
 
   for(let layer=0; layer<3; layer++){
-    const baseY = 430 + layer*85;
-    x.fillStyle = layer===0 ? 'rgba(10,14,29,0.45)' : layer===1 ? 'rgba(8,11,22,0.68)' : 'rgba(5,7,15,0.90)';
+    const baseY = 420 + layer*82;
+    x.fillStyle = layer===0 ? 'rgba(10,14,29,0.45)' : layer===1 ? 'rgba(8,11,22,0.70)' : 'rgba(5,7,15,0.92)';
     x.beginPath(); x.moveTo(0,720); x.lineTo(0,baseY);
-    for(let px=0; px<=1280; px+=80){
-      const ridge = Math.sin(px*0.005 + i*1.7 + layer*2.1)*44 + Math.cos(px*0.013 + layer)*22;
+    for(let px=0; px<=1280; px+=64){
+      const ridge = Math.sin(px*0.005 + i*1.7 + layer*2.1)*38 + Math.cos(px*0.013 + layer)*20;
       x.lineTo(px, baseY + ridge);
     }
     x.lineTo(1280,720); x.closePath(); x.fill();
   }
+
+  // Elementos específicos do cenário (árvores, prédios iluminados ou torres)
+  if(isCity){
+    for(let b=0; b<18; b++){
+      const bw = 48 + (b*23)%55, bh = 140 + (b*71)%220;
+      const bx = (b*76 + i*30) % 1240, by = 600 - bh;
+      x.fillStyle = 'rgba(7,10,22,0.88)';
+      x.fillRect(bx, by, bw, bh);
+      x.fillStyle = pal[3]+'66';
+      for(let wy=by+14; wy<by+bh-20; wy+=18){
+        for(let wx=bx+8; wx<bx+bw-12; wx+=14){
+          if(((wx+wy+i)%3)!==0) x.fillRect(wx, wy, 6, 9);
+        }
+      }
+    }
+  } else if(isForest){
+    for(let tr=0; tr<16; tr++){
+      const tx = (tr*88 + i*25)%1260, ty = 580 + (tr%3)*28, th = 150 + (tr%4)*35;
+      x.fillStyle = 'rgba(6,14,18,0.86)';
+      x.fillRect(tx-6, ty-th*0.4, 12, th*0.45);
+      x.beginPath();
+      x.moveTo(tx, ty-th);
+      x.lineTo(tx-44, ty-th*0.25);
+      x.lineTo(tx+44, ty-th*0.25);
+      x.closePath(); x.fill();
+    }
+  }
+
+  // Silhuetas cinematográficas dos personagens atuando no centro do cenário
+  const c1x = 560 + ((i%2)*40), c2x = 690 + ((i%2)*35), groundY = 585;
+  for(const [cx, scale, isFem] of [[c1x, 1.0, false], [c2x, 0.94, true]]){
+    x.save();
+    x.translate(cx, groundY);
+    x.scale(scale, scale);
+    // Halo de contraluz nos personagens
+    const chg = x.createRadialGradient(0, -68, 6, 0, -68, 64);
+    chg.addColorStop(0, pal[3]+'55'); chg.addColorStop(1, 'transparent');
+    x.fillStyle = chg; x.beginPath(); x.arc(0, -68, 64, 0, Math.PI*2); x.fill();
+    x.fillStyle = '#090d1a';
+    x.beginPath(); x.arc(0, -108, 16, 0, Math.PI*2); x.fill();
+    x.beginPath(); x.roundRect(-18, -90, 36, 54, 12); x.fill();
+    x.fillRect(-13, -38, 10, 38);
+    x.fillRect(3, -38, 10, 38);
+    x.restore();
+  }
+
   try{ return await createImageBitmap(c); }catch(e){ return c; }
 }
 
@@ -2943,19 +3071,51 @@ function buildCharacterFallbackSvg(char, idx){
   return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
 }
 
-// Prepara retrato 512x512 de um personagem com buffer de deformação labial próprio
-async function prepareCinemaActor(char, idx, artStylePrompt){
+// Detecta automaticamente olhos, boca e cor labial no retrato 512x512 do personagem da história
+function detectActorMouthAndEyes(srcCv, isAi){
+  const def = !isAi
+    ? { x:0.50, y:0.553, w:0.125, eyeY:0.422, eyeSep:0.160, oralR:34, oralG:12, oralB:18 }
+    : { x:0.50, y:0.555, w:0.132, eyeY:0.415, eyeSep:0.155, oralR:34, oralG:12, oralB:18 };
+  try{
+    if(typeof detectAvatarLandmarks === 'function'){
+      const lm = detectAvatarLandmarks(srcCv);
+      if(lm){
+        const ctx = srcCv.getContext('2d');
+        const px = Math.round(lm.mx * 512), py = Math.round(lm.my * 512);
+        const d = ctx.getImageData(Math.max(0, px-10), Math.max(0, py-4), 20, 8).data;
+        let rS=0, gS=0, bS=0, n=0;
+        for(let i=0; i<d.length; i+=4){ rS+=d[i]; gS+=d[i+1]; bS+=d[i+2]; n++; }
+        return {
+          x: lm.mx,
+          y: lm.my,
+          w: lm.mouthW || 0.132,
+          eyeY: ((lm.eyeLY || 0.41) + (lm.eyeRY || 0.41)) * 0.5,
+          eyeSep: Math.max(0.11, (lm.eyeRX || 0.57) - (lm.eyeLX || 0.43)),
+          oralR: n ? Math.max(18, Math.round((rS/n)*0.30)) : 34,
+          oralG: n ? Math.max(8, Math.round((gS/n)*0.20)) : 12,
+          oralB: n ? Math.max(10, Math.round((bS/n)*0.22)) : 18
+        };
+      }
+    }
+  }catch(e){}
+  return def;
+}
+
+// Prepara retrato 512x512 de um personagem com geração IA (Backend + Pollinations Flux Direto) e leitura facial automática
+async function prepareCinemaActor(char, idx, artStylePrompt, style='cinematic'){
   const srcCv = document.createElement('canvas'); srcCv.width = 512; srcCv.height = 512;
   const workCv = document.createElement('canvas'); workCv.width = 512; workCv.height = 512;
   let loadedImg = null;
   let isAi = false;
+  const portraitPrompt = `${artStylePrompt || 'cinematic character portrait'}, ${char.appearance || char.name}, centered front-facing portrait looking at camera, closed relaxed mouth, clear eyes`;
+
   try{
     const r = await fetch('/api/avatar', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
         action:'portrait',
-        prompt: `${artStylePrompt || 'cinematic film portrait'}, ${char.appearance || char.name}`,
-        style: char.portraitStyle || 'studio'
+        prompt: portraitPrompt,
+        style: char.portraitStyle || (style === 'animation' ? 'pixar' : 'studio')
       })
     });
     const j = await r.json();
@@ -2970,6 +3130,15 @@ async function prepareCinemaActor(char, idx, artStylePrompt){
     }
   }catch(e){}
 
+  // Fallback direto no navegador via Pollinations Flux se o serverless estiver ocupado
+  if(!loadedImg){
+    const directBmp = await fetchFreeAiImageDirect(portraitPrompt, style === 'animation' ? 'pixar' : 'studio', 512, 512);
+    if(directBmp){
+      loadedImg = directBmp;
+      isAi = true;
+    }
+  }
+
   if(!loadedImg){
     loadedImg = await new Promise((res) => {
       const im = new Image();
@@ -2979,9 +3148,11 @@ async function prepareCinemaActor(char, idx, artStylePrompt){
   }
 
   const sctx = srcCv.getContext('2d');
-  const side = Math.min(loadedImg.naturalWidth || 512, loadedImg.naturalHeight || 512);
-  const sx = ((loadedImg.naturalWidth || 512) - side) * 0.5;
-  const sy = ((loadedImg.naturalHeight || 512) - side) * 0.35;
+  const iw = loadedImg.naturalWidth || loadedImg.width || 512;
+  const ih = loadedImg.naturalHeight || loadedImg.height || 512;
+  const side = Math.min(iw, ih);
+  const sx = (iw - side) * 0.5;
+  const sy = (ih - side) * 0.35;
   sctx.drawImage(loadedImg, Math.max(0,sx), Math.max(0,sy), side, side, 0, 0, 512, 512);
 
   return {
@@ -2989,11 +3160,11 @@ async function prepareCinemaActor(char, idx, artStylePrompt){
     srcCanvas: srcCv,
     workCanvas: workCv,
     blinkOffset: idx * 1.85,
-    mouth: !isAi ? { x:0.50, y:0.553, w:0.125, eyeY:0.422, eyeSep:0.160 } : { x:0.50, y:0.555, w:0.132, eyeY:0.415, eyeSep:0.155 }
+    mouth: detectActorMouthAndEyes(srcCv, isAi)
   };
 }
 
-// Renderiza o rosto do personagem com lip-sync C⁰ + ultra-leve para GPU mobile (zero redesenho quando em repouso!)
+// Renderiza o rosto do personagem com lip-sync anatômico em janela de cosseno (zero borda quadrada!)
 function renderActorLipSyncCanvas(actor, mouthOpen, mouthWide, blink){
   if(mouthOpen <= 0.015 && blink <= 0.05) return actor.srcCanvas;
 
@@ -3004,47 +3175,61 @@ function renderActorLipSyncCanvas(actor, mouthOpen, mouthWide, blink){
 
   const m = actor.mouth;
   if(blink > 0.05){
-    const ey = m.eyeY * S, sep = m.eyeSep * S, ew = S * 0.068, eh = S * 0.026 * blink;
+    const ey = m.eyeY * S, sep = m.eyeSep * S, ew = S * 0.068, eh = S * 0.028 * blink;
     for(const dir of [-1, 1]){
       const ex = m.x * S + dir * sep * 0.5;
       wctx.save();
-      wctx.beginPath(); wctx.ellipse(ex, ey, ew, eh, 0, 0, Math.PI*2); wctx.clip();
-      wctx.drawImage(actor.srcCanvas, ex - ew, ey - S*0.036, ew*2, S*0.026, ex - ew, ey - eh, ew*2, eh*2);
+      wctx.beginPath();
+      wctx.moveTo(ex - ew, ey);
+      wctx.quadraticCurveTo(ex, ey - eh * 1.15, ex + ew, ey);
+      wctx.quadraticCurveTo(ex, ey + eh * 1.05, ex - ew, ey);
+      wctx.closePath(); wctx.clip();
+      wctx.drawImage(actor.srcCanvas, ex - ew, ey - S*0.038, ew*2, S*0.026, ex - ew, ey - eh, ew*2, eh*2.1);
       wctx.restore();
     }
   }
 
   if(mouthOpen > 0.015){
     const mx = m.x * S, my = m.y * S;
-    const lipRx = S * m.w * (1 + mouthWide * 0.20) * 0.5;
-    const jawRx = S * 0.165;
-    const yTop = my - S * 0.042;
-    const yBot = my + S * 0.165;
-    const gap = Math.min(S * 0.052, mouthOpen * S * 0.046);
-    const uLip = my - gap * 0.22;
-    const lLip = my + gap * 0.78;
+    const lipRx = S * m.w * (1 + mouthWide * 0.22) * 0.52;
+    const jawRx = Math.max(lipRx * 1.45, S * 0.165);
+    const yTop = my - S * 0.045;
+    const yBot = my + S * 0.175;
+    const gap = Math.min(S * 0.055, mouthOpen * S * 0.048);
 
     wctx.save();
     wctx.beginPath(); wctx.ellipse(mx, (yTop+yBot)*0.5, jawRx, (yBot-yTop)*0.5, 0, 0, Math.PI*2); wctx.clip();
-    const STEP = 6; // 18 faixas suaves em vez de 53 (3x mais leve na GPU do celular, zero perda visual!)
-    for(let y = yTop; y < yBot; y += STEP){
-      let srcY = y <= uLip
-        ? yTop + ((y - yTop) / Math.max(1, uLip - yTop)) * (my - yTop)
-        : (y >= lLip ? my + ((y - lLip) / Math.max(1, yBot - lLip)) * (yBot - my) : my);
-      wctx.drawImage(actor.srcCanvas, mx - jawRx, srcY, jawRx*2, STEP + 0.9, mx - jawRx, y, jawRx*2, STEP + 0.9);
+    const COLS = 18;
+    const colW = (jawRx * 2) / COLS;
+    for(let c = 0; c < COLS; c++){
+      const x0 = mx - jawRx + c * colW;
+      const u = Math.min(1, Math.abs(((x0 + colW * 0.5) - mx) / jawRx));
+      const w = 0.5 * (1 + Math.cos(Math.PI * u));
+      if(w < 0.02) continue;
+      const shiftY = gap * 0.68 * w;
+      wctx.drawImage(
+        actor.srcCanvas,
+        x0, my, colW + 0.8, (yBot - my) - shiftY,
+        x0, my + shiftY * 0.85, colW + 0.8, (yBot - my) - shiftY * 0.85
+      );
     }
-    if(gap > 1.2){
+    if(gap > 1.1){
+      const uLip = my - gap * 0.22;
+      const lLip = my + gap * 0.78;
       wctx.save();
       wctx.beginPath();
-      wctx.moveTo(mx - lipRx, my + gap*0.12);
-      wctx.quadraticCurveTo(mx, uLip - gap*0.10, mx + lipRx, my + gap*0.12);
-      wctx.quadraticCurveTo(mx, lLip + gap*0.16, mx - lipRx, my + gap*0.12);
+      wctx.moveTo(mx - lipRx, my + gap*0.08);
+      wctx.quadraticCurveTo(mx, uLip - gap*0.12, mx + lipRx, my + gap*0.08);
+      wctx.quadraticCurveTo(mx, lLip + gap*0.18, mx - lipRx, my + gap*0.08);
       wctx.closePath(); wctx.clip();
-      wctx.fillStyle = '#240c12';
-      wctx.fillRect(mx - lipRx, uLip - 2, lipRx*2, (lLip - uLip) + 6);
-      if(mouthOpen > 0.22){
-        wctx.fillStyle = 'rgba(243,238,234,0.62)';
-        wctx.beginPath(); wctx.roundRect(mx - lipRx*0.64, uLip - 1, lipRx*1.28, Math.max(2, gap*0.26), 2); wctx.fill();
+      const oralGrad = wctx.createRadialGradient(mx, (uLip+lLip)*0.5, 1, mx, (uLip+lLip)*0.5, lipRx);
+      oralGrad.addColorStop(0, `rgb(${Math.max(10,(m.oralR||34)-12)},${Math.max(5,(m.oralG||12)-6)},${Math.max(8,(m.oralB||18)-6)})`);
+      oralGrad.addColorStop(1, `rgb(${m.oralR||34},${m.oralG||12},${m.oralB||18})`);
+      wctx.fillStyle = oralGrad;
+      wctx.fillRect(mx - lipRx, uLip - 3, lipRx*2, (lLip - uLip) + 8);
+      if(mouthOpen > 0.20){
+        wctx.fillStyle = 'rgba(244,240,236,0.56)';
+        wctx.beginPath(); wctx.roundRect(mx - lipRx*0.58, uLip - 1, lipRx*1.16, Math.max(1.8, gap*0.24), 2); wctx.fill();
       }
       wctx.restore();
     }
@@ -3053,18 +3238,24 @@ function renderActorLipSyncCanvas(actor, mouthOpen, mouthWide, blink){
   return actor.workCanvas;
 }
 
-// Desenha um cenário com movimento de câmera cinematográfico (zoom/pan) cobrindo W×H
-function drawSceneryWithCamera(ctx, img, W, H, p, move='zoomIn', alpha=1){
+// Desenha um cenário com movimento de câmera cinematográfico fluido (cubic-bezier + respiração orgânica de lente) cobrindo W×H
+function drawSceneryWithCamera(ctx, img, W, H, p, move='zoomIn', alpha=1, t=0){
   if(!img) return;
   ctx.save();
   ctx.globalAlpha = alpha;
   const iw = img.width || 1280, ih = img.height || 720;
   const ir = iw / ih, cr = W / H;
-  let zoom = 1.08, panX = 0, panY = 0;
-  if(move === 'zoomIn'){ zoom = 1.02 + 0.13 * p; }
-  else if(move === 'zoomOut'){ zoom = 1.15 - 0.12 * p; }
-  else if(move === 'panRight'){ zoom = 1.13; panX = (0.5 - p) * 0.07; }
-  else if(move === 'panLeft'){ zoom = 1.13; panX = (p - 0.5) * 0.07; }
+  // Curva suave S-curve (easeInOutSine) para fluidez cinematográfica real
+  const ep = 0.5 - 0.5 * Math.cos(Math.PI * Math.max(0, Math.min(1, p)));
+  const breathX = Math.sin(t * 1.15) * 0.004;
+  const breathY = Math.cos(t * 0.95) * 0.003;
+  let zoom = 1.08, panX = breathX, panY = breathY;
+  if(move === 'zoomIn'){ zoom = 1.03 + 0.14 * ep; }
+  else if(move === 'dollyIn'){ zoom = 1.06 + 0.18 * ep; panY = -0.025 * ep + breathY; }
+  else if(move === 'zoomOut'){ zoom = 1.18 - 0.14 * ep; }
+  else if(move === 'panRight'){ zoom = 1.14; panX = (0.5 - ep) * 0.085 + breathX; }
+  else if(move === 'panLeft'){ zoom = 1.14; panX = (ep - 0.5) * 0.085 + breathX; }
+  else if(move === 'tiltUp'){ zoom = 1.14; panY = (0.5 - ep) * 0.075 + breathY; }
   let dw, dh;
   if(ir > cr){ dh = H * zoom; dw = dh * ir; } else { dw = W * zoom; dh = dw / ir; }
   ctx.drawImage(img, (W - dw)*0.5 + dw*panX, (H - dh)*0.5 + dh*panY, dw, dh);
@@ -3106,10 +3297,26 @@ function drawSceneAtmosphere(ctx, W, H, t, kind='particles'){
   ctx.restore();
 }
 
-// Motor principal do CINEMA CONECTADO: Narrador + Cenários Dinâmicos + Diálogo Entre Personagens + Legendas Karaokê
+// Mapa de rótulos de emoção em português para exibição cinematográfica
+const EMOTION_LABELS_PT = {
+  excited: '🤩 Entusiasmado',
+  surprised: '😮 Surpreso',
+  curious: '🧐 Curioso',
+  tense: '😰 Tenso',
+  happy: '😊 Feliz',
+  warm: '✨ Emocionado',
+  sad: '😢 Comovido',
+  determined: '🔥 Determinado',
+  storyteller: '📖 Narrando'
+};
+
+// Motor principal do CINEMA DE HISTÓRIAS: Cenário Multi-Plano 100% Visível + Personagens Atuando + Palco Picture-in-Scene Sincronizado
 function makeConnectedCinemaDrawer(movie){
   let smoothDialogueMix = 0;
+  let smoothActionShotMix = 0;
   let lastT = 0;
+  let lastBeatIdx = -1;
+  let cutFlash = 0;
   const smoothScale = {};
 
   return (ctx, t) => {
@@ -3125,149 +3332,169 @@ function makeConnectedCinemaDrawer(movie){
     const span = Math.max(0.5, sc.end - sc.start);
     const sp = Math.max(0, Math.min(1, (t - sc.start) / span));
 
-    // 1) CENÁRIO VIVO + Transição suave Cross-Dissolve entre cenas consecutivas
+    const beats = movie.timedBeats || [];
+    let bIdx = beats.findIndex(b => t >= b.start && t < b.end);
+    let activeBeat = bIdx >= 0 ? beats[bIdx] : null;
+    if(!activeBeat){
+      const nearIdx = beats.findIndex(b => Math.abs(b.start - t) < 0.35 && b.sceneIndex === sIdx);
+      if(nearIdx >= 0){ bIdx = nearIdx; activeBeat = beats[nearIdx]; }
+    }
+    if(bIdx !== lastBeatIdx && bIdx >= 0){
+      if(lastBeatIdx >= 0) cutFlash = 0.22; // Sutil transição óptica de corte de câmera a cada fala
+      lastBeatIdx = bIdx;
+    }
+    cutFlash = Math.max(0, cutFlash - dt * 0.95);
+
+    const beatSpan = activeBeat ? Math.max(0.4, activeBeat.end - activeBeat.start) : span;
+    const beatP = activeBeat ? Math.max(0, Math.min(1, (t - activeBeat.start) / beatSpan)) : sp;
+    const camMove = (activeBeat && activeBeat.cameraMove) || sc.cameraMove || 'zoomIn';
+
+    // Alterna suavemente entre Shot A (Plano Aberto do Cenário) e Shot B (Plano de Ação dos Personagens no Cenário)
+    const wantActionShot = !!(sc.actionBitmap && ((activeBeat && activeBeat.shot === 'action') || sp > 0.42));
+    smoothActionShotMix += ((wantActionShot ? 1 : 0) - smoothActionShotMix) * Math.min(1, dt * 3.8);
+
+    // 1) CENÁRIO VIVO EM TELA CHEIA (100% VISÍVEL E ILUMINADO — NUNCA COBERTO NO CENTRO!)
     ctx.fillStyle = '#05060f';
     ctx.fillRect(0, 0, W, H);
-    drawSceneryWithCamera(ctx, sc.imgBitmap, W, H, sp, sc.cameraMove || 'zoomIn', 1);
-    if(sIdx > 0 && (t - sc.start) < 0.70){
-      const fadePrev = 1 - Math.max(0, (t - sc.start) / 0.70);
-      drawSceneryWithCamera(ctx, scenes[sIdx - 1].imgBitmap, W, H, 1, scenes[sIdx - 1].cameraMove || 'zoomIn', fadePrev);
+    drawSceneryWithCamera(ctx, sc.imgBitmap, W, H, sp, sc.cameraMove || 'zoomIn', 1, t);
+    if(sc.actionBitmap && smoothActionShotMix > 0.02){
+      drawSceneryWithCamera(ctx, sc.actionBitmap, W, H, beatP, camMove, smoothActionShotMix, t);
+    }
+    // Cross-dissolve suave entre cenas consecutivas
+    if(sIdx > 0 && (t - sc.start) < 0.75){
+      const prevSc = scenes[sIdx - 1];
+      const fadePrev = 1 - Math.max(0, (t - sc.start) / 0.75);
+      drawSceneryWithCamera(ctx, prevSc.actionBitmap || prevSc.imgBitmap, W, H, 1, prevSc.cameraMove || 'zoomIn', fadePrev, t);
     }
     drawSceneAtmosphere(ctx, W, H, t, sc.atmosphere || 'particles');
 
-    const beats = movie.timedBeats || [];
-    let activeBeat = beats.find(b => t >= b.start && t < b.end);
-    if(!activeBeat){
-      const near = beats.find(b => Math.abs(b.start - t) < 0.35 && b.sceneIndex === sIdx);
-      activeBeat = near || null;
+    // Sutil flash anamórfico na troca de ângulo/corte
+    if(cutFlash > 0.01){
+      ctx.fillStyle = `rgba(255,250,235,${cutFlash * 0.35})`;
+      ctx.fillRect(0, 0, W, H);
     }
 
     const isCharDialogue = !!(activeBeat && activeBeat.speaker !== 'narrator' && movie.actors && movie.actors.length);
     const targetMix = isCharDialogue ? 1 : 0;
-    smoothDialogueMix += (targetMix - smoothDialogueMix) * Math.min(1, dt * 6.5);
+    smoothDialogueMix += (targetMix - smoothDialogueMix) * Math.min(1, dt * 7.5);
 
-    const grad = ctx.createLinearGradient(0, 0, 0, H);
-    grad.addColorStop(0, `rgba(6,8,20,${0.18 + 0.24 * smoothDialogueMix})`);
-    grad.addColorStop(0.55, `rgba(6,8,20,${0.08 + 0.34 * smoothDialogueMix})`);
-    grad.addColorStop(1, 'rgba(5,6,15,0.84)');
+    // Vinheta suave apenas no rodapé para leitura perfeita das legendas sem escurecer o cenário!
+    const grad = ctx.createLinearGradient(0, H * 0.62, 0, H);
+    grad.addColorStop(0, 'rgba(5,6,15,0)');
+    grad.addColorStop(0.55, 'rgba(5,6,15,0.48)');
+    grad.addColorStop(1, 'rgba(5,6,15,0.88)');
     ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, W, H);
+    ctx.fillRect(0, H * 0.62, W, H * 0.38);
 
-    // 2) DIÁLOGO ENTRE PERSONAGENS DENTRO DO CENÁRIO (boca sincronizada com o áudio real!)
+    // 2) PALCO PICTURE-IN-SCENE DO PERSONAGEM FALANDO (No canto inferior — deixa o centro do cenário 100% livre!)
     if(smoothDialogueMix > 0.03 && movie.actors && movie.actors.length){
       const actors = movie.actors;
-      for(let idx = 0; idx < actors.length; idx++){
-        const actor = actors[idx];
-        const isSpeakingNow = !!(activeBeat && activeBeat.speaker === actor.id && t >= activeBeat.start && t < activeBeat.end);
+      const speakingIdx = actors.findIndex(a => activeBeat && activeBeat.speaker === a.id);
+      const activeActor = speakingIdx >= 0 ? actors[speakingIdx] : actors[0];
+      const idx = speakingIdx >= 0 ? speakingIdx : 0;
+      const isLeftStage = (idx % 2 === 0);
 
-        let mOpen = 0, mWide = 0;
-        if(isSpeakingNow && activeBeat){
-          const relT = Math.max(0, t - activeBeat.start);
-          if(activeBeat.lipProfile){
-            const fi = Math.min(activeBeat.lipProfile.openArr.length - 1, Math.floor(relT * activeBeat.lipProfile.fps));
-            mOpen = activeBeat.lipProfile.openArr[fi];
-            mWide = activeBeat.lipProfile.wideArr[fi];
-          } else {
-            const ph = phonemeMouthAt(activeBeat.text, relT, Math.max(0.4, activeBeat.end - activeBeat.start));
-            mOpen = ph.open; mWide = ph.wide;
-          }
-        }
-
-        const blink = blinkAtTime(t + actor.blinkOffset);
-        const faceCv = renderActorLipSyncCanvas(actor, mOpen, mWide, blink);
-
-        const targetS = isSpeakingNow ? 1.06 : 0.92;
-        smoothScale[actor.id] = (smoothScale[actor.id] || 0.95) + (targetS - (smoothScale[actor.id] || 0.95)) * Math.min(1, dt * 8);
-
-        let cardS, cx, cy;
-        if(isLandscape){
-          cardS = Math.min(H * 0.50, W * 0.29) * smoothScale[actor.id];
-          cx = actors.length === 1 ? W * 0.5 : (idx === 0 ? W * 0.27 : W * 0.73);
-          cy = H * 0.46 + (1 - smoothDialogueMix) * (H * 0.10);
+      let mOpen = 0, mWide = 0;
+      if(activeBeat && activeBeat.speaker === activeActor.id && t >= activeBeat.start && t < activeBeat.end){
+        const relT = Math.max(0, t - activeBeat.start);
+        if(activeBeat.lipProfile){
+          const fi = Math.min(activeBeat.lipProfile.openArr.length - 1, Math.floor(relT * activeBeat.lipProfile.fps));
+          mOpen = activeBeat.lipProfile.openArr[fi];
+          mWide = activeBeat.lipProfile.wideArr[fi];
         } else {
-          cardS = Math.min(W * 0.43, H * 0.34) * smoothScale[actor.id];
-          cx = actors.length === 1 ? W * 0.5 : (idx === 0 ? W * 0.265 : W * 0.735);
-          cy = H * 0.45 + (1 - smoothDialogueMix) * (H * 0.08);
+          const ph = phonemeMouthAt(activeBeat.text, relT, Math.max(0.4, activeBeat.end - activeBeat.start));
+          mOpen = ph.open; mWide = ph.wide;
         }
-
-        const bobY = Math.sin(t * 1.7 + idx * 2.1) * 3.5 - mOpen * 4.5;
-        const headTilt = Math.sin(t * 1.2 + idx) * 0.008 + (isSpeakingNow ? Math.sin(t * 3.1) * 0.012 * mOpen : 0);
-
-        ctx.save();
-        ctx.globalAlpha = smoothDialogueMix * (isSpeakingNow ? 1 : 0.80);
-
-        if(isSpeakingNow){
-          const halo = ctx.createRadialGradient(cx, cy + bobY, cardS * 0.32, cx, cy + bobY, cardS * 0.72);
-          halo.addColorStop(0, (actor.themeColor || '#38bdf8') + '66');
-          halo.addColorStop(1, 'transparent');
-          ctx.fillStyle = halo;
-          ctx.beginPath(); ctx.arc(cx, cy + bobY, cardS * 0.72, 0, Math.PI*2); ctx.fill();
-        }
-
-        const rx = cx - cardS * 0.5, ry = cy + bobY - cardS * 0.5;
-        const rad = Math.round(cardS * 0.09);
-        // Sombra suave acelerada por GPU (ZERO shadowBlur CPU readback!)
-        ctx.fillStyle = 'rgba(0,0,0,0.42)';
-        ctx.beginPath(); ctx.roundRect(rx + 6, ry + 11, cardS, cardS, rad); ctx.fill();
-
-        ctx.save();
-        ctx.beginPath(); ctx.roundRect(rx, ry, cardS, cardS, rad); ctx.clip();
-        ctx.translate(cx, cy + bobY);
-        ctx.rotate(headTilt);
-        ctx.drawImage(faceCv, -cardS * 0.5, -cardS * 0.5, cardS, cardS);
-        if(!isSpeakingNow){
-          ctx.fillStyle = 'rgba(8,10,24,0.22)';
-          ctx.fillRect(-cardS * 0.5, -cardS * 0.5, cardS, cardS);
-        }
-        ctx.restore();
-
-        ctx.strokeStyle = isSpeakingNow ? (actor.themeColor || '#38bdf8') : 'rgba(255,255,255,0.22)';
-        ctx.lineWidth = isSpeakingNow ? 3.5 : 1.6;
-        ctx.beginPath(); ctx.roundRect(rx, ry, cardS, cardS, Math.round(cardS * 0.09)); ctx.stroke();
-
-        const badgeText = `${isSpeakingNow ? '🗣️ ' : ''}${actor.name}`;
-        ctx.font = `800 ${Math.max(14, Math.round(cardS * 0.068))}px Inter, sans-serif`;
-        const bw = ctx.measureText(badgeText).width + 28;
-        const bh = Math.max(28, Math.round(cardS * 0.105));
-        ctx.fillStyle = isSpeakingNow ? 'rgba(12,15,32,0.92)' : 'rgba(12,15,32,0.72)';
-        ctx.beginPath(); ctx.roundRect(cx - bw*0.5, ry + cardS - bh*0.55, bw, bh, 999); ctx.fill();
-        ctx.strokeStyle = actor.themeColor || '#38bdf8';
-        ctx.lineWidth = 1.5; ctx.stroke();
-        ctx.fillStyle = '#ffffff';
-        ctx.textAlign = 'center';
-        ctx.fillText(badgeText, cx, ry + cardS - bh*0.55 + bh*0.69);
-        ctx.textAlign = 'left';
-
-        ctx.restore();
       }
+
+      const blink = blinkAtTime(t + activeActor.blinkOffset);
+      const faceCv = renderActorLipSyncCanvas(activeActor, mOpen, mWide, blink);
+
+      const cardS = isLandscape ? Math.round(H * 0.27) : Math.round(W * 0.28);
+      const marginX = isLandscape ? Math.round(W * 0.032) : Math.round(W * 0.04);
+      const slideOffset = (1 - smoothDialogueMix) * (isLeftStage ? -80 : 80);
+      const cx = (isLeftStage ? (marginX + cardS * 0.5) : (W - marginX - cardS * 0.5)) + slideOffset;
+      const cy = H - cardS * 0.5 - Math.round(H * (isLandscape ? 0.17 : 0.19));
+
+      const bobY = Math.sin(t * 2.1 + idx) * 2.8 - mOpen * 4.0;
+      const headTilt = Math.sin(t * 1.4 + idx) * 0.010 + Math.sin(t * 3.4) * 0.014 * mOpen;
+
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, smoothDialogueMix * 1.08);
+
+      // Halo colorido pulsante sincronizado com a voz do personagem
+      const haloR = cardS * (0.58 + mOpen * 0.14);
+      const halo = ctx.createRadialGradient(cx, cy + bobY, cardS * 0.25, cx, cy + bobY, haloR);
+      halo.addColorStop(0, (activeActor.themeColor || '#38bdf8') + '88');
+      halo.addColorStop(1, 'transparent');
+      ctx.fillStyle = halo;
+      ctx.beginPath(); ctx.arc(cx, cy + bobY, haloR, 0, Math.PI*2); ctx.fill();
+
+      const rx = cx - cardS * 0.5, ry = cy + bobY - cardS * 0.5;
+      const rad = Math.round(cardS * 0.20);
+      ctx.fillStyle = 'rgba(0,0,0,0.48)';
+      ctx.beginPath(); ctx.roundRect(rx + 4, ry + 8, cardS, cardS, rad); ctx.fill();
+
+      ctx.save();
+      ctx.beginPath(); ctx.roundRect(rx, ry, cardS, cardS, rad); ctx.clip();
+      ctx.translate(cx, cy + bobY);
+      ctx.rotate(headTilt);
+      ctx.drawImage(faceCv, -cardS * 0.5, -cardS * 0.5, cardS, cardS);
+      ctx.restore();
+
+      ctx.strokeStyle = activeActor.themeColor || '#38bdf8';
+      ctx.lineWidth = 3.2;
+      ctx.beginPath(); ctx.roundRect(rx, ry, cardS, cardS, rad); ctx.stroke();
+
+      // Etiqueta do Personagem + Emoção
+      const emoLabel = activeBeat && activeBeat.emotion ? (EMOTION_LABELS_PT[activeBeat.emotion] || '') : '';
+      const badgeText = `🗣️ ${activeActor.name}${emoLabel ? ' • ' + emoLabel : ''}`;
+      const badgeFont = Math.max(12, Math.round(cardS * 0.088));
+      ctx.font = `800 ${badgeFont}px Inter, sans-serif`;
+      const bw = ctx.measureText(badgeText).width + 22;
+      const bh = Math.max(24, Math.round(cardS * 0.145));
+      const bxBadge = Math.max(14, Math.min(W - bw - 14, cx - bw * 0.5));
+      const byBadge = ry + cardS - bh * 0.45;
+      ctx.fillStyle = 'rgba(10,13,28,0.94)';
+      ctx.beginPath(); ctx.roundRect(bxBadge, byBadge, bw, bh, 999); ctx.fill();
+      ctx.strokeStyle = activeActor.themeColor || '#38bdf8';
+      ctx.lineWidth = 1.6; ctx.stroke();
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.fillText(badgeText, bxBadge + bw * 0.5, byBadge + bh * 0.69);
+      ctx.textAlign = 'left';
+
+      ctx.restore();
     }
 
-    // 3) CABEÇALHO DE LOCALIZAÇÃO / CENA
+    // 3) CABEÇALHO DE LOCALIZAÇÃO / CENA + AÇÃO ATUAL
     ctx.save();
-    const locTitle = `📍 Cena ${sc.i}/${scenes.length} • ${sc.locationName || sc.title}`;
-    const hudFont = Math.max(15, Math.round(Math.min(W, H) * 0.025));
+    const actionHint = (activeBeat && activeBeat.action) ? ` • ${activeBeat.action}` : (sc.sceneSummaryPt ? ` • ${sc.sceneSummaryPt}` : '');
+    const locTitle = `📍 Cena ${sc.i}/${scenes.length}: ${sc.locationName || sc.title}${actionHint}`;
+    const hudFont = Math.max(14, Math.round(Math.min(W, H) * 0.023));
     ctx.font = `700 ${hudFont}px Inter, sans-serif`;
-    const lw = Math.min(W * 0.78, ctx.measureText(locTitle).width + 36);
-    ctx.fillStyle = 'rgba(10, 13, 28, 0.74)';
+    const clippedLoc = locTitle.length > 68 ? locTitle.slice(0, 67) + '…' : locTitle;
+    const lw = Math.min(W * 0.82, ctx.measureText(clippedLoc).width + 34);
+    ctx.fillStyle = 'rgba(10, 13, 28, 0.72)';
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
     ctx.lineWidth = 1.2;
-    ctx.beginPath(); ctx.roundRect(22, 20, lw, 40, 999); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.roundRect(20, 18, lw, 38, 999); ctx.fill(); ctx.stroke();
     ctx.fillStyle = '#f8fafc';
-    ctx.fillText(locTitle.slice(0, 56), 40, 46);
+    ctx.fillText(clippedLoc, 36, 42);
 
     if(activeBeat && activeBeat.speaker === 'narrator'){
       const nb = '🎙️ Narrador';
-      const nw = ctx.measureText(nb).width + 58;
-      const nx = W - nw - 22;
-      ctx.fillStyle = 'rgba(15, 18, 36, 0.80)';
+      const nw = ctx.measureText(nb).width + 54;
+      const nx = W - nw - 20;
+      ctx.fillStyle = 'rgba(15, 18, 36, 0.78)';
       ctx.strokeStyle = 'rgba(251, 191, 36, 0.65)';
-      ctx.beginPath(); ctx.roundRect(nx, 20, nw, 40, 999); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.roundRect(nx, 18, nw, 38, 999); ctx.fill(); ctx.stroke();
       ctx.fillStyle = '#fde68a';
-      ctx.fillText(nb, nx + 16, 46);
+      ctx.fillText(nb, nx + 15, 42);
       for(let b = 0; b < 4; b++){
-        const hBar = 6 + Math.abs(Math.sin(t * 10 + b * 1.1)) * 16;
+        const hBar = 6 + Math.abs(Math.sin(t * 10 + b * 1.1)) * 15;
         ctx.fillStyle = '#fbbf24';
-        ctx.fillRect(nx + nw - 32 + b * 5, 40 - hBar * 0.5, 3, hBar);
+        ctx.fillRect(nx + nw - 30 + b * 5, 37 - hBar * 0.5, 3, hBar);
       }
     }
     ctx.restore();
@@ -3277,9 +3504,9 @@ function makeConnectedCinemaDrawer(movie){
       const cue = activeBeat.captions.find(c => t >= c.start && t < c.end) || activeBeat.captions[activeBeat.captions.length - 1];
       if(cue){
         ctx.save();
-        const fSize = Math.round(isLandscape ? H * 0.041 : W * 0.045);
+        const fSize = Math.round(isLandscape ? H * 0.039 : W * 0.043);
         ctx.font = `800 ${fSize}px Inter, sans-serif`;
-        const maxLineW = W * 0.86;
+        const maxLineW = W * 0.84;
         const lines = [];
         let cur = [];
         for(const wObj of cue.words){
@@ -3289,20 +3516,23 @@ function makeConnectedCinemaDrawer(movie){
         }
         if(cur.length) lines.push(cur);
 
-        const speakerTag = activeBeat.speaker === 'narrator' ? '🎙️ NARRADOR' : `🗣️ ${String(activeBeat.speakerName || '').toUpperCase()}`;
+        const emoBadge = (activeBeat.speaker !== 'narrator' && activeBeat.emotion && EMOTION_LABELS_PT[activeBeat.emotion])
+          ? ` (${EMOTION_LABELS_PT[activeBeat.emotion]})`
+          : '';
+        const speakerTag = activeBeat.speaker === 'narrator' ? '🎙️ NARRADOR' : `🗣️ ${String(activeBeat.speakerName || '').toUpperCase()}${emoBadge}`;
         const accent = activeBeat.themeColor || (activeBeat.speaker === 'narrator' ? '#fbbf24' : '#38bdf8');
         const lineH = Math.round(fSize * 1.32);
-        const boxH = lines.length * lineH + 34;
-        const boxW = Math.min(W * 0.92, Math.max(220, ...lines.map(l => ctx.measureText(l.map(x=>x.word).join(' ')).width + 54)));
+        const boxH = lines.length * lineH + 32;
+        const boxW = Math.min(W * 0.90, Math.max(220, ...lines.map(l => ctx.measureText(l.map(x=>x.word).join(' ')).width + 52)));
         const bx = (W - boxW) * 0.5;
-        const by = H - boxH - Math.round(H * 0.045);
+        const by = H - boxH - Math.round(H * 0.032);
 
         ctx.fillStyle = 'rgba(8, 10, 22, 0.84)';
-        ctx.strokeStyle = accent + '88';
+        ctx.strokeStyle = accent + '99';
         ctx.lineWidth = 2;
         ctx.beginPath(); ctx.roundRect(bx, by, boxW, boxH, 16); ctx.fill(); ctx.stroke();
 
-        const tagFont = Math.max(12, Math.round(fSize * 0.48));
+        const tagFont = Math.max(11, Math.round(fSize * 0.46));
         ctx.font = `800 ${tagFont}px Inter, sans-serif`;
         const tw = ctx.measureText(speakerTag).width + 24;
         ctx.fillStyle = accent;
@@ -3314,7 +3544,7 @@ function makeConnectedCinemaDrawer(movie){
         lines.forEach((lineArr, li) => {
           const fullStr = lineArr.map(x => x.word).join(' ');
           let wx = (W - ctx.measureText(fullStr).width) * 0.5;
-          const wy = by + 22 + (li + 0.82) * lineH;
+          const wy = by + 20 + (li + 0.82) * lineH;
           lineArr.forEach(wObj => {
             const activeW = t >= wObj.start && t <= wObj.end + 0.06;
             ctx.fillStyle = activeW ? accent : '#ffffff';
@@ -3354,7 +3584,7 @@ function buildMasterCinemaAudioBuffer(decodedItems, addMusic = true, mood = 'cin
     const dur = mono24.length / SR;
     const end = start + dur;
     segments.push({ ...item, start, end, mono24 });
-    totalSec = end + (item.isLastInScene ? 0.45 : 0.20);
+    totalSec = end + (item.isLastInScene ? 0.38 : 0.16);
   }
   totalSec += 0.35;
 
@@ -3410,7 +3640,7 @@ function makeKenBurnsDrawer(scenes, opts={}){
     const dir=((sc.i||0)%2===0)?1:-1;
     const zoom=1+0.12*p;
     ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
-    const img=sc.imgBitmap;
+    const img=(p > 0.5 && sc.actionBitmap) ? sc.actionBitmap : sc.imgBitmap;
     if(img){
       const ir=img.width/img.height, cr=W/H;
       let dw,dh;
@@ -3432,22 +3662,33 @@ function makeKenBurnsDrawer(scenes, opts={}){
   };
 }
 
-async function fetchSceneImage(scene,style){
+// Busca imagem da cena combinando API Backend + Geração Direta Flux no Navegador (garante cenário real sempre!)
+async function fetchSceneImage(promptOrScene, style, w=896, h=504){
+  const promptText = typeof promptOrScene === 'string'
+    ? promptOrScene
+    : (promptOrScene.visual || promptOrScene.title || '');
   try{
-    const r=await fetch('/api/scene-image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:scene.visual||scene.title,style})});
+    const r=await fetch('/api/scene-image',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({prompt:promptText, style, width:w, height:h})
+    });
     const j=await r.json();
     if(j&&j.imageBase64){
       const blob=await (await fetch(`data:${j.mime||'image/png'};base64,${j.imageBase64}`)).blob();
       return await createImageBitmap(blob);
     }
-  }catch(e){ console.warn('imagem da cena falhou',e); }
+  }catch(e){ console.warn('imagem da cena backend:',e); }
+  // Fallback imediato direto da CDN de IA gratuita pelo navegador do usuário
+  const direct = await fetchFreeAiImageDirect(promptText, style, w, h);
+  if(direct) return direct;
   return null;
 }
 
-async function fetchSceneAudio(text,voice){
+async function fetchSceneAudio(text,voice,emotion=''){
   for(let attempt=0; attempt<2; attempt++){
     try{
-      const r=await fetch('/api/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,voice})});
+      const r=await fetch('/api/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,voice,emotion})});
       const ct=r.headers.get('content-type')||'';
       if(r.ok&&ct.includes('audio')) return { blob: await r.blob(), provider: r.headers.get('x-audio-provider')||'' };
       let msg='resposta inválida do servidor';
@@ -3470,10 +3711,11 @@ async function buildCreateVideo(){
   const style=document.getElementById('style').value;
   const fmt=(document.getElementById('createFormat')||{}).value||'16:9';
   const dim = fmt === '9:16' ? { w:720, h:1280 } : fmt === '1:1' ? { w:960, h:960 } : { w:1280, h:720 };
+  const imgDim = fmt === '9:16' ? { w:576, h:1024 } : fmt === '1:1' ? { w:768, h:768 } : { w:896, h:504 };
   const addMusic = ((document.getElementById('createMusic')||{}).value||'cinematic') !== 'none';
-  const isConnected = (d.cinemaMode || (document.getElementById('cinemaMode')||{}).value || 'connected') !== 'classic';
+  const isConnected = (d.cinemaMode || (document.getElementById('cinemaMode')||{}).value || 'story') !== 'classic';
 
-  btn.disabled=true; btn.textContent='⏳ Produzindo filme completo...';
+  btn.disabled=true; btn.textContent='⏳ Produzindo história animada completa...';
   const prog=document.getElementById('videoBuildProgress');
   prog.classList.remove('hidden');
   $('#createProgress').classList.add('show');
@@ -3486,25 +3728,35 @@ async function buildCreateVideo(){
     setStep(['s1','s2','s3','s4'], 1);
     let actors = [];
     if(isConnected && Array.isArray(d.characters) && d.characters.length){
-      document.getElementById('videoBuildMsg').textContent = `🎭 Criando rostos consistentes dos personagens (${d.characters.map(c=>c.name).join(' & ')})...`;
+      document.getElementById('videoBuildMsg').textContent = `🎭 Criando rostos animados dos personagens (${d.characters.map(c=>c.name).join(' & ')})...`;
       document.getElementById('videoBuildFill').style.width = '10%';
       setProgress('createProgressFill', 35);
-      actors = await Promise.all(d.characters.map((ch, idx) => prepareCinemaActor(ch, idx, d.artStylePrompt)));
+      actors = await Promise.all(d.characters.map((ch, idx) => prepareCinemaActor(ch, idx, d.artStylePrompt, style)));
     }
     const actorMap = {};
     actors.forEach(a => { actorMap[a.id] = a; });
 
     const scenes = new Array(d.scenes.length);
-    for(let i = 0; i < d.scenes.length; i += 2){
-      const slice = d.scenes.slice(i, i + 2);
-      document.getElementById('videoBuildMsg').textContent = `🏞️ Gerando cenários ${i+1}–${Math.min(d.scenes.length, i+2)} de ${d.scenes.length} (“${slice[0].locationName||slice[0].title}”)...`;
-      const pct = Math.round(14 + (i / d.scenes.length) * 26);
+    for(let i = 0; i < d.scenes.length; i++){
+      const s = d.scenes[i];
+      document.getElementById('videoBuildMsg').textContent = `🏞️ Gerando cenário e ação da Cena ${i+1} de ${d.scenes.length} (“${s.locationName||s.title}”)...`;
+      const pct = Math.round(14 + (i / d.scenes.length) * 28);
       document.getElementById('videoBuildFill').style.width = pct + '%';
       setProgress('createProgressFill', 35 + Math.round((i / d.scenes.length) * 20));
-      const imgs = await Promise.all(slice.map((s, j) => fetchSceneImage(s, style).then(im => im || placeholderBitmap(s, i + j))));
-      slice.forEach((s, j) => {
-        scenes[i + j] = { ...s, i: s.i || (i + j + 1), imgBitmap: imgs[j] };
-      });
+
+      // Gera simultaneamente o Plano Aberto (Shot A) e o Plano de Ação (Shot B) da cena!
+      const [mainBmp, actBmp] = await Promise.all([
+        fetchSceneImage(s.visual || s.title, style, imgDim.w, imgDim.h).then(im => im || placeholderBitmap(s, i)),
+        s.actionVisual
+          ? fetchSceneImage(s.actionVisual, style, imgDim.w, imgDim.h)
+          : Promise.resolve(null)
+      ]);
+      scenes[i] = {
+        ...s,
+        i: s.i || (i + 1),
+        imgBitmap: mainBmp,
+        actionBitmap: actBmp || mainBmp
+      };
     }
 
     setStep(['s1','s2','s3','s4'], 2);
@@ -3512,7 +3764,7 @@ async function buildCreateVideo(){
     scenes.forEach((sc, sIdx) => {
       const rawBeats = (isConnected && Array.isArray(sc.beats) && sc.beats.length)
         ? sc.beats
-        : [{ speaker:'narrator', speakerName:'Narrador', voice: narratorVoice, text: sc.narration }];
+        : [{ speaker:'narrator', speakerName:'Narrador', emotion:'storyteller', shot:'establishing', voice: narratorVoice, text: sc.narration }];
       rawBeats.forEach((b, bIdx) => {
         const actor = actorMap[b.speaker];
         flatBeats.push({
@@ -3520,6 +3772,10 @@ async function buildCreateVideo(){
           speaker: b.speaker || 'narrator',
           speakerName: actor ? actor.name : (b.speakerName || 'Narrador'),
           themeColor: actor ? actor.themeColor : '#fbbf24',
+          emotion: b.emotion || (b.speaker === 'narrator' ? 'storyteller' : 'excited'),
+          action: b.action || '',
+          shot: b.shot || (bIdx === 0 ? 'establishing' : 'action'),
+          cameraMove: b.cameraMove || sc.cameraMove || 'zoomIn',
           voice: b.voice || (actor ? actor.voice : narratorVoice) || narratorVoice,
           text: String(b.text || '').trim(),
           isLastInScene: bIdx === rawBeats.length - 1
@@ -3531,12 +3787,12 @@ async function buildCreateVideo(){
     const decCtx = new AC();
     for(let i = 0; i < flatBeats.length; i += 2){
       const pair = flatBeats.slice(i, i + 2);
-      document.getElementById('videoBuildMsg').textContent = `🎙️ Gravando vozes conectadas ${i+1}–${Math.min(flatBeats.length, i+2)} de ${flatBeats.length} (${pair.map(p=>p.speakerName).join(' & ')})...`;
+      document.getElementById('videoBuildMsg').textContent = `🎙️ Gravando atuação de voz ${i+1}–${Math.min(flatBeats.length, i+2)} de ${flatBeats.length} (${pair.map(p=>p.speakerName).join(' & ')})...`;
       const pct = Math.round(42 + (i / Math.max(1, flatBeats.length)) * 22);
       document.getElementById('videoBuildFill').style.width = pct + '%';
       setProgress('createProgressFill', 55 + Math.round((i / Math.max(1, flatBeats.length)) * 18));
 
-      const audios = await Promise.all(pair.map(b => fetchSceneAudio(b.text, b.voice)));
+      const audios = await Promise.all(pair.map(b => fetchSceneAudio(b.text, b.voice, b.emotion)));
       for(let j = 0; j < pair.length; j++){
         const a = audios[j];
         if(a && a.blob){
