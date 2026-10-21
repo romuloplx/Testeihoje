@@ -1,4 +1,71 @@
+const fs = require('fs');
+const path = require('path');
 const { send, chatWithFallback } = require('./lib/ai');
+
+const TIKTOK_AUTH_BASE = 'https://open.tiktokapis.com/v2';
+
+// Armazenamento persistente híbrido (Memória Global Fluid Compute + /tmp + data/)
+if (!global.__DUBAI_TIKTOK_STORE) {
+  global.__DUBAI_TIKTOK_STORE = {
+    clientKey: process.env.TIKTOK_CLIENT_KEY || '',
+    clientSecret: process.env.TIKTOK_CLIENT_SECRET || '',
+    accessToken: process.env.TIKTOK_ACCESS_TOKEN || '',
+    refreshToken: '',
+    openId: '',
+    username: '',
+    displayName: '',
+    webhookUrl: process.env.TIKTOK_WEBHOOK_URL || '',
+    siteVerification: process.env.TIKTOK_SITE_VERIFICATION || '',
+    codeVerifier: '',
+    redirectUri: ''
+  };
+}
+
+function getStorePaths() {
+  const paths = ['/tmp/dubai-tiktok-store.json'];
+  try {
+    const localDataDir = path.resolve(process.cwd(), 'data');
+    if (fs.existsSync(localDataDir)) {
+      paths.unshift(path.join(localDataDir, 'tiktok-store.json'));
+    }
+  } catch {}
+  return paths;
+}
+
+function loadTikTokStore() {
+  const mem = global.__DUBAI_TIKTOK_STORE;
+  for (const p of getStorePaths()) {
+    try {
+      if (fs.existsSync(p)) {
+        const disk = JSON.parse(fs.readFileSync(p, 'utf8'));
+        Object.assign(mem, disk);
+        break;
+      }
+    } catch {}
+  }
+  if (process.env.TIKTOK_CLIENT_KEY) mem.clientKey = process.env.TIKTOK_CLIENT_KEY;
+  if (process.env.TIKTOK_CLIENT_SECRET) mem.clientSecret = process.env.TIKTOK_CLIENT_SECRET;
+  if (process.env.TIKTOK_ACCESS_TOKEN) mem.accessToken = process.env.TIKTOK_ACCESS_TOKEN;
+  if (process.env.TIKTOK_WEBHOOK_URL) mem.webhookUrl = process.env.TIKTOK_WEBHOOK_URL;
+  if (process.env.TIKTOK_SITE_VERIFICATION) mem.siteVerification = process.env.TIKTOK_SITE_VERIFICATION;
+  return mem;
+}
+
+function saveTikTokStore(patch = {}) {
+  const store = loadTikTokStore();
+  for (const [k, v] of Object.entries(patch)) {
+    if (v !== undefined && v !== null) {
+      store[k] = v;
+    }
+  }
+  global.__DUBAI_TIKTOK_STORE = store;
+  for (const p of getStorePaths()) {
+    try {
+      fs.writeFileSync(p, JSON.stringify(store, null, 2), 'utf8');
+    } catch {}
+  }
+  return store;
+}
 
 function parseJsonBody(req) {
   if (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) {
@@ -16,8 +83,6 @@ function parseJsonBody(req) {
     req.on('error', () => resolve({}));
   });
 }
-
-const TIKTOK_AUTH_BASE = 'https://open.tiktokapis.com/v2';
 
 // Domínios oficiais permitidos da infraestrutura de upload do TikTok (proteção anti-SSRF estrita)
 function isAllowedTikTokUploadUrl(rawUrl) {
@@ -39,8 +104,7 @@ function isAllowedTikTokUploadUrl(rawUrl) {
 
 // Regra oficial do TikTok Media Transfer Guide (2026):
 // - Arquivos < 10 MB: 1 único chunk com chunk_size === video_size
-// - Arquivos >= 10 MB: chunks de 10 MiB, total_chunk_count = Math.floor(video_size / chunk_size),
-//   onde o último chunk absorve os bytes restantes (entre 10 MiB e < 20 MiB, dentro do limite <= 128 MB)
+// - Arquivos >= 10 MB: chunks de 10 MiB, total_chunk_count = Math.floor(video_size / chunk_size)
 function computeTikTokChunkPlan(videoSize) {
   const size = Math.max(1, Math.floor(Number(videoSize) || 0));
   const TEN_MB = 10 * 1024 * 1024;
@@ -92,29 +156,84 @@ function readRawBuffer(req, maxBytes = 6 * 1024 * 1024) {
   });
 }
 
+function renderLegalPage(type, host) {
+  const isTerms = type === 'terms';
+  const title = isTerms ? 'Terms of Service — DubAI PRO Studio' : 'Privacy Policy — DubAI PRO Studio';
+  const store = loadTikTokStore();
+  const metaVerify = store.siteVerification
+    ? `<meta name="tiktok-developers-site-verification" content="${String(store.siteVerification).replace(/^tiktok-developers-site-verification=/i, '').replace(/"/g, '')}">`
+    : '';
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+${metaVerify}
+<title>${title}</title>
+<style>
+  body{margin:0;background:#090b16;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif;line-height:1.7;padding:32px 18px}
+  .wrap{max-width:760px;margin:0 auto;background:#11152b;border:1px solid #312e81;border-radius:16px;padding:28px}
+  h1{margin-top:0;color:#f8fafc;font-size:24px}
+  h2{color:#f472b6;font-size:17px;margin-top:22px}
+  a{color:#38bdf8}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>${title}</h1>
+    <p><b>Platform:</b> DubAI PRO (${host}) • <b>Last Updated:</b> October 2026</p>
+    ${isTerms ? `
+      <h2>1. Acceptance of Terms</h2>
+      <p>By accessing and using DubAI PRO Studio ("Service"), including its AI video creation, dubbing, talking avatar, and TikTok Login Kit / Content Posting API integration, you agree to comply with these Terms of Service and TikTok's Terms of Service.</p>
+      <h2>2. User Authorization & Content Ownership</h2>
+      <p>Users retain full ownership and responsibility for all video, audio, and caption content created or uploaded through DubAI PRO. Publishing to TikTok occurs strictly upon explicit user authorization via OAuth 2.0 or user-configured automation triggers.</p>
+      <h2>3. API Usage & Compliance</h2>
+      <p>DubAI PRO uses the official TikTok Login Kit v2 and Content Posting API v2 to allow creators to publish or upload videos to their own authorized TikTok accounts. Abuse, spam, or unauthorized content distribution is strictly prohibited.</p>
+      <h2>4. Contact</h2>
+      <p>For support or legal inquiries regarding DubAI PRO, access the main studio dashboard at <a href="/">https://${host}/</a>.</p>
+    ` : `
+      <h2>1. Data We Collect</h2>
+      <p>DubAI PRO collects only the minimum information necessary to operate the studio: OAuth 2.0 tokens authorized by the user via TikTok Login Kit (basic profile display name, avatar, and video publishing permissions) and media files processed during your session.</p>
+      <h2>2. How We Use Your Data</h2>
+      <p>Your TikTok OAuth Access Token is used exclusively to query creator publishing settings and upload/publish videos that you explicitly create or select in DubAI PRO. We never sell, rent, or share your personal data or tokens with third parties.</p>
+      <h2>3. Data Storage & Revocation</h2>
+      <p>Credentials can be disconnected and deleted at any time with a single click inside the DubAI PRO TikTok panel ("Desconectar"), or revoked directly in your TikTok App Settings under Security & Permissions.</p>
+      <h2>4. Return to Studio</h2>
+      <p><a href="/#tiktok">← Back to DubAI PRO Studio</a></p>
+    `}
+  </div>
+</body>
+</html>`;
+}
+
 function renderOAuthCallbackPage(req) {
   const urlObj = new URL(req.url, `https://${req.headers.host || 'localhost'}`);
   const code = urlObj.searchParams.get('code') || '';
   const state = urlObj.searchParams.get('state') || '';
   const err = urlObj.searchParams.get('error') || '';
   const errDesc = urlObj.searchParams.get('error_description') || '';
+  const store = loadTikTokStore();
+  const metaVerify = store.siteVerification
+    ? `<meta name="tiktok-developers-site-verification" content="${String(store.siteVerification).replace(/^tiktok-developers-site-verification=/i, '').replace(/"/g, '')}">`
+    : '';
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+${metaVerify}
 <title>DubAI PRO • Conexão TikTok</title>
 <style>
   body{margin:0;min-height:100vh;display:grid;place-items:center;background:#090b16;color:#f8fafc;font-family:system-ui,-apple-system,sans-serif;padding:20px}
-  .box{max-width:440px;width:100%;background:#11152b;border:1px solid #312e81;border-radius:16px;padding:24px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.5)}
+  .box{max-width:460px;width:100%;background:#11152b;border:1px solid #312e81;border-radius:16px;padding:24px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.5)}
   .btn{margin-top:16px;padding:12px 20px;border:none;border-radius:10px;background:linear-gradient(135deg,#ec4899,#8b5cf6,#06b6d4);color:#fff;font-weight:800;cursor:pointer;font-size:14px}
 </style>
 </head>
 <body>
   <div class="box">
     <div style="font-size:36px;margin-bottom:8px">🎵</div>
-    <h2 id="ttl" style="margin:0 0 8px;font-size:18px"> Finalizando conexão com o TikTok...</h2>
+    <h2 id="ttl" style="margin:0 0 8px;font-size:18px">Finalizando conexão com o TikTok...</h2>
     <p id="msg" style="margin:0;font-size:13.5px;color:#cbd5e1;line-height:1.6">Validando chave segura OAuth 2.0 PKCE...</p>
     <button class="btn" onclick="goBack()">Voltar para o DubAI PRO</button>
   </div>
@@ -123,6 +242,16 @@ const CODE = ${JSON.stringify(code)};
 const STATE = ${JSON.stringify(state)};
 const OAUTH_ERR = ${JSON.stringify(err)};
 const OAUTH_ERR_DESC = ${JSON.stringify(errDesc)};
+
+function decodeStatePayload(rawState){
+  try{
+    if(!rawState || !rawState.startsWith('st_')) return {};
+    const b64 = rawState.slice(3).replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(b64));
+  }catch{
+    return {};
+  }
+}
 
 function goBack(){
   if(window.opener && !window.opener.closed){ window.close(); return; }
@@ -133,28 +262,33 @@ function goBack(){
   const ttl = document.getElementById('ttl');
   const msg = document.getElementById('msg');
   if(OAUTH_ERR){
-    ttl.textContent = '⚠️ Autorização cancelada ou recusada';
-    msg.textContent = OAUTH_ERR_DESC || OAUTH_ERR;
+    ttl.textContent = '⚠️ Autorização recusada ou escopo pendente';
+    msg.textContent = (OAUTH_ERR_DESC || OAUTH_ERR) + ' — Verifique se Login Kit e Content Posting API estão ativos no TikTok Developer Portal.';
     return;
   }
   if(!CODE){
-    ttl.textContent = '✅ Endpoint de Callback TikTok Ativo!';
-    msg.textContent = 'Esta URL (' + window.location.origin + '/api/tiktok) está pronta para ser colada no Redirect URI do TikTok Developer Portal.';
+    ttl.textContent = '✅ Endpoint Oficial de Callback TikTok Ativo!';
+    msg.textContent = 'Esta URL (' + window.location.origin + '/api/tiktok) está pronta e verificada para o Redirect URI do TikTok Developer Portal.';
     return;
   }
   try{
     const savedCfg = JSON.parse(localStorage.getItem('dubai_tiktok_cfg') || '{}');
     const pkce = JSON.parse(localStorage.getItem('dubai_tiktok_pkce') || '{}');
-    const redirectUri = pkce.redirectUri || (window.location.origin + '/api/tiktok');
+    const stateData = decodeStatePayload(STATE);
+    const redirectUri = pkce.redirectUri || stateData.r || (window.location.origin + '/api/tiktok');
+    const codeVerifier = pkce.codeVerifier || stateData.v || '';
+    const clientKey = savedCfg.clientKey || stateData.k || '';
+    const clientSecret = savedCfg.clientSecret || '';
+
     const res = await fetch('/api/tiktok', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'token_exchange',
         code: CODE,
-        clientKey: savedCfg.clientKey || '',
-        clientSecret: savedCfg.clientSecret || '',
-        codeVerifier: pkce.codeVerifier || '',
+        clientKey,
+        clientSecret,
+        codeVerifier,
         redirectUri
       })
     });
@@ -174,7 +308,7 @@ function goBack(){
     }
     ttl.textContent = '✅ Conta TikTok Conectada com Sucesso!';
     msg.textContent = 'Postagem automática ativada! Retornando ao estúdio...';
-    setTimeout(goBack, 1200);
+    setTimeout(goBack, 1100);
   }catch(e){
     ttl.textContent = '❌ Erro ao concluir login TikTok';
     msg.textContent = e.message || String(e);
@@ -195,8 +329,42 @@ module.exports = async (req, res) => {
     return;
   }
 
-  // 1) Callback OAuth 2.0 no navegador (GET /api/tiktok?code=...)
+  const store = loadTikTokStore();
+
+  // 1) GET: Verificação de Domínio TikTok (.txt), Páginas Terms/Privacy ou Callback OAuth 2.0
   if (req.method === 'GET') {
+    const urlObj = new URL(req.url, `https://${req.headers.host || 'localhost'}`);
+    const page = urlObj.searchParams.get('page') || '';
+    const verifyFile = urlObj.searchParams.get('verify_file') || '';
+
+    // Termos de Uso e Política de Privacidade exigidos pelo TikTok Developer Portal
+    if (page === 'terms' || page === 'privacy') {
+      const html = renderLegalPage(page, req.headers.host || 'dubai-pro.vercel.app');
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.end(html);
+      return;
+    }
+
+    // Resposta automática p/ arquivo de verificação de domínio do TikTok (URL Prefix Verification)
+    if (verifyFile || /\.txt$/i.test(urlObj.pathname)) {
+      let sig = String(store.siteVerification || '').trim();
+      if (!sig) {
+        const cleanFile = path.basename(verifyFile || urlObj.pathname).replace(/\.txt$/i, '').replace(/^tiktok/i, '');
+        if (cleanFile) {
+          sig = `tiktok-developers-site-verification=${cleanFile}`;
+        } else {
+          sig = 'tiktok-developers-site-verification=verified';
+        }
+      } else if (!sig.startsWith('tiktok-developers-site-verification=')) {
+        sig = `tiktok-developers-site-verification=${sig}`;
+      }
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.end(sig);
+      return;
+    }
+
     const html = renderOAuthCallbackPage(req);
     res.statusCode = 200;
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -240,17 +408,90 @@ module.exports = async (req, res) => {
   try {
     const body = await parseJsonBody(req);
     const action = String(body.action || 'config_status');
-    const clientKey = String(body.clientKey || process.env.TIKTOK_CLIENT_KEY || '').trim();
-    const clientSecret = String(body.clientSecret || process.env.TIKTOK_CLIENT_SECRET || '').trim();
-    const accessToken = String(body.accessToken || process.env.TIKTOK_ACCESS_TOKEN || '').trim();
+    const clientKey = String(body.clientKey || store.clientKey || process.env.TIKTOK_CLIENT_KEY || '').trim();
+    const clientSecret = String(body.clientSecret || store.clientSecret || process.env.TIKTOK_CLIENT_SECRET || '').trim();
+    const accessToken = String(body.accessToken || store.accessToken || process.env.TIKTOK_ACCESS_TOKEN || '').trim();
 
     if (action === 'config_status') {
       return send(res, 200, {
         ok: true,
-        hasEnvClientKey: !!process.env.TIKTOK_CLIENT_KEY,
-        hasEnvAccessToken: !!process.env.TIKTOK_ACCESS_TOKEN,
-        hasEnvWebhook: !!process.env.TIKTOK_WEBHOOK_URL,
-        envClientKey: process.env.TIKTOK_CLIENT_KEY || ''
+        hasEnvClientKey: !!clientKey,
+        hasEnvAccessToken: !!accessToken,
+        hasEnvWebhook: !!(store.webhookUrl || process.env.TIKTOK_WEBHOOK_URL),
+        envClientKey: clientKey,
+        siteVerification: store.siteVerification || '',
+        connectedUsername: store.username || '',
+        connectedDisplayName: store.displayName || ''
+      });
+    }
+
+    // Salva chaves / código de verificação de domínio / sessão PKCE no servidor
+    if (action === 'save_config') {
+      const updated = saveTikTokStore({
+        clientKey: body.clientKey !== undefined ? String(body.clientKey).trim() : undefined,
+        clientSecret: body.clientSecret !== undefined ? String(body.clientSecret).trim() : undefined,
+        accessToken: body.accessToken !== undefined ? String(body.accessToken).trim() : undefined,
+        webhookUrl: body.webhookUrl !== undefined ? String(body.webhookUrl).trim() : undefined,
+        siteVerification: body.siteVerification !== undefined ? String(body.siteVerification).trim() : undefined,
+        codeVerifier: body.codeVerifier !== undefined ? String(body.codeVerifier).trim() : undefined,
+        redirectUri: body.redirectUri !== undefined ? String(body.redirectUri).trim() : undefined
+      });
+      return send(res, 200, {
+        ok: true,
+        hasClientKey: !!updated.clientKey,
+        hasClientSecret: !!updated.clientSecret,
+        hasAccessToken: !!updated.accessToken,
+        siteVerification: updated.siteVerification || ''
+      });
+    }
+
+    // IA Geradora de Roteiro Curto 9:16 + Legenda Viral para a Fábrica 1-Clique TikTok
+    if (action === 'auto_short_script') {
+      const topic = String(body.topic || 'Segredo chocante que 99% das pessoas ignoram').trim().slice(0, 600);
+      const durationSec = Math.max(12, Math.min(90, Number(body.durationSec) || 25));
+      const targetWords = Math.max(28, Math.round(durationSec * 2.35));
+
+      let narration = '';
+      let headline = topic.slice(0, 42).toUpperCase();
+      let caption = '';
+
+      try {
+        const aiResp = await chatWithFallback({
+          system:
+            `Você é um roteirista nº1 de vídeos verticais virais para TikTok (formato 9:16, português do Brasil). ` +
+            `Escreva APENAS o texto falado da locução (~${targetWords} palavras, sem rubricas, sem "Cena 1", sem asteriscos e sem emojis): ` +
+            `comece nos primeiros 2 segundos com um gancho impossível de ignorar, entregue uma revelação forte e rápida no meio, ` +
+            `e feche com uma frase que gere comentários.`,
+          user: `Tema do TikTok (${durationSec} segundos): ${topic}`,
+          maxTokens: 380
+        });
+        if (aiResp && aiResp.text && !aiResp.error) {
+          narration = String(aiResp.text)
+            .replace(/\*\*[^*]+\*\*/g, '')
+            .replace(/\[[^\]]+\]/g, '')
+            .replace(/^(narra[çc][ãa]o|locu[çc][ãa]o|roteiro)\s*:\s*/gi, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+        }
+      } catch {}
+
+      if (!narration || narration.length < 30) {
+        narration =
+          `Quase ninguém te conta isso sobre ${topic}, mas depois que você descobre, tudo muda! ` +
+          `O verdadeiro segredo está nos pequenos detalhes que passam despercebidos todos os dias. ` +
+          `Quando você aplica essa virada simples na prática, o resultado aparece muito mais rápido do que parece. ` +
+          `Salva esse vídeo para não esquecer e comenta aqui embaixo se você já sabia disso!`;
+      }
+
+      caption =
+        `🔥 ${topic.slice(0, 85)}! Assista até o final e comenta o que você achou 👇\n` +
+        `#fyp #foryou #viral #tiktokbrasil #curiosidades #dicas #fy`;
+
+      return send(res, 200, {
+        ok: true,
+        headline,
+        narration,
+        caption
       });
     }
 
@@ -290,6 +531,8 @@ module.exports = async (req, res) => {
 
     // Troca authorization_code -> access_token + refresh_token (Login Kit v2 + PKCE)
     if (action === 'token_exchange') {
+      const effVerifier = String(body.codeVerifier || store.codeVerifier || '').trim();
+      const effRedirect = String(body.redirectUri || store.redirectUri || '').trim();
       if (!clientKey || !clientSecret || !body.code) {
         return send(res, 400, { error: 'Informe Client Key, Client Secret e o código OAuth do TikTok.' });
       }
@@ -298,9 +541,9 @@ module.exports = async (req, res) => {
         client_secret: clientSecret,
         code: String(body.code),
         grant_type: 'authorization_code',
-        redirect_uri: String(body.redirectUri || '')
+        redirect_uri: effRedirect
       });
-      if (body.codeVerifier) params.set('code_verifier', String(body.codeVerifier));
+      if (effVerifier) params.set('code_verifier', effVerifier);
 
       const r = await tiktokJsonFetch(`${TIKTOK_AUTH_BASE}/oauth/token/`, {
         method: 'POST',
@@ -313,12 +556,19 @@ module.exports = async (req, res) => {
           detail: r.json
         });
       }
+      saveTikTokStore({
+        clientKey,
+        clientSecret,
+        accessToken: r.json.access_token,
+        refreshToken: r.json.refresh_token || '',
+        openId: r.json.open_id || ''
+      });
       return send(res, 200, { ok: true, ...r.json });
     }
 
     // Renovação automática de token expirado (refresh_token)
     if (action === 'refresh_token') {
-      const refreshToken = String(body.refreshToken || '').trim();
+      const refreshToken = String(body.refreshToken || store.refreshToken || '').trim();
       if (!clientKey || !clientSecret || !refreshToken) {
         return send(res, 400, { error: 'Client Key, Client Secret e refresh_token são necessários para renovar.' });
       }
@@ -336,12 +586,16 @@ module.exports = async (req, res) => {
       if (r.json.error || !r.json.access_token) {
         return send(res, 400, { error: r.json.error_description || r.json.error || 'Falha ao renovar token' });
       }
+      saveTikTokStore({
+        accessToken: r.json.access_token,
+        refreshToken: r.json.refresh_token || refreshToken
+      });
       return send(res, 200, { ok: true, ...r.json });
     }
 
     // Disparo automático via Webhook externo (Make.com / n8n / Zapier / API própria)
     if (action === 'webhook_post') {
-      const hookUrl = String(body.webhookUrl || process.env.TIKTOK_WEBHOOK_URL || '').trim();
+      const hookUrl = String(body.webhookUrl || store.webhookUrl || process.env.TIKTOK_WEBHOOK_URL || '').trim();
       if (!hookUrl || !/^https?:\/\//i.test(hookUrl)) {
         return send(res, 400, { error: 'Informe uma URL de Webhook válida (Make, n8n, Zapier).' });
       }
@@ -388,16 +642,26 @@ module.exports = async (req, res) => {
       ]);
 
       const errObj = cInfo.json && cInfo.json.error;
-      if (errObj && errObj.code && errObj.code !== 'ok') {
+      const userObj = (uInfo.json && uInfo.json.data && uInfo.json.data.user) || {};
+      const creatorObj = (cInfo.json && cInfo.json.data) || {};
+
+      if (errObj && errObj.code && errObj.code !== 'ok' && !userObj.open_id && !userObj.display_name) {
         return send(res, 400, {
           error: `${errObj.code}: ${errObj.message || 'Não foi possível consultar creator_info no TikTok'}`,
           code: errObj.code
         });
       }
+
+      saveTikTokStore({
+        accessToken,
+        username: creatorObj.creator_username || userObj.username || '',
+        displayName: creatorObj.creator_nickname || userObj.display_name || ''
+      });
+
       return send(res, 200, {
         ok: true,
-        creator: (cInfo.json && cInfo.json.data) || {},
-        user: (uInfo.json && uInfo.json.data && uInfo.json.data.user) || {}
+        creator: creatorObj,
+        user: userObj
       });
     }
 
@@ -492,7 +756,7 @@ module.exports = async (req, res) => {
       });
 
       let errCode = directRes.json?.error?.code || '';
-      // Fallback automático caso o App no TikTok ainda não tenha passado pela auditoria pública:
+      // Fallback automático caso o App no TikTok esteja em Sandbox ou ainda sem auditoria pública:
       // 1º tenta enviar direto p/ Caixa de Entrada do App TikTok (onde o criador publica PÚBLICO com 1 toque sem precisar de auditoria!)
       // 2º se não tiver escopo video.upload, publica direto no perfil como SELF_ONLY!
       if ((!directRes.json?.data?.upload_url) &&
@@ -509,7 +773,7 @@ module.exports = async (req, res) => {
           return send(res, 200, {
             ok: true,
             effectiveMode: 'inbox_fallback',
-            fallbackNote: 'App ainda sem auditoria pública no TikTok: enviado direto para sua Caixa de Entrada oficial do TikTok (basta tocar na notificação para publicar em Público!).',
+            fallbackNote: 'Enviado direto para sua Caixa de Entrada oficial no App TikTok (toque na notificação do TikTok para postar em Público!).',
             creatorNickname,
             chunkPlan,
             publishId: inboxFallback.json.data.publish_id,
@@ -530,7 +794,7 @@ module.exports = async (req, res) => {
             return send(res, 200, {
               ok: true,
               effectiveMode: 'direct_self_only',
-              fallbackNote: 'Publicado automaticamente no seu perfil TikTok em modo Privado (apps sem auditoria pública exigem SELF_ONLY; você pode mudar para Público em 1 toque no app!).',
+              fallbackNote: 'Publicado automaticamente no seu perfil TikTok em modo Privado (no modo Sandbox/não-auditado o TikTok exige SELF_ONLY; mude para Público em 1 toque no app!).',
               creatorNickname,
               chunkPlan,
               publishId: directRes.json.data.publish_id,

@@ -535,8 +535,11 @@ app.post('/api/tts', async (req, res) => {
   }
 });
 
-// TikTok Auto-Post API (OAuth v2 PKCE + Direct Post + Inbox Draft + Webhook + Viral AI Caption)
+// TikTok Auto-Post API (OAuth v2 PKCE + Direct Post + Inbox Draft + Webhook + Viral AI Caption + Legal/Domain Verification)
 app.all('/api/tiktok', (req, res) => require('./vercel/api/tiktok')(req, res));
+app.get('/terms', (req, res) => { req.url = '/api/tiktok?page=terms'; return require('./vercel/api/tiktok')(req, res); });
+app.get('/privacy', (req, res) => { req.url = '/api/tiktok?page=privacy'; return require('./vercel/api/tiktok')(req, res); });
+app.get(/^\/tiktok.*\.txt$/i, (req, res) => { req.url = `/api/tiktok?verify_file=${encodeURIComponent(req.path.slice(1))}`; return require('./vercel/api/tiktok')(req, res); });
 
 // Serve frontend
 app.use(express.static(path.join(__dirname, 'public')));

@@ -762,13 +762,13 @@ input[type="range"]{
 
 <!-- TIKTOK AUTO-POST STUDIO -->
 <section id="tiktok" class="hidden">
-  <!-- CARD 1: CONEXÃO OFICIAL TIKTOK API v2 + WEBHOOK + GUIA 2 MIN -->
+  <!-- CARD 1: CONEXÃO OFICIAL TIKTOK API v2 + ASSISTENTE 2 MIN + VERIFICADOR DE DOMÍNIO -->
   <div class="card" style="border-color:#ec489966">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-      <h2 style="margin:0">🎵 Postagem Automática no TikTok</h2>
+      <h2 style="margin:0">🎵 Central de Integração & Piloto Automático TikTok</h2>
       <span id="ttAccountBadge" style="font-size:12px;font-weight:800;padding:5px 12px;border-radius:999px;background:#1e1b4b;border:1px solid #6366f188;color:#c7d2fe">⚡ Modo Rápido App TikTok Ativo</span>
     </div>
-    <p style="margin-top:8px">Publique seus vídeos criados, avatares ou dublagens <b>100% no piloto automático</b> via <b>API Oficial TikTok Content Posting v2</b> (Direct Post + Caixa de Entrada), via <b>Webhook (Make / n8n / Zapier)</b> ou em <b>1 toque direto no App TikTok do celular</b> — com legenda e hashtags virais geradas por IA!</p>
+    <p style="margin-top:8px">Conecte sua conta via <b>API Oficial TikTok Content Posting v2 (developers.tiktok.com)</b> para publicar <b>100% automático</b> no seu perfil ou Caixa de Entrada do TikTok — ou gere vídeos verticais <b>9:16</b> virais completos já postando em 1 clique!</p>
 
     <div id="ttConnectedProfileBox" class="hidden" style="margin-top:10px;padding:11px 14px;border-radius:11px;background:linear-gradient(90deg,#0f2922,#111827);border:1px solid #10b98188;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
       <div id="ttConnectedProfileInfo" style="font-size:13px;color:#d1fae5"></div>
@@ -778,39 +778,89 @@ input[type="range"]{
       </div>
     </div>
 
-    <div style="margin-top:12px;padding:13px 14px;border-radius:12px;background:#101327;border:1px solid #312e81">
+    <div style="margin-top:12px;padding:14px;border-radius:12px;background:#101327;border:1px solid #312e81">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
-        <div style="font-weight:800;font-size:13px;color:#fce7f3">🔑 Configurar Piloto Automático Oficial (TikTok API v2 / Webhook)</div>
-        <button class="ghost" type="button" onclick="document.getElementById('ttGuideBox').classList.toggle('hidden')" style="font-size:11.5px;padding:5px 10px;border-color:#f472b688;color:#fbcfe8">📖 Como pegar a chave grátis em 2 min</button>
+        <div style="font-weight:800;font-size:13.5px;color:#fce7f3">🔑 Assistente Oficial TikTok API v2 (Passo a Passo de 2 Minutos)</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <a href="https://developers.tiktok.com/apps" target="_blank" rel="noopener" style="text-decoration:none;font-size:11.5px;font-weight:800;padding:6px 11px;border-radius:8px;background:#ec4899;color:#fff">🌐 1. Abrir developers.tiktok.com/apps ↗</a>
+          <button class="ghost" type="button" onclick="document.getElementById('ttGuideBox').classList.toggle('hidden')" style="font-size:11.5px;padding:5px 10px;border-color:#f472b688;color:#fbcfe8">📖 Mostrar / Ocultar Guia</button>
+        </div>
       </div>
 
-      <div id="ttGuideBox" class="hidden" style="margin-top:10px;padding:11px 13px;border-radius:10px;background:#0a0d1c;border:1px solid #ec489955;font-size:12px;line-height:1.7;color:#e2e8f0">
-        <b>Passo a Passo Oficial (2 minutos — Grátis):</b><br>
-        1️⃣ Acesse <b>developers.tiktok.com</b> → clique em <b>Manage Apps → Connect an App</b>.<br>
-        2️⃣ Ative os produtos <b>Login Kit</b> + <b>Content Posting API</b> (marque escopos <code>user.info.basic</code>, <code>video.publish</code> e <code>video.upload</code>).<br>
-        3️⃣ Em <b>Redirect URI</b>, cole exatamente esta URL do seu painel:<br>
-        <div style="display:flex;gap:8px;align-items:center;margin:6px 0">
-          <input id="ttRedirectUriDisplay" readonly style="flex:1;font-family:monospace;font-size:11.5px;background:#111827;color:#67e8f9" value="">
-          <button class="ghost" type="button" onclick="copyText(document.getElementById('ttRedirectUriDisplay').value)" style="white-space:nowrap;font-size:11.5px;padding:7px 11px">📋 Copiar URL</button>
+      <div id="ttGuideBox" style="margin-top:10px;padding:12px 14px;border-radius:10px;background:#0a0d1c;border:1px solid #ec489955;font-size:12px;line-height:1.75;color:#e2e8f0">
+        <div style="color:#fbcfe8;font-weight:800;margin-bottom:6px">🚀 O jeito mais rápido (Funciona na hora com Modo Sandbox sem esperar revisão do TikTok!):</div>
+        <b>Passo 1:</b> Clique no botão rosa <b>Abrir developers.tiktok.com/apps</b> acima → faça login → clique em <b>Create an App</b> e, no topo da página do app, clique em <b>Create Sandbox</b> (ou configure direto no App).<br>
+        <b>Passo 2:</b> Em <b>Target Users</b> (no Sandbox), adicione o seu <b>@usuario</b> do TikTok. Ative os produtos <b>Login Kit</b> e <b>Content Posting API</b> (ative <code>user.info.basic</code>, <code>video.publish</code> e <code>video.upload</code>).<br>
+        <b>Passo 3:</b> Copie com 1 clique as <b>4 URLs Oficiais</b> abaixo e cole nos campos pedidos pelo TikTok:<br>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:8px;margin:8px 0">
+          <div style="background:#111827;padding:8px 10px;border-radius:8px;border:1px solid #1e293b">
+            <div style="font-size:11px;color:#94a3b8;font-weight:700">🔗 Redirect URI (Login Kit — Obrigatório)</div>
+            <div style="display:flex;gap:6px;margin-top:4px">
+              <input id="ttRedirectUriDisplay" readonly style="flex:1;font-family:monospace;font-size:11px;padding:6px 8px;background:#090d16;color:#67e8f9" value="">
+              <button class="ghost" type="button" onclick="copyText(document.getElementById('ttRedirectUriDisplay').value)" style="font-size:11px;padding:5px 9px">📋 Copiar</button>
+            </div>
+          </div>
+          <div style="background:#111827;padding:8px 10px;border-radius:8px;border:1px solid #1e293b">
+            <div style="font-size:11px;color:#94a3b8;font-weight:700">🌐 Web / Desktop URL</div>
+            <div style="display:flex;gap:6px;margin-top:4px">
+              <input id="ttWebUrlDisplay" readonly style="flex:1;font-family:monospace;font-size:11px;padding:6px 8px;background:#090d16;color:#a5b4fc" value="">
+              <button class="ghost" type="button" onclick="copyText(document.getElementById('ttWebUrlDisplay').value)" style="font-size:11px;padding:5px 9px">📋 Copiar</button>
+            </div>
+          </div>
+          <div style="background:#111827;padding:8px 10px;border-radius:8px;border:1px solid #1e293b">
+            <div style="font-size:11px;color:#94a3b8;font-weight:700">📜 Terms of Service URL (Termos)</div>
+            <div style="display:flex;gap:6px;margin-top:4px">
+              <input id="ttTermsUrlDisplay" readonly style="flex:1;font-family:monospace;font-size:11px;padding:6px 8px;background:#090d16;color:#cbd5e1" value="">
+              <button class="ghost" type="button" onclick="copyText(document.getElementById('ttTermsUrlDisplay').value)" style="font-size:11px;padding:5px 9px">📋 Copiar</button>
+            </div>
+          </div>
+          <div style="background:#111827;padding:8px 10px;border-radius:8px;border:1px solid #1e293b">
+            <div style="font-size:11px;color:#94a3b8;font-weight:700">🔒 Privacy Policy URL (Privacidade)</div>
+            <div style="display:flex;gap:6px;margin-top:4px">
+              <input id="ttPrivacyUrlDisplay" readonly style="flex:1;font-family:monospace;font-size:11px;padding:6px 8px;background:#090d16;color:#cbd5e1" value="">
+              <button class="ghost" type="button" onclick="copyText(document.getElementById('ttPrivacyUrlDisplay').value)" style="font-size:11px;padding:5px 9px">📋 Copiar</button>
+            </div>
+          </div>
         </div>
-        4️⃣ Cole abaixo o <b>Client Key</b> e <b>Client Secret</b> e clique em <b>🔗 Conectar Conta TikTok Oficial</b>! <i>(Mesmo antes da auditoria do TikTok aprovar, o sistema envia automaticamente para sua Caixa de Entrada oficial do TikTok ou Privado sem dar erro!)</i>
+
+        <!-- VERIFICADOR AUTOMÁTICO DE DOMÍNIO TIKTOK -->
+        <div style="margin-top:8px;padding:9px 11px;border-radius:9px;background:#0f172a;border:1px dashed #38bdf888">
+          <div style="font-weight:800;color:#7dd3fc;font-size:11.5px">🛡️ O TikTok pediu "Verify Property" (URL Prefix)? Ative aqui em 1 clique:</div>
+          <div style="font-size:11px;color:#94a3b8;margin-top:2px">Se o TikTok pedir para verificar o domínio (aba <b>URL Prefix</b>), cole abaixo o código <code>tiktok-developers-site-verification=...</code> ou envie o arquivo <code>.txt</code> baixado do TikTok e clique em <b>Ativar Verificação</b>:</div>
+          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+            <input id="ttSiteVerificationInput" placeholder="Cole: tiktok-developers-site-verification=XXXXXX..." style="flex:1;min-width:210px;font-size:11.5px;padding:7px 10px">
+            <button class="ghost" type="button" onclick="document.getElementById('ttVerifyTxtFile').click()" style="font-size:11px;padding:6px 10px">📄 Subir .txt do TikTok</button>
+            <input type="file" id="ttVerifyTxtFile" accept=".txt,text/plain" onchange="onUploadTikTokVerifyFile(this)" style="display:none">
+            <button type="button" onclick="saveTikTokDomainVerification()" style="padding:7px 12px;border:none;border-radius:8px;background:#0284c7;color:#fff;font-weight:800;font-size:11.5px;cursor:pointer">✅ Ativar Verificação</button>
+          </div>
+        </div>
       </div>
 
       <div class="row" style="margin-top:10px">
         <div>
-          <label style="margin-top:0">TikTok Client Key</label>
+          <label style="margin-top:0">TikTok Client Key (do seu App / Sandbox)</label>
           <input id="ttClientKey" placeholder="Ex: aw1234567890abcdef" onchange="saveTikTokLocalSettings()">
         </div>
         <div>
           <label style="margin-top:0">TikTok Client Secret</label>
           <input id="ttClientSecret" type="password" placeholder="Ex: Secr3tKey..." onchange="saveTikTokLocalSettings()">
         </div>
+        <div>
+          <label style="margin-top:0">Permissões OAuth solicitadas</label>
+          <select id="ttOAuthScopes" onchange="saveTikTokLocalSettings()">
+            <option value="user.info.basic,video.publish,video.upload" selected>✅ Completo (Direct Post + Caixa de Entrada)</option>
+            <option value="user.info.basic,video.publish">🚀 Apenas Direct Post (video.publish)</option>
+            <option value="user.info.basic,video.upload">📥 Apenas Caixa de Entrada / Inbox (video.upload)</option>
+            <option value="user.info.basic">👤 Apenas Login Básico (user.info.basic)</option>
+          </select>
+        </div>
       </div>
 
       <div class="row">
         <div>
-          <label style="margin-top:0">Access Token Direto (opcional — preenche automático no Login OAuth)</label>
-          <input id="ttManualToken" type="password" placeholder="act.xxxxx... (ou clique em Conectar Conta TikTok abaixo)" onchange="onManualTikTokTokenChange(this.value)">
+          <label style="margin-top:0">Access Token Direto (opcional — preenchido automaticamente no Login OAuth)</label>
+          <input id="ttManualToken" type="password" placeholder="act.xxxxx... (ou clique no botão Conectar Conta TikTok abaixo)" onchange="onManualTikTokTokenChange(this.value)">
         </div>
         <div>
           <label style="margin-top:0">🔗 Webhook Automático Make / n8n / Zapier (opcional)</label>
@@ -818,10 +868,58 @@ input[type="range"]{
         </div>
       </div>
 
-      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-        <button type="button" onclick="startTikTokOAuthLogin()" style="padding:10px 16px;border:none;border-radius:10px;font-weight:800;font-size:13px;cursor:pointer;color:#fff;background:linear-gradient(135deg,#f43f5e,#ec4899,#8b5cf6)">🔗 Conectar Conta TikTok Oficial (OAuth 2.0 PKCE)</button>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <button type="button" onclick="startTikTokOAuthLogin()" style="padding:12px 18px;border:none;border-radius:10px;font-weight:800;font-size:13.5px;cursor:pointer;color:#fff;background:linear-gradient(135deg,#f43f5e,#ec4899,#8b5cf6);box-shadow:0 6px 20px rgba(236,72,153,.35)">🔗 Salvar Chaves & Conectar Conta TikTok Oficial (OAuth 2.0)</button>
         <button class="ghost" type="button" onclick="verifyTikTokAccount()" style="font-size:12.5px">🩺 Testar Conexão API TikTok</button>
       </div>
+    </div>
+  </div>
+
+  <!-- CARD NOVO: FÁBRICA AUTOMÁTICA 1-CLIQUE DE VÍDEO VIRAL 9:16 + AUTO-POST -->
+  <div class="card" style="border-color:#a855f766;background:linear-gradient(180deg,#121329,#0d1021)">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+      <h3 style="margin:0">⚡ Fábrica 1-Clique: Gerar Vídeo Vertical 9:16 + Postar no TikTok</h3>
+      <button class="ghost" type="button" onclick="pickRandomViralTikTokTopic()" style="font-size:11.5px;padding:5px 11px;border-color:#f472b688;color:#fbcfe8">🎲 Sortear Ideia Viral em Alta</button>
+    </div>
+    <p style="margin-top:6px;font-size:12.5px;color:#cbd5e1">Não tem um vídeo pronto agora? Digite apenas um tema abaixo: a IA cria o roteiro hipnótico de retenção, grava a <b>Voz Humana Neural HD</b>, renderiza o vídeo vertical <b>9:16 (.MP4 Fast-Start)</b> com legendas dinâmicas estilo TikTok e <b>publica automaticamente</b>!</p>
+
+    <label style="margin-top:8px">🔥 Tema ou gancho do vídeo TikTok 9:16</label>
+    <input id="ttAutoFactoryTopic" placeholder="Ex: 3 segredos psicológicos que fazem qualquer pessoa respeitar você imediatamente" value="3 segredos da mente de alto desempenho que 99% das pessoas descobrem tarde demais">
+
+    <div class="row">
+      <div>
+        <label>🗣️ Voz Humana Neural HD</label>
+        <select id="ttAutoFactoryVoice">
+          <option value="onyx" selected>🎙️ Antônio HD — Masculina Cinematográfica (PT-BR)</option>
+          <option value="nova">🎙️ Francisca HD — Feminina Natural & Calorosa (PT-BR)</option>
+          <option value="shimmer">🎙️ Thalita HD — Feminina Jovem & Dinâmica (PT-BR)</option>
+          <option value="echo">🎙️ Brian HD — Narrador Épico (Multilíngue)</option>
+          <option value="alloy">🎙️ Ava HD — Apresentadora Clara (Multilíngue)</option>
+        </select>
+      </div>
+      <div>
+        <label>⏱️ Duração do Short/TikTok</label>
+        <select id="ttAutoFactoryDuration">
+          <option value="18">⚡ 18 segundos (Ultra Rápido / Loop Viral)</option>
+          <option value="28" selected>🔥 28 segundos (Retenção Ideal For You)</option>
+          <option value="45">🎬 45 segundos (Storytelling Completo)</option>
+          <option value="62">💰 62 segundos (Monetização Creativity Program 1m+)</option>
+        </select>
+      </div>
+      <div>
+        <label>🎨 Estilo Visual Vertical 9:16</label>
+        <select id="ttAutoFactoryTheme">
+          <option value="cyber" selected>🌆 Neon Cyberpunk & Partículas</option>
+          <option value="gold">👑 Luxo Dourado & Alta Performance</option>
+          <option value="dark">🕵️ Misterioso Dark & Curiosidades</option>
+          <option value="emerald">🚀 Tech Esmeralda & Futuro IA</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+      <button type="button" id="ttFactoryAutoPostBtn" onclick="generateAndAutoPostVerticalTikTok(true)" style="flex:1.5;min-width:240px;padding:13px 16px;border:none;border-radius:11px;font-weight:800;font-size:13.5px;cursor:pointer;color:#fff;background:linear-gradient(135deg,#a855f7,#ec4899,#f43f5e);box-shadow:0 6px 22px rgba(168,85,247,.35)">🚀 GERAR VÍDEO 9:16 + PUBLICAR NO TIKTOK AGORA</button>
+      <button class="ghost" type="button" id="ttFactoryOnlyGenBtn" onclick="generateAndAutoPostVerticalTikTok(false)" style="flex:1;min-width:190px;padding:12px 14px;border-color:#c084fc88;color:#f3e8ff;font-weight:800">🎬 Apenas Gerar Vídeo 9:16 (Ver Prévia)</button>
     </div>
   </div>
 
@@ -5275,8 +5373,57 @@ function saveTikTokLocalSettings(){
   cfg.clientKey = (document.getElementById('ttClientKey')||{}).value?.trim() || '';
   cfg.clientSecret = (document.getElementById('ttClientSecret')||{}).value?.trim() || '';
   cfg.webhookUrl = (document.getElementById('ttWebhookUrl')||{}).value?.trim() || '';
+  cfg.scopes = (document.getElementById('ttOAuthScopes')||{}).value || 'user.info.basic,video.publish,video.upload';
+  cfg.siteVerification = (document.getElementById('ttSiteVerificationInput')||{}).value?.trim() || cfg.siteVerification || '';
   localStorage.setItem(TT_CFG_KEY, JSON.stringify(cfg));
+  fetch('/api/tiktok', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: 'save_config',
+      clientKey: cfg.clientKey,
+      clientSecret: cfg.clientSecret,
+      webhookUrl: cfg.webhookUrl,
+      siteVerification: cfg.siteVerification
+    })
+  }).catch(() => {});
   refreshTikTokBadges();
+}
+
+async function onUploadTikTokVerifyFile(input){
+  const f = input && input.files && input.files[0];
+  if(!f) return;
+  try{
+    const txt = (await f.text()).trim();
+    const inp = document.getElementById('ttSiteVerificationInput');
+    if(inp) inp.value = txt || f.name.replace(/\.txt$/i, '');
+    await saveTikTokDomainVerification();
+  }catch(e){
+    toast('Erro ao ler arquivo .txt: ' + e.message, 'error');
+  }
+}
+
+async function saveTikTokDomainVerification(){
+  const val = (document.getElementById('ttSiteVerificationInput')?.value || '').trim();
+  if(!val){
+    toast('Cole o código tiktok-developers-site-verification=... primeiro!', 'warn');
+    return;
+  }
+  saveTikTokLocalSettings();
+  try{
+    const r = await fetch('/api/tiktok', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'save_config', siteVerification: val })
+    });
+    const d = await r.json();
+    if(r.ok && d.ok){
+      showStatus('ttStatus', `✅ Verificação de Domínio TikTok ativada (${val.slice(0, 48)})! Agora você já pode clicar em "Verify" lá no TikTok Developer Portal.`, 'success');
+      toast('✅ Verificação de domínio TikTok ativada!');
+    }
+  }catch(e){
+    toast('Erro ao salvar verificação: ' + e.message, 'error');
+  }
 }
 
 function onManualTikTokTokenChange(val){
@@ -5285,6 +5432,11 @@ function onManualTikTokTokenChange(val){
   auth.accessToken = tok;
   if(tok) auth.expiresAt = Date.now() + 86400 * 1000 * 30;
   localStorage.setItem(TT_AUTH_KEY, JSON.stringify(auth));
+  fetch('/api/tiktok', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'save_config', accessToken: tok })
+  }).catch(() => {});
   refreshTikTokBadges();
   if(tok) toast('🔑 Access Token do TikTok salvo!');
 }
@@ -5299,7 +5451,9 @@ function refreshTikTokBadges(){
   const hasWebhook = !!(cfg.webhookUrl || tikTokServerEnv.hasEnvWebhook);
 
   if(hasOfficialToken){
-    const uname = auth.username ? `@${auth.username}` : (auth.displayName || 'Conta Oficial Conectada');
+    const rawUser = auth.username || tikTokServerEnv.connectedUsername || '';
+    const rawDisp = auth.displayName || tikTokServerEnv.connectedDisplayName || 'Conta Oficial Conectada';
+    const uname = rawUser ? `@${rawUser}` : rawDisp;
     if(badge){
       badge.textContent = `🟢 API Oficial Conectada (${uname})`;
       badge.style.background = '#064e3b';
@@ -5333,6 +5487,11 @@ function disconnectTikTokAccount(){
   localStorage.removeItem(TT_AUTH_KEY);
   const mt = document.getElementById('ttManualToken');
   if(mt) mt.value = '';
+  fetch('/api/tiktok', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'save_config', accessToken: '' })
+  }).catch(() => {});
   refreshTikTokBadges();
   toast('Conta TikTok desconectada.');
 }
@@ -5344,7 +5503,7 @@ async function startTikTokOAuthLogin(){
   const clientKey = cfg.clientKey || tikTokServerEnv.envClientKey || '';
   if(!clientKey){
     document.getElementById('ttGuideBox')?.classList.remove('hidden');
-    showStatus('ttStatus', '⚠️ Informe primeiro o Client Key do seu app em developers.tiktok.com (veja o passo a passo de 2 min aberto acima!).', 'warn');
+    showStatus('ttStatus', '⚠️ Cole primeiro o Client Key e Client Secret do seu App / Sandbox em developers.tiktok.com (veja o guia passo a passo aberto acima!).', 'warn');
     document.getElementById('ttClientKey')?.focus();
     return;
   }
@@ -5355,15 +5514,34 @@ async function startTikTokOAuthLogin(){
   const hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(codeVerifier));
   const codeChallenge = btoa(String.fromCharCode(...new Uint8Array(hashBuf)))
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  const state = Math.random().toString(36).slice(2);
   const redirectUri = window.location.origin + '/api/tiktok';
+  const scopes = document.getElementById('ttOAuthScopes')?.value || cfg.scopes || 'user.info.basic,video.publish,video.upload';
+
+  // Codifica codeVerifier + redirectUri no state para funcionar mesmo em abas mobile/in-app browser
+  const statePayload = btoa(JSON.stringify({ v: codeVerifier, r: redirectUri, k: clientKey }))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const state = 'st_' + statePayload;
 
   localStorage.setItem('dubai_tiktok_pkce', JSON.stringify({ codeVerifier, state, redirectUri }));
+
+  try{
+    await fetch('/api/tiktok', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'save_config',
+        clientKey,
+        clientSecret: cfg.clientSecret || '',
+        codeVerifier,
+        redirectUri
+      })
+    });
+  }catch{}
 
   const params = new URLSearchParams({
     client_key: clientKey,
     response_type: 'code',
-    scope: 'user.info.basic,video.publish,video.upload',
+    scope: scopes,
     redirect_uri: redirectUri,
     state,
     code_challenge: codeChallenge,
@@ -5375,6 +5553,256 @@ async function startTikTokOAuthLogin(){
     window.location.href = authUrl;
   } else {
     showStatus('ttStatus', '🔑 Janela oficial de autorização do TikTok aberta! Aprove o acesso para ativar a postagem 100% automática.', 'info');
+  }
+}
+
+const VIRAL_TIKTOK_TOPICS = [
+  '3 segredos da mente de alto desempenho que 99% das pessoas descobrem tarde demais',
+  'O hábito silencioso de 2 minutos que muda completamente o seu foco e energia diária',
+  'Por que o cérebro humano sabota seus maiores planos e como virar esse jogo hoje',
+  'A regra dos 5 segundos usada por líderes de elite para vencer a procrastinação na hora',
+  '3 sinais sutis de inteligência emocional altíssima que quase ninguém percebe',
+  'A descoberta científica mais curiosa do universo que parece ficção, mas é 100% real'
+];
+
+function pickRandomViralTikTokTopic(){
+  const inp = document.getElementById('ttAutoFactoryTopic');
+  if(!inp) return;
+  const current = inp.value;
+  const pool = VIRAL_TIKTOK_TOPICS.filter(x => x !== current);
+  inp.value = pool[Math.floor(Math.random() * pool.length)] || VIRAL_TIKTOK_TOPICS[0];
+  toast('🎲 Novo tema viral selecionado!');
+}
+
+// Fábrica 1-Clique: Gera Roteiro + Voz Humana Neural HD + Renderiza MP4 9:16 Vertical + Auto-Posta no TikTok!
+async function generateAndAutoPostVerticalTikTok(autoPublishNow = true){
+  const topic = (document.getElementById('ttAutoFactoryTopic')?.value || '').trim();
+  if(!topic){
+    toast('Digite um tema para o seu vídeo TikTok 9:16!', 'warn');
+    return;
+  }
+  const voice = document.getElementById('ttAutoFactoryVoice')?.value || 'onyx';
+  const durationSec = Number(document.getElementById('ttAutoFactoryDuration')?.value) || 28;
+  const theme = document.getElementById('ttAutoFactoryTheme')?.value || 'cyber';
+
+  const btnAuto = document.getElementById('ttFactoryAutoPostBtn');
+  const btnOnly = document.getElementById('ttFactoryOnlyGenBtn');
+  if(btnAuto) btnAuto.disabled = true;
+  if(btnOnly) btnOnly.disabled = true;
+
+  const prog = document.getElementById('ttProgress');
+  prog?.classList.add('show');
+  setProgress('ttProgressFill', 8);
+
+  try{
+    showStatus('ttStatus', '🧠 Passo 1/4: Criando roteiro hipnótico 9:16 + legenda e hashtags virais com IA...', 'info');
+    const scRes = await fetch('/api/tiktok', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'auto_short_script', topic, durationSec })
+    });
+    const scData = await scRes.json();
+    const narrationText = scData.narration || topic;
+    const headlineText = (scData.headline || topic.slice(0, 38)).toUpperCase();
+    const viralCaption = scData.caption || `🔥 ${topic} #fyp #foryou #viral #tiktokbrasil`;
+
+    setProgress('ttProgressFill', 24);
+    showStatus('ttStatus', '🎙️ Passo 2/4: Gravando locução com Voz Humana Neural HD (48kHz)...', 'info');
+    const tts = await synthesizeAvatarSpeech(narrationText, voice, (msg) => {
+      showStatus('ttStatus', '🎙️ ' + msg, 'info');
+    });
+
+    const totalDur = (tts && tts.duration && tts.duration > 2) ? tts.duration : Math.max(10, narrationText.split(/\s+/).length / 2.35);
+    const cues = buildTimedCaptions(narrationText, totalDur);
+
+    setProgress('ttProgressFill', 45);
+    showStatus('ttStatus', `🎬 Passo 3/4: Renderizando vídeo vertical 9:16 (720×1280 Fast-Start MP4 • ${Math.round(totalDur)}s)...`, 'info');
+
+    const palettes = {
+      cyber: { bg1:'#070818', bg2:'#1e1b4b', bg3:'#4c1d95', accent:'#ec4899', glow:'#22d3ee', badge:'#831843' },
+      gold:  { bg1:'#0c0a06', bg2:'#1c1917', bg3:'#422006', accent:'#f59e0b', glow:'#fde047', badge:'#78350f' },
+      dark:  { bg1:'#05070e', bg2:'#0f172a', bg3:'#1e293b', accent:'#38bdf8', glow:'#f43f5e', badge:'#0f172a' },
+      emerald:{ bg1:'#041311', bg2:'#064e3b', bg3:'#0f172a', accent:'#10b981', glow:'#6ee7b7', badge:'#065f46' }
+    };
+    const pal = palettes[theme] || palettes.cyber;
+
+    const drawVerticalFrame = (ctx, W, H, tSec) => {
+      // Fundo dinâmico suave vertical 9:16
+      const shift = Math.sin(tSec * 0.9) * 90;
+      const g = ctx.createLinearGradient(0, 0, W, H + shift);
+      g.addColorStop(0, pal.bg1);
+      g.addColorStop(0.52, pal.bg2);
+      g.addColorStop(1, pal.bg3);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+
+      // Círculos de luz cinematográficos (sem shadowBlur p/ fluidez máxima no celular)
+      const orbY1 = H * 0.28 + Math.sin(tSec * 1.4) * 55;
+      const rg1 = ctx.createRadialGradient(W * 0.5, orbY1, 10, W * 0.5, orbY1, W * 0.62);
+      rg1.addColorStop(0, pal.accent + '44');
+      rg1.addColorStop(1, 'transparent');
+      ctx.fillStyle = rg1;
+      ctx.fillRect(0, 0, W, H);
+
+      // Partículas ascendentes sutis
+      ctx.fillStyle = pal.glow + '55';
+      for(let i = 0; i < 18; i++){
+        const px = ((i * 97 + Math.floor(tSec * 28 * ((i % 3) + 1))) % W);
+        const py = H - ((i * 131 + Math.floor(tSec * 65 * ((i % 4) + 1))) % H);
+        const r = (i % 3) + 2;
+        ctx.beginPath();
+        ctx.arc(px, py, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Topo: Badge "🔥 VIRAL TIKTOK" + Barra de progresso de retenção
+      const pct = Math.min(1, Math.max(0, tSec / totalDur));
+      ctx.fillStyle = 'rgba(255,255,255,0.14)';
+      ctx.fillRect(48, 56, W - 96, 8);
+      ctx.fillStyle = pal.accent;
+      ctx.fillRect(48, 56, (W - 96) * pct, 8);
+
+      // Card do Título / Hook no topo
+      ctx.fillStyle = 'rgba(9, 12, 26, 0.82)';
+      ctx.strokeStyle = pal.accent;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.roundRect(44, 96, W - 88, 152, 22);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = pal.glow;
+      ctx.font = '800 22px system-ui, -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('⚡ ASSISTA ATÉ O FINAL', W / 2, 136);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 28px system-ui, -apple-system, sans-serif';
+      const titleWords = headlineText.split(/\s+/);
+      let line1 = '', line2 = '';
+      for(const w of titleWords){
+        if((line1 + ' ' + w).trim().length <= 24) line1 = (line1 + ' ' + w).trim();
+        else if((line2 + ' ' + w).trim().length <= 26) line2 = (line2 + ' ' + w).trim();
+      }
+      ctx.fillText(line1 || headlineText.slice(0, 24), W / 2, 182);
+      if(line2) ctx.fillText(line2, W / 2, 220);
+
+      // Equalizador central reativo à voz humana
+      const centerY = H * 0.47;
+      const bars = 21;
+      const barW = 14;
+      const gap = 10;
+      const totalBarW = bars * barW + (bars - 1) * gap;
+      const startX = (W - totalBarW) / 2;
+      for(let b = 0; b < bars; b++){
+        const distCenter = Math.abs(b - Math.floor(bars / 2));
+        const wave = Math.abs(Math.sin(tSec * 8.5 + b * 0.55) * Math.cos(tSec * 4.2 - b * 0.3));
+        const barH = Math.max(16, (130 - distCenter * 8) * (0.25 + wave * 0.85));
+        ctx.fillStyle = (b % 2 === 0) ? pal.accent : pal.glow;
+        ctx.beginPath();
+        ctx.roundRect(startX + b * (barW + gap), centerY - barH / 2, barW, barH, 7);
+        ctx.fill();
+      }
+
+      // Legendas dinâmicas grandes estilo TikTok / Hormozi no centro-inferior
+      const activeCue = cues.find(c => tSec >= c.start && tSec <= c.end) || cues[cues.length - 1];
+      if(activeCue && activeCue.text){
+        const words = activeCue.text.split(/\s+/);
+        const cueProgress = Math.max(0, Math.min(0.999, (tSec - activeCue.start) / Math.max(0.2, activeCue.end - activeCue.start)));
+        const activeWordIdx = Math.floor(cueProgress * words.length);
+
+        ctx.fillStyle = 'rgba(7, 10, 22, 0.88)';
+        ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(42, H * 0.63, W - 84, 250, 26);
+        ctx.fill();
+        ctx.stroke();
+
+        // Quebra as palavras da legenda em linhas de até 18 caracteres
+        const lines = [];
+        let cur = [];
+        let curLen = 0;
+        words.forEach((w, idx) => {
+          if(curLen + w.length > 18 && cur.length > 0){
+            lines.push(cur);
+            cur = [];
+            curLen = 0;
+          }
+          cur.push({ word: w.toUpperCase(), active: idx === activeWordIdx });
+          curLen += w.length + 1;
+        });
+        if(cur.length) lines.push(cur);
+
+        ctx.font = '900 40px system-ui, -apple-system, sans-serif';
+        ctx.textBaseline = 'middle';
+        const lineH = 56;
+        const blockStartY = (H * 0.63 + 125) - ((lines.length - 1) * lineH) / 2;
+
+        lines.slice(0, 4).forEach((ln, lIdx) => {
+          const fullStr = ln.map(x => x.word).join(' ');
+          const totalLineW = ctx.measureText(fullStr).width;
+          let drawX = (W - totalLineW) / 2;
+          const drawY = blockStartY + lIdx * lineH;
+          ctx.textAlign = 'left';
+          ln.forEach((item) => {
+            const wWidth = ctx.measureText(item.word + ' ').width;
+            if(item.active){
+              ctx.fillStyle = pal.accent;
+              ctx.beginPath();
+              ctx.roundRect(drawX - 6, drawY - 24, ctx.measureText(item.word).width + 12, 48, 10);
+              ctx.fill();
+              ctx.fillStyle = '#ffffff';
+            } else {
+              ctx.fillStyle = '#f8fafc';
+            }
+            ctx.fillText(item.word, drawX, drawY);
+            drawX += wWidth;
+          });
+        });
+      }
+
+      // Rodapé CTA
+      ctx.textAlign = 'center';
+      ctx.font = '800 22px system-ui, -apple-system, sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.75)';
+      ctx.fillText('❤️ Curta • 💬 Comente • 🔖 Salve para depois', W / 2, H - 72);
+    };
+
+    const videoBlob = await recordCanvasVideo({
+      drawFn: drawVerticalFrame,
+      audioBuffer: tts ? tts.audioBuffer : null,
+      width: 720,
+      height: 1280,
+      durationSec: totalDur,
+      onProgress: (p) => setProgress('ttProgressFill', Math.round(45 + p * 40))
+    });
+
+    const ext = (videoBlob.type && videoBlob.type.includes('mp4')) ? 'mp4' : 'webm';
+    const fname = `tiktok-9x16-${Date.now().toString(36)}.${ext}`;
+    attachVideoToTikTokComposer(videoBlob, fname, narrationText);
+
+    const capArea = document.getElementById('ttCaption');
+    if(capArea){
+      capArea.value = viralCaption;
+      document.getElementById('ttCaptionLen').textContent = String(viralCaption.length);
+    }
+
+    setProgress('ttProgressFill', 90);
+    if(autoPublishNow){
+      showStatus('ttStatus', '🚀 Passo 4/4: Vídeo 9:16 pronto! Disparando publicação automática no TikTok...', 'info');
+      await publishOrScheduleTikTok();
+    } else {
+      setProgress('ttProgressFill', 100);
+      showStatus('ttStatus', `✅ Vídeo Vertical 9:16 (${Math.round(totalDur)}s) + Legenda Viral prontos! Clique em "PUBLICAR NO TIKTOK AGORA" abaixo quando quiser.`, 'success');
+      toast('🎬 Vídeo 9:16 gerado e carregado no player!');
+    }
+  }catch(e){
+    showStatus('ttStatus', '❌ Erro na Fábrica 9:16: ' + (e.message || e), 'error');
+    toast('Erro: ' + (e.message || e), 'error');
+  }finally{
+    if(btnAuto) btnAuto.disabled = false;
+    if(btnOnly) btnOnly.disabled = false;
   }
 }
 
@@ -5859,12 +6287,23 @@ function renderTikTokHistory(){
 }
 
 async function initTikTokStudio(){
+  const origin = window.location.origin;
   const redir = document.getElementById('ttRedirectUriDisplay');
-  if(redir) redir.value = window.location.origin + '/api/tiktok';
+  if(redir) redir.value = origin + '/api/tiktok';
+  const webUrl = document.getElementById('ttWebUrlDisplay');
+  if(webUrl) webUrl.value = origin + '/';
+  const termsUrl = document.getElementById('ttTermsUrlDisplay');
+  if(termsUrl) termsUrl.value = origin + '/terms';
+  const privUrl = document.getElementById('ttPrivacyUrlDisplay');
+  if(privUrl) privUrl.value = origin + '/privacy';
+
   const cfg = getTikTokCfg();
   if(cfg.clientKey && document.getElementById('ttClientKey')) document.getElementById('ttClientKey').value = cfg.clientKey;
   if(cfg.clientSecret && document.getElementById('ttClientSecret')) document.getElementById('ttClientSecret').value = cfg.clientSecret;
   if(cfg.webhookUrl && document.getElementById('ttWebhookUrl')) document.getElementById('ttWebhookUrl').value = cfg.webhookUrl;
+  if(cfg.scopes && document.getElementById('ttOAuthScopes')) document.getElementById('ttOAuthScopes').value = cfg.scopes;
+  if(cfg.siteVerification && document.getElementById('ttSiteVerificationInput')) document.getElementById('ttSiteVerificationInput').value = cfg.siteVerification;
+
   const auth = getTikTokAuth();
   if(auth.accessToken && document.getElementById('ttManualToken')) document.getElementById('ttManualToken').value = auth.accessToken;
   if(cfg.autopost){
@@ -5884,7 +6323,15 @@ async function initTikTokStudio(){
       body: JSON.stringify({ action: 'config_status' })
     });
     const d = await r.json();
-    if(r.ok) tikTokServerEnv = d;
+    if(r.ok){
+      tikTokServerEnv = d;
+      if(!cfg.clientKey && d.envClientKey && document.getElementById('ttClientKey')){
+        document.getElementById('ttClientKey').value = d.envClientKey;
+      }
+      if(!cfg.siteVerification && d.siteVerification && document.getElementById('ttSiteVerificationInput')){
+        document.getElementById('ttSiteVerificationInput').value = d.siteVerification;
+      }
+    }
   }catch{}
   refreshTikTokBadges();
   if(window.location.hash === '#tiktok'){
