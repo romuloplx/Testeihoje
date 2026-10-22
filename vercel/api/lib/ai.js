@@ -3025,13 +3025,31 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
               if (vd.shortDescription) description = String(vd.shortDescription).slice(0, 1800);
               if (Array.isArray(vd.keywords)) keywords = vd.keywords.slice(0, 18);
 
+              // Se o próprio ytInitialPlayerResponse trouxer stream MP4 direto (itag 18 faststart), baixa o vídeo real!
+              const directFmt = (pr?.streamingData?.formats || []).find(f => f && f.url && /mp4/i.test(f.mimeType || ''));
+              if (directFmt && directFmt.url && !directVideoBase64) {
+                try {
+                  const vr = await fetch(directFmt.url, {
+                    headers: { Range: 'bytes=0-3300000', 'User-Agent': 'Mozilla/5.0' },
+                    signal: AbortSignal.timeout(4500)
+                  });
+                  if (vr.status === 200 || vr.status === 206) {
+                    const vbuf = Buffer.from(await vr.arrayBuffer());
+                    if (vbuf.length > 30000 && vbuf.length <= 3_500_000) {
+                      directVideoBase64 = vbuf.toString('base64');
+                      directVideoMime = 'video/mp4';
+                    }
+                  }
+                } catch (_) {}
+              }
+
               // Extrai capítulos da descrição se existirem (ex: 00:00 Introdução)
               if (description) {
                 const chapMatches = description.match(/(?:\d{1,2}:)?\d{1,2}:\d{2}\s+[^\r\n]+/g);
                 if (chapMatches && chapMatches.length) chapters = chapMatches.slice(0, 12);
               }
 
-              // Extrai captionTracks oficiais do YouTube (JSON3 ou XML)
+              // Extrai captionTracks oficiais do YouTube (JSON3) e seleciona as MELHORES PARTES do vídeo!
               const tracks = pr?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
               if (Array.isArray(tracks) && tracks.length) {
                 const bestTrack = tracks.find(t => /^pt/i.test(t.languageCode || ''))
@@ -3142,12 +3160,12 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
           const mp4Stream = j.videoStreams.find(vs => !vs.videoOnly && /mp4/i.test(vs.format || vs.mimeType || '') && vs.url);
           if (mp4Stream && mp4Stream.url) {
             const vr = await fetch(mp4Stream.url, {
-              headers: { Range: 'bytes=0-3200000', 'User-Agent': 'Mozilla/5.0' },
+              headers: { Range: 'bytes=0-3300000', 'User-Agent': 'Mozilla/5.0' },
               signal: AbortSignal.timeout(5000)
             });
-            if (vr.status === 200) {
+            if (vr.status === 200 || vr.status === 206) {
               const vbuf = Buffer.from(await vr.arrayBuffer());
-              if (vbuf.length > 20000 && vbuf.length <= 3_400_000) {
+              if (vbuf.length > 20000 && vbuf.length <= 3_500_000) {
                 directVideoBase64 = vbuf.toString('base64');
                 directVideoMime = 'video/mp4';
               }
@@ -3156,6 +3174,44 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
         }
         break;
       } catch (_) {}
+    }
+
+    // 2.3) Se ainda não obteve o stream MP4 direto, consulta o player Innertube (ANDROID / IOS) para extrair o stream MP4 (itag=18) real do vídeo!
+    if (!directVideoBase64) {
+      for (const clientCfg of [
+        { clientName: 'ANDROID', clientVersion: '19.09.37', androidSdkVersion: 30, ua: 'com.google.android.youtube/19.09.37 (Linux; U; Android 11) gzip' },
+        { clientName: 'IOS', clientVersion: '19.09.3', deviceModel: 'iPhone14,3', ua: 'com.google.ios.youtube/19.09.3 (iPhone14,3; U; CPU iOS 15_6 like Mac OS X)' }
+      ]) {
+        if (directVideoBase64) break;
+        try {
+          const ir = await fetch('https://www.youtube.com/youtubei/v1/player?prettyPrint=false', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'User-Agent': clientCfg.ua },
+            body: JSON.stringify({
+              videoId,
+              context: { client: { clientName: clientCfg.clientName, clientVersion: clientCfg.clientVersion, hl: 'pt', gl: 'BR' } }
+            }),
+            signal: AbortSignal.timeout(4500)
+          });
+          if (ir.ok) {
+            const ij = await ir.json();
+            const fmt = (ij?.streamingData?.formats || []).find(f => f && f.url && /mp4/i.test(f.mimeType || ''));
+            if (fmt && fmt.url) {
+              const vr = await fetch(fmt.url, {
+                headers: { Range: 'bytes=0-3300000', 'User-Agent': clientCfg.ua },
+                signal: AbortSignal.timeout(5000)
+              });
+              if (vr.status === 200 || vr.status === 206) {
+                const vbuf = Buffer.from(await vr.arrayBuffer());
+                if (vbuf.length > 25000 && vbuf.length <= 3_500_000) {
+                  directVideoBase64 = vbuf.toString('base64');
+                  directVideoMime = 'video/mp4';
+                }
+              }
+            }
+          }
+        } catch (_) {}
+      }
     }
   }
 

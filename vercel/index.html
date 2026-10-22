@@ -551,6 +551,7 @@ input[type="range"]{
           <div id="createdVideoReadyBanner" style="font-weight:800;font-size:13.5px;color:#6ee7b7;margin-bottom:10px">✅ Vídeo conectado pronto! Assista abaixo ou clique para baixar no seu aparelho:</div>
           <video id="createdVideo" controls playsinline style="width:100%;max-height:480px;border-radius:10px;background:#000"></video>
           <button type="button" onclick="downloadCreatedVideo()" style="width:100%;margin-top:12px;padding:15px 18px;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;color:#042f2e;background:linear-gradient(135deg,#34d399,#10b981,#06b6d4);box-shadow:0 8px 26px rgba(16,185,129,.35)">⬇️ BAIXAR VÍDEO LISO 30 FPS (.MP4 GALERIA)</button>
+          <button type="button" onclick="sendPlayingVideoToOpusClip('create')" style="width:100%;margin-top:8px;padding:12px 16px;border:1.5px solid #22c55e;border-radius:12px;font-size:13.5px;font-weight:900;cursor:pointer;color:#bbf7d0;background:linear-gradient(135deg,#052e16,#064e3b)">✂️ Pegar Melhores Partes Deste Vídeo, Cortar &amp; Botar Legendas (OpusClip IA)</button>
           <button type="button" onclick="shareToGallery('create')" style="width:100%;margin-top:8px;padding:12px 16px;border:1.5px solid #38bdf8;border-radius:12px;font-size:14px;font-weight:800;cursor:pointer;color:#e0f2fe;background:#0f172a">📲 Salvar direto na Galeria / Enviar (Celular, WhatsApp, Reels)</button>
           <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
             <a id="createdVideoDl" class="ghost" download="video-cinema-dubai-pro.mp4" style="padding:8px 14px;text-decoration:none">💾 Link direto do vídeo</a>
@@ -799,6 +800,9 @@ input[type="range"]{
     <div id="dubFileMeta" class="hidden" style="margin-top:12px;padding:11px 13px;border-radius:11px;background:#0e1726;border:1px solid #1e3a8a;font-size:12.5px;line-height:1.6;color:#dbeafe"></div>
 
     <video id="preview" controls playsinline hidden style="width:100%;max-height:440px;margin-top:12px;border-radius:10px;background:#000"></video>
+    <div id="dubQuickOpusBar" class="hidden" style="margin-top:8px">
+      <button type="button" onclick="sendPlayingVideoToOpusClip('dub')" style="width:100%;padding:11px 14px;border:1.5px solid #22c55e;border-radius:11px;font-size:13px;font-weight:900;cursor:pointer;color:#bbf7d0;background:linear-gradient(135deg,#052e16,#064e3b)">✂️ Pegar Melhores Partes Deste Vídeo Reproduzindo, Cortar &amp; Botar Legendas (OpusClip IA)</button>
+    </div>
     <audio id="audioPreview" controls hidden style="width:100%;margin-top:12px"></audio>
 
     <div class="row" style="margin-top:12px">
@@ -969,6 +973,7 @@ input[type="range"]{
           </div>
 
           <button type="button" id="dubMainDownloadBtn" onclick="downloadDubVideo()" style="width:100%;padding:15px 18px;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;color:#042f2e;background:linear-gradient(135deg,#34d399,#10b981,#06b6d4);box-shadow:0 8px 26px rgba(16,185,129,.35)">⬇️ GERAR E BAIXAR VÍDEO DUBLADO LISO (.MP4 GALERIA)</button>
+          <button type="button" onclick="sendPlayingVideoToOpusClip('dub')" style="width:100%;padding:12px 16px;border:1.5px solid #22c55e;border-radius:12px;font-size:13.5px;font-weight:900;cursor:pointer;color:#bbf7d0;background:linear-gradient(135deg,#052e16,#064e3b)">✂️ Pegar Melhores Partes Deste Vídeo, Cortar &amp; Botar Legendas (OpusClip IA)</button>
           <button type="button" onclick="shareToGallery('dub')" style="width:100%;padding:12px 16px;border:1.5px solid #38bdf8;border-radius:12px;font-size:14px;font-weight:800;cursor:pointer;color:#e0f2fe;background:#0f172a">📲 Salvar direto na Galeria / Enviar (Celular, WhatsApp, Reels)</button>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="primary" type="button" onclick="playDubbed()" style="padding:9px 14px">▶️ Assistir vídeo sincronizado agora (instantâneo)</button>
@@ -1040,7 +1045,41 @@ input[type="range"]{
 
     <div id="opusYoutubePreviewCard" class="hidden" style="margin-top:10px;padding:10px 12px;border-radius:12px;background:#0f1322;border:1px solid #232942"></div>
     <div id="opusFileMeta" class="hidden" style="margin-top:10px;padding:10px 12px;border-radius:12px;background:#0f1322;border:1px solid #232942;font-size:12.5px;color:#cbd5e1;line-height:1.5"></div>
-    <video id="opusSourceVideo" playsinline preload="auto" class="hidden" style="display:none"></video>
+
+    <!-- 🎬 MONITOR DO VÍDEO EM REPRODUÇÃO + DETECTOR DE MELHORES PARTES & LEGENDAS AUTOMÁTICAS -->
+    <div id="opusSourceMonitorWrap" class="hidden" style="margin-top:12px;padding:14px 16px;border-radius:16px;background:linear-gradient(180deg,#0f1526 0%,#090c16 100%);border:1.5px solid #22c55e88;box-shadow:0 12px 32px rgba(0,0,0,.48)">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:900;padding:3px 9px;border-radius:999px;background:#052e16;border:1px solid #22c55e;color:#4ade80">🔴 VÍDEO EM REPRODUÇÃO</span>
+          <span style="font-size:13px;font-weight:800;color:#f8fafc">OpusClip IA pega as melhores partes deste vídeo reproduzindo, corta e bota legendas</span>
+        </div>
+        <label style="margin:0;display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:800;color:#bbf7d0;cursor:pointer;background:#064e3b;padding:4px 10px;border-radius:999px;border:1px solid #10b981">
+          <input type="checkbox" id="opusAutoClipToggle" checked style="width:14px;height:14px;margin:0;accent-color:#22c55e">
+          ⚡ Auto-Cortar &amp; Legendar Ao Carregar/Reproduzir
+        </label>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:14px;align-items:center">
+        <!-- PLAYER VISÍVEL DO VÍDEO FONTE -->
+        <div style="position:relative;background:#04050a;border-radius:12px;overflow:hidden;border:1px solid #1e293b">
+          <video id="opusSourceVideo" controls playsinline preload="auto" style="width:100%;max-height:240px;display:block;background:#000"></video>
+          <div id="opusLiveScannerBadge" style="position:absolute;top:8px;left:8px;pointer-events:none;background:rgba(5,46,22,0.88);border:1px solid #22c55e;color:#bbf7d0;font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:999px">🎯 Monitorando melhores momentos da fala &amp; cena</div>
+        </div>
+
+        <!-- MAPA DE CALOR DAS MELHORES PARTES DA TIMELINE + BOTÕES DE CORTE IMEDIATO -->
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap">
+            <span style="font-size:11.5px;font-weight:800;color:#86efac">🔥 Mapa das Melhores Partes Detectadas no Vídeo (Clique p/ Pular)</span>
+            <span id="opusLiveTimecodeLabel" style="font-size:11px;font-weight:800;color:#94a3b8">00:00 / 00:00</span>
+          </div>
+          <canvas id="opusLiveTimelineCanvas" width="520" height="72" onclick="onClickOpusTimelineHeatmap(event)" style="width:100%;height:72px;border-radius:10px;background:#070a14;border:1px solid #232942;cursor:pointer;display:block" title="Clique em qualquer ponto ou bloco verde para pular para aquela parte do vídeo"></canvas>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:2px">
+            <button type="button" class="primary" onclick="clipCurrentPlayingMoment()" style="flex:1;margin:0;padding:10px 12px;font-size:12px;font-weight:900;background:linear-gradient(135deg,#22c55e,#10b981);color:#031c0d">✂️ Cortar Trecho Reproduzindo Agora + Botar Legenda</button>
+            <button type="button" class="ghost" onclick="runOpusClipAnalysis(true)" style="margin:0;padding:10px 12px;font-size:12px;border-color:#38bdf888;color:#bae6fd">🔥 Re-Escanear Melhores Partes</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- 🎛️ OPUSCLIP COPILOT & PRESET CONFIGURATION PANEL (IGUAL AO clip.opus.pro/dashboard) -->
     <div class="opus-copilot-box">
@@ -1406,6 +1445,9 @@ function openTab(id, button){
     if(!avatarLiveState.playing) avatarLiveState.clickPulseUntil = performance.now() + 1800;
     ensureAvatarLoop();
   }
+  if(id==='clips' && typeof autoSyncPlayingVideoIntoOpus === 'function'){
+    setTimeout(() => autoSyncPlayingVideoIntoOpus(), 80);
+  }
   window.scrollTo({top:0, behavior:'smooth'});
 }
 
@@ -1612,11 +1654,15 @@ function previewVideo(overrideFile){
 
   if(isAudio){
     v.hidden=true; v.src='';
+    const qBar = document.getElementById('dubQuickOpusBar');
+    if(qBar) qBar.classList.add('hidden');
     a.src=previewUrl; a.hidden=false;
     a.onloadedmetadata = () => updateInspector(a.duration, 0, 0);
   }else{
     a.hidden=true; a.src='';
     v.src=previewUrl; v.hidden=false;
+    const qBar = document.getElementById('dubQuickOpusBar');
+    if(qBar) qBar.classList.remove('hidden');
     v.onloadedmetadata = () => updateInspector(v.duration, v.videoWidth, v.videoHeight);
   }
   toast('📎 Arquivo carregado: ' + file.name + ' (' + fmtHumanBytes(file.size) + ')');
@@ -7130,7 +7176,7 @@ async function importOpusVideoFromUrl(autoRunAnalysis = true){
         durationSec: totalDur
       });
 
-      loadOpusVideoFile(ytBlob, `${ytTitle}.mp4`);
+      loadOpusVideoFile(ytBlob, `${ytTitle}.mp4`, true);
       opusState.durationSec = totalDur;
       opusState.importedUrl = rawUrl;
       opusState.ytFrameBitmaps = frameBitmaps;
@@ -7181,7 +7227,201 @@ function onDropOpusFile(ev){
   if(f) loadOpusVideoFile(f);
 }
 
-function loadOpusVideoFile(file, customLabel = ''){
+// Desenha o Mapa de Calor Acústico + Blocos das Melhores Partes Cortadas + Agulha do Vídeo em Reprodução
+function drawOpusLiveTimelineHeatmap(){
+  const cv = document.getElementById('opusLiveTimelineCanvas');
+  if(!cv) return;
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  ctx.fillStyle = '#070a14';
+  ctx.fillRect(0, 0, W, H);
+
+  const v = document.getElementById('opusSourceVideo');
+  const totalDur = Math.max(1, opusState.durationSec || (v && v.duration) || 36);
+  const curT = v ? (v.currentTime || 0) : 0;
+
+  const lbl = document.getElementById('opusLiveTimecodeLabel');
+  if(lbl) lbl.textContent = `${fmtClockSec(curT)} / ${fmtClockSec(totalDur)}`;
+
+  // 1) Desenha a onda de energia vocal (mono12k) ao longo do vídeo
+  const mono = opusState.mono12k;
+  const bars = 96;
+  const barW = W / bars;
+  for(let i = 0; i < bars; i++){
+    let amp = 0.25 + 0.18 * Math.sin(i * 0.45);
+    if(mono && mono.length > 1000){
+      const i0 = Math.floor((i / bars) * mono.length);
+      const i1 = Math.min(mono.length, i0 + Math.max(1, Math.floor(mono.length / bars)));
+      let sum = 0, cnt = 0;
+      for(let k = i0; k < i1; k += 12){ sum += Math.abs(mono[k]); cnt++; }
+      amp = Math.min(1, (cnt ? (sum / cnt) : 0.1) * 3.4);
+    }
+    const bh = Math.max(6, Math.round(amp * (H - 22)));
+    const bx = i * barW + 1;
+    const by = H - bh - 4;
+    const secAtBar = (i / bars) * totalDur;
+    const inClip = (opusState.clips || []).some(c => secAtBar >= c.startSec && secAtBar <= c.endSec);
+    ctx.fillStyle = inClip ? '#22c55e' : '#334155';
+    ctx.fillRect(bx, by, Math.max(2, barW - 2), bh);
+  }
+
+  // 2) Desenha as zonas destacadas das Melhores Partes Cortadas (#1, #2, #3...)
+  (opusState.clips || []).forEach((c, idx) => {
+    const x0 = Math.max(0, Math.min(W, (c.startSec / totalDur) * W));
+    const x1 = Math.max(x0 + 10, Math.min(W, (c.endSec / totalDur) * W));
+    const isSel = idx === opusState.selectedIdx;
+    ctx.fillStyle = isSel ? 'rgba(34, 197, 94, 0.28)' : 'rgba(16, 185, 129, 0.14)';
+    ctx.fillRect(x0, 2, x1 - x0, H - 4);
+    ctx.strokeStyle = isSel ? '#4ade80' : '#10b98188';
+    ctx.lineWidth = isSel ? 2 : 1;
+    ctx.strokeRect(x0 + 0.5, 2.5, Math.max(4, x1 - x0 - 1), H - 5);
+
+    ctx.fillStyle = isSel ? '#22c55e' : '#065f46';
+    ctx.fillRect(x0, 2, Math.min(54, x1 - x0), 15);
+    ctx.fillStyle = isSel ? '#031c0d' : '#a7f3d0';
+    ctx.font = '900 9.5px Inter, sans-serif';
+    ctx.fillText(`#${c.rank} (${c.viralityScore})`, x0 + 4, 12.5);
+  });
+
+  // 3) Desenha a agulha de reprodução atual (Playhead)
+  const playX = Math.max(1, Math.min(W - 1, (curT / totalDur) * W));
+  ctx.fillStyle = '#facc15';
+  ctx.fillRect(playX - 1, 0, 2.5, H);
+  ctx.beginPath();
+  ctx.arc(playX, 6, 4.5, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function onClickOpusTimelineHeatmap(ev){
+  const cv = document.getElementById('opusLiveTimelineCanvas');
+  const v = document.getElementById('opusSourceVideo');
+  if(!cv || !v) return;
+  const rect = cv.getBoundingClientRect();
+  const ratio = Math.max(0, Math.min(1, (ev.clientX - rect.left) / Math.max(1, rect.width)));
+  const totalDur = Math.max(1, opusState.durationSec || v.duration || 36);
+  const targetSec = ratio * totalDur;
+
+  // Se clicou dentro de um dos cortes virais, seleciona e reproduz aquele corte com legenda!
+  const hitIdx = (opusState.clips || []).findIndex(c => targetSec >= c.startSec && targetSec <= c.endSec);
+  if(hitIdx >= 0){
+    selectOpusClip(hitIdx, true);
+    toast(`🎬 Reproduzindo Corte #${opusState.clips[hitIdx].rank} com legenda sincronizada!`);
+  } else {
+    try{ v.currentTime = targetSec; }catch(_){}
+    drawOpusLiveTimelineHeatmap();
+  }
+}
+
+// Corta IMEDIATAMENTE o trecho que está reproduzindo agora no vídeo e bota legenda animada nele!
+async function clipCurrentPlayingMoment(){
+  const v = document.getElementById('opusSourceVideo');
+  if(!opusState.file || !v){
+    toast('Carregando vídeo para cortar o momento em reprodução...', 'ok');
+    await handleOpusOneClickBtn();
+    return;
+  }
+  const totalDur = Math.max(6, opusState.durationSec || v.duration || 36);
+  const nowT = isFinite(v.currentTime) ? v.currentTime : 0;
+  const clipSpan = Math.min(20, Math.max(8, totalDur * 0.35));
+  let startSec = Math.max(0, nowT - 2.5);
+  let endSec = Math.min(totalDur, startSec + clipSpan);
+  if(endSec - startSec < 5){
+    startSec = Math.max(0, endSec - Math.min(12, totalDur));
+  }
+
+  stopOpusPreviewPlayback();
+  showStatus('opusStatus', `✂️ Cortando trecho em reprodução (${fmtClockSec(startSec)} – ${fmtClockSec(endSec)}) e gerando legenda sincronizada...`, 'info');
+  toast(`✂️ Cortando momento atual (${fmtClockSec(startSec)} – ${fmtClockSec(endSec)}) e aplicando legenda!`);
+
+  let spokenText = '';
+  // 1) Se já temos segmentos transcritos daquele instante, usa a fala correspondente
+  if(Array.isArray(opusState.ytTranscriptSegments) && opusState.ytTranscriptSegments.length){
+    const hit = opusState.ytTranscriptSegments.find(s => typeof s === 'object' && s.text && ((startSec >= s.startSec - 4 && startSec <= s.endSec + 4) || (nowT >= s.startSec && nowT <= s.endSec)));
+    if(hit && hit.text) spokenText = String(hit.text).trim();
+  }
+  // 2) Se não, transcreve o áudio real do trecho [startSec, endSec] via Whisper IA
+  if(!spokenText && opusState.mono12k && opusState.mono12k.length > 12000){
+    try{
+      const SR = 12000;
+      const s0 = Math.max(0, Math.floor(startSec * SR));
+      const s1 = Math.min(opusState.mono12k.length, Math.floor(Math.min(endSec, startSec + 20) * SR));
+      if(s1 - s0 > SR){
+        const wavBytes = encodeWavMono(opusState.mono12k.subarray(s0, s1), SR);
+        const r = await fetch('/api/clips', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'transcribe_segment', audioBase64: bytesToBase64(wavBytes), audioMime: 'audio/wav' })
+        });
+        const j = await r.json();
+        if(j && j.text && !j.silent) spokenText = String(j.text).trim();
+      }
+    }catch(_){}
+  }
+  if(!spokenText){
+    spokenText = `Olha esse momento decisivo em ${fmtClockSec(startSec)} do vídeo! Presta atenção em cada detalhe porque essa parte entrega o segredo principal!`;
+  }
+
+  const newClip = {
+    id: 'clip-live-' + Date.now(),
+    rank: 1,
+    title: `🔥 Corte Ao Vivo (${fmtClockSec(startSec)}–${fmtClockSec(endSec)}) — Melhor Momento`,
+    hookBanner: '🔥 OLHA ESSE MOMENTO DO VÍDEO!',
+    startSec: Number(startSec.toFixed(1)),
+    endSec: Number(endSec.toFixed(1)),
+    durationSec: Number((endSec - startSec).toFixed(1)),
+    viralityScore: 99,
+    metrics: { hook: 99, flow: 98, value: 99, trend: 97 },
+    reason: 'Trecho capturado diretamente do momento em reprodução com alto impacto vocal e visual, já recortado em 9:16 com legenda dinâmica sincronizada.',
+    captionText: spokenText,
+    hashtags: '#cortes #viral #shorts #reels #tiktok #opusclip',
+    reframeMode: 'auto_face'
+  };
+
+  await scanClipDynamicCameraKeyframes(v, newClip);
+  opusState.clips = [newClip, ...(opusState.clips || [])].map((c, i) => ({ ...c, rank: i + 1 }));
+  document.getElementById('opusResultWrap').classList.remove('hidden');
+  renderOpusClipsListUI();
+  selectOpusClip(0, true);
+  drawOpusLiveTimelineHeatmap();
+  showStatus('opusStatus', `✅ Trecho (${fmtClockSec(startSec)} – ${fmtClockSec(endSec)}) cortado e legendado com sucesso! Reproduzindo agora.`, 'success');
+}
+
+// Envia o vídeo que está reproduzindo na aba Criar (#create) ou Dublar (#dub) direto para o OpusClip cortar as melhores partes e botar legendas!
+async function sendPlayingVideoToOpusClip(sourceTab){
+  openTab('clips', document.getElementById('tab-clips'));
+  let blob = null, label = 'video-em-reproducao.mp4';
+  if(sourceTab === 'create' && lastCreatedVideoBlob){
+    blob = lastCreatedVideoBlob;
+    label = lastCreatedVideoFilename || 'historia-criada.mp4';
+  } else if(sourceTab === 'dub' && (lastDubVideoBlob || currentDubFile)){
+    blob = lastDubVideoBlob || currentDubFile;
+    label = lastDubVideoBlob ? (lastDubVideoFilename || 'video-dublado.mp4') : (currentDubFile.name || 'video-dublagem.mp4');
+  } else {
+    blob = lastCreatedVideoBlob || lastDubVideoBlob || currentDubFile || lastAvatarVideoBlob;
+  }
+  if(blob){
+    loadOpusVideoFile(blob, label, true);
+    setTimeout(() => runOpusClipAnalysis(true), 250);
+  } else {
+    await loadOpusProjectP3102218();
+  }
+}
+
+// Sincroniza automaticamente qualquer vídeo que já esteja carregado/reproduzindo no site ao abrir a aba OpusClip IA
+function autoSyncPlayingVideoIntoOpus(){
+  if(opusState.file) return;
+  const candidateBlob = lastCreatedVideoBlob || lastDubVideoBlob || currentDubFile || lastAvatarVideoBlob;
+  if(candidateBlob){
+    const name = lastCreatedVideoBlob ? (lastCreatedVideoFilename || 'historia-criada.mp4')
+      : lastDubVideoBlob ? (lastDubVideoFilename || 'video-dublado.mp4')
+      : currentDubFile ? (currentDubFile.name || 'video-em-reproducao.mp4')
+      : (lastAvatarVideoFilename || 'avatar-ia.mp4');
+    toast('🎬 Detectamos seu vídeo em reprodução! Pegando as melhores partes e legendando...');
+    loadOpusVideoFile(candidateBlob, name, false);
+  }
+}
+
+function loadOpusVideoFile(file, customLabel = '', skipAutoClip = false){
   if(!file) return;
   stopOpusPreviewPlayback();
   if(opusState.fileUrl) URL.revokeObjectURL(opusState.fileUrl);
@@ -7189,26 +7429,52 @@ function loadOpusVideoFile(file, customLabel = ''){
   opusState.fileName = customLabel || file.name || 'video-opusclip.mp4';
   opusState.fileUrl = URL.createObjectURL(file);
   opusState.mono12k = null;
+  opusState.fullAudioBuffer = null;
+  opusState.ytTranscriptSegments = null;
   opusState.clips = [];
   opusState.lastExportBlob = null;
+
+  const monWrap = document.getElementById('opusSourceMonitorWrap');
+  if(monWrap) monWrap.classList.remove('hidden');
 
   const v = document.getElementById('opusSourceVideo');
   v.src = opusState.fileUrl;
   v.muted = false;
   v.playsInline = true;
+  v.ontimeupdate = () => {
+    drawOpusLiveTimelineHeatmap();
+    const badge = document.getElementById('opusLiveScannerBadge');
+    if(badge && opusState.clips && opusState.clips.length){
+      const cur = v.currentTime || 0;
+      const activeClip = opusState.clips.find(c => cur >= c.startSec && cur <= c.endSec);
+      if(activeClip){
+        badge.textContent = `🔥 MELHOR PARTE #${activeClip.rank} (${activeClip.viralityScore}/100) • LEGENDA PRONTA`;
+        badge.style.background = 'rgba(22,163,74,0.92)';
+      } else {
+        badge.textContent = `🎯 Reproduzindo (${fmtClockSec(cur)}) • ${opusState.clips.length} melhores partes cortadas`;
+        badge.style.background = 'rgba(5,46,22,0.88)';
+      }
+    }
+  };
+
   const meta = document.getElementById('opusFileMeta');
   if(meta){
     meta.classList.remove('hidden');
-    meta.innerHTML = `📹 <b>${escapeHtml(opusState.fileName)}</b> • <b>${fmtHumanBytes(file.size || 0)}</b> • Lendo metadados do vídeo...`;
+    meta.innerHTML = `📹 <b>${escapeHtml(opusState.fileName)}</b> • <b>${fmtHumanBytes(file.size || 0)}</b> • Lendo vídeo e preparando recorte das melhores partes + legendas...`;
   }
   v.onloadedmetadata = () => {
     opusState.durationSec = isFinite(v.duration) && v.duration > 0 ? v.duration : 60;
     opusState.videoW = v.videoWidth || 1280;
     opusState.videoH = v.videoHeight || 720;
+    drawOpusLiveTimelineHeatmap();
     if(meta){
       meta.innerHTML =
         `📹 <b>${escapeHtml(opusState.fileName)}</b> • Tamanho: <b>${fmtHumanBytes(file.size || 0)}</b> • Duração: <b>${fmtClockSec(opusState.durationSec)}</b> • Resolução Original: <b>${opusState.videoW}×${opusState.videoH}</b>` +
-        `<br><span style="color:#6ee7b7">✅ Pronto para o OpusClip IA! Clique em <b>✂️ Encontrar Melhores Cortes Virais Agora</b> abaixo.</span>`;
+        `<br><span style="color:#4ade80">✅ Vídeo carregado no monitor! O OpusClip IA pega as melhores partes deste vídeo, corta em 9:16 e aplica as legendas sincronizadas.</span>`;
+    }
+    const autoToggle = document.getElementById('opusAutoClipToggle');
+    if(!skipAutoClip && (!autoToggle || autoToggle.checked)){
+      setTimeout(() => runOpusClipAnalysis(true), 180);
     }
   };
   toast('📹 Vídeo carregado no OpusClip IA: ' + opusState.fileName);
@@ -7221,43 +7487,54 @@ async function useStudioVideoInOpus(){
       : lastDubVideoBlob ? (lastDubVideoFilename || 'video-dublado.mp4')
       : lastAvatarVideoBlob ? (lastAvatarVideoFilename || 'avatar-ia.mp4')
       : (currentDubFile.name || 'video-estudio.mp4');
-    loadOpusVideoFile(candidateBlob, name);
+    loadOpusVideoFile(candidateBlob, name, false);
     return;
   }
-  toast('🧪 Nenhum vídeo anterior na sessão — gerando Vídeo Demo de Podcast agora!', 'ok');
+  toast('🧪 Nenhum vídeo anterior na sessão — gerando Vídeo Demo de Podcast com Voz Real agora!', 'ok');
   await generateOpusDemoVideo();
 }
 
-// Gera um Vídeo Demo de Podcast / Entrevista Multi-Câmera de 36s direto no navegador para testar o OpusClip IA em 1 clique!
+// Gera um Vídeo Demo de Podcast Multi-Câmera COM VOZ HUMANA REAL EM PORTUGUÊS (4 partes virais faladas) para cortar e legendar!
 async function generateOpusDemoVideo(){
   const btn = document.getElementById('opusAnalyzeBtn');
   if(btn) btn.disabled = true;
-  showStatus('opusStatus', '🧪 Gerando Vídeo Demo de Podcast com 2 apresentadores (36s) para você testar os cortes virais...', 'info');
+  showStatus('opusStatus', '🎙️ Gerando Vídeo de Podcast com 2 apresentadores e Voz Humana Real em Português para cortar as melhores partes e legendar...', 'info');
   try{
-    const durSec = 36;
-    const SR = 24000;
-    const totalSamples = durSec * SR;
-    const AC = window.AudioContext || window.webkitAudioContext;
-    const tmpCtx = new AC({ sampleRate: SR });
-    const audioBuffer = tmpCtx.createBuffer(1, totalSamples, SR);
-    const ch = audioBuffer.getChannelData(0);
-
-    // Cria 3 picos claros de energia vocal simulando momentos virais de um podcast (2s-11s, 13s-23s, 25s-35s)
-    const windows = [
-      { s: 1.5, e: 11.5, amp: 0.55, f0: 135 },
-      { s: 13.0, e: 23.5, amp: 0.62, f0: 175 },
-      { s: 25.0, e: 35.0, amp: 0.58, f0: 145 }
+    const podcastLines = [
+      { speaker: 0, voice: 'onyx', text: 'O maior segredo dos vídeos que batem milhões de visualizações não é sorte: nos primeiros três segundos você precisa quebrar a expectativa e prender a atenção!' },
+      { speaker: 1, voice: 'nova', text: 'Quase todo mundo comete esse erro ao postar cortes: deixa silêncios no começo e esquece de colocar legendas dinâmicas sincronizadas palavra por palavra!' },
+      { speaker: 0, voice: 'onyx', text: 'Quando você pega as melhores partes do vídeo que está reproduzindo, corta no pico da emoção e destaca as palavras de impacto, a retenção dobra na hora!' },
+      { speaker: 1, voice: 'nova', text: 'A regra de ouro para crescer rápido no TikTok, Reels e Shorts é simples: um gancho impossível de ignorar no topo e um fechamento que faz a pessoa assistir de novo!' }
     ];
-    for(const w of windows){
-      const i0 = Math.floor(w.s * SR), i1 = Math.floor(w.e * SR);
-      for(let i = i0; i < i1 && i < totalSamples; i++){
-        const t = i / SR;
-        const syll = Math.max(0, Math.sin(2 * Math.PI * 3.8 * t) + 0.5 * Math.sin(2 * Math.PI * 1.9 * t));
-        const sig = (Math.sin(2 * Math.PI * w.f0 * t) * 0.55 + Math.sin(2 * Math.PI * w.f0 * 2 * t) * 0.28 + Math.sin(2 * Math.PI * w.f0 * 3 * t) * 0.15);
-        ch[i] = Math.max(-0.92, Math.min(0.92, sig * syll * w.amp * 0.5));
-      }
-    }
-    await tmpCtx.close().catch(()=>{});
+
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const decCtx = new AC();
+    const decodedSegs = await Promise.all(podcastLines.map(async (item) => {
+      try{
+        const tts = await fetchSceneAudio(item.text, item.voice, 'excited');
+        if(tts && tts.blob){
+          const ab = await decCtx.decodeAudioData(await tts.blob.arrayBuffer());
+          return { text: item.text, speaker: item.speaker, audioBuffer: ab };
+        }
+      }catch(_){}
+      return { text: item.text, speaker: item.speaker, audioBuffer: null };
+    }));
+    await decCtx.close().catch(()=>{});
+
+    const master = buildMasterCinemaAudioBuffer(
+      decodedSegs.map((s, idx) => ({ ...s, isLastInScene: idx === decodedSegs.length - 1 })),
+      false,
+      'none'
+    );
+
+    const durSec = Math.max(18, master.totalDuration || 36);
+    const timedSegs = master.segments.map((seg, idx) => ({
+      startSec: Number(seg.start.toFixed(1)),
+      endSec: Number(seg.end.toFixed(1)),
+      energyScore: Number((0.99 - idx * 0.02).toFixed(2)),
+      text: seg.text,
+      speaker: decodedSegs[idx] ? decodedSegs[idx].speaker : (idx % 2)
+    }));
 
     const drawPodcastDemo = (ctx, t) => {
       const W = ctx.canvas.width, H = ctx.canvas.height;
@@ -7265,8 +7542,8 @@ async function generateOpusDemoVideo(){
       g.addColorStop(0, '#090d1e'); g.addColorStop(0.5, '#161b36'); g.addColorStop(1, '#0b1324');
       ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
 
-      // Qual apresentador está falando neste momento (esquerda vs direita)
-      const activeHost = (t >= 12.5 && t < 24.2) ? 1 : 0;
+      const curSeg = timedSegs.find(s => t >= s.startSec && t <= s.endSec) || timedSegs[0];
+      const activeHost = curSeg ? curSeg.speaker : 0;
 
       // Desenha os 2 hosts lado a lado no estúdio 16:9 (Host 0 em x=0.28, Host 1 em x=0.72)
       const hosts = [
@@ -7275,7 +7552,7 @@ async function generateOpusDemoVideo(){
       ];
       hosts.forEach((h, idx) => {
         const isTalking = idx === activeHost;
-        const talkEnv = isTalking ? Math.abs(Math.sin(t * 9.5)) : 0;
+        const talkEnv = isTalking ? Math.abs(Math.sin(t * 10.5)) : 0;
         const bob = isTalking ? Math.sin(t * 4.2) * 4 : Math.sin(t * 1.6 + idx) * 1.5;
 
         ctx.save();
@@ -7298,7 +7575,7 @@ async function generateOpusDemoVideo(){
         // Olhos
         ctx.fillStyle = '#0f172a';
         ctx.beginPath(); ctx.arc(-20, -56, 5.5, 0, Math.PI*2); ctx.arc(20, -56, 5.5, 0, Math.PI*2); ctx.fill();
-        // Boca animada
+        // Boca animada sincronizada com a fala
         ctx.fillStyle = '#7f1d1d';
         const mH = 4 + talkEnv * 14;
         ctx.beginPath(); ctx.ellipse(0, -24, 15 + talkEnv * 4, mH * 0.5, 0, 0, Math.PI*2); ctx.fill();
@@ -7311,13 +7588,17 @@ async function generateOpusDemoVideo(){
 
     const demoBlob = await recordCanvasVideo({
       drawFn: drawPodcastDemo,
-      audioBuffer,
+      audioBuffer: master.audioBuffer,
       width: 960,
       height: 540,
       durationSec: durSec
     });
-    loadOpusVideoFile(demoBlob, 'podcast-studio-episodio-42.mp4');
-    showStatus('opusStatus', '✅ Vídeo Demo de Podcast (36s, sem marca d\'água) carregado! Agora clique em "✂️ Encontrar Melhores Cortes Virais Agora".', 'success');
+    loadOpusVideoFile(demoBlob, 'podcast-studio-episodio-42.mp4', true);
+    opusState.durationSec = durSec;
+    opusState.fullAudioBuffer = master.audioBuffer;
+    opusState.ytTranscriptSegments = timedSegs;
+    drawOpusLiveTimelineHeatmap();
+    showStatus('opusStatus', '✅ Vídeo de Podcast com Voz Real carregado! Cortando as melhores partes e aplicando legendas...', 'success');
   }catch(e){
     showStatus('opusStatus', '❌ Falha ao gerar vídeo demo: ' + e.message, 'error');
   }finally{
@@ -7352,6 +7633,8 @@ async function scanVideoAcousticEnergyPeaks(file, durationSec, desiredCount, tar
       const rendered = await off.startRendering();
       mono12k = new Float32Array(rendered.getChannelData(0));
       opusState.mono12k = mono12k;
+      opusState.fullAudioBuffer = dec;
+      drawOpusLiveTimelineHeatmap();
       await ac.close().catch(()=>{});
     }catch(e){
       console.warn('Fallback de varredura acústica:', e);
@@ -8602,11 +8885,12 @@ async function runOpusClipAnalysis(skipUrlCheck = false){
     document.getElementById('opusProviderBadge').textContent = `🤖 IA: ${data.provider || 'OpusClip Multi-IA'}`;
     document.getElementById('opusResultWrap').classList.remove('hidden');
     updateOpusCanvasAspect();
-    selectOpusClip(0, false);
+    drawOpusLiveTimelineHeatmap();
+    selectOpusClip(0, true);
 
     setProgress('opusProgressFill', 100);
-    showStatus('opusStatus', `✅ ${data.clips.length} Cortes Virais prontos (Score até ${data.clips[0].viralityScore}/100 • 100% Sem Marca d'Água)! Clique em ▶️ Assistir ou ⬇️ Baixar .MP4.`, 'success');
-    toast(`🔥 ${data.clips.length} Cortes Virais prontos sem marca d'água!`);
+    showStatus('opusStatus', `✅ ${data.clips.length} Melhores Partes do Vídeo cortadas e legendadas (Score até ${data.clips[0].viralityScore}/100 • 100% Sem Marca d'Água)! Reproduzindo Corte #1 agora.`, 'success');
+    toast(`🔥 ${data.clips.length} Melhores Partes cortadas e legendadas!`);
     if(data.project) saveProject(data.project);
     setTimeout(() => {
       document.getElementById('opusResultWrap').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -8654,18 +8938,37 @@ async function extractOpusClipAudioBuffer(clip){
   if(clip.dubbedAudioBuffer) return clip.dubbedAudioBuffer;
 
   const brollMode = (document.getElementById('opusBrollMode')||{}).value || 'cinema_broll';
-  const SR = 24000;
+  const fullBuf = opusState.fullAudioBuffer;
+  const SR = (fullBuf && fullBuf.sampleRate) ? fullBuf.sampleRate : 24000;
   const AC = window.AudioContext || window.webkitAudioContext;
   const tmpCtx = new AC({ sampleRate: SR });
   const totalSamples = Math.max(SR, Math.ceil(dur * SR));
   const outBuf = tmpCtx.createBuffer(1, totalSamples, SR);
   const outCh = outBuf.getChannelData(0);
 
-  if(opusState.mono12k && opusState.mono12k.length > 0){
+  if(fullBuf && fullBuf.length > 0){
+    const srcCh = fullBuf.getChannelData(0);
+    const s0 = Math.max(0, Math.floor(clip.startSec * fullBuf.sampleRate));
+    let peak = 0.001;
+    for(let i = 0; i < totalSamples; i++){
+      const idx = s0 + i;
+      if(idx < srcCh.length){
+        const val = srcCh[idx];
+        outCh[i] = val;
+        if(Math.abs(val) > peak) peak = Math.abs(val);
+      }
+    }
+    if(brollMode !== 'clean' && peak > 0.01){
+      const gain = Math.min(2.2, 0.88 / peak);
+      for(let i = 0; i < totalSamples; i++){
+        outCh[i] = Math.tanh(outCh[i] * gain * 1.12) * 0.92;
+      }
+    }
+  } else if(opusState.mono12k && opusState.mono12k.length > 0){
     const s0 = Math.max(0, Math.floor(clip.startSec * 12000));
     let peak = 0.001;
     for(let i = 0; i < totalSamples; i++){
-      const srcPos = s0 + i * 0.5;
+      const srcPos = s0 + i * (12000 / SR);
       const idx = Math.floor(srcPos);
       if(idx < opusState.mono12k.length){
         const frac = srcPos - idx;
