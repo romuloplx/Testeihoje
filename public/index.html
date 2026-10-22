@@ -10417,11 +10417,25 @@ async function exportSelectedOpusClipMp4(opts = {}){
         }
       });
     } else {
-      // CAMINHO B: YouTube bloqueou extração bruta direta -> Renderiza Corte Vertical 9:16 .MP4 por Hardware (WebCodecs H.264 + AAC) com Voz Sincronizada + Legendas Ajustadas!
-      showStatus('opusStatus', `🎙️ Preparando voz sincronizada e renderizando vídeo .MP4 9:16 em alta velocidade para o Corte #${clip.rank}...`, 'info');
+      // CAMINHO B: YouTube bloqueou download direto — oferece captura real do vídeo em movimento (não foto) OU fallback estúdio apenas se usuário confirmar
+      showStatus('opusStatus', `⚠️ YouTube protegeu este vídeo contra download direto. Abrindo captura do VÍDEO REAL em movimento (não foto) — escolha "Esta aba" + "Compartilhar áudio da aba"...`, 'warn');
       setProgress('opusProgressFill', 32);
-
+      const preferCapture = true;
       let studioAudioBuf = clip.dubbedAudioBuffer || null;
+      if(preferCapture){
+        // Tenta captura real primeiro — vídeo normal com áudio original
+        toast('🎥 Para baixar VÍDEO NORMAL (real em movimento): selecione Esta Aba + marque Compartilhar áudio!', 'info');
+        await captureLiveYoutubeVideoForOpus(opusState.ytVideoId, clip.title || `corte-${clip.rank}`);
+        if(opusState.file && opusState.fileUrl){
+          // Usuário capturou vídeo real — re-tenta export com arquivo capturado
+          showStatus('opusStatus', `✅ Vídeo real capturado! Reprocessando corte #${clip.rank} em MP4 normal...`, 'success');
+          opusState.ytEmbedMode = false;
+          // Recursão 1x com novo arquivo
+          return await exportSelectedOpusClipMp4(opts);
+        }
+        // Se captura cancelada, cai no fallback estúdio mas avisa que será foto+TTS
+        showStatus('opusStatus', `🎙️ Gerando fallback estúdio (foto + voz IA) — para vídeo normal, use captura de aba!`, 'warn');
+      }
       if(!studioAudioBuf){
         const voice = (document.getElementById('dubVoice')||{}).value || 'onyx';
         const speechText = String(clip.captionText || clip.title || 'Corte viral do podcast.').slice(0, 1200);

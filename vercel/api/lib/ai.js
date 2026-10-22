@@ -3755,26 +3755,67 @@ async function fetchYoutubeClipMp4Segment({ videoId = '', url = '', startSec = 0
 
   const candidateUrls = [];
 
-  // 1) Tenta API de recorte por trecho (loader.to / oceansaver com start & end) + extratores em paralelo
+  // 1) Tenta API de recorte por trecho (loader.to / oceansaver com start & end) + extratores em paralelo — prioridade para clip real em movimento
   const tasks = [
     async () => {
-      const initUrl = `https://ab.cococococ.com/ajax/download.php?copyright=0&format=360&url=${encodeURIComponent(watchUrl)}&start=${sFloor}&end=${eCeil}&api=dfcb6d76f2f6a9894gjkege8a4ab232222`;
-      const r = await fetch(initUrl, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(4500) });
-      if (!r.ok) return null;
-      const j = await r.json();
-      const jobId = j?.id;
-      if (!jobId) return null;
-      for (let poll = 0; poll < 3; poll++) {
-        await new Promise(res => setTimeout(res, 1100));
-        const pr = await fetch(`https://ab.cococococ.com/ajax/progress.php?id=${encodeURIComponent(jobId)}`, {
-          headers: { 'User-Agent': 'Mozilla/5.0' },
-          signal: AbortSignal.timeout(3500)
-        });
-        if (pr.ok) {
-          const pj = await pr.json();
-          if (pj?.download_url && /^https?:\/\//i.test(pj.download_url)) return pj.download_url;
+      try {
+        const initUrl = `https://ab.cococococ.com/ajax/download.php?copyright=0&format=360&url=${encodeURIComponent(watchUrl)}&start=${sFloor}&end=${eCeil}&api=dfcb6d76f2f6a9894gjkege8a4ab232222`;
+        const r = await fetch(initUrl, { headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://loader.to/' }, signal: AbortSignal.timeout(6000) });
+        if (!r.ok) return null;
+        const j = await r.json();
+        const jobId = j?.id || j?.jobId;
+        if (!jobId) return j?.download_url || j?.url || null;
+        for (let poll = 0; poll < 7; poll++) {
+          await new Promise(res => setTimeout(res, 1100 + poll * 400));
+          try {
+            const pr = await fetch(`https://ab.cococococ.com/ajax/progress.php?id=${encodeURIComponent(jobId)}`, {
+              headers: { 'User-Agent': 'Mozilla/5.0' },
+              signal: AbortSignal.timeout(4000)
+            });
+            if (pr.ok) {
+              const pj = await pr.json();
+              if (pj?.download_url && /^https?:\/\//i.test(pj.download_url)) return pj.download_url;
+              if (pj?.url && /^https?:\/\//i.test(pj.url)) return pj.url;
+              if (pj?.status === 'error' || pj?.error) break;
+            }
+          } catch (_) {}
         }
-      }
+      } catch (_) {}
+      return null;
+    },
+    async () => {
+      try {
+        // Cobalt API — suporta YouTube com clipping
+        const r = await fetch('https://api.cobalt.tools/api/json', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({ url: watchUrl, vCodec: 'h264', vQuality: '720', aFormat: 'mp3' }),
+          signal: AbortSignal.timeout(6000)
+        });
+        if (r.ok) {
+          const j = await r.json();
+          if (j?.url) return j.url;
+          if (j?.pickerType === 'various' && Array.isArray(j.picker)) {
+            const mp4 = j.picker.find(p => /mp4/i.test(p.type || ''));
+            if (mp4?.url) return mp4.url;
+          }
+        }
+      } catch (_) {}
+      return null;
+    },
+    async () => {
+      try {
+        const r = await fetch(`https://co.wuk.sh/api/json`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: watchUrl, vCodec: 'h264', vQuality: '720' }),
+          signal: AbortSignal.timeout(6000)
+        });
+        if (r.ok) {
+          const j = await r.json();
+          if (j?.url) return j.url;
+        }
+      } catch (_) {}
       return null;
     },
     async () => {
