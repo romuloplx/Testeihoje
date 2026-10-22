@@ -3281,13 +3281,58 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
     if (words.length < 18) return [];
     const out = [];
     const count = Math.max(3, Math.min(8, Number(targetCount) || 4));
-    const step = Math.max(24, Math.floor(words.length / count));
+    const step = Math.max(35, Math.floor(words.length / count));
     for (let i = 0; i < count; i++) {
-      const startWord = Math.min( Math.max(0, words.length - 28), i * step );
-      const slice = words.slice(startWord, startWord + 28).join(' ').trim();
+      const startWord = Math.min(Math.max(0, words.length - 55), i * step);
+      const slice = words.slice(startWord, startWord + 55).join(' ').trim();
       if (slice.length > 15) out.push(slice);
     }
     return out;
+  };
+
+  // Extrai timestamps em nível de palavra (tOffsetMs) do JSON3 do YouTube para sincronia exata com a fala!
+  const parseYoutubeJson3Events = (events) => {
+    const rawLines = [];
+    const wordList = [];
+    for (const ev of (events || [])) {
+      if (!Array.isArray(ev.segs)) continue;
+      const baseMs = Number(ev.tStartMs) || 0;
+      const durMs = Number(ev.dDurationMs) || 2800;
+      const fullLine = ev.segs.map(x => x.utf8 || '').join('').replace(/\s+/g, ' ').trim();
+      if (fullLine) rawLines.push(fullLine);
+
+      const hasWordOffsets = ev.segs.some(sg => sg && Number(sg.tOffsetMs) > 0);
+      if (hasWordOffsets) {
+        for (let k = 0; k < ev.segs.length; k++) {
+          const sg = ev.segs[k];
+          const w = String(sg?.utf8 || '').replace(/\s+/g, ' ').trim();
+          if (!w) continue;
+          const wStartMs = baseMs + (Number(sg.tOffsetMs) || 0);
+          const nextSg = ev.segs[k + 1];
+          const wEndMs = nextSg && Number(nextSg.tOffsetMs) > Number(sg.tOffsetMs || 0)
+            ? baseMs + Number(nextSg.tOffsetMs)
+            : wStartMs + Math.max(220, Math.min(850, durMs / Math.max(1, ev.segs.length)));
+          wordList.push({ startSec: wStartMs / 1000, endSec: wEndMs / 1000, word: w });
+        }
+      } else if (fullLine) {
+        timestampedSegments.push({
+          inicio: Number((baseMs / 1000).toFixed(2)),
+          fim: Number(((baseMs + durMs) / 1000).toFixed(2)),
+          texto: fullLine
+        });
+      }
+    }
+    if (wordList.length >= 6) {
+      // Agrupa de 6 em 6 palavras com início e fim travados no tOffsetMs real da fala!
+      for (let i = 0; i < wordList.length; i += 6) {
+        const chunk = wordList.slice(i, i + 6);
+        const startSec = Number(chunk[0].startSec.toFixed(2));
+        const endSec = Number(Math.max(startSec + 0.35, chunk[chunk.length - 1].endSec).toFixed(2));
+        const texto = chunk.map(x => x.word).join(' ').replace(/\s+/g, ' ').trim();
+        if (texto) timestampedSegments.push({ inicio: startSec, fim: endSec, texto });
+      }
+    }
+    return rawLines;
   };
 
   const tryDownloadFromCandidate = async (candUrl, ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36') => {
@@ -3405,18 +3450,7 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
                   if (cr.ok) {
                     const cj = await cr.json();
                     if (cj && Array.isArray(cj.events)) {
-                      const rawLines = [];
-                      for (const ev of cj.events) {
-                        if (Array.isArray(ev.segs)) {
-                          const s = ev.segs.map(x => x.utf8 || '').join('').replace(/\s+/g, ' ').trim();
-                          if (s) {
-                            rawLines.push(s);
-                            const startSec = Number(((ev.tStartMs || 0) / 1000).toFixed(2));
-                            const endSec = Number((((ev.tStartMs || 0) + (ev.dDurationMs || 3000)) / 1000).toFixed(2));
-                            timestampedSegments.push({ inicio: startSec, fim: endSec, texto: s });
-                          }
-                        }
-                      }
+                      const rawLines = parseYoutubeJson3Events(cj.events);
                       const built = buildSegmentsFromLines(rawLines, desiredClipsCount);
                       if (built.length >= 2) {
                         transcriptSegments = built;
@@ -3447,9 +3481,20 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
       })()
     ]);
 
-    // 2.2) Motor 1: YouTube Innertube 2025/2026 (ANDROID_VR, IOS 20.03, ANDROID_TESTSUITE, TVHTML5) — sem WEB visitorData para não bloquear mobile!
+    // 2.2) Motor 1: YouTube Innertube 2025/2026 (WEB_EMBEDDED_PLAYER, ANDROID_VR, IOS 20.03, ANDROID_TESTSUITE)
     if (!directVideoBase64 || !timestampedSegments.length) {
       const innertubeClients = [
+        {
+          client: {
+            clientName: 'WEB_EMBEDDED_PLAYER',
+            clientVersion: '1.20250115.01.00',
+            hl: 'pt',
+            gl: 'BR'
+          },
+          thirdParty: { embedUrl: 'https://www.google.com/' },
+          ua: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+          clientIdHeader: '56'
+        },
         {
           client: {
             clientName: 'ANDROID_VR',
@@ -3462,7 +3507,8 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
             hl: 'pt',
             gl: 'BR'
           },
-          ua: 'com.google.android.apps.youtube.vr.oculus/1.60.19 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip'
+          ua: 'com.google.android.apps.youtube.vr.oculus/1.60.19 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip',
+          clientIdHeader: '28'
         },
         {
           client: {
@@ -3475,7 +3521,8 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
             hl: 'pt',
             gl: 'BR'
           },
-          ua: 'com.google.ios.youtube/20.03.02 (iPhone16,2; U; CPU iOS 18_2_1 like Mac OS X;)'
+          ua: 'com.google.ios.youtube/20.03.02 (iPhone16,2; U; CPU iOS 18_2_1 like Mac OS X;)',
+          clientIdHeader: '5'
         },
         {
           client: {
@@ -3487,7 +3534,8 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
             hl: 'pt',
             gl: 'BR'
           },
-          ua: 'com.google.android.youtube/1.9 (Linux; U; Android 12; US) gzip'
+          ua: 'com.google.android.youtube/1.9 (Linux; U; Android 12; US) gzip',
+          clientIdHeader: '30'
         }
       ];
 
@@ -3499,11 +3547,14 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
             headers: {
               'Content-Type': 'application/json',
               'User-Agent': cfg.ua,
-              'X-YouTube-Client-Name': cfg.client.clientName === 'IOS' ? '5' : cfg.client.clientName === 'ANDROID_VR' ? '28' : '3'
+              'X-YouTube-Client-Name': cfg.clientIdHeader || '28'
             },
             body: JSON.stringify({
               videoId,
-              context: { client: cfg.client },
+              context: {
+                client: cfg.client,
+                ...(cfg.thirdParty ? { thirdParty: cfg.thirdParty } : {})
+              },
               contentCheckOk: true,
               racyCheckOk: true
             }),
@@ -3517,7 +3568,7 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
           if (vd.lengthSeconds && Number(vd.lengthSeconds) > 4) durationSec = Number(vd.lengthSeconds);
           if (vd.shortDescription && !description) description = String(vd.shortDescription).slice(0, 1800);
 
-          // Se a página HTML não trouxe legendas, extrai do player Innertube!
+          // Se a página HTML não trouxe legendas, extrai do player Innertube com precisão de palavra!
           if (!timestampedSegments.length) {
             const iTracks = ij?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
             if (Array.isArray(iTracks) && iTracks.length) {
@@ -3531,18 +3582,7 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
                   if (cr.ok) {
                     const cj = await cr.json();
                     if (cj && Array.isArray(cj.events)) {
-                      const rawLines = [];
-                      for (const ev of cj.events) {
-                        if (Array.isArray(ev.segs)) {
-                          const s = ev.segs.map(x => x.utf8 || '').join('').replace(/\s+/g, ' ').trim();
-                          if (s) {
-                            rawLines.push(s);
-                            const startSec = Number(((ev.tStartMs || 0) / 1000).toFixed(2));
-                            const endSec = Number((((ev.tStartMs || 0) + (ev.dDurationMs || 3000)) / 1000).toFixed(2));
-                            timestampedSegments.push({ inicio: startSec, fim: endSec, texto: s });
-                          }
-                        }
-                      }
+                      const rawLines = parseYoutubeJson3Events(cj.events);
                       const built = buildSegmentsFromLines(rawLines, desiredClipsCount);
                       if (built.length >= 2) {
                         transcriptSegments = built;
@@ -3705,11 +3745,91 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
   };
 }
 
+// Extrai o stream MP4 de um corte específico [startSec, endSec] quando o usuário clica em Baixar Corte (.MP4)
+async function fetchYoutubeClipMp4Segment({ videoId = '', url = '', startSec = 0, endSec = 120 } = {}) {
+  const vid = videoId || extractYoutubeVideoId(url);
+  if (!vid) return { ok: false, error: 'videoId inválido' };
+  const watchUrl = `https://www.youtube.com/watch?v=${vid}`;
+  const sFloor = Math.max(0, Math.floor(Number(startSec) || 0));
+  const eCeil = Math.max(sFloor + 5, Math.ceil(Number(endSec) || (sFloor + 120)));
+
+  const candidateUrls = [];
+
+  // 1) Tenta API de recorte por trecho (loader.to / oceansaver com start & end) + extratores em paralelo
+  const tasks = [
+    async () => {
+      const initUrl = `https://ab.cococococ.com/ajax/download.php?copyright=0&format=360&url=${encodeURIComponent(watchUrl)}&start=${sFloor}&end=${eCeil}&api=dfcb6d76f2f6a9894gjkege8a4ab232222`;
+      const r = await fetch(initUrl, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(4500) });
+      if (!r.ok) return null;
+      const j = await r.json();
+      const jobId = j?.id;
+      if (!jobId) return null;
+      for (let poll = 0; poll < 3; poll++) {
+        await new Promise(res => setTimeout(res, 1100));
+        const pr = await fetch(`https://ab.cococococ.com/ajax/progress.php?id=${encodeURIComponent(jobId)}`, {
+          headers: { 'User-Agent': 'Mozilla/5.0' },
+          signal: AbortSignal.timeout(3500)
+        });
+        if (pr.ok) {
+          const pj = await pr.json();
+          if (pj?.download_url && /^https?:\/\//i.test(pj.download_url)) return pj.download_url;
+        }
+      }
+      return null;
+    },
+    async () => {
+      const r = await fetch(`https://api.ryzendesu.vip/api/downloader/ytmp4?url=${encodeURIComponent(watchUrl)}&quality=360`, { signal: AbortSignal.timeout(4500) });
+      if (!r.ok) return null;
+      const j = await r.json();
+      return j?.url || j?.data?.url || j?.result?.url || null;
+    },
+    async () => {
+      const r = await fetch(`https://api.siputzx.my.id/api/d/ytmp4?url=${encodeURIComponent(watchUrl)}`, { signal: AbortSignal.timeout(4500) });
+      if (!r.ok) return null;
+      const j = await r.json();
+      return j?.data?.dl || j?.data?.url || j?.url || null;
+    },
+    async () => {
+      const r = await fetch(`https://pipedapi.kavin.rocks/streams/${vid}`, { signal: AbortSignal.timeout(4200) });
+      if (!r.ok) return null;
+      const j = await r.json();
+      const vs = (j.videoStreams || []).find(s => !s.videoOnly && /mp4/i.test(s.format || s.mimeType || '') && s.url);
+      return vs ? vs.url : null;
+    }
+  ];
+
+  const found = await Promise.all(tasks.map(fn => fn().catch(() => null)));
+  for (const u of found) {
+    if (u && typeof u === 'string' && /^https?:\/\//i.test(u) && !candidateUrls.includes(u)) {
+      candidateUrls.push(u);
+    }
+  }
+  candidateUrls.push(`https://inv.nadeko.net/latest_version?id=${vid}&itag=18&local=true`);
+  candidateUrls.push(`https://invidious.nerdvpn.de/latest_version?id=${vid}&itag=18&local=true`);
+
+  for (const cand of candidateUrls) {
+    const dl = await downloadVideoStreamChunk(cand, { startByte: 0, endByte: 3670015, timeoutMs: 6500 });
+    if (dl && dl.buffer && dl.bytesRead > 25000) {
+      return {
+        ok: true,
+        videoBase64: dl.buffer.toString('base64'),
+        mime: dl.mime || 'video/mp4',
+        streamUrl: cand,
+        hasMore: !!dl.hasMore,
+        totalSize: dl.totalSize || null,
+        candidateUrls
+      };
+    }
+  }
+
+  return { ok: false, candidateUrls };
+}
+
 module.exports = {
   TTS_VOICES, mockScript, mockCreateFull, mockDubResult,
   generateWithOpenAI, generateCreateFull, generateSceneImage, dubWithOpenAI, enhanceScript,
   generateAvatarPortrait, generateAvatarScript, generateAvatarVideo, detectAvatarFaceLandmarks,
-  transcribeClipSegment, analyzeViralClips, extractYoutubeVideoId, fetchYoutubeVideoInfoAndStream, fetchVideoStreamChunk,
+  transcribeClipSegment, analyzeViralClips, extractYoutubeVideoId, fetchYoutubeVideoInfoAndStream, fetchVideoStreamChunk, fetchYoutubeClipMp4Segment,
   chatWithFallback, ttsWithFallback, chatViaPollinations, ttsGoogle, ttsStreamElements,
   probeOpenAI, fullPipelineProbe, candidatesProbe, unorouterProbe, unorouterVideoProbe, getBody, send
 };

@@ -1342,32 +1342,78 @@ input[type="range"]{
             </div>
           </div>
 
-          <!-- CONTROLES DE EDIÇÃO DE TEXTO, TEMPO E EXPORTAÇÃO -->
+          <!-- CONTROLES DE EDIÇÃO DE TEXTO, TEMPO, SINCRONIA DA FALA E EXPORTAÇÃO -->
           <div>
             <div style="padding:12px;border-radius:12px;background:#0b0f1d;border:1px solid #1e293b">
-              <div style="font-size:12px;font-weight:800;color:#86efac;margin-bottom:8px">✂️ Trim & Text-Based Editing (Tempo Real)</div>
+              <div style="font-size:12px;font-weight:800;color:#86efac;margin-bottom:8px">✂️ Trim, Sincronia com a Fala &amp; Ajuste Fino da Legenda</div>
               <div class="row" style="margin-top:0">
                 <div style="min-width:110px">
-                  <label style="margin-top:0;font-size:11px">⏱️ Início (seg)</label>
+                  <label style="margin-top:0;font-size:11px">⏱️ Início do Corte (seg)</label>
                   <input type="number" step="0.5" id="opusEditStart" onchange="onEditSelectedOpusClip()" style="padding:8px 10px;font-size:12.5px;margin-top:4px">
                 </div>
                 <div style="min-width:110px">
-                  <label style="margin-top:0;font-size:11px">⏱️ Fim (seg)</label>
+                  <label style="margin-top:0;font-size:11px">⏱️ Fim do Corte (seg)</label>
                   <input type="number" step="0.5" id="opusEditEnd" onchange="onEditSelectedOpusClip()" style="padding:8px 10px;font-size:12.5px;margin-top:4px">
                 </div>
               </div>
+
+              <!-- PAINEL DE SINCRONIA COM A FALA E AJUSTE DE POSIÇÃO/TAMANHO DA LEGENDA -->
+              <div style="margin-top:10px;padding:10px;border-radius:10px;background:#070a14;border:1px solid #22c55e55">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+                  <span style="font-size:11.5px;font-weight:900;color:#4ade80">🎙️ Sincronizar Legenda com a Fala</span>
+                  <span id="opusCaptionSyncBadge" style="font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px;background:#052e16;color:#bbf7d0;border:1px solid #10b981">Offset: 0.0s • Ritmo: 1.00x</span>
+                </div>
+                <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px">
+                  <button type="button" class="ghost" onclick="nudgeOpusCaptionOffset(-0.5)" style="padding:5px 8px;font-size:11px">⏪ -0.5s (Adiantar)</button>
+                  <button type="button" class="ghost" onclick="nudgeOpusCaptionOffset(-0.15)" style="padding:5px 8px;font-size:11px">-0.15s</button>
+                  <button type="button" onclick="lockOpusCaptionStartToCurrentVideoTime()" style="padding:5px 10px;font-size:11px;font-weight:900;border-radius:8px;border:1px solid #22c55e;background:#16a34a;color:#fff;cursor:pointer" title="Clique no exato momento em que a pessoa começar a falar no vídeo!">🎯 Cravar Fala Agora</button>
+                  <button type="button" class="ghost" onclick="nudgeOpusCaptionOffset(0.15)" style="padding:5px 8px;font-size:11px">+0.15s</button>
+                  <button type="button" class="ghost" onclick="nudgeOpusCaptionOffset(0.5)" style="padding:5px 8px;font-size:11px">+0.5s (Atrasar) ⏩</button>
+                  <button type="button" class="ghost" onclick="resetOpusCaptionSync()" style="padding:5px 8px;font-size:11px;color:#fde68a">🔄 Zerar</button>
+                </div>
+
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:8px">
+                  <div>
+                    <label style="margin:0;font-size:10.5px;color:#cbd5e1">⏱️ Tempo da Legenda (<span id="opusLblOffset">0.0s</span>)</label>
+                    <input type="range" id="opusEditCaptionOffset" min="-15" max="15" step="0.1" value="0" oninput="onAdjustOpusCaptionSettings()" style="width:100%;margin-top:3px;accent-color:#22c55e">
+                  </div>
+                  <div>
+                    <label style="margin:0;font-size:10.5px;color:#cbd5e1">⚡ Velocidade da Fala (<span id="opusLblSpeed">1.00x</span>)</label>
+                    <input type="range" id="opusEditCaptionSpeed" min="0.5" max="1.8" step="0.05" value="1" oninput="onAdjustOpusCaptionSettings()" style="width:100%;margin-top:3px;accent-color:#38bdf8">
+                  </div>
+                  <div>
+                    <label style="margin:0;font-size:10.5px;color:#cbd5e1">↕️ Altura no Vídeo (<span id="opusLblY">78%</span>)</label>
+                    <input type="range" id="opusEditCaptionY" min="15" max="90" step="1" value="78" oninput="onAdjustOpusCaptionSettings()" style="width:100%;margin-top:3px;accent-color:#a855f7">
+                  </div>
+                  <div>
+                    <label style="margin:0;font-size:10.5px;color:#cbd5e1">🔠 Tamanho da Letra (<span id="opusLblScale">100%</span>)</label>
+                    <input type="range" id="opusEditCaptionScale" min="60" max="150" step="5" value="100" oninput="onAdjustOpusCaptionSettings()" style="width:100%;margin-top:3px;accent-color:#facc15">
+                  </div>
+                </div>
+
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:8px">
+                  <span style="font-size:10.5px;color:#94a3b8">📝 Palavras por bloco na tela:</span>
+                  <select id="opusEditWordsPerPhrase" onchange="onAdjustOpusCaptionSettings()" style="width:auto;padding:5px 9px;margin:0;font-size:11.5px;border-radius:7px;background:#0b0f1d;border:1px solid #282e46">
+                    <option value="1">⚡ 1 Palavra (Dinâmico Rápido)</option>
+                    <option value="2">🔥 2 Palavras (Impacto)</option>
+                    <option value="3" selected>💎 3 Palavras (Padrão Hormozi / OpusClip)</option>
+                    <option value="4">🎬 4 Palavras (Frase Completa)</option>
+                  </select>
+                </div>
+              </div>
+
               <label style="margin-top:8px;font-size:11px">🏷️ Auto Hook Banner (Topo do Vídeo)</label>
               <input type="text" id="opusEditHookBanner" oninput="onEditSelectedOpusClip()" style="padding:8px 10px;font-size:12.5px;margin-top:4px;width:100%;border-radius:8px;border:1px solid #282e46;background:#070a14;color:#fff">
-              <label style="margin-top:8px;font-size:11px">💬 Captions & Transcript Editor (Edite qualquer palavra)</label>
+              <label style="margin-top:8px;font-size:11px">💬 Editar Texto da Legenda (Qualquer alteração atualiza no vídeo na hora)</label>
               <textarea id="opusEditCaption" rows="3" oninput="onEditSelectedOpusClip()" style="padding:8px 10px;font-size:12.5px;margin-top:4px;min-height:68px"></textarea>
             </div>
 
             <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
-              <button type="button" id="opusExportMp4Btn" onclick="exportSelectedOpusClipMp4()" style="width:100%;padding:13px 16px;border:none;border-radius:12px;font-size:14px;font-weight:900;cursor:pointer;color:#022c22;background:linear-gradient(135deg,#4ade80,#22c55e,#10b981);box-shadow:0 8px 24px rgba(34,197,94,.3)">⬇️ Download HD (.MP4 Sem Marca d'Água)</button>
+              <button type="button" id="opusExportMp4Btn" onclick="exportSelectedOpusClipMp4()" style="width:100%;padding:13px 16px;border:none;border-radius:12px;font-size:14px;font-weight:900;cursor:pointer;color:#022c22;background:linear-gradient(135deg,#4ade80,#22c55e,#10b981);box-shadow:0 8px 24px rgba(34,197,94,.3)">⬇️ Baixar Corte em Vídeo (.MP4 c/ Legenda Sincronizada)</button>
               <button type="button" onclick="shareOpusClipToGallery()" style="width:100%;padding:10px 14px;border:1.5px solid #38bdf8;border-radius:12px;font-size:13px;font-weight:800;cursor:pointer;color:#e0f2fe;background:#0f172a">📲 Post / Schedule (TikTok, Reels, Shorts)</button>
               <div style="display:flex;gap:8px;flex-wrap:wrap">
                 <button class="ghost" type="button" id="opusDubClipBtn" onclick="dubSelectedOpusClip()" style="flex:1;font-size:11.5px;border-color:#a855f788;color:#e9d5ff">🎙️ Add AI voice-over (PT-BR)</button>
-                <button class="ghost" type="button" onclick="exportOpusClipXml(opusState.selectedIdx)" style="font-size:11.5px">🎞️ Export XML</button>
+                <button class="ghost" type="button" onclick="document.getElementById('opusVideoInput').click()" style="font-size:11.5px;border-color:#22c55e88;color:#bbf7d0">📂 Usar Meu .MP4</button>
                 <button class="ghost" type="button" onclick="downloadSelectedOpusClipSrt()" style="font-size:11.5px">📜 Baixar .SRT</button>
               </div>
             </div>
@@ -7021,33 +7067,43 @@ let opusState = {
   ytCurrentTime: 0,
   ytLastTimePerf: 0,
   ytPlayerState: -1,
-  ytHandshakeTimer: null
+  ytHandshakeTimer: null,
+  ytPlayConfirmedWall: 0
 };
 
-// Escuta mensagens oficiais do YouTube IFrame Player API (enablejsapi=1) para sincronizar cada palavra da legenda ao segundo exato do vídeo do YouTube!
+// Escuta mensagens oficiais do YouTube IFrame Player API (enablejsapi=1) para sincronizar cada palavra da legenda ao milissegundo exato da fala no vídeo do YouTube!
 window.addEventListener('message', (ev) => {
   if(!opusState.ytEmbedMode || !ev.data || typeof ev.data !== 'string') return;
   if(!ev.origin || !/youtube\.com|youtube-nocookie\.com/i.test(ev.origin)) return;
   try{
     const msg = JSON.parse(ev.data);
-    if(msg.event === 'onReady'){
+    if(msg.event === 'onReady' || msg.event === 'initialDelivery'){
+      if(msg.info && typeof msg.info.currentTime === 'number' && isFinite(msg.info.currentTime)){
+        opusState.ytCurrentTime = msg.info.currentTime;
+        opusState.ytLastTimePerf = performance.now();
+      }
       document.querySelectorAll('.opus-yt-916-iframe').forEach(ifr => {
         try{
+          ifr.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1, channel: 'widget' }), '*');
           ifr.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
           ifr.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'unMute', args: [] }), '*');
           ifr.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'setVolume', args: [100] }), '*');
         }catch(_){}
       });
-    } else if(msg.event === 'infoDelivery' && msg.info){
-      if(typeof msg.info.currentTime === 'number' && isFinite(msg.info.currentTime)){
-        opusState.ytCurrentTime = msg.info.currentTime;
+    } else if((msg.event === 'infoDelivery' || msg.event === 'onStateChange') && msg.info != null){
+      const infoObj = typeof msg.info === 'object' ? msg.info : { playerState: Number(msg.info) };
+      if(typeof infoObj.currentTime === 'number' && isFinite(infoObj.currentTime)){
+        opusState.ytCurrentTime = infoObj.currentTime;
         opusState.ytLastTimePerf = performance.now();
       }
-      if(typeof msg.info.playerState === 'number'){
-        opusState.ytPlayerState = msg.info.playerState;
+      if(typeof infoObj.playerState === 'number' && !isNaN(infoObj.playerState)){
+        opusState.ytPlayerState = infoObj.playerState;
+        if(infoObj.playerState === 1 && !opusState.ytPlayConfirmedWall){
+          opusState.ytPlayConfirmedWall = performance.now();
+        }
       }
-      if(typeof msg.info.duration === 'number' && msg.info.duration > 30){
-        opusState.durationSec = msg.info.duration;
+      if(typeof infoObj.duration === 'number' && infoObj.duration > 30){
+        opusState.durationSec = infoObj.duration;
       }
     }
   }catch(_){}
@@ -7057,6 +7113,10 @@ window.addEventListener('message', (ev) => {
 function mountOpusYt916Player(containerEl, videoId, startSec, endSec, isPlaying){
   if(!containerEl || !videoId) return;
   containerEl.classList.remove('hidden');
+  if(opusState.ytHandshakeTimer){
+    clearInterval(opusState.ytHandshakeTimer);
+    opusState.ytHandshakeTimer = null;
+  }
   if(!isPlaying){
     const thumb = opusState.ytThumbUrl || `https://i.ytimg.com/vi/${encodeURIComponent(videoId)}/hqdefault.jpg`;
     containerEl.innerHTML = `<img src="${thumb}" style="width:100%;height:100%;object-fit:cover;object-position:center center;filter:brightness(0.88) contrast(1.08);display:block;pointer-events:none" alt="Preview 9:16">`;
@@ -7065,8 +7125,8 @@ function mountOpusYt916Player(containerEl, videoId, startSec, endSec, isPlaying)
   const sFloor = Math.max(0, Math.floor(Number(startSec) || 0));
   const eCeil = Math.max(sFloor + 8, Math.ceil(Number(endSec) || (sFloor + 120)));
   const reframeMode = (document.getElementById('opusReframeMode')||{}).value || 'auto_face';
-  const originParam = (location.origin && /^https?:/i.test(location.origin)) ? `&origin=${encodeURIComponent(location.origin)}` : '';
-  const srcUrl = `https://www.youtube.com/embed/${encodeURIComponent(videoId)}?autoplay=1&playsinline=1&enablejsapi=1&controls=0&rel=0&modestbranding=1&iv_load_policy=3&start=${sFloor}&end=${eCeil}${originParam}`;
+  const originParam = (location.origin && /^https?:/i.test(location.origin)) ? `&origin=${encodeURIComponent(location.origin)}&widget_referrer=${encodeURIComponent(location.href)}` : '';
+  const srcUrl = `https://www.youtube.com/embed/${encodeURIComponent(videoId)}?autoplay=1&playsinline=1&enablejsapi=1&controls=0&rel=0&modestbranding=1&iv_load_policy=3&cc_load_policy=0&start=${sFloor}&end=${eCeil}${originParam}`;
 
   let iframeStyle = 'position:absolute;top:0;left:50%;width:316%;height:100%;transform:translateX(-50%);border:0;';
   let bgHtml = '';
@@ -7083,20 +7143,40 @@ function mountOpusYt916Player(containerEl, videoId, startSec, endSec, isPlaying)
   containerEl.innerHTML = `${bgHtml}<iframe class="opus-yt-916-iframe" src="${srcUrl}" style="${iframeStyle}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>`;
   const ifr = containerEl.querySelector('iframe');
   if(ifr){
+    let seekSent = false;
     const sendHandshake = () => {
       try{
         if(!ifr.contentWindow) return;
         ifr.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1, channel: 'widget' }), '*');
-        ifr.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
-        ifr.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'unMute', args: [] }), '*');
-        ifr.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'setVolume', args: [100] }), '*');
+        if(!seekSent){
+          seekSent = true;
+          if(Math.abs((Number(startSec) || 0) - sFloor) > 0.15){
+            ifr.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'seekTo', args: [Number(startSec) || 0, true] }), '*');
+          }
+          ifr.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
+          ifr.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'unMute', args: [] }), '*');
+          ifr.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'setVolume', args: [100] }), '*');
+        }
       }catch(_){}
     };
     ifr.addEventListener('load', () => {
       sendHandshake();
-      setTimeout(sendHandshake, 450);
-      setTimeout(sendHandshake, 1200);
+      setTimeout(sendHandshake, 280);
+      setTimeout(sendHandshake, 700);
+      setTimeout(sendHandshake, 1300);
     });
+    opusState.ytHandshakeTimer = setInterval(() => {
+      if(!opusState.playing){
+        clearInterval(opusState.ytHandshakeTimer);
+        opusState.ytHandshakeTimer = null;
+        return;
+      }
+      try{
+        if(ifr && ifr.contentWindow){
+          ifr.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1, channel: 'widget' }), '*');
+        }
+      }catch(_){}
+    }, 450);
   }
 }
 
@@ -8177,8 +8257,8 @@ function pickOpusEmojiForPhrase(phraseText){
   return '🎯';
 }
 
-// Constrói blocos curtos de 3 palavras estilo OpusClip Pro 3.0 com Timestamps Whisper ([inicio, fim, texto]) + Sincronia Acústica Real!
-function buildOpusWordByWordCues(text, clipDurationSec, clipStartSec = 0, subSegments = null){
+// Constrói blocos curtos de palavras estilo OpusClip Pro 3.0 com Timestamps Whisper ([inicio, fim, texto]) + Sincronia Acústica Real!
+function buildOpusWordByWordCues(text, clipDurationSec, clipStartSec = 0, subSegments = null, wordsPerPhrase = 3){
   const clean = String(text || '').replace(/\s+/g, ' ').trim();
   if(!clean) return [];
   const rawWords = clean.split(' ').filter(Boolean);
@@ -8271,9 +8351,9 @@ function buildOpusWordByWordCues(text, clipDurationSec, clipStartSec = 0, subSeg
     });
   }
 
-  // Agrupa de 3 em 3 palavras (padrão ouro OpusClip Pro / Alex Hormozi Shorts)
+  // Agrupa de N em N palavras (ajustável pelo usuário: 1, 2, 3 ou 4 palavras por vez)
   const phrases = [];
-  const WORDS_PER_PHRASE = 3;
+  const WORDS_PER_PHRASE = Math.max(1, Math.min(6, Number(wordsPerPhrase) || 3));
   for(let i = 0; i < timedWords.length; i += WORDS_PER_PHRASE){
     const slice = timedWords.slice(i, i + WORDS_PER_PHRASE);
     const phraseStr = slice.map(x => x.word).join(' ');
@@ -8289,7 +8369,7 @@ function buildOpusWordByWordCues(text, clipDurationSec, clipStartSec = 0, subSeg
   return phrases;
 }
 
-// Renderiza 1 frame ultra-profissional do OpusClip Pro 3.0 (100% SEM MARCA D'ÁGUA + Auto-Reframe 3.0 + Dynamic Zoom Cuts + AI B-Roll + Multi-Line Hormozi/MrBeast/Iman Captions)
+// Renderiza 1 frame ultra-profissional do OpusClip Pro 3.0 (100% SEM MARCA D'ÁGUA + Auto-Reframe 3.0 + Dynamic Zoom Cuts + AI B-Roll + Legendas Ajustáveis Sincronizadas com a Fala)
 function drawOpusReframedFrame(ctx, videoEl, clip, relSec){
   const W = ctx.canvas.width, H = ctx.canvas.height;
   const reframeMode = (document.getElementById('opusReframeMode')||{}).value || clip.reframeMode || 'auto_face';
@@ -8300,19 +8380,26 @@ function drawOpusReframedFrame(ctx, videoEl, clip, relSec){
   const brollMode = (document.getElementById('opusBrollMode')||{}).value || 'cinema_broll';
 
   const clipDur = Math.max(2, (clip.endSec || 30) - (clip.startSec || 0));
-  if(!clip._cues || clip._cuesText !== clip.captionText || clip._cuesDur !== clipDur){
-    clip._cues = buildOpusWordByWordCues(clip.captionText, clipDur, clip.startSec || 0, clip.subSegments);
+  const wPerPhrase = Number(clip.wordsPerPhrase) || Number((document.getElementById('opusEditWordsPerPhrase')||{}).value) || 3;
+  if(!clip._cues || clip._cuesText !== clip.captionText || clip._cuesDur !== clipDur || clip._cuesWpp !== wPerPhrase){
+    clip._cues = buildOpusWordByWordCues(clip.captionText, clipDur, clip.startSec || 0, clip.subSegments, wPerPhrase);
     clip._cuesText = clip.captionText;
     clip._cuesDur = clipDur;
+    clip._cuesWpp = wPerPhrase;
   }
   const cues = clip._cues || [];
-  const activeCue = cues.find(c => relSec >= c.start && relSec <= c.end + 0.08) || cues[Math.min(cues.length - 1, Math.floor((relSec / clipDur) * cues.length))];
-  const activeWordObj = activeCue && activeCue.words ? activeCue.words.find(w => relSec >= w.start && relSec <= w.end + 0.05) : null;
+
+  // Aplica o Ajuste Fino de Sincronia com a Fala (Offset em segundos + Velocidade da Fala)
+  const capOffset = Number(clip.captionOffsetSec) || 0;
+  const capSpeed = Math.max(0.4, Math.min(2.2, Number(clip.captionSpeedRate) || 1.0));
+  const captionRelSec = Math.max(0, (relSec - capOffset) * capSpeed);
+
+  const activeCue = cues.find(c => captionRelSec >= c.start && captionRelSec <= c.end + 0.08) || cues[Math.min(cues.length - 1, Math.max(0, Math.floor((captionRelSec / clipDur) * cues.length)))];
+  const activeWordObj = activeCue && activeCue.words ? activeCue.words.find(w => captionRelSec >= w.start && captionRelSec <= w.end + 0.05) : null;
 
   // Calcula o fator de Zoom Dinâmico (Jump-Cut Punch-In estilo OpusClip Pro)
   let cameraZoom = 1.0;
   if(zoomStyle === 'auto_punch'){
-    // Punch-in no gancho inicial (0 a 1.6s) + Punch-in nas palavras de impacto ou frases pares
     const isOpeningHook = relSec < 1.65;
     const isPunchPhrase = activeCue && (activeCue.phraseIdx % 2 === 1);
     const isPowerMoment = !!(activeWordObj && activeWordObj.isPowerWord);
@@ -8334,6 +8421,36 @@ function drawOpusReframedFrame(ctx, videoEl, clip, relSec){
   if(hasRealVideoFrame){
     ctx.fillStyle = '#05070f';
     ctx.fillRect(0, 0, W, H);
+  } else if(clip._forceStudioRender){
+    // Quando o usuário baixa o corte em .MP4 no celular e o YouTube bloqueou o binário bruto, desenha o Estúdio de Podcast Dinâmico 9:16 em movimento sincronizado com a voz!
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#070b18'); g.addColorStop(0.5, '#121936'); g.addColorStop(1, '#060913');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    if(clip._thumbBitmap){
+      try{
+        const z = cameraZoom * (1.04 + 0.04 * Math.sin(relSec * 0.9));
+        const bw = W * z * 1.6, bh = H * z;
+        ctx.save();
+        ctx.globalAlpha = 0.42;
+        ctx.drawImage(clip._thumbBitmap, (W - bw) * 0.5 + Math.sin(relSec * 0.7) * 18, (H - bh) * 0.5, bw, bh);
+        ctx.restore();
+      }catch(_){}
+    }
+    // Ondas acústicas de estúdio sincronizadas com a palavra falada
+    ctx.save();
+    const bars = 28;
+    const barAreaW = W * 0.76;
+    const startX = (W - barAreaW) * 0.5;
+    const centerY = H * 0.44;
+    for(let b = 0; b < bars; b++){
+      const wave = activeWordObj ? (0.35 + 0.65 * Math.abs(Math.sin(relSec * 14 + b * 0.55))) : 0.12;
+      const bh = Math.max(6, Math.round(wave * (H * 0.085)));
+      ctx.fillStyle = b % 2 === 0 ? 'rgba(34,197,94,0.85)' : 'rgba(56,189,248,0.75)';
+      ctx.beginPath();
+      ctx.roundRect(startX + b * (barAreaW / bars), centerY - bh * 0.5, Math.max(4, (barAreaW / bars) - 4), bh, 4);
+      ctx.fill();
+    }
+    ctx.restore();
   } else {
     // No modo YouTube Stream 9:16 (ytEmbedMode), o vídeo original em movimento do YouTube está na camada #opusCardYtWrap / #opusPreviewYtWrap logo atrás do Canvas!
     ctx.clearRect(0, 0, W, H);
@@ -8501,23 +8618,24 @@ function drawOpusReframedFrame(ctx, videoEl, clip, relSec){
     ctx.restore();
   }
 
-  // 5) LEGENDAS ULTRA-PROFISSIONAIS OPUSCLIP PRO 3.0 (MULTI-LINHA INTELIGENTE, ZERO CORTE NAS BORDAS, 6 ESTILOS DE ELITE)
+  // 5) LEGENDAS ULTRA-PROFISSIONAIS OPUSCLIP PRO 3.0 (MULTI-LINHA INTELIGENTE, ZERO CORTE NAS BORDAS, AJUSTÁVEIS NA POSIÇÃO E SINCRONIA COM A FALA)
   if(captionStyle !== 'none' && activeCue && activeCue.words && activeCue.words.length){
     ctx.save();
-    const maxSafeWidth = W * 0.85;
-    let baseFont = Math.max(20, Math.round(W * (captionStyle === 'mrbeast' ? 0.068 : captionStyle === 'iman' ? 0.056 : 0.064)));
+    const maxSafeWidth = W * 0.86;
+    const fontScale = Math.max(0.55, Math.min(1.6, (Number(clip.captionFontScale) || Number((document.getElementById('opusEditCaptionScale')||{}).value) || 100) / 100));
+    let baseFont = Math.max(16, Math.round(W * (captionStyle === 'mrbeast' ? 0.068 : captionStyle === 'iman' ? 0.056 : 0.064) * fontScale));
     ctx.font = `900 ${baseFont}px Inter, system-ui, sans-serif`;
 
     // Se alguma palavra individual for mais larga que a zona segura, reduz a fonte automaticamente para nunca cortar!
     for(const wObj of activeCue.words){
       const wWidth = ctx.measureText(wObj.word.toUpperCase()).width;
       if(wWidth > maxSafeWidth * 0.92){
-        baseFont = Math.max(16, Math.floor(baseFont * (maxSafeWidth * 0.92) / wWidth));
+        baseFont = Math.max(15, Math.floor(baseFont * (maxSafeWidth * 0.92) / wWidth));
         ctx.font = `900 ${baseFont}px Inter, system-ui, sans-serif`;
       }
     }
 
-    // Quebra inteligente das palavras do bloco em 1 ou 2 linhas centralizadas que sempre cabem em 85% da largura
+    // Quebra inteligente das palavras do bloco em 1 ou 2 linhas centralizadas que sempre cabem em 86% da largura
     const spaceW = ctx.measureText(' ').width;
     const wrappedLines = [];
     let currentLine = [];
@@ -8537,15 +8655,21 @@ function drawOpusReframedFrame(ctx, videoEl, clip, relSec){
     }
     if(currentLine.length > 0) wrappedLines.push({ words: currentLine, totalW: currentLineW });
 
-    const yAnchorRatio = captionPos === 'center' ? 0.54 : captionPos === 'top' ? 0.28 : 0.78;
+    const yAnchorRatio = (Number.isFinite(Number(clip.captionYRatio)) && Number(clip.captionYRatio) >= 12 && Number(clip.captionYRatio) <= 92)
+      ? (Number(clip.captionYRatio) / 100)
+      : (captionPos === 'center' ? 0.54 : captionPos === 'top' ? 0.28 : 0.78);
+    const xCenterRatio = (Number.isFinite(Number(clip.captionXRatio)) && Number(clip.captionXRatio) >= 20 && Number(clip.captionXRatio) <= 80)
+      ? (Number(clip.captionXRatio) / 100)
+      : 0.50;
+    const blockCenterX = Math.round(W * xCenterRatio);
     const blockCenterY = Math.round(H * yAnchorRatio);
     const lineH = Math.round(baseFont * 1.32);
 
     // Inclinação dinâmica de -2 graus exclusiva dos estilos Hormozi Pro e MrBeast Explosive
     if(captionStyle === 'hormozi' || captionStyle === 'mrbeast'){
-      ctx.translate(W * 0.5, blockCenterY);
+      ctx.translate(blockCenterX, blockCenterY);
       ctx.rotate(-0.032);
-      ctx.translate(-W * 0.5, -blockCenterY);
+      ctx.translate(-blockCenterX, -blockCenterY);
     }
 
     // Emoji 3D contextual flutuante com spring bounce acima da legenda
@@ -8554,9 +8678,9 @@ function drawOpusReframedFrame(ctx, videoEl, clip, relSec){
       const emoSize = Math.round(baseFont * 1.18);
       ctx.font = `${emoSize}px sans-serif`;
       ctx.textAlign = 'center';
-      const bounce = Math.sin(relSec * 9.5) * 4;
+      const bounce = Math.sin(captionRelSec * 9.5) * 4;
       const emoY = blockCenterY - ((wrappedLines.length - 1) * lineH * 0.5) - baseFont * 1.25 + bounce;
-      ctx.fillText(activeCue.emoji, W * 0.5, emoY);
+      ctx.fillText(activeCue.emoji, blockCenterX, emoY);
       ctx.restore();
       ctx.font = `900 ${baseFont}px Inter, system-ui, sans-serif`;
     }
@@ -8568,7 +8692,7 @@ function drawOpusReframedFrame(ctx, videoEl, clip, relSec){
       const boxTopY = blockCenterY - ((wrappedLines.length - 1) * lineH * 0.5) - baseFont * 0.96;
       ctx.fillStyle = captionStyle === 'iman' ? 'rgba(6, 9, 18, 0.84)' : 'rgba(8, 10, 20, 0.76)';
       ctx.beginPath();
-      ctx.roundRect((W - widestLine) * 0.5 - 20, boxTopY, widestLine + 40, totalBoxH, 12);
+      ctx.roundRect(blockCenterX - widestLine * 0.5 - 20, boxTopY, widestLine + 40, totalBoxH, 12);
       ctx.fill();
       if(captionStyle === 'iman'){
         ctx.strokeStyle = 'rgba(250, 204, 21, 0.45)';
@@ -8580,10 +8704,10 @@ function drawOpusReframedFrame(ctx, videoEl, clip, relSec){
     // Desenha cada linha e cada palavra com animação pop individual na sílaba exata!
     wrappedLines.forEach((lineObj, lineIdx) => {
       const yPos = blockCenterY + (lineIdx - (wrappedLines.length - 1) * 0.5) * lineH;
-      let cursorX = (W - lineObj.totalW) * 0.5;
+      let cursorX = blockCenterX - lineObj.totalW * 0.5;
 
       lineObj.words.forEach((wObj) => {
-        const isCurrent = relSec >= wObj.start && relSec <= wObj.end + 0.05;
+        const isCurrent = captionRelSec >= wObj.start && captionRelSec <= wObj.end + 0.05;
         const wordCenterX = cursorX + wObj.wW * 0.5;
         const wordCenterY = yPos - baseFont * 0.34;
 
@@ -9029,6 +9153,7 @@ async function toggleOpusPreviewPlayback(){
     opusState.ytCurrentTime = clip.startSec || 0;
     opusState.ytLastTimePerf = performance.now();
     opusState.ytPlayerState = -1;
+    opusState.ytPlayConfirmedWall = 0;
     const playStartWall = performance.now();
 
     if(studioOpen && prevYtWrap){
@@ -9053,12 +9178,20 @@ async function toggleOpusPreviewPlayback(){
     const tickYt = () => {
       if(!opusState.playing) return;
       let relSec = 0;
+      const elapsedSinceClick = (performance.now() - playStartWall) / 1000;
       if(opusState.ytPlayerState === 1 && opusState.ytCurrentTime >= (clip.startSec || 0) - 2){
-        const liveT = opusState.ytCurrentTime + Math.min(0.35, (performance.now() - opusState.ytLastTimePerf) / 1000);
+        const liveT = opusState.ytCurrentTime + Math.min(0.28, (performance.now() - opusState.ytLastTimePerf) / 1000);
         relSec = Math.max(0, liveT - (clip.startSec || 0));
+      } else if(opusState.ytPlayerState === 2){
+        // Vídeo pausado dentro do iframe do YouTube: congela a legenda exatamente onde a fala parou!
+        relSec = Math.max(0, (opusState.ytCurrentTime || (clip.startSec || 0)) - (clip.startSec || 0));
+      } else if(elapsedSinceClick < 1.85){
+        // Enquanto o iframe do YouTube carrega/bufferiza nos primeiros ~1.8s, segura a legenda em 0.00s para começar junto com a primeira palavra falada!
+        relSec = 0;
       } else {
-        relSec = Math.max(0, (performance.now() - playStartWall) / 1000);
+        relSec = Math.max(0, elapsedSinceClick - 1.75);
       }
+      opusState.lastPreviewRelSec = relSec;
       if(relSec >= clipDur){
         stopOpusPreviewPlayback();
         renderSingleOpusPreviewFrame();
@@ -9069,13 +9202,16 @@ async function toggleOpusPreviewPlayback(){
       if(cardTimeEl){
         cardTimeEl.textContent = `${fmtClockSec(relSec)} / ${fmtClockSec(clipDur)}`;
       }
+      const capOffset = Number(clip.captionOffsetSec) || 0;
+      const capSpeed = Math.max(0.4, Math.min(2.2, Number(clip.captionSpeedRate) || 1.0));
+      const captionRelSec = Math.max(0, (relSec - capOffset) * capSpeed);
       const wordsContainer = document.getElementById(`opusTranscriptWords-${idx}`);
       if(wordsContainer){
         const spans = wordsContainer.querySelectorAll('.opus-tw');
         spans.forEach(sp => {
           const ws = parseFloat(sp.getAttribute('data-s')) || 0;
           const we = parseFloat(sp.getAttribute('data-e')) || 0;
-          sp.classList.toggle('tw-active', relSec >= ws && relSec <= we + 0.08);
+          sp.classList.toggle('tw-active', captionRelSec >= ws && captionRelSec <= we + 0.08);
         });
       }
       opusState.rafId = requestAnimationFrame(tickYt);
@@ -9118,19 +9254,23 @@ async function toggleOpusPreviewPlayback(){
       return;
     }
     const relSec = Math.max(0, nowT - clip.startSec);
+    opusState.lastPreviewRelSec = relSec;
     if(ctx) drawOpusReframedFrame(ctx, v, clip, relSec);
     if(cardCtx) drawOpusReframedFrame(cardCtx, v, clip, relSec);
     if(cardTimeEl){
       cardTimeEl.textContent = `${fmtClockSec(relSec)} / ${fmtClockSec(clipDur)}`;
     }
     // Destaca em verde (#22c55e) a palavra exata que está sendo falada na coluna [CC] Transcript!
+    const capOffset = Number(clip.captionOffsetSec) || 0;
+    const capSpeed = Math.max(0.4, Math.min(2.2, Number(clip.captionSpeedRate) || 1.0));
+    const captionRelSec = Math.max(0, (relSec - capOffset) * capSpeed);
     const wordsContainer = document.getElementById(`opusTranscriptWords-${idx}`);
     if(wordsContainer){
       const spans = wordsContainer.querySelectorAll('.opus-tw');
       spans.forEach(sp => {
         const ws = parseFloat(sp.getAttribute('data-s')) || 0;
         const we = parseFloat(sp.getAttribute('data-e')) || 0;
-        sp.classList.toggle('tw-active', relSec >= ws && relSec <= we + 0.08);
+        sp.classList.toggle('tw-active', captionRelSec >= ws && captionRelSec <= we + 0.08);
       });
     }
     opusState.rafId = requestAnimationFrame(tick);
@@ -9149,6 +9289,263 @@ function restartOpusPreviewClip(){
   setTimeout(() => toggleOpusPreviewPlayback(), 60);
 }
 
+function syncOpusCaptionUiFromClip(clip){
+  if(!clip) return;
+  const offVal = Number(clip.captionOffsetSec) || 0;
+  const spdVal = Number(clip.captionSpeedRate) || 1.0;
+  const yVal = Number.isFinite(Number(clip.captionYRatio)) && Number(clip.captionYRatio) > 0 ? Number(clip.captionYRatio) : 78;
+  const sclVal = Number(clip.captionFontScale) || 100;
+  const wppVal = Number(clip.wordsPerPhrase) || 3;
+
+  const offEl = document.getElementById('opusEditCaptionOffset');
+  const spdEl = document.getElementById('opusEditCaptionSpeed');
+  const yEl = document.getElementById('opusEditCaptionY');
+  const sclEl = document.getElementById('opusEditCaptionScale');
+  const wppEl = document.getElementById('opusEditWordsPerPhrase');
+  if(offEl) offEl.value = offVal;
+  if(spdEl) spdEl.value = spdVal;
+  if(yEl) yEl.value = yVal;
+  if(sclEl) sclEl.value = sclVal;
+  if(wppEl) wppEl.value = String(wppVal);
+
+  const offBadge = document.getElementById('opusCaptionOffsetBadge');
+  const spdBadge = document.getElementById('opusCaptionSpeedBadge');
+  const yBadge = document.getElementById('opusCaptionYBadge');
+  const sclBadge = document.getElementById('opusCaptionScaleBadge');
+  const wppBadge = document.getElementById('opusWordsPerPhraseBadge');
+  if(offBadge) offBadge.textContent = `${offVal >= 0 ? '+' : ''}${offVal.toFixed(1)}s (${Math.abs(offVal) < 0.05 ? 'Sincronizado' : offVal > 0 ? 'Atrasado' : 'Adiantado'})`;
+  if(spdBadge) spdBadge.textContent = `${spdVal.toFixed(2)}x`;
+  if(yBadge) yBadge.textContent = `${Math.round(yVal)}% (${yVal < 36 ? 'Topo' : yVal < 62 ? 'Centro' : 'Base'})`;
+  if(sclBadge) sclBadge.textContent = `${Math.round(sclVal)}%`;
+  if(wppBadge) wppBadge.textContent = `${wppVal} ${wppVal === 1 ? 'palavra' : 'palavras'}`;
+}
+
+function updateInlineCardCaptionBadges(idx, clip){
+  if(!clip) return;
+  const offVal = Number(clip.captionOffsetSec) || 0;
+  const spdVal = Number(clip.captionSpeedRate) || 1.0;
+  const yVal = Number.isFinite(Number(clip.captionYRatio)) && Number(clip.captionYRatio) > 0 ? Number(clip.captionYRatio) : 78;
+  const sclVal = Number(clip.captionFontScale) || 100;
+  const elOff = document.getElementById(`opusCardSyncOff-${idx}`);
+  const elSpd = document.getElementById(`opusCardSyncSpd-${idx}`);
+  const elY = document.getElementById(`opusCardSyncY-${idx}`);
+  const elScl = document.getElementById(`opusCardSyncScl-${idx}`);
+  const rngY = document.getElementById(`opusCardRangeY-${idx}`);
+  const rngOff = document.getElementById(`opusCardRangeOff-${idx}`);
+  if(elOff) elOff.textContent = `${offVal >= 0 ? '+' : ''}${offVal.toFixed(1)}s`;
+  if(elSpd) elSpd.textContent = `${spdVal.toFixed(2)}x`;
+  if(elY) elY.textContent = `${Math.round(yVal)}%`;
+  if(elScl) elScl.textContent = `${Math.round(sclVal)}%`;
+  if(rngY) rngY.value = yVal;
+  if(rngOff) rngOff.value = offVal;
+}
+
+function onAdjustOpusCaptionSettings(cardIdx = null){
+  const idx = (cardIdx != null && opusState.clips[cardIdx]) ? cardIdx : opusState.selectedIdx;
+  const clip = opusState.clips[idx];
+  if(!clip) return;
+
+  if(cardIdx != null){
+    const rngOff = document.getElementById(`opusCardRangeOff-${cardIdx}`);
+    const rngY = document.getElementById(`opusCardRangeY-${cardIdx}`);
+    if(rngOff) clip.captionOffsetSec = Number(parseFloat(rngOff.value || 0).toFixed(2));
+    if(rngY) clip.captionYRatio = Math.max(15, Math.min(88, Math.round(parseFloat(rngY.value || 78))));
+  } else {
+    const offEl = document.getElementById('opusEditCaptionOffset');
+    const spdEl = document.getElementById('opusEditCaptionSpeed');
+    const yEl = document.getElementById('opusEditCaptionY');
+    const sclEl = document.getElementById('opusEditCaptionScale');
+    const wppEl = document.getElementById('opusEditWordsPerPhrase');
+    if(offEl) clip.captionOffsetSec = Number(parseFloat(offEl.value || 0).toFixed(2));
+    if(spdEl) clip.captionSpeedRate = Number(parseFloat(spdEl.value || 1.0).toFixed(2));
+    if(yEl) clip.captionYRatio = Math.max(15, Math.min(88, Math.round(parseFloat(yEl.value || 78))));
+    if(sclEl) clip.captionFontScale = Math.max(65, Math.min(145, Math.round(parseFloat(sclEl.value || 100))));
+    if(wppEl){
+      const newWpp = Math.max(1, Math.min(6, parseInt(wppEl.value || '3', 10)));
+      if(clip.wordsPerPhrase !== newWpp){
+        clip.wordsPerPhrase = newWpp;
+        clip._cues = null;
+      }
+    }
+  }
+
+  opusState.lastExportBlob = null;
+  if(idx === opusState.selectedIdx) syncOpusCaptionUiFromClip(clip);
+  updateInlineCardCaptionBadges(idx, clip);
+
+  const v = document.getElementById('opusSourceVideo');
+  const relSec = opusState.playing ? (opusState.lastPreviewRelSec || 0.8) : 0.8;
+  const cardCv = document.getElementById(`opusCardCanvas-${idx}`);
+  if(cardCv){
+    drawOpusReframedFrame(cardCv.getContext('2d'), opusState.ytEmbedMode ? null : v, clip, relSec);
+  }
+  if(idx === opusState.selectedIdx && !opusState.playing){
+    renderSingleOpusPreviewFrame();
+  }
+}
+
+function nudgeOpusCaptionOffset(deltaSec, cardIdx = null){
+  const idx = (cardIdx != null && opusState.clips[cardIdx]) ? cardIdx : opusState.selectedIdx;
+  const clip = opusState.clips[idx];
+  if(!clip) return;
+  const cur = Number(clip.captionOffsetSec) || 0;
+  clip.captionOffsetSec = Number(Math.max(-15, Math.min(15, cur + (Number(deltaSec) || 0))).toFixed(2));
+  opusState.lastExportBlob = null;
+  if(idx === opusState.selectedIdx) syncOpusCaptionUiFromClip(clip);
+  updateInlineCardCaptionBadges(idx, clip);
+  if(!opusState.playing) renderSingleOpusPreviewFrame();
+  const cardCv = document.getElementById(`opusCardCanvas-${idx}`);
+  if(cardCv && !opusState.playing){
+    drawOpusReframedFrame(cardCv.getContext('2d'), opusState.ytEmbedMode ? null : document.getElementById('opusSourceVideo'), clip, 0.8);
+  }
+  toast(`⏱️ Sincronia da legenda: ${clip.captionOffsetSec >= 0 ? '+' : ''}${clip.captionOffsetSec.toFixed(1)}s em relação à fala`);
+}
+
+function nudgeOpusCaptionSpeed(deltaRate, cardIdx = null){
+  const idx = (cardIdx != null && opusState.clips[cardIdx]) ? cardIdx : opusState.selectedIdx;
+  const clip = opusState.clips[idx];
+  if(!clip) return;
+  const cur = Number(clip.captionSpeedRate) || 1.0;
+  clip.captionSpeedRate = Number(Math.max(0.60, Math.min(1.50, cur + (Number(deltaRate) || 0))).toFixed(2));
+  opusState.lastExportBlob = null;
+  if(idx === opusState.selectedIdx) syncOpusCaptionUiFromClip(clip);
+  updateInlineCardCaptionBadges(idx, clip);
+  if(!opusState.playing) renderSingleOpusPreviewFrame();
+  toast(`🏃 Ritmo da legenda ajustado para ${clip.captionSpeedRate.toFixed(2)}x`);
+}
+
+function nudgeOpusCaptionY(deltaPct, cardIdx = null){
+  const idx = (cardIdx != null && opusState.clips[cardIdx]) ? cardIdx : opusState.selectedIdx;
+  const clip = opusState.clips[idx];
+  if(!clip) return;
+  const cur = Number.isFinite(Number(clip.captionYRatio)) && Number(clip.captionYRatio) > 0 ? Number(clip.captionYRatio) : 78;
+  clip.captionYRatio = Math.max(15, Math.min(88, Math.round(cur + (Number(deltaPct) || 0))));
+  opusState.lastExportBlob = null;
+  if(idx === opusState.selectedIdx) syncOpusCaptionUiFromClip(clip);
+  updateInlineCardCaptionBadges(idx, clip);
+  const cardCv = document.getElementById(`opusCardCanvas-${idx}`);
+  if(cardCv && !opusState.playing){
+    drawOpusReframedFrame(cardCv.getContext('2d'), opusState.ytEmbedMode ? null : document.getElementById('opusSourceVideo'), clip, 0.8);
+  }
+  if(!opusState.playing) renderSingleOpusPreviewFrame();
+}
+
+function nudgeOpusCaptionScale(deltaPct, cardIdx = null){
+  const idx = (cardIdx != null && opusState.clips[cardIdx]) ? cardIdx : opusState.selectedIdx;
+  const clip = opusState.clips[idx];
+  if(!clip) return;
+  const cur = Number(clip.captionFontScale) || 100;
+  clip.captionFontScale = Math.max(65, Math.min(145, Math.round(cur + (Number(deltaPct) || 0))));
+  opusState.lastExportBlob = null;
+  if(idx === opusState.selectedIdx) syncOpusCaptionUiFromClip(clip);
+  updateInlineCardCaptionBadges(idx, clip);
+  const cardCv = document.getElementById(`opusCardCanvas-${idx}`);
+  if(cardCv && !opusState.playing){
+    drawOpusReframedFrame(cardCv.getContext('2d'), opusState.ytEmbedMode ? null : document.getElementById('opusSourceVideo'), clip, 0.8);
+  }
+  if(!opusState.playing) renderSingleOpusPreviewFrame();
+}
+
+function lockOpusCaptionStartToCurrentVideoTime(cardIdx = null){
+  const idx = (cardIdx != null && opusState.clips[cardIdx]) ? cardIdx : opusState.selectedIdx;
+  const clip = opusState.clips[idx];
+  if(!clip) return;
+  const curRel = Number(opusState.lastPreviewRelSec) || 0;
+  clip.captionOffsetSec = Number(Math.max(-10, Math.min(15, curRel)).toFixed(2));
+  opusState.lastExportBlob = null;
+  if(idx === opusState.selectedIdx) syncOpusCaptionUiFromClip(clip);
+  updateInlineCardCaptionBadges(idx, clip);
+  toast(`🎯 Início da legenda cravado na fala atual (${clip.captionOffsetSec >= 0 ? '+' : ''}${clip.captionOffsetSec.toFixed(1)}s)!`);
+}
+
+function resetOpusCaptionSync(cardIdx = null){
+  const idx = (cardIdx != null && opusState.clips[cardIdx]) ? cardIdx : opusState.selectedIdx;
+  const clip = opusState.clips[idx];
+  if(!clip) return;
+  clip.captionOffsetSec = 0;
+  clip.captionSpeedRate = 1.0;
+  clip.captionYRatio = 78;
+  clip.captionXRatio = 50;
+  clip.captionFontScale = 100;
+  clip.wordsPerPhrase = 3;
+  clip._cues = null;
+  opusState.lastExportBlob = null;
+  if(idx === opusState.selectedIdx) syncOpusCaptionUiFromClip(clip);
+  updateInlineCardCaptionBadges(idx, clip);
+  renderSingleOpusPreviewFrame();
+  renderAllOpusCardStaticPreviews();
+  toast('🔄 Legenda restaurada para o padrão sincronizado!');
+}
+
+function onInlineEditCardCaptionText(idx, val){
+  const clip = opusState.clips[idx];
+  if(!clip) return;
+  clip.captionText = String(val || '');
+  clip._cues = null;
+  opusState.lastExportBlob = null;
+  if(idx === opusState.selectedIdx){
+    const ed = document.getElementById('opusEditCaption');
+    if(ed) ed.value = clip.captionText;
+  }
+  const cardCv = document.getElementById(`opusCardCanvas-${idx}`);
+  if(cardCv && !opusState.playing){
+    drawOpusReframedFrame(cardCv.getContext('2d'), opusState.ytEmbedMode ? null : document.getElementById('opusSourceVideo'), clip, 0.8);
+  }
+}
+
+// Permite arrastar a legenda com o dedo ou mouse diretamente sobre o preview 9:16 do Studio Drawer
+(function bindOpusPreviewCaptionDrag(){
+  setTimeout(() => {
+    const shield = document.getElementById('opusPreviewClickShield');
+    const cv = document.getElementById('opusPreviewCanvas');
+    const target = shield || cv;
+    if(!target || target._dragBound) return;
+    target._dragBound = true;
+    let dragging = false, moved = false, startX = 0, startY = 0;
+    const onDown = (e) => {
+      const clip = opusState.clips && opusState.clips[opusState.selectedIdx];
+      if(!clip) return;
+      dragging = true;
+      moved = false;
+      const pt = e.touches ? e.touches[0] : e;
+      startX = pt.clientX;
+      startY = pt.clientY;
+    };
+    const onMove = (e) => {
+      if(!dragging) return;
+      const pt = e.touches ? e.touches[0] : e;
+      if(Math.abs(pt.clientX - startX) > 6 || Math.abs(pt.clientY - startY) > 6){
+        moved = true;
+      }
+      if(!moved) return;
+      if(e.cancelable) e.preventDefault();
+      const rect = (cv || target).getBoundingClientRect();
+      if(!rect.height || !rect.width) return;
+      const clip = opusState.clips && opusState.clips[opusState.selectedIdx];
+      if(!clip) return;
+      const relY = ((pt.clientY - rect.top) / rect.height) * 100;
+      const relX = ((pt.clientX - rect.left) / rect.width) * 100;
+      clip.captionYRatio = Math.max(15, Math.min(88, Math.round(relY)));
+      clip.captionXRatio = Math.max(25, Math.min(75, Math.round(relX)));
+      syncOpusCaptionUiFromClip(clip);
+      updateInlineCardCaptionBadges(opusState.selectedIdx, clip);
+      if(!opusState.playing) renderSingleOpusPreviewFrame();
+    };
+    const onUp = () => {
+      if(dragging && moved){
+        setTimeout(() => { moved = false; }, 60);
+      }
+      dragging = false;
+    };
+    target.addEventListener('mousedown', onDown);
+    window.addEventListener('mousemove', onMove, { passive: false });
+    window.addEventListener('mouseup', onUp);
+    target.addEventListener('touchstart', onDown, { passive: true });
+    target.addEventListener('touchmove', onMove, { passive: false });
+    target.addEventListener('touchend', onUp);
+  }, 400);
+})();
+
 function selectOpusClip(idx, autoPlay = false){
   if(!opusState.clips || !opusState.clips[idx]) return;
   stopOpusPreviewPlayback();
@@ -9164,6 +9561,7 @@ function selectOpusClip(idx, autoPlay = false){
   document.getElementById('opusEditEnd').value = clip.endSec;
   document.getElementById('opusEditHookBanner').value = clip.hookBanner || clip.title;
   document.getElementById('opusEditCaption').value = clip.captionText || '';
+  syncOpusCaptionUiFromClip(clip);
 
   // Se os cards ainda não foram montados no DOM, monta-os agora
   const listEl = document.getElementById('opusClipsList');
@@ -9213,7 +9611,7 @@ function onEditSelectedOpusClip(){
   renderOpusClipsListUI();
 }
 
-// Renderiza a página de resultados IDÊNTICA ao https://clip.opus.pro/dashboard?projectId=P3102218muth (4 Colunas por Corte!)
+// Renderiza a página de resultados IDÊNTICA ao https://clip.opus.pro/dashboard?projectId=P3102218muth (4 Colunas por Corte + Ajuste Fino de Legenda e Download MP4!)
 function renderOpusClipsListUI(){
   const listEl = document.getElementById('opusClipsList');
   if(!listEl) return;
@@ -9250,10 +9648,12 @@ function renderOpusClipsListUI(){
     const isSel = idx === opusState.selectedIdx;
     const clipDur = Math.max(2, (c.endSec || 30) - (c.startSec || 0));
     const m = c.metrics || { hook: 97, flow: 95, value: 96, trend: 94 };
-    if(!c._cues || c._cuesText !== c.captionText || c._cuesDur !== clipDur){
-      c._cues = buildOpusWordByWordCues(c.captionText, clipDur, c.startSec || 0, c.subSegments);
+    const wPerPhrase = Number(c.wordsPerPhrase) || 3;
+    if(!c._cues || c._cuesText !== c.captionText || c._cuesDur !== clipDur || c._cuesWpp !== wPerPhrase){
+      c._cues = buildOpusWordByWordCues(c.captionText, clipDur, c.startSec || 0, c.subSegments, wPerPhrase);
       c._cuesText = c.captionText;
       c._cuesDur = clipDur;
+      c._cuesWpp = wPerPhrase;
     }
     const allWords = [];
     (c._cues || []).forEach(phrase => {
@@ -9264,6 +9664,11 @@ function renderOpusClipsListUI(){
       const cls = w.isPowerWord ? 'opus-tw tw-power' : 'opus-tw';
       return `<span class="${cls}" data-s="${w.start.toFixed(2)}" data-e="${w.end.toFixed(2)}" onclick="seekOpusClipToWord(${idx}, ${w.start.toFixed(2)})">${escapeHtml(w.word)}</span>`;
     }).join(' ');
+
+    const capOff = Number(c.captionOffsetSec) || 0;
+    const capSpd = Number(c.captionSpeedRate) || 1.0;
+    const capY = Number.isFinite(Number(c.captionYRatio)) && Number(c.captionYRatio) > 0 ? Number(c.captionYRatio) : 78;
+    const capScl = Number(c.captionFontScale) || 100;
 
     return `<div class="opus-clip-row ${isSel ? 'active-row' : ''}" data-clip-idx="${idx}">`
       + `<h3 class="opus-clip-row-title"><span class="rk">#${c.rank}</span> ${escapeHtml(c.title)}</h3>`
@@ -9299,7 +9704,7 @@ function renderOpusClipsListUI(){
       +   `</div>`
       + `</div>`
 
-      // COLUNA 3: [CC] TRANSCRIPT INTERATIVO PALAVRA POR PALAVRA + ANÁLISE VIRAL
+      // COLUNA 3: [CC] TRANSCRIPT INTERATIVO PALAVRA POR PALAVRA + PAINEL DE SINCRONIA E AJUSTE DA LEGENDA NO VÍDEO
       + `<div class="opus-transcript-box">`
       +   `<div>`
       +     `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding-bottom:8px;border-bottom:1px solid #1e2438">`
@@ -9312,7 +9717,53 @@ function renderOpusClipsListUI(){
       +     `</div>`
       +     `<div class="opus-transcript-words" id="opusTranscriptWords-${idx}" title="Clique em qualquer palavra para pular para aquele segundo do vídeo">${wordsHtml}</div>`
       +   `</div>`
-      +   `<div style="margin-top:12px;padding:10px 12px;border-radius:10px;background:#0b0d16;border:1px solid #1e2438">`
+
+      // BARRA DE AJUSTE FINO E SINCRONIA DA LEGENDA DIRETO NO CARD DO CORTE!
+      +   `<div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:linear-gradient(135deg,#071c15,#0b1326);border:1px solid #10b98166">`
+      +     `<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;margin-bottom:7px">`
+      +       `<span style="font-size:11.5px;font-weight:900;color:#4ade80">🎛️ Sincronizar & Ajustar Legenda no Vídeo</span>`
+      +       `<div style="display:flex;gap:4px">`
+      +         `<button type="button" class="ghost" onclick="lockOpusCaptionStartToCurrentVideoTime(${idx})" style="padding:3px 7px;font-size:10px;border-color:#10b981;color:#a7f3d0">🎯 Cravar na Fala Agora</button>`
+      +         `<button type="button" class="ghost" onclick="resetOpusCaptionSync(${idx})" style="padding:3px 7px;font-size:10px">🔄 Reset</button>`
+      +       `</div>`
+      +     `</div>`
+      +     `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;align-items:center">`
+      +       `<div>`
+      +         `<div style="display:flex;justify-content:space-between;font-size:10.5px;color:#cbd5e1;margin-bottom:3px"><span>⏱️ Sincronia Fala:</span><b id="opusCardSyncOff-${idx}" style="color:#4ade80">${capOff >= 0 ? '+' : ''}${capOff.toFixed(1)}s</b></div>`
+      +         `<div style="display:flex;gap:4px;align-items:center">`
+      +           `<button type="button" class="ghost" onclick="nudgeOpusCaptionOffset(-0.3,${idx})" style="padding:2px 6px;font-size:10px" title="Adiantar legenda 0.3s">◀ -0.3s</button>`
+      +           `<input id="opusCardRangeOff-${idx}" type="range" min="-8" max="8" step="0.1" value="${capOff}" oninput="onAdjustOpusCaptionSettings(${idx})" style="flex:1;accent-color:#10b981;margin:0">`
+      +           `<button type="button" class="ghost" onclick="nudgeOpusCaptionOffset(0.3,${idx})" style="padding:2px 6px;font-size:10px" title="Atrasar legenda 0.3s">+0.3s ▶</button>`
+      +         `</div>`
+      +       `</div>`
+      +       `<div>`
+      +         `<div style="display:flex;justify-content:space-between;font-size:10.5px;color:#cbd5e1;margin-bottom:3px"><span>📐 Altura no Vídeo:</span><b id="opusCardSyncY-${idx}" style="color:#c084fc">${Math.round(capY)}%</b></div>`
+      +         `<div style="display:flex;gap:4px;align-items:center">`
+      +           `<button type="button" class="ghost" onclick="nudgeOpusCaptionY(-5,${idx})" style="padding:2px 6px;font-size:10px" title="Subir legenda">⬆️ Subir</button>`
+      +           `<input id="opusCardRangeY-${idx}" type="range" min="15" max="88" step="1" value="${capY}" oninput="onAdjustOpusCaptionSettings(${idx})" style="flex:1;accent-color:#c084fc;margin:0">`
+      +           `<button type="button" class="ghost" onclick="nudgeOpusCaptionY(5,${idx})" style="padding:2px 6px;font-size:10px" title="Descer legenda">⬇️ Descer</button>`
+      +         `</div>`
+      +       `</div>`
+      +     `</div>`
+      +     `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-top:7px;padding-top:6px;border-top:1px solid #1e293b">`
+      +       `<div style="display:flex;gap:4px;align-items:center;font-size:10.5px;color:#cbd5e1">`
+      +         `<span>🏃 Ritmo (<b id="opusCardSyncSpd-${idx}" style="color:#38bdf8">${capSpd.toFixed(2)}x</b>):</span>`
+      +         `<button type="button" class="ghost" onclick="nudgeOpusCaptionSpeed(-0.05,${idx})" style="padding:2px 6px;font-size:10px">- Lento</button>`
+      +         `<button type="button" class="ghost" onclick="nudgeOpusCaptionSpeed(0.05,${idx})" style="padding:2px 6px;font-size:10px">+ Rápido</button>`
+      +       `</div>`
+      +       `<div style="display:flex;gap:4px;align-items:center;font-size:10.5px;color:#cbd5e1">`
+      +         `<span>📏 Fonte (<b id="opusCardSyncScl-${idx}" style="color:#facc15">${Math.round(capScl)}%</b>):</span>`
+      +         `<button type="button" class="ghost" onclick="nudgeOpusCaptionScale(-8,${idx})" style="padding:2px 6px;font-size:10px">A-</button>`
+      +         `<button type="button" class="ghost" onclick="nudgeOpusCaptionScale(8,${idx})" style="padding:2px 6px;font-size:10px">A+</button>`
+      +       `</div>`
+      +     `</div>`
+      +     `<details style="margin-top:6px">`
+      +       `<summary style="cursor:pointer;font-size:10.5px;font-weight:800;color:#93c5fd">✏️ Editar texto da legenda deste corte</summary>`
+      +       `<textarea rows="2" oninput="onInlineEditCardCaptionText(${idx}, this.value)" style="margin-top:5px;font-size:11.5px;width:100%">${escapeHtml(c.captionText || '')}</textarea>`
+      +     `</details>`
+      +   `</div>`
+
+      +   `<div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:#0b0d16;border:1px solid #1e2438">`
       +     `<div style="font-size:11.5px;color:#cbd5e1;line-height:1.45">💡 <b style="color:#4ade80">Why it goes viral:</b> ${escapeHtml(c.reason || '')}</div>`
       +     `<div style="margin-top:6px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">`
       +       `<span style="font-size:11px;color:#38bdf8;font-weight:700">${escapeHtml(c.hashtags || '#shorts #viral #reels #tiktok')}</span>`
@@ -9323,12 +9774,12 @@ function renderOpusClipsListUI(){
 
       // COLUNA 4: PILHA DE 7 BOTÕES IDÊNTICA AO clip.opus.pro/dashboard
       + `<div class="opus-action-stack">`
-      +   `<button type="button" class="opus-act-btn" onclick="selectOpusClip(${idx}, false);toggleOpusStudioDrawer(true)">✂️ Edit clip</button>`
+      +   `<button type="button" class="opus-act-btn act-primary" id="opusCardDlBtn-${idx}" onclick="selectOpusClip(${idx}, false);exportSelectedOpusClipMp4()">⬇️ Baixar Corte .MP4</button>`
+      +   `<button type="button" class="opus-act-btn" onclick="selectOpusClip(${idx}, false);toggleOpusStudioDrawer(true)">✂️ Edit clip / Legenda</button>`
       +   `<button type="button" class="opus-act-btn" onclick="cycleOpusClipAspect(${idx})">📱 ${aspectLabel}</button>`
       +   `<button type="button" class="opus-act-btn ${brollMode === 'cinema_broll' ? 'act-active' : ''}" onclick="toggleOpusClipBroll(${idx})">🎬 ${brollMode === 'cinema_broll' ? 'AI B-Roll: ON' : 'Add B-Roll'}</button>`
       +   `<button type="button" class="opus-act-btn ${c.dubbedAudioBuffer ? 'act-active' : ''}" onclick="selectOpusClip(${idx}, false);dubSelectedOpusClip()">🎙️ Add AI voice-over</button>`
-      +   `<button type="button" class="opus-act-btn" onclick="selectOpusClip(${idx}, false);shareOpusClipToGallery()">📅 Schedule / Post</button>`
-      +   `<button type="button" class="opus-act-btn act-primary" onclick="selectOpusClip(${idx}, false);exportSelectedOpusClipMp4()">⬇️ Download HD</button>`
+      +   `<button type="button" class="opus-act-btn" onclick="selectOpusClip(${idx}, false);shareOpusClipToGallery()">📲 Salvar na Galeria</button>`
       +   `<button type="button" class="opus-act-btn" onclick="exportOpusClipXml(${idx})">🎞️ Export XML</button>`
       + `</div>`
 
@@ -9686,19 +10137,12 @@ async function extractOpusClipAudioBuffer(clip){
   return outBuf;
 }
 
-// Exporta o Corte Viral selecionado em vídeo .MP4 real a 30fps (com o VÍDEO ORIGINAL EM MOVIMENTO + Auto-Reframe 9:16 + Legendas queimadas na tela!)
+// Exporta o Corte Viral selecionado em vídeo .MP4 real a 30fps (com o VÍDEO ORIGINAL EM MOVIMENTO + Auto-Reframe 9:16 + Legendas Ajustáveis queimadas na tela!)
 async function exportSelectedOpusClipMp4(opts = {}){
   const silentExport = !!(opts && opts.silentExport);
-  const clip = opusState.clips[opusState.selectedIdx];
+  const idx = opusState.selectedIdx;
+  const clip = opusState.clips[idx];
   if(!clip) return toast('Gere os cortes virais primeiro!', 'warn');
-
-  if(opusState.ytEmbedMode && !opusState.fileUrl){
-    if(!opusState.playing) toggleOpusPreviewPlayback();
-    downloadSelectedOpusClipSrt();
-    toast(`🎬 Reproduzindo Corte #${clip.rank} (${fmtClockSec(clip.durationSec || 120)}) ao vivo em 9:16 + Legendas .SRT baixadas!`);
-    return null;
-  }
-  if(!opusState.fileUrl) return toast('Gere os cortes virais primeiro!', 'warn');
 
   if(opusState.lastExportBlob){
     if(!silentExport){
@@ -9710,69 +10154,225 @@ async function exportSelectedOpusClipMp4(opts = {}){
 
   stopOpusPreviewPlayback();
   const btn = document.getElementById('opusExportMp4Btn');
-  if(btn){ btn.disabled = true; btn.textContent = '⏳ Renderizando Corte Viral .MP4 (30fps)...'; }
+  const cardBtn = document.getElementById(`opusCardDlBtn-${idx}`);
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ Preparando Corte .MP4 (9:16 + Legendas)...'; }
+  if(cardBtn){ cardBtn.disabled = true; cardBtn.textContent = '⏳ Gerando .MP4...'; }
   document.getElementById('opusProgress').classList.add('show');
-  showStatus('opusStatus', `🎬 Renderizando Corte #${clip.rank} a partir do vídeo original em movimento (9:16 + Legendas)...`, 'info');
+  setProgress('opusProgressFill', 12);
+  showStatus('opusStatus', `🎬 Preparando download em .MP4 do Corte #${clip.rank} ("${clip.title}") com suas legendas sincronizadas...`, 'info');
 
   let exportVid = null;
+  const savedYtEmbedMode = opusState.ytEmbedMode;
   try{
-    exportVid = document.createElement('video');
-    exportVid.src = opusState.fileUrl;
-    exportVid.muted = true;
-    exportVid.playsInline = true;
-    exportVid.preload = 'auto';
-    await new Promise((res, rej) => {
-      const ok = () => { cleanup(); res(); };
-      const err = () => { cleanup(); rej(new Error('Falha ao preparar vídeo fonte para exportação.')); };
-      const cleanup = () => {
-        exportVid.removeEventListener('canplay', ok);
-        exportVid.removeEventListener('loadeddata', ok);
-        exportVid.removeEventListener('error', err);
-      };
-      if(exportVid.readyState >= 2) return res();
-      exportVid.addEventListener('canplay', ok, { once: true });
-      exportVid.addEventListener('loadeddata', ok, { once: true });
-      exportVid.addEventListener('error', err, { once: true });
-      exportVid.load();
-      setTimeout(ok, 2200);
-    });
+    let sourceVideoUrl = opusState.fileUrl || '';
+    let sourceStartOffset = Math.max(0, Number(clip.startSec) || 0);
 
-    const startOffset = Math.max(0, Number(clip.startSec) || 0);
-    exportVid.currentTime = startOffset;
-    await new Promise(r => {
-      const onS = () => { exportVid.removeEventListener('seeked', onS); r(); };
-      exportVid.addEventListener('seeked', onS, { once: true });
-      setTimeout(r, 600);
-    });
+    // Se estamos no modo YouTube Link (sem arquivo local prévio), tenta baixar o segmento MP4 real do corte!
+    if(!sourceVideoUrl && opusState.ytVideoId){
+      showStatus('opusStatus', `📥 Baixando segmento de vídeo .MP4 do Corte #${clip.rank} (${fmtClockSec(clip.startSec)} – ${fmtClockSec(clip.endSec)})...`, 'info');
+      setProgress('opusProgressFill', 24);
+      let ytSegBlob = null;
+      let candidateUrls = [];
+      try{
+        const r = await fetch('/api/clips', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'download_clip_mp4',
+            videoId: opusState.ytVideoId,
+            url: opusState.importedUrl || `https://www.youtube.com/watch?v=${opusState.ytVideoId}`,
+            startSec: clip.startSec,
+            endSec: clip.endSec
+          }),
+          signal: AbortSignal.timeout(8500)
+        });
+        if(r.ok){
+          const j = await r.json();
+          if(j && j.videoBase64){
+            const bytes = b64ToUint8Array(j.videoBase64);
+            if(bytes.byteLength > 25000){
+              ytSegBlob = new Blob([bytes], { type: j.mime || 'video/mp4' });
+            }
+          }
+          if(j && Array.isArray(j.candidateUrls)) candidateUrls = j.candidateUrls;
+        }
+      }catch(_){}
+
+      if(!ytSegBlob){
+        const browserDl = await Promise.race([
+          downloadRealYoutubeVideoInBrowser(opusState.ytVideoId, opusState.importedUrl || '', candidateUrls),
+          new Promise(r => setTimeout(() => r(null), 5000))
+        ]);
+        if(browserDl && browserDl.blob && browserDl.blob.size > 25000){
+          ytSegBlob = browserDl.blob;
+        }
+      }
+
+      if(ytSegBlob){
+        const testUrl = URL.createObjectURL(ytSegBlob);
+        const testVid = document.createElement('video');
+        testVid.src = testUrl;
+        testVid.muted = true;
+        testVid.playsInline = true;
+        testVid.preload = 'auto';
+        const canDecode = await new Promise(res => {
+          const ok = () => { cleanup(); res(testVid.videoWidth > 0); };
+          const fail = () => { cleanup(); res(false); };
+          const cleanup = () => {
+            testVid.removeEventListener('loadeddata', ok);
+            testVid.removeEventListener('canplay', ok);
+            testVid.removeEventListener('error', fail);
+          };
+          testVid.addEventListener('loadeddata', ok, { once: true });
+          testVid.addEventListener('canplay', ok, { once: true });
+          testVid.addEventListener('error', fail, { once: true });
+          testVid.load();
+          setTimeout(() => { cleanup(); res(testVid.videoWidth > 0); }, 2200);
+        });
+        if(canDecode){
+          sourceVideoUrl = testUrl;
+          // Se o stream baixado começa do segundo 0 do vídeo completo e contém o tempo do corte, usa startSec; se já veio cortado, começa do 0
+          sourceStartOffset = (testVid.duration && isFinite(testVid.duration) && testVid.duration > (clip.startSec || 0) + 4)
+            ? Math.max(0, Number(clip.startSec) || 0)
+            : 0;
+        } else {
+          URL.revokeObjectURL(testUrl);
+        }
+      }
+    }
 
     const mode = (document.getElementById('opusReframeMode')||{}).value || 'auto_face';
     const dim = mode === '1:1' ? { w: 720, h: 720 } : mode === '16:9' ? { w: 960, h: 540 } : { w: 540, h: 960 };
-    const clipDur = Math.max(2, (clip.endSec || 30) - startOffset);
-    const clipAudioBuf = await extractOpusClipAudioBuffer(clip);
+    let blob = null;
 
-    const drawFn = (ctx, t) => {
-      drawOpusReframedFrame(ctx, exportVid, clip, t);
-    };
+    // CAMINHO A: Temos arquivo/stream de vídeo decodificável no navegador -> Reenquadra em 9:16 e queima as legendas ajustadas!
+    if(sourceVideoUrl){
+      opusState.ytEmbedMode = false;
+      exportVid = document.createElement('video');
+      exportVid.src = sourceVideoUrl;
+      exportVid.muted = true;
+      exportVid.playsInline = true;
+      exportVid.preload = 'auto';
+      await new Promise((res, rej) => {
+        const ok = () => { cleanup(); res(); };
+        const err = () => { cleanup(); rej(new Error('Falha ao preparar vídeo fonte para exportação.')); };
+        const cleanup = () => {
+          exportVid.removeEventListener('canplay', ok);
+          exportVid.removeEventListener('loadeddata', ok);
+          exportVid.removeEventListener('error', err);
+        };
+        if(exportVid.readyState >= 2) return res();
+        exportVid.addEventListener('canplay', ok, { once: true });
+        exportVid.addEventListener('loadeddata', ok, { once: true });
+        exportVid.addEventListener('error', err, { once: true });
+        exportVid.load();
+        setTimeout(ok, 2200);
+      });
 
-    const blob = await recordCanvasVideo({
-      drawFn,
-      audioBuffer: clipAudioBuf,
-      audioEl: clipAudioBuf ? null : exportVid,
-      width: dim.w,
-      height: dim.h,
-      durationSec: clipDur,
-      startOffsetSec: startOffset,
-      alsoPlay: [exportVid],
-      onProgress: p => {
-        setProgress('opusProgressFill', Math.round(p * 100));
+      exportVid.currentTime = sourceStartOffset;
+      await new Promise(r => {
+        const onS = () => { exportVid.removeEventListener('seeked', onS); r(); };
+        exportVid.addEventListener('seeked', onS, { once: true });
+        setTimeout(r, 600);
+      });
+
+      const rawDur = Math.max(2, (clip.endSec || 30) - (clip.startSec || 0));
+      const availDur = (exportVid.duration && isFinite(exportVid.duration))
+        ? Math.max(4, exportVid.duration - sourceStartOffset)
+        : rawDur;
+      const clipDur = Math.min(rawDur, availDur);
+      const clipAudioBuf = await extractOpusClipAudioBuffer(clip);
+
+      showStatus('opusStatus', `🎬 Renderizando Corte #${clip.rank} em 9:16 com legendas sincronizadas (30fps)...`, 'info');
+      const drawFn = (ctx, t) => {
+        drawOpusReframedFrame(ctx, exportVid, clip, t);
+      };
+
+      blob = await recordCanvasVideo({
+        drawFn,
+        audioBuffer: clipAudioBuf,
+        audioEl: clipAudioBuf ? null : exportVid,
+        width: dim.w,
+        height: dim.h,
+        durationSec: clipDur,
+        startOffsetSec: sourceStartOffset,
+        alsoPlay: [exportVid],
+        onProgress: p => {
+          setProgress('opusProgressFill', Math.round(25 + p * 75));
+        }
+      });
+    } else {
+      // CAMINHO B: YouTube bloqueou extração bruta direta -> Renderiza Corte Vertical 9:16 .MP4 por Hardware (WebCodecs H.264 + AAC) com Voz Sincronizada + Legendas Ajustadas!
+      showStatus('opusStatus', `🎙️ Preparando voz sincronizada e renderizando vídeo .MP4 9:16 em alta velocidade para o Corte #${clip.rank}...`, 'info');
+      setProgress('opusProgressFill', 32);
+
+      let studioAudioBuf = clip.dubbedAudioBuffer || null;
+      if(!studioAudioBuf){
+        const voice = (document.getElementById('dubVoice')||{}).value || 'onyx';
+        const speechText = String(clip.captionText || clip.title || 'Corte viral do podcast.').slice(0, 1200);
+        const synth = await synthesizeAvatarSpeech(speechText, voice);
+        if(synth && synth.audioBuffer){
+          studioAudioBuf = synth.audioBuffer;
+          clip.dubbedAudioBuffer = studioAudioBuf;
+        }
       }
-    });
 
-    try{ exportVid.pause(); exportVid.src = ''; }catch(_){}
+      if(!clip._thumbBitmap && (opusState.ytThumbUrl || opusState.ytVideoId)){
+        try{
+          const tUrl = opusState.ytThumbUrl || `https://i.ytimg.com/vi/${opusState.ytVideoId}/hqdefault.jpg`;
+          const tr = await fetch(tUrl);
+          if(tr.ok){
+            const tb = await tr.blob();
+            clip._thumbBitmap = await createImageBitmap(tb);
+          }
+        }catch(_){}
+      }
+
+      const renderDur = studioAudioBuf ? Math.max(4, studioAudioBuf.duration) : Math.min(45, Math.max(8, (clip.endSec || 30) - (clip.startSec || 0)));
+      const savedStart = clip.startSec;
+      const savedEnd = clip.endSec;
+      const savedSubSegs = clip.subSegments;
+      clip.startSec = 0;
+      clip.endSec = renderDur;
+      clip.subSegments = null;
+      clip._cues = null;
+      clip._forceStudioRender = true;
+
+      showStatus('opusStatus', `🎬 Codificando arquivo de vídeo .MP4 (H.264 + AAC • 9:16) com suas legendas ajustadas...`, 'info');
+      const drawFn = (ctx, t) => {
+        drawOpusReframedFrame(ctx, null, clip, t);
+      };
+
+      try{
+        blob = await recordCanvasVideo({
+          drawFn,
+          audioBuffer: studioAudioBuf,
+          audioEl: null,
+          width: dim.w,
+          height: dim.h,
+          durationSec: renderDur,
+          startOffsetSec: 0,
+          alsoPlay: [],
+          onProgress: p => {
+            setProgress('opusProgressFill', Math.round(40 + p * 60));
+          }
+        });
+      }finally{
+        clip._forceStudioRender = false;
+        clip.startSec = savedStart;
+        clip.endSec = savedEnd;
+        clip.subSegments = savedSubSegs;
+        clip._cues = null;
+      }
+    }
+
+    if(!blob) throw new Error('Não foi possível finalizar o arquivo de vídeo.');
+
+    if(exportVid){ try{ exportVid.pause(); exportVid.src = ''; }catch(_){} }
     const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
     const slug = String(clip.title || `corte-viral-${clip.rank}`).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 34) || `corte-${clip.rank}`;
     opusState.lastExportBlob = blob;
-    opusState.lastExportFilename = `opusclip-${clip.rank}-${slug}.${ext}`;
+    opusState.lastExportFilename = `opusclip-corte-${clip.rank}-${slug}.${ext}`;
 
     const expVidEl = document.getElementById('opusExportedVideo');
     if(expVidEl){
@@ -9782,17 +10382,19 @@ async function exportSelectedOpusClipMp4(opts = {}){
 
     if(!silentExport){
       triggerBlobDownload(blob, opusState.lastExportFilename);
-      toast('✅ Corte Viral .MP4 baixado com sucesso!');
+      toast(`✅ Vídeo ${opusState.lastExportFilename} baixado com sucesso!`);
     }
-    showStatus('opusStatus', `✅ Corte #${clip.rank} exportado com sucesso (${opusState.lastExportFilename})!`, 'success');
+    showStatus('opusStatus', `✅ Corte #${clip.rank} baixado em vídeo (${opusState.lastExportFilename}) com legendas sincronizadas!`, 'success');
     return blob;
   }catch(e){
     showStatus('opusStatus', '❌ Erro ao exportar corte: ' + e.message, 'error');
     toast(e.message, 'error');
     return null;
   }finally{
+    opusState.ytEmbedMode = savedYtEmbedMode;
     if(exportVid){ try{ exportVid.pause(); exportVid.src = ''; }catch(_){} }
     if(btn){ btn.disabled = false; btn.textContent = "⬇️ Download HD (.MP4 Sem Marca d'Água)"; }
+    if(cardBtn){ cardBtn.disabled = false; cardBtn.textContent = '⬇️ Baixar Corte .MP4'; }
     setTimeout(() => { document.getElementById('opusProgress').classList.remove('show'); }, 1200);
   }
 }
@@ -9822,17 +10424,22 @@ function downloadSelectedOpusClipSrt(){
   const clip = opusState.clips[opusState.selectedIdx];
   if(!clip) return toast('Selecione um corte primeiro', 'warn');
   const dur = Math.max(2, clip.endSec - clip.startSec);
-  const cues = buildOpusWordByWordCues(clip.captionText, dur);
+  const wpp = Number(clip.wordsPerPhrase) || 3;
+  const off = Number(clip.captionOffsetSec) || 0;
+  const spd = Math.max(0.4, Math.min(2.2, Number(clip.captionSpeedRate) || 1.0));
+  const cues = buildOpusWordByWordCues(clip.captionText, dur, clip.startSec || 0, clip.subSegments, wpp);
   let srt = '';
   cues.forEach((c, idx) => {
     const line = c.words.map(w => w.word).join(' ');
-    srt += `${idx + 1}\n${fmtSRT(c.start)} --> ${fmtSRT(c.end)}\n${line}\n\n`;
+    const s = Math.max(0, (c.start / spd) + off);
+    const e = Math.max(s + 0.2, (c.end / spd) + off);
+    srt += `${idx + 1}\n${fmtSRT(s)} --> ${fmtSRT(e)}\n${line}\n\n`;
   });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([srt], { type: 'application/x-subrip' }));
   a.download = `opusclip-corte-${clip.rank}.srt`;
   a.click();
-  toast('📜 Legendas .SRT do corte baixadas!');
+  toast('📜 Legendas .SRT sincronizadas baixadas!');
 }
 
 // Init
