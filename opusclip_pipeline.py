@@ -43,8 +43,11 @@ client = OpenAI(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL) if OPENAI_BASE
 def baixar_midia_youtube(url_youtube, output_path="video_original.mp4"):
     print("[1/6] ⬇️  [yt-dlp] Baixando mídia bruta do YouTube...")
     print(f"      URL: {url_youtube}")
+    # Formato solicitado: baixa original em MP4 1080p direto (bv+ba)
+    # Comando equivalente: yt-dlp -f "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]" <url>
     ydl_opts = {
-        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+        "format": "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]",
+        "merge_output_format": "mp4",
         "outtmpl": output_path,
         "overwrites": True,
         "quiet": False,

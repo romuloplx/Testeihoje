@@ -1064,6 +1064,19 @@ input[type="range"]{
       </div>
     </div>
 
+    <!-- 📥 BAIXAR VÍDEO ORIGINAL YOUTUBE MP4 1080p (comando yt-dlp) -->
+    <div style="margin-top:12px;padding:12px 14px;border-radius:12px;background:#0e111e;border:1px solid #1e2538;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between">
+      <div style="flex:1;min-width:260px">
+        <div style="font-size:12px;font-weight:900;color:#f8fafc">📥 Baixar vídeo original do YouTube em MP4 1080p</div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:3px">Baixa o arquivo original sem cortes — depois gere os cortes virais. Comando usado:</div>
+        <code id="ytdlpCmd" style="display:block;margin-top:6px;padding:8px 10px;border-radius:8px;background:#080a14;border:1px solid #242b40;color:#a5f3fc;font-size:11px;word-break:break-all;user-select:all">yt-dlp -f "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]" https://link-do-seu-video-aqui</code>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="ghost" onclick="copyYtdlpCommand()" style="padding:10px 14px;font-size:12px;border-color:#334155;color:#e2e8f0">📋 Copiar comando</button>
+        <button type="button" class="primary" onclick="downloadOriginalYoutube1080p()" style="padding:10px 16px;font-size:12px;font-weight:900;background:linear-gradient(135deg,#7c3aed,#06b6d4);color:#fff;border:none;margin:0">⬇️ Baixar MP4 1080p agora</button>
+      </div>
+    </div>
+
     <div id="opusYoutubePreviewCard" class="hidden" style="margin-top:10px;padding:10px 12px;border-radius:12px;background:#0f1322;border:1px solid #232942"></div>
     <div id="opusFileMeta" class="hidden" style="margin-top:10px;padding:10px 12px;border-radius:12px;background:#0f1322;border:1px solid #232942;font-size:12.5px;color:#cbd5e1;line-height:1.5"></div>
 
@@ -7725,6 +7738,91 @@ async function importOpusVideoFromUrl(autoRunAnalysis = true){
   }finally{
     if(fetchBtn){ fetchBtn.disabled = false; fetchBtn.textContent = '⚡ Get clips in 1 click'; }
     if(mainBtn) mainBtn.disabled = false;
+  }
+}
+
+function updateYtdlpCommandDisplay(){
+  const inp = document.getElementById('opusYoutubeUrl');
+  const code = document.getElementById('ytdlpCmd');
+  if(!code) return;
+  const url = (inp && inp.value.trim()) || 'https://link-do-seu-video-aqui';
+  code.textContent = `yt-dlp -f "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]" ${url}`;
+}
+document.addEventListener('input', (e)=>{
+  if(e.target && e.target.id === 'opusYoutubeUrl') updateYtdlpCommandDisplay();
+});
+function copyYtdlpCommand(){
+  updateYtdlpCommandDisplay();
+  const code = document.getElementById('ytdlpCmd');
+  const text = code ? code.textContent : '';
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(()=> toast('📋 Comando yt-dlp copiado! Cole no terminal.'));
+  } else {
+    const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('📋 Comando copiado!');
+  }
+}
+async function downloadOriginalYoutube1080p(){
+  const inp = document.getElementById('opusYoutubeUrl');
+  const rawUrl = (inp ? inp.value.trim() : '');
+  if(!rawUrl){
+    toast('🔗 Cole o link do YouTube primeiro no campo acima!', 'warn');
+    if(inp) inp.focus();
+    return;
+  }
+  updateYtdlpCommandDisplay();
+  const btn = document.querySelector('button[onclick="downloadOriginalYoutube1080p()"]');
+  if(btn){ btn.disabled=true; btn.textContent='⏳ Baixando 1080p...'; }
+  showStatus('opusStatus','📥 Baixando vídeo original em MP4 1080p (bv*[ext=mp4]+ba[ext=m4a])...','info');
+  try{
+    let blob=null;
+    let filename='';
+    // Tenta via backend /api/clips com action fetch_url + download direto (usa yt-dlp no servidor quando disponível)
+    try{
+      const r = await fetch('/api/clips', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ action:'fetch_url', url: rawUrl, clipPrompt:'', desiredClipsCount:1 })
+      });
+      const j = await r.json();
+      if(j && j.directVideoBase64){
+        const bytes=b64ToUint8Array(j.directVideoBase64);
+        // se veio só preview pequeno, baixa o restante via stream
+        if(j.hasMoreVideoChunks && j.directStreamUrl){
+          const full = await downloadVideoChunksViaProxy(j.directStreamUrl, j.directStreamUa, bytes, 20);
+          if(full && full.blob){ blob=full.blob; filename=(j.title ? j.title.replace(/[^\w\-]+/g,'_') : 'video')+'.mp4'; }
+          else blob=new Blob([bytes],{type:j.directVideoMime||'video/mp4'});
+        } else {
+          blob=new Blob([bytes],{type:j.directVideoMime||'video/mp4'});
+        }
+        filename=(j.title ? j.title.replace(/[^\w\-]+/g,'_').slice(0,80) : 'video')+'.mp4';
+      }
+      if(!blob && j && Array.isArray(j.candidateStreamUrls) && j.candidateStreamUrls.length){
+        const dl = await downloadRealYoutubeVideoInBrowser(j.videoId||'', rawUrl, j.candidateStreamUrls);
+        if(dl && dl.blob){ blob=dl.blob; filename=(j.title ? j.title.replace(/[^\w\-]+/g,'_').slice(0,80) : 'video')+'.mp4'; }
+      }
+    }catch(_){}
+    // Fallback direto no navegador via Piped/Invidious
+    if(!blob){
+      const m=rawUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([A-Za-z0-9_\-]{11})/);
+      const vid=m?m[1]:'';
+      if(vid){
+        const dl=await downloadRealYoutubeVideoInBrowser(vid, rawUrl, []);
+        if(dl && dl.blob){ blob=dl.blob; filename=vid+'.mp4'; }
+      }
+    }
+    if(!blob) throw new Error('Não foi possível baixar o MP4 1080p por este link. Copie o comando yt-dlp acima e rode no seu terminal/Termux.');
+    if(!filename) filename='video-original-1080p.mp4';
+    if(!filename.toLowerCase().endsWith('.mp4')) filename+='.mp4';
+    triggerBlobDownload(blob, filename);
+    toast('✅ Vídeo original MP4 1080p baixado: '+filename);
+    showStatus('opusStatus','✅ Vídeo original MP4 1080p baixado com sucesso!','success');
+    // Também carrega no player para já gerar cortes
+    try{ loadOpusVideoFile(blob, filename, true); }catch(_){}
+  }catch(e){
+    showStatus('opusStatus','❌ '+e.message,'error');
+    toast(e.message,'error');
+  }finally{
+    if(btn){ btn.disabled=false; btn.textContent='⬇️ Baixar MP4 1080p agora'; }
   }
 }
 
