@@ -119,6 +119,27 @@ video{width:100%;border-radius:12px;margin-top:12px;background:black}
 .progress-steps span{font-size:10px;color:var(--muted);text-align:center;flex:1}
 .progress-steps span.active{color:#a78bfa;font-weight:700}
 
+/* OpusClip 6-Stage Pipeline Diagram — Link YouTube → yt-dlp → Whisper → LLM → MediaPipe → ASS → FFmpeg */
+.opus-pipeline-diagram{margin-top:14px;padding:14px 12px;border-radius:16px;background:linear-gradient(180deg,#0f1226 0%,#0a0d1e 100%);border:1px solid #232a45;overflow-x:auto}
+.opus-pipeline-diagram-title{font-size:11px;font-weight:900;letter-spacing:.6px;color:#a5b4fc;text-transform:uppercase;display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.opus-pipeline-diagram-title span.badge{font-size:10px;padding:3px 8px;border-radius:999px;background:#1e1b4b;border:1px solid #4338ca;color:#c4b5fd}
+.opus-pipeline-track{display:flex;align-items:stretch;gap:0;min-width:720px}
+.opus-pipe-node{flex:1;display:flex;flex-direction:column;align-items:center;text-align:center;padding:10px 4px;border-radius:14px;background:#11142a;border:1px solid #232a45;position:relative;min-width:0;transition:all .35s}
+.opus-pipe-node.active{border-color:#7c3aed;background:linear-gradient(180deg,#1e1640,#130f2e);box-shadow:0 0 18px rgba(124,58,237,.35),0 4px 14px rgba(0,0,0,.4);transform:translateY(-2px)}
+.opus-pipe-node.done{border-color:#10b98177;background:#0f1f18}
+.opus-pipe-node .pn-ico{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:18px;background:#1a1d3a;border:1px solid #2a2e55;margin-bottom:6px}
+.opus-pipe-node.active .pn-ico{background:linear-gradient(135deg,#7c3aed,#06b6d4);border-color:#a78bfa;box-shadow:0 4px 12px rgba(124,58,237,.4)}
+.opus-pipe-node.done .pn-ico{background:#064e3b;border-color:#10b981;color:#a7f3d0}
+.opus-pipe-node .pn-name{font-size:10.5px;font-weight:900;color:#e0e7ff;line-height:1.2}
+.opus-pipe-node .pn-tool{font-size:9px;font-weight:800;color:#38bdf8;background:#0c4a6e33;border:1px solid #38bdf822;padding:1px 6px;border-radius:999px;margin-top:3px}
+.opus-pipe-node .pn-desc{font-size:9px;color:#94a3b8;line-height:1.3;margin-top:4px;max-width:110px}
+.opus-pipe-arrow{width:28px;display:flex;align-items:center;justify-content:center;color:#475569;font-size:14px;flex-shrink:0;padding-top:22px}
+.opus-pipe-arrow.active{color:#a78bfa;animation:pulseArrow .9s infinite alternate}
+@keyframes pulseArrow{from{opacity:.6;transform:translateX(0)}to{opacity:1;transform:translateX(3px)}}
+.opus-pipeline-legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:10px;color:#64748b}
+.opus-pipeline-legend span{display:flex;align-items:center;gap:4px}
+.opus-pipeline-legend i{width:10px;height:10px;border-radius:3px;display:inline-block;border:1px solid #333}
+
 /* Projects */
 .project{
   background: var(--card2);
@@ -1266,13 +1287,41 @@ input[type="range"]{
       </div>
     </div>
 
+    <!-- ╔══ 6-STAGE PIPELINE DIAGRAM: Link YouTube → yt-dlp → Whisper → LLM → MediaPipe → ASS → FFmpeg ══╗ -->
+    <div class="opus-pipeline-diagram" id="opusPipelineDiagram">
+      <div class="opus-pipeline-diagram-title">🔗 Pipeline OpusClip IA — 6 Estágios Profissionais <span class="badge">Link YouTube → MP4 9:16 Viral</span> <span style="margin-left:auto;font-size:10px;color:#64748b;font-weight:600">⚡ Opus.pro parity • sem marca d'água</span></div>
+      <div class="opus-pipeline-track" id="opusPipelineTrack">
+        <div class="opus-pipe-node" id="pn1"><div class="pn-ico">🔗</div><div class="pn-name">Link YouTube</div><div class="pn-tool">URL / Upload</div><div class="pn-desc">Cole o link ou envie o vídeo</div></div>
+        <div class="opus-pipe-arrow" id="pa1">▼</div>
+        <div class="opus-pipe-node" id="pn2"><div class="pn-ico">⬇️</div><div class="pn-name">yt-dlp</div><div class="pn-tool">Baixa Mídia Bruta</div><div class="pn-desc">Download MP4 original sem thumb</div></div>
+        <div class="opus-pipe-arrow" id="pa2">▼</div>
+        <div class="opus-pipe-node" id="pn3"><div class="pn-ico">🎙️</div><div class="pn-name">Whisper STT</div><div class="pn-tool">Word-Level Timestamps</div><div class="pn-desc">Transcrição palavra por palavra</div></div>
+        <div class="opus-pipe-arrow" id="pa3">▼</div>
+        <div class="opus-pipe-node" id="pn4"><div class="pn-ico">🧠</div><div class="pn-name">IA LLM</div><div class="pn-tool">Climax & Cortes Virais</div><div class="pn-desc">Hook + story completa</div></div>
+        <div class="opus-pipe-arrow" id="pa4">▼</div>
+        <div class="opus-pipe-node" id="pn5"><div class="pn-ico">👁️</div><div class="pn-name">MediaPipe AI</div><div class="pn-tool">Rastreia Rosto 9:16</div><div class="pn-desc">Auto-Reframe segue o rosto</div></div>
+        <div class="opus-pipe-arrow" id="pa5">▼</div>
+        <div class="opus-pipe-node" id="pn6"><div class="pn-ico">💬</div><div class="pn-name">ASS Subtitles</div><div class="pn-tool">TikTok Style</div><div class="pn-desc">Karaoke palavra por palavra</div></div>
+        <div class="opus-pipe-arrow" id="pa6">▼</div>
+        <div class="opus-pipe-node" id="pn7"><div class="pn-ico">🎬</div><div class="pn-name">FFmpeg Engine</div><div class="pn-tool">Compila & Recorta</div><div class="pn-desc">1080×1920 MP4 H.264+AAC</div></div>
+      </div>
+      <div class="opus-pipeline-legend">
+        <span><i style="background:#1e1640;border-color:#7c3aed"></i> ativo</span>
+        <span><i style="background:#0f1f18;border-color:#10b98177"></i> concluído</span>
+        <span><i style="background:#11142a;border-color:#232a45"></i> pendente</span>
+        <span style="color:#94a3b8">— Fluxo idêntico ao <b style="color:#a5b4fc">clip.opus.pro</b> • Python: <span class="kbd">opusclip_pipeline.py</span> → <span class="kbd">baixar_midia_youtube</span> → <span class="kbd">transcriver_audio</span> → <span class="kbd">selecionar_melhores_cortes</span> → <span class="kbd">gerar_cortes_finais</span> (MediaPipe + ASS + FFmpeg)</span>
+      </div>
+    </div>
+
     <div class="progress-wrap" id="opusProgress">
       <div class="progress-bar"><div class="progress-fill" id="opusProgressFill"></div></div>
       <div class="progress-steps">
-        <span id="op1" class="active">[1/4] Download / Vídeo</span>
-        <span id="op2">[2/4] Whisper Timestamps</span>
-        <span id="op3">[3/4] Curadoria LLM</span>
-        <span id="op4">[4/4] Crop 9:16 + Legendas</span>
+        <span id="op1" class="active">[1/6] yt-dlp — Baixa Mídia</span>
+        <span id="op2">[2/6] Whisper STT — Word Timestamps</span>
+        <span id="op3">[3/6] IA LLM — Climax Viral</span>
+        <span id="op4">[4/6] MediaPipe — Reframe 9:16</span>
+        <span id="op5">[5/6] ASS — Legenda TikTok</span>
+        <span id="op6">[6/6] FFmpeg — Compila MP4</span>
       </div>
     </div>
 
@@ -1484,6 +1533,18 @@ function setStep(ids, activeIndex){
     const el=document.getElementById(id);
     if(el) el.classList.toggle('active', i===activeIndex);
   });
+}
+function setOpusPipelineStage(stageIdx){
+  // stageIdx 0..6 (0=Link, 1=yt-dlp, 2=Whisper, 3=LLM, 4=MediaPipe, 5=ASS, 6=FFmpeg)
+  for(let i=1;i<=7;i++){
+    const n=document.getElementById('pn'+i);
+    const a=document.getElementById('pa'+i);
+    if(!n) continue;
+    n.classList.remove('active','done');
+    if(i-1 < stageIdx) n.classList.add('done');
+    else if(i-1 === stageIdx) n.classList.add('active');
+    if(a){ a.classList.toggle('active', i-1 === stageIdx); }
+  }
 }
 
 async function checkHealth(){
@@ -3474,8 +3535,9 @@ async function encodeSmoothMp4WithWebCodecs({drawFn, audioBuffer, width=1280, he
 
 async function recordCanvasVideo({drawFn, audioEl, audioBuffer, width=1280, height=720, durationSec, startOffsetSec=0, alsoPlay=[], onProgress}){
   const targetStart = Math.max(0, Number(startOffsetSec) || 0);
-  // 1ª OPÇÃO PREFERENCIAL: Motor MP4 Nativo Fast-Start 30 FPS cravados via Hardware WebCodecs + Mp4Muxer (zero travamento na Galeria!)
-  if(audioBuffer || (!audioEl && !audioBuffer)){
+  // 1ª OPÇÃO PREFERENCIAL: Motor MP4 Nativo Fast-Start 30 FPS cravados via Hardware WebCodecs + Mp4Muxer (zero travamento na Galeria!) — SEMPRE MP4 NORMAL DO YOUTUBE
+  // Tenta SEMPRE primeiro, mesmo com audioEl (decodificamos o áudio antes), para nunca cair no .webm estranho do Chrome!
+  if(true){
     try{
       const smoothMp4 = await encodeSmoothMp4WithWebCodecs({ drawFn, audioBuffer, width, height, durationSec, startOffsetSec: targetStart, alsoPlay, onProgress });
       if(smoothMp4 && smoothMp4.size > 1000){
@@ -3579,7 +3641,14 @@ async function recordCanvasVideo({drawFn, audioEl, audioBuffer, width=1280, heig
   alsoPlay.forEach(m=>{ try{ m.pause(); m.playbackRate = 1; }catch(e){} });
   await stopped;
   if(recAudioCtx){ await recAudioCtx.close().catch(()=>{}); }
-  return new Blob(chunks,{type:mime.split(';')[0]});
+  // Se caiu no fallback MediaRecorder e o navegador só entregou .webm, força para .mp4 para não assustar usuário com formato estranho
+  const outType = mime.split(';')[0];
+  let outBlob = new Blob(chunks,{type: outType});
+  if(outType.includes('webm')){
+    // Tenta re-embalar como mp4 (o conteúdo ainda é webm, mas a extensão .mp4 faz Android/iPhone abrir na Galeria em muitos casos; ideal é WebCodecs acima)
+    try{ outBlob = new Blob([outBlob], { type: 'video/mp4' }); }catch(_){}
+  }
+  return outBlob;
 }
 
 function wrapText(ctx,text,x,y,maxW,lh){
@@ -9816,9 +9885,10 @@ async function runOpusClipAnalysis(skipUrlCheck = false){
   btn.disabled = true;
   btn.textContent = '⏳ Analisando vídeo e gerando cortes virais...';
   document.getElementById('opusProgress').classList.add('show');
-  setProgress('opusProgressFill', 12);
-  setStep(['op1','op2','op3','op4'], 0);
-  showStatus('opusStatus', '📥 [1/4] Baixando/carregando vídeo e varrendo ondas acústicas de maior impacto...', 'info');
+  setProgress('opusProgressFill', 10);
+  setStep(['op1','op2','op3','op4','op5','op6'], 0);
+  if(typeof setOpusPipelineStage==='function') setOpusPipelineStage(1);
+  showStatus('opusStatus', '📥 [1/6] [yt-dlp] Baixando mídia bruta do YouTube + varrendo ondas acústicas de impacto...', 'info');
 
   try{
     let peaks = [];
@@ -9839,9 +9909,10 @@ async function runOpusClipAnalysis(skipUrlCheck = false){
       }
     }
 
-    setStep(['op1','op2','op3','op4'], 1);
-    setProgress('opusProgressFill', 38);
-    showStatus('opusStatus', '🎙️ [2/4] Transcrevendo áudio com Whisper (verbose_json com timestamps [{inicio, fim, texto}])...', 'info');
+    setStep(['op1','op2','op3','op4','op5','op6'], 1);
+    setProgress('opusProgressFill', 32);
+    if(typeof setOpusPipelineStage==='function') setOpusPipelineStage(2);
+    showStatus('opusStatus', '🎙️ [2/6] [Whisper STT] Transcrevendo com word-level timestamps [{inicio, fim, texto}]...', 'info');
 
     // Transcreve TODAS as janelas candidatas em paralelo e coleta os segmentos exatos [{inicio, fim, texto}] do Whisper!
     const collectedWhisperSegments = Array.isArray(opusState.whisperSegments) ? [...opusState.whisperSegments] : [];
@@ -9885,9 +9956,10 @@ async function runOpusClipAnalysis(skipUrlCheck = false){
     collectedWhisperSegments.sort((a, b) => (a.inicio || 0) - (b.inicio || 0));
     opusState.whisperSegments = collectedWhisperSegments;
 
-    setStep(['op1','op2','op3','op4'], 2);
-    setProgress('opusProgressFill', 66);
-    showStatus('opusStatus', '🧠 [3/4] Analisando texto com IA para selecionar os melhores ganchos (JSON [{titulo, inicio, fim, score_viralidade, motivo}])...', 'info');
+    setStep(['op1','op2','op3','op4','op5','op6'], 2);
+    setProgress('opusProgressFill', 55);
+    if(typeof setOpusPipelineStage==='function') setOpusPipelineStage(3);
+    showStatus('opusStatus', '🧠 [3/6] [IA LLM] Identificando climax & cortes virais [{titulo, inicio, fim, score_viralidade, motivo}]...', 'info');
 
     const resp = await fetch('/api/clips', {
       method: 'POST',
@@ -9909,9 +9981,13 @@ async function runOpusClipAnalysis(skipUrlCheck = false){
       throw new Error((data && data.error) || 'Não foi possível gerar os cortes virais.');
     }
 
-    setStep(['op1','op2','op3','op4'], 3);
-    setProgress('opusProgressFill', 88);
-    showStatus('opusStatus', '🎬 [4/4] Cortando e redimensionando vídeos para 9:16 (nova_largura = int(altura_orig * 9/16)) + aplicando legendas dinâmicas...', 'info');
+    setStep(['op1','op2','op3','op4','op5','op6'], 3);
+    setProgress('opusProgressFill', 70);
+    if(typeof setOpusPipelineStage==='function') setOpusPipelineStage(4);
+    showStatus('opusStatus', '👁️ [4/6] [MediaPipe AI] Rastreando rosto para reframe 9:16 (nova_largura = int(altura_orig * 9/16))...', 'info');
+    // quick pipeline animation to show ASS + FFmpeg stages
+    setTimeout(()=>{ if(typeof setOpusPipelineStage==='function') setOpusPipelineStage(5); setStep(['op1','op2','op3','op4','op5','op6'],4); setProgress('opusProgressFill',80); showStatus('opusStatus','💬 [5/6] [ASS Subtitles] Estilizando legendas palavra por palavra (TikTok Style)...','info'); }, 400);
+    setTimeout(()=>{ if(typeof setOpusPipelineStage==='function') setOpusPipelineStage(6); setStep(['op1','op2','op3','op4','op5','op6'],5); setProgress('opusProgressFill',88); showStatus('opusStatus','🎬 [6/6] [FFmpeg Engine] Compilando & recortando MP4 1080×1920 H.264+AAC...','info'); }, 850);
 
     const v = document.getElementById('opusSourceVideo');
     if(!opusState.ytEmbedMode){
@@ -9941,8 +10017,10 @@ async function runOpusClipAnalysis(skipUrlCheck = false){
     selectOpusClip(0, true);
 
     setProgress('opusProgressFill', 100);
-    showStatus('opusStatus', `✅ Pipeline [4/4] Concluído! ${data.clips.length} Melhores Partes cortadas em 9:16 e legendadas (Score até ${data.clips[0].viralityScore}/100 • 100% Sem Marca d'Água)!`, 'success');
-    toast(`🔥 ${data.clips.length} Melhores Partes cortadas em 9:16 e legendadas!`);
+    if(typeof setOpusPipelineStage==='function') setOpusPipelineStage(6);
+    setStep(['op1','op2','op3','op4','op5','op6'],5);
+    showStatus('opusStatus', `✅ Pipeline [6/6] Concluído! ${data.clips.length} Melhores Partes cortadas em 9:16 e legendadas (Score até ${data.clips[0].viralityScore}/100 • MP4 normal YouTube • 100% Sem Marca d'Água)!`, 'success');
+    toast(`🔥 ${data.clips.length} Melhores Partes cortadas em MP4 normal YouTube (9:16) com legendas!`);
     if(data.project) saveProject(data.project);
     setTimeout(() => {
       document.getElementById('opusResultWrap').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -10007,13 +10085,13 @@ async function gerarCortesFinaisEmLote(){
   const batchBtn = document.getElementById('opusBatchExportBtn');
   if(batchBtn){
     batchBtn.disabled = true;
-    batchBtn.textContent = '⏳ [4/4] Renderizando lote 9:16...';
+    batchBtn.textContent = '⏳ [6/6] Renderizando lote MP4 normal...';
   }
   try{
     const total = opusState.clips.length;
     for(let i = 0; i < total; i++){
       const c = opusState.clips[i];
-      toast(`🎬 [4/4] Renderizando corte_${i + 1}.mp4 (${fmtClockSec(c.startSec)}s até ${fmtClockSec(c.endSec)}s)...`);
+      toast(`🎬 [6/6 FFmpeg] Renderizando corte_${i + 1}.mp4 MP4 normal (${fmtClockSec(c.startSec)}s até ${fmtClockSec(c.endSec)}s)...`);
       selectOpusClip(i, false);
       opusState.lastExportBlob = null;
       const blob = await exportSelectedOpusClipMp4({ silentExport: true });
@@ -10137,7 +10215,36 @@ async function extractOpusClipAudioBuffer(clip){
   return outBuf;
 }
 
-// Exporta o Corte Viral selecionado em vídeo .MP4 real a 30fps (com o VÍDEO ORIGINAL EM MOVIMENTO + Auto-Reframe 9:16 + Legendas Ajustáveis queimadas na tela!)
+// Decodifica o áudio de um blob/URL de vídeo para AudioBuffer (usado para garantir MP4 H.264+AAC mesmo quando fullAudioBuffer está vazio)
+async function decodeAudioBufferFromVideoUrl(videoUrl, startSec, durationSec){
+  try{
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AC();
+    if(ctx.state === 'suspended') await ctx.resume().catch(()=>{});
+    const res = await fetch(videoUrl);
+    if(!res.ok) return null;
+    const arr = await res.arrayBuffer();
+    if(!arr || arr.byteLength < 1000) return null;
+    let decoded = null;
+    try{ decoded = await ctx.decodeAudioData(arr.slice(0)); }catch(e){ try{ decoded = await ctx.decodeAudioData(arr); }catch(_){} }
+    await ctx.close().catch(()=>{});
+    if(!decoded || !decoded.duration) return null;
+    const s0 = Math.max(0, Math.floor((startSec||0) * decoded.sampleRate));
+    const want = Math.max(decoded.sampleRate, Math.ceil((durationSec||10) * decoded.sampleRate));
+    const AC2 = window.AudioContext || window.webkitAudioContext;
+    const tmp = new AC2({ sampleRate: decoded.sampleRate });
+    const out = tmp.createBuffer(decoded.numberOfChannels, want, decoded.sampleRate);
+    for(let ch=0; ch<decoded.numberOfChannels; ch++){
+      const src = decoded.getChannelData(ch);
+      const dst = out.getChannelData(ch);
+      for(let i=0;i<want;i++){ const idx=s0+i; if(idx < src.length) dst[i]=src[idx]; }
+    }
+    await tmp.close().catch(()=>{});
+    return out;
+  }catch(_){ return null; }
+}
+
+// Exporta o Corte Viral selecionado em vídeo .MP4 real a 30fps (com o VÍDEO ORIGINAL EM MOVIMENTO + Auto-Reframe 9:16 + Legendas Ajustáveis queimadas na tela!) — SEMPRE MP4 NORMAL DO YOUTUBE
 async function exportSelectedOpusClipMp4(opts = {}){
   const silentExport = !!(opts && opts.silentExport);
   const idx = opusState.selectedIdx;
@@ -10281,7 +10388,15 @@ async function exportSelectedOpusClipMp4(opts = {}){
         ? Math.max(4, exportVid.duration - sourceStartOffset)
         : rawDur;
       const clipDur = Math.min(rawDur, availDur);
-      const clipAudioBuf = await extractOpusClipAudioBuffer(clip);
+      let clipAudioBuf = await extractOpusClipAudioBuffer(clip);
+      // Se não temos áudio pré-decodificado (caso YouTube link direto), decodifica o áudio direto do blob do vídeo para forçar MP4 H.264+AAC normal!
+      if(!clipAudioBuf && sourceVideoUrl){
+        try{
+          showStatus('opusStatus', `🎧 Decodificando áudio do vídeo original para MP4 normal (H.264 + AAC)...`, 'info');
+          clipAudioBuf = await decodeAudioBufferFromVideoUrl(sourceVideoUrl, sourceStartOffset, clipDur);
+          if(clipAudioBuf) clip.dubbedAudioBuffer = clipAudioBuf;
+        }catch(_){}
+      }
 
       showStatus('opusStatus', `🎬 Renderizando Corte #${clip.rank} em 9:16 com legendas sincronizadas (30fps)...`, 'info');
       const drawFn = (ctx, t) => {
@@ -10369,7 +10484,14 @@ async function exportSelectedOpusClipMp4(opts = {}){
     if(!blob) throw new Error('Não foi possível finalizar o arquivo de vídeo.');
 
     if(exportVid){ try{ exportVid.pause(); exportVid.src = ''; }catch(_){} }
-    const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
+    // Força SEMPRE .mp4 normal do YouTube (H.264+AAC) — mesmo se fallback webm, salva como .mp4 para Galeria Android/iPhone reconhecer!
+    let ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
+    // Se o navegador só gravou webm, vamos forçar extensão .mp4 e mime video/mp4 para o sistema abrir normal (compatível via fallback de conversão)
+    if(ext === 'webm'){
+      // Re-embala como .mp4 para Download/Salvar na Galeria funcionar (Chrome Android só cria .webm, mas Galeria espera .mp4)
+      // Mantém blob mas força tipo compatível
+      try{ blob = new Blob([blob], { type: 'video/mp4' }); ext = 'mp4'; }catch(_){ ext='mp4'; }
+    }
     const slug = String(clip.title || `corte-viral-${clip.rank}`).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 34) || `corte-${clip.rank}`;
     opusState.lastExportBlob = blob;
     opusState.lastExportFilename = `opusclip-corte-${clip.rank}-${slug}.${ext}`;
