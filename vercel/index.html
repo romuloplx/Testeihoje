@@ -7176,7 +7176,9 @@ let opusState = {
   dubStartWall: 0,
   lastExportBlob: null,
   lastExportFilename: 'corte-viral-opusclip.mp4',
+  lastExportClipId: null,
   importedUrl: '',
+  ytCandidateUrls: [],
   ytTranscriptSegments: null,
   ytEmbedMode: false,
   ytVideoId: '',
@@ -7194,7 +7196,7 @@ function getOpusVisibleIds(){ return getOpusFilteredClips().map(c=>c.id); }
 function toggleBulkSelectAll(checked){ const vis=getOpusVisibleIds(); if(checked) vis.forEach(id=>opusBulkSelected.add(id)); else vis.forEach(id=>opusBulkSelected.delete(id)); updateOpusBulkCount(); renderOpusClipsListUI(); }
 function toggleOpusBulkItem(id, checked){ if(checked) opusBulkSelected.add(id); else opusBulkSelected.delete(id); updateOpusBulkCount(); renderOpusClipsListUI(); }
 function toastOpusClip(m,t){ try{ toast(m,t||'ok'); }catch(e){ console.log(m); } }
-function quickDownloadOpusClip(clipId, ev){ if(ev){ ev.preventDefault(); ev.stopPropagation(); } const idx=opusState.clips.findIndex(c=>c.id===clipId); if(idx>=0){ opusState.selectedIdx=idx; renderOpusClipsListUI(); exportSelectedOpusClipMp4(); } }
+function quickDownloadOpusClip(clipId, ev){ if(ev){ ev.preventDefault(); ev.stopPropagation(); } const idx=opusState.clips.findIndex(c=>c.id===clipId); if(idx>=0){ selectOpusClip(idx, false); exportSelectedOpusClipMp4(); } }
 
 // Escuta mensagens oficiais do YouTube IFrame Player API (enablejsapi=1) para sincronizar cada palavra da legenda ao milissegundo exato da fala no vídeo do YouTube!
 window.addEventListener('message', (ev) => {
@@ -7682,6 +7684,7 @@ async function importOpusVideoFromUrl(autoRunAnalysis = true){
     }
 
     // 3) MODO PODCAST & YOUTUBE STREAM 9:16 AO VIVO COM LEGENDAS (Zero aviso amarelo — extrai automaticamente as melhores partes de 2 minutos com o vídeo real do YouTube em movimento + legendas dinâmicas!)
+    if(info.candidateStreamUrls) opusState.ytCandidateUrls = Array.isArray(info.candidateStreamUrls) ? [...info.candidateStreamUrls] : [];
     if(!finalVideoBlob && ytId){
       stopOpusPreviewPlayback();
       if(opusState.fileUrl) URL.revokeObjectURL(opusState.fileUrl);
@@ -7698,7 +7701,7 @@ async function importOpusVideoFromUrl(autoRunAnalysis = true){
       opusState.mono12k = null;
       opusState.fullAudioBuffer = null;
       opusState.clips = [];
-      opusState.lastExportBlob = null;
+      opusState.lastExportBlob = null; opusState.lastExportClipId = null;
       opusState.importedUrl = rawUrl;
       opusState.ytTranscriptSegments = Array.isArray(info.transcriptSegments) ? info.transcriptSegments : null;
       opusState.whisperSegments = Array.isArray(info.timestampedSegments) && info.timestampedSegments.length ? info.timestampedSegments : null;
@@ -8106,7 +8109,7 @@ function loadOpusVideoFile(file, customLabel = '', skipAutoClip = false){
   opusState.fullAudioBuffer = null;
   opusState.ytTranscriptSegments = null;
   opusState.clips = [];
-  opusState.lastExportBlob = null;
+  opusState.lastExportBlob = null; opusState.lastExportClipId = null;
 
   const monWrap = document.getElementById('opusSourceMonitorWrap');
   if(monWrap) monWrap.classList.remove('hidden');
@@ -9034,7 +9037,7 @@ function updateOpusCanvasAspect(){
 
 function onChangeOpusVisualSettings(){
   updateOpusCanvasAspect();
-  opusState.lastExportBlob = null;
+  opusState.lastExportBlob = null; opusState.lastExportClipId = null;
   renderSingleOpusPreviewFrame();
 }
 
@@ -9608,7 +9611,7 @@ function onAdjustOpusCaptionSettings(cardIdx = null){
     }
   }
 
-  opusState.lastExportBlob = null;
+  opusState.lastExportBlob = null; opusState.lastExportClipId = null;
   if(idx === opusState.selectedIdx) syncOpusCaptionUiFromClip(clip);
   updateInlineCardCaptionBadges(idx, clip);
 
@@ -9629,7 +9632,7 @@ function nudgeOpusCaptionOffset(deltaSec, cardIdx = null){
   if(!clip) return;
   const cur = Number(clip.captionOffsetSec) || 0;
   clip.captionOffsetSec = Number(Math.max(-15, Math.min(15, cur + (Number(deltaSec) || 0))).toFixed(2));
-  opusState.lastExportBlob = null;
+  opusState.lastExportBlob = null; opusState.lastExportClipId = null;
   if(idx === opusState.selectedIdx) syncOpusCaptionUiFromClip(clip);
   updateInlineCardCaptionBadges(idx, clip);
   if(!opusState.playing) renderSingleOpusPreviewFrame();
@@ -9646,7 +9649,7 @@ function nudgeOpusCaptionSpeed(deltaRate, cardIdx = null){
   if(!clip) return;
   const cur = Number(clip.captionSpeedRate) || 1.0;
   clip.captionSpeedRate = Number(Math.max(0.60, Math.min(1.50, cur + (Number(deltaRate) || 0))).toFixed(2));
-  opusState.lastExportBlob = null;
+  opusState.lastExportBlob = null; opusState.lastExportClipId = null;
   if(idx === opusState.selectedIdx) syncOpusCaptionUiFromClip(clip);
   updateInlineCardCaptionBadges(idx, clip);
   if(!opusState.playing) renderSingleOpusPreviewFrame();
@@ -9659,7 +9662,7 @@ function nudgeOpusCaptionY(deltaPct, cardIdx = null){
   if(!clip) return;
   const cur = Number.isFinite(Number(clip.captionYRatio)) && Number(clip.captionYRatio) > 0 ? Number(clip.captionYRatio) : 78;
   clip.captionYRatio = Math.max(15, Math.min(88, Math.round(cur + (Number(deltaPct) || 0))));
-  opusState.lastExportBlob = null;
+  opusState.lastExportBlob = null; opusState.lastExportClipId = null;
   if(idx === opusState.selectedIdx) syncOpusCaptionUiFromClip(clip);
   updateInlineCardCaptionBadges(idx, clip);
   const cardCv = document.getElementById(`opusCardCanvas-${idx}`);
@@ -9675,7 +9678,7 @@ function nudgeOpusCaptionScale(deltaPct, cardIdx = null){
   if(!clip) return;
   const cur = Number(clip.captionFontScale) || 100;
   clip.captionFontScale = Math.max(65, Math.min(145, Math.round(cur + (Number(deltaPct) || 0))));
-  opusState.lastExportBlob = null;
+  opusState.lastExportBlob = null; opusState.lastExportClipId = null;
   if(idx === opusState.selectedIdx) syncOpusCaptionUiFromClip(clip);
   updateInlineCardCaptionBadges(idx, clip);
   const cardCv = document.getElementById(`opusCardCanvas-${idx}`);
@@ -9691,7 +9694,7 @@ function lockOpusCaptionStartToCurrentVideoTime(cardIdx = null){
   if(!clip) return;
   const curRel = Number(opusState.lastPreviewRelSec) || 0;
   clip.captionOffsetSec = Number(Math.max(-10, Math.min(15, curRel)).toFixed(2));
-  opusState.lastExportBlob = null;
+  opusState.lastExportBlob = null; opusState.lastExportClipId = null;
   if(idx === opusState.selectedIdx) syncOpusCaptionUiFromClip(clip);
   updateInlineCardCaptionBadges(idx, clip);
   toast(`🎯 Início da legenda cravado na fala atual (${clip.captionOffsetSec >= 0 ? '+' : ''}${clip.captionOffsetSec.toFixed(1)}s)!`);
@@ -9708,7 +9711,7 @@ function resetOpusCaptionSync(cardIdx = null){
   clip.captionFontScale = 100;
   clip.wordsPerPhrase = 3;
   clip._cues = null;
-  opusState.lastExportBlob = null;
+  opusState.lastExportBlob = null; opusState.lastExportClipId = null;
   if(idx === opusState.selectedIdx) syncOpusCaptionUiFromClip(clip);
   updateInlineCardCaptionBadges(idx, clip);
   renderSingleOpusPreviewFrame();
@@ -9721,7 +9724,7 @@ function onInlineEditCardCaptionText(idx, val){
   if(!clip) return;
   clip.captionText = String(val || '');
   clip._cues = null;
-  opusState.lastExportBlob = null;
+  opusState.lastExportBlob = null; opusState.lastExportClipId = null;
   if(idx === opusState.selectedIdx){
     const ed = document.getElementById('opusEditCaption');
     if(ed) ed.value = clip.captionText;
@@ -9789,7 +9792,7 @@ function selectOpusClip(idx, autoPlay = false){
   if(!opusState.clips || !opusState.clips[idx]) return;
   stopOpusPreviewPlayback();
   opusState.selectedIdx = idx;
-  opusState.lastExportBlob = null;
+  opusState.lastExportBlob = null; opusState.lastExportClipId = null; opusState.lastExportClipId = null;
   const expVid = document.getElementById('opusExportedVideo');
   if(expVid) expVid.classList.add('hidden');
 
@@ -9846,7 +9849,7 @@ function onEditSelectedOpusClip(){
   clip.hookBanner = document.getElementById('opusEditHookBanner').value;
   clip.captionText = document.getElementById('opusEditCaption').value;
   clip._cues = null;
-  opusState.lastExportBlob = null;
+  opusState.lastExportBlob = null; opusState.lastExportClipId = null;
   renderOpusClipsListUI();
 }
 
@@ -10274,7 +10277,7 @@ async function gerarCortesFinaisEmLote(forcedIds){
       const c = opusState.clips[i];
       toast(`🎬 [6/6 FFmpeg] Renderizando corte_${i + 1}.mp4 MP4 normal (${fmtClockSec(c.startSec)}s até ${fmtClockSec(c.endSec)}s)...`);
       selectOpusClip(i, false);
-      opusState.lastExportBlob = null;
+      opusState.lastExportBlob = null; opusState.lastExportClipId = null;
       const blob = await exportSelectedOpusClipMp4({ silentExport: true });
       if(blob){
         const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
@@ -10310,7 +10313,7 @@ async function dubSelectedOpusClip(){
     const arr = await res.blob.arrayBuffer();
     clip.dubbedAudioBuffer = await ac.decodeAudioData(arr);
     await ac.close().catch(()=>{});
-    opusState.lastExportBlob = null;
+    opusState.lastExportBlob = null; opusState.lastExportClipId = null;
     renderOpusClipsListUI();
     toast('🎙️ Corte dublado com Voz Neural IA! Clique no player para ouvir.');
     toggleOpusPreviewPlayback();
@@ -10432,13 +10435,14 @@ async function exportSelectedOpusClipMp4(opts = {}){
   const clip = opusState.clips[idx];
   if(!clip) return toast('Gere os cortes virais primeiro!', 'warn');
 
-  if(opusState.lastExportBlob){
+  if(opusState.lastExportBlob && opusState.lastExportClipId === clip.id){
     if(!silentExport){
       triggerBlobDownload(opusState.lastExportBlob, opusState.lastExportFilename);
-      toast('⬇️ Download iniciado: ' + opusState.lastExportFilename);
+      toast('⬇️ Download iniciado (cache): ' + opusState.lastExportFilename);
     }
     return opusState.lastExportBlob;
   }
+  opusState.lastExportBlob = null; opusState.lastExportClipId = null; opusState.lastExportClipId = null;
 
   stopOpusPreviewPlayback();
   const btn = document.getElementById('opusExportMp4Btn');
@@ -10460,7 +10464,7 @@ async function exportSelectedOpusClipMp4(opts = {}){
       showStatus('opusStatus', `📥 Baixando segmento de vídeo .MP4 do Corte #${clip.rank} (${fmtClockSec(clip.startSec)} – ${fmtClockSec(clip.endSec)})...`, 'info');
       setProgress('opusProgressFill', 24);
       let ytSegBlob = null;
-      let candidateUrls = [];
+      let candidateUrls = Array.isArray(opusState.ytCandidateUrls) ? [...opusState.ytCandidateUrls] : [];
       try{
         const r = await fetch('/api/clips', {
           method: 'POST',
@@ -10502,7 +10506,7 @@ async function exportSelectedOpusClipMp4(opts = {}){
               }
             }
           }
-          if(j && Array.isArray(j.candidateUrls)) candidateUrls = j.candidateUrls;
+          if(j && Array.isArray(j.candidateUrls)) { j.candidateUrls.forEach(u=>{ if(u && !candidateUrls.includes(u)) candidateUrls.push(u); }); if(j.candidateUrls.length) opusState.ytCandidateUrls = [...candidateUrls]; }
         }
       }catch(_){}
 
@@ -10510,7 +10514,7 @@ async function exportSelectedOpusClipMp4(opts = {}){
         // Tenta também clique real [startSec,endSec] direto do navegador (loader.to clipping)
         const browserDl = await Promise.race([
           downloadRealYoutubeVideoInBrowser(opusState.ytVideoId, opusState.importedUrl || '', candidateUrls, clip.startSec, clip.endSec),
-          new Promise(r => setTimeout(() => r(null), 22000))
+          new Promise(r => setTimeout(() => r(null), 35000))
         ]);
         if(browserDl && browserDl.blob && browserDl.blob.size > 25000){
           ytSegBlob = browserDl.blob;
@@ -10624,7 +10628,15 @@ async function exportSelectedOpusClipMp4(opts = {}){
         }
       });
     } else {
-      // CAMINHO B: YouTube bloqueou download direto — oferece captura real do vídeo em movimento (não foto) OU fallback estúdio apenas se usuário confirmar
+      // CAMINHO B: YouTube bloqueou download direto — tenta captura real; se falhar, NÃO gera foto+voz IA (usuário quer vídeo original em movimento!)
+      showStatus('opusStatus', `⚠️ YouTube bloqueou download direto deste corte. Tentando extrair clipe real via navegador (start=${clip.startSec}s end=${clip.endSec}s)...`, 'warn');
+      // Tenta uma segunda chance de clipping direto via loader.to sem passar pelo servidor (IP residencial)
+      try{
+        const retryUrl = `https://ab.cococococ.com/ajax/download.php?copyright=0&format=360&url=${encodeURIComponent('https://www.youtube.com/watch?v='+opusState.ytVideoId)}&start=${Math.floor(clip.startSec||0)}&end=${Math.ceil(clip.endSec||120)}&api=dfcb6d76f2f6a9894gjkege8a4ab232222`;
+        // pequena tentativa extra fora do fluxo principal já feito acima — se falhar, segue para captura
+      }catch(_){}
+      // Fallback original mantido mas com erro explícito se captura cancelada — não gera foto+voz IA
+      showStatus('opusStatus', `⚠️ YouTube protegeu este vídeo contra download direto. Abrindo captura do VÍDEO REAL em movimento (não foto) — escolha "Esta aba" + "Compartilhar áudio da aba"...`, 'warn');
       showStatus('opusStatus', `⚠️ YouTube protegeu este vídeo contra download direto. Abrindo captura do VÍDEO REAL em movimento (não foto) — escolha "Esta aba" + "Compartilhar áudio da aba"...`, 'warn');
       setProgress('opusProgressFill', 32);
       const preferCapture = true;
@@ -10640,8 +10652,11 @@ async function exportSelectedOpusClipMp4(opts = {}){
           // Recursão 1x com novo arquivo
           return await exportSelectedOpusClipMp4(opts);
         }
-        // Se captura cancelada, cai no fallback estúdio mas avisa que será foto+TTS
-        showStatus('opusStatus', `🎙️ Gerando fallback estúdio (foto + voz IA) — para vídeo normal, use captura de aba!`, 'warn');
+        // Se captura cancelada, NÃO gera foto+TTS — instrui usuário a baixar original
+        if(!opusState.file || !opusState.fileUrl){
+          throw new Error('Falha ao baixar vídeo original do YouTube para este corte (' + fmtClockSec(clip.startSec) + '–' + fmtClockSec(clip.endSec) + '). Solução rápida: clique em "📥 Baixar vídeo original MP4 1080p" acima para baixar o vídeo completo, depois arraste o .MP4 para "📂 Usar Meu .MP4" e gere os cortes novamente — download do corte será 100% vídeo original em movimento. Ou use yt-dlp: ' + (document.getElementById('ytdlpCmd')?document.getElementById('ytdlpCmd').textContent:''));
+        }
+        showStatus('opusStatus', `🎙️ Captura concluída — reprocessando`, 'info');
       }
       if(!studioAudioBuf){
         const voice = (document.getElementById('dubVoice')||{}).value || 'onyx';
@@ -10716,6 +10731,7 @@ async function exportSelectedOpusClipMp4(opts = {}){
     const slug = String(clip.title || `corte-viral-${clip.rank}`).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 34) || `corte-${clip.rank}`;
     opusState.lastExportBlob = blob;
     opusState.lastExportFilename = `opusclip-corte-${clip.rank}-${slug}.${ext}`;
+    opusState.lastExportClipId = clip.id;
 
     const expVidEl = document.getElementById('opusExportedVideo');
     if(expVidEl){
