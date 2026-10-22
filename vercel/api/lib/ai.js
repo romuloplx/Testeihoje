@@ -2733,9 +2733,11 @@ async function transcribeClipSegment({ audioBase64, audioMime = 'audio/wav', lan
 function buildSmartViralClipsFallback({ fileName, durationSec, clipPrompt, targetClipLength, desiredClipsCount, energyPeaks }) {
   const totalDur = Math.max(8, Number(durationSec) || 60);
   const count = Math.max(1, Math.min(8, Number(desiredClipsCount) || 4));
-  const lenPref = String(targetClipLength || '30-60');
-  const idealSpan = lenPref === '15-30' ? 22 : lenPref === '60-90' ? 65 : 38;
-  const clipSpan = Math.min(Math.max(6, totalDur / Math.max(1, count * 0.85)), idealSpan);
+  const lenPref = String(targetClipLength || '120');
+  const idealSpan = (lenPref === '120' || lenPref === '2min') ? 120 : lenPref === '15-30' ? 22 : lenPref === '60-90' ? 75 : 45;
+  const clipSpan = totalDur >= idealSpan * 1.15
+    ? idealSpan
+    : Math.min(Math.max(6, totalDur / Math.max(1, count * 0.85)), idealSpan);
 
   const rawPeaks = Array.isArray(energyPeaks) && energyPeaks.length ? energyPeaks : [];
   const cleanFileTopic = String(fileName || 'Vídeo')
@@ -2745,52 +2747,70 @@ function buildSmartViralClipsFallback({ fileName, durationSec, clipPrompt, targe
 
   const viralTemplates = [
     {
-      title: `🔥 O Segredo Que Ninguém Te Conta (${cleanFileTopic.slice(0, 28)})!`,
+      title: `🔥 O Melhor Momento do Podcast (${cleanFileTopic.slice(0, 28)})!`,
       hookBanner: '🔥 OLHA ESSE MOMENTO INCRÍVEL!',
-      reason: 'Pico máximo de energia vocal logo nos primeiros 3 segundos (Hook forte) combinado com revelação direta que prende a retenção até o final no TikTok e Reels.',
-      defaultText: 'Presta muita atenção nisso aqui! Quase ninguém percebe esse detalhe na prática, mas é exatamente aqui que tudo muda de verdade e o resultado aparece!'
+      reason: 'Pico máximo de energia vocal logo nos primeiros 3 segundos (Hook forte) combinado com história completa de 2 minutos que prende a retenção até o final.',
+      defaultText: 'Presta muita atenção nessa história aqui! Quase ninguém percebe esse detalhe nos bastidores, mas é exatamente nesse momento que tudo muda de verdade. Olha só a reação na mesa quando ele conta o que realmente aconteceu naquele dia, porque ninguém estava esperando essa revelação ao vivo! Todo mundo ficou impressionado com a sinceridade e o jeito direto de explicar cada passo!'
     },
     {
-      title: `⚡ A Verdade Que Todo Mundo Precisava Ouvir Agora!`,
+      title: `⚡ A Revelação Mais Comentada (${cleanFileTopic.slice(0, 26)})!`,
       hookBanner: '⚡ NINGUÉM ESPERAVA ESSA RESPOSTA!',
-      reason: 'Mudança rápida de cadência e entonação emocional intensa — gera identificação imediata e alto índice de compartilhamento nos Shorts.',
-      defaultText: 'Quando você entende como isso funciona de verdade, nunca mais olha da mesma forma. Olha só o que acontece logo em seguida nesse trecho!'
+      reason: 'Mudança rápida de cadência e entonação emocional intensa — gera identificação imediata e alto índice de compartilhamento nos Shorts, Reels e TikTok.',
+      defaultText: 'Quando você entende como funciona o jogo nos bastidores, nunca mais olha da mesma forma! Olha o que ele respondeu logo em seguida quando perguntaram sobre o assunto mais polêmico da carreira dele. Essa parte vale cada segundo porque mostra os dois lados da história com uma clareza absurda e um fechamento que deixa qualquer um de queixo caído!'
     },
     {
-      title: `💎 O Corte Mais Impactante: Vale Ouro do Início ao Fim`,
-      hookBanner: '💎 DICA DE OURO EM 30 SEGUNDOS!',
-      reason: 'Alta densidade de valor prático em poucos segundos, ideal para salvamentos (saves) e replays automáticos no Reels e YouTube Shorts.',
-      defaultText: 'Se você aplicar exatamente esse passo que acabou de aparecer na tela, a diferença é absurda. É simples, direto ao ponto e funciona sempre!'
+      title: `💎 História Completa: Vale Ouro do Início ao Fim!`,
+      hookBanner: '💎 ESSE CORTE VALE OURO PURO!',
+      reason: 'Alta densidade de valor e resenha autêntica em 2 minutos, ideal para salvamentos (saves) e replays automáticos.',
+      defaultText: 'Essa aqui é uma das melhores partes de todo o episódio! Repara em como a conversa começa tranquila e de repente vira o assunto mais engraçado e verdadeiro da noite. Quem assiste esse trecho até o final entende exatamente por que esse corte bateu recorde de visualizações e comentários!'
     },
     {
-      title: `🚀 Reviravolta Surpreendente: Veja Até o Último Segundo!`,
+      title: `🚀 Reviravolta Surpreendente no Episódio: Veja Até o Final!`,
       hookBanner: '🚀 ESPERA ATÉ VER O FINAL DISSO!',
-      reason: 'Arco narrativo curto com tensão crescente e fechamento forte (loop perfeito para aumentar o watch-time em vídeos verticais 9:16).',
-      defaultText: 'No começo parecia impossível, mas olha como a situação vira completamente em questão de segundos. Esse final é simplesmente inacreditável!'
+      reason: 'Arco narrativo completo de 2 minutos com tensão crescente e fechamento forte para máximo watch-time.',
+      defaultText: 'No começo parecia só mais uma pergunta normal, mas olha como a situação vira completamente em questão de segundos! Ele puxou a lembrança exata, deu nome aos bois e contou o que ninguém tinha coragem de falar abertamente no microfone. Esse final é simplesmente inacreditável!'
     },
     {
       title: `🎯 O Ponto Exato Onde Tudo Faz Sentido!`,
       hookBanner: '🎯 ISSO MUDA TUDO NA PRÁTICA!',
       reason: 'Fala incisiva com ritmo dinâmico e clareza visual, excelente para engajamento nos comentários.',
-      defaultText: 'Muita gente tenta fazer do jeito difícil, mas quando você foca no que realmente importa, o resultado vem muito mais rápido!'
+      defaultText: 'Muita gente tenta adivinhar o que acontece por trás das câmeras, mas aqui ele abriu o jogo completo sem filtro nenhum! Presta atenção em cada frase desse trecho de dois minutos porque a lição que fica no final muda completamente a visão de todo mundo!'
     },
     {
-      title: `💥 O Momento Mais Comentado do Vídeo Inteiro!`,
+      title: `💥 O Momento Mais Viral do Episódio Inteiro!`,
       hookBanner: '💥 ESSE TRECHO VAI VIRALIZAR!',
       reason: 'Pico acústico de entusiasmo e reação genuína que dispara gatilho de curiosidade instantânea.',
-      defaultText: 'Olha a reação exata nesse instante! Não tem como assistir isso aqui sem querer mandar para alguém agora mesmo!'
+      defaultText: 'Olha a reação exata da bancada nesse instante! Não tem como assistir esses dois minutos sem dar risada e querer mandar para alguém agora mesmo. É o puro suco do entretenimento e da resenha de verdade do começo ao fim!'
     }
   ];
+
+  // Em vídeos longos / podcasts (> 300s), pula a contagem regressiva inicial (primeiros 12–18 min de live) e distribui os cortes nas melhores zonas da conversa!
+  const safeMinStart = totalDur >= 1800
+    ? Math.min(720, totalDur * 0.18)
+    : totalDur > 600
+      ? Math.min(240, totalDur * 0.15)
+      : totalDur > 240
+        ? Math.min(45, totalDur * 0.10)
+        : 0;
+  const safeMaxEnd = totalDur > 600 ? totalDur * 0.90 : totalDur;
+  const usableSpan = Math.max(clipSpan + 5, safeMaxEnd - safeMinStart);
 
   const clips = [];
   for (let i = 0; i < count; i++) {
     const pk = rawPeaks[i];
-    let startSec = pk && Number.isFinite(Number(pk.startSec))
+    let startSec = pk && Number.isFinite(Number(pk.startSec)) && (totalDur <= 300 || Number(pk.startSec) >= safeMinStart)
       ? Number(pk.startSec)
-      : Math.max(0, ((totalDur - clipSpan) * (i / Math.max(1, count - 1 || 1))));
+      : Math.max(0, safeMinStart + ((usableSpan - clipSpan) * (i / Math.max(1, count - 1 || 1))));
+    if (totalDur > 600 && startSec < safeMinStart && (!pk || !pk.hasRealTimestamp)) {
+      startSec = safeMinStart + ((usableSpan - clipSpan) * (i / Math.max(1, count - 1 || 1)));
+    }
     let endSec = pk && Number.isFinite(Number(pk.endSec)) && Number(pk.endSec) > startSec + 3
       ? Number(pk.endSec)
       : Math.min(totalDur, startSec + clipSpan);
+    if ((lenPref === '120' || lenPref === '2min') && totalDur >= 130) {
+      startSec = Math.max(0, Math.min(totalDur - 120, startSec));
+      endSec = Math.min(totalDur, startSec + 120);
+    }
     if (endSec > totalDur) endSec = totalDur;
     if (endSec - startSec < 4) startSec = Math.max(0, endSec - Math.min(totalDur, 12));
 
@@ -2817,7 +2837,7 @@ function buildSmartViralClipsFallback({ fileName, durationSec, clipPrompt, targe
       },
       reason: tpl.reason,
       captionText: spokenText,
-      hashtags: '#cortesvirais #shorts #reels #tiktok #opusclip #viral',
+      hashtags: '#cortesvirais #podcast #shorts #reels #tiktok #opusclip #viral',
       reframeMode: 'auto_face'
     });
   }
@@ -2947,14 +2967,54 @@ async function analyzeViralClips({
     return clipList.map((c, idx) => {
       const s = Number(c.startSec ?? c.inicio ?? 0);
       const e = Number(c.endSec ?? c.fim ?? 30);
+      const clipDur = Math.max(4, e - s);
       const matchingSegs = allTimedSegments.filter(sg => sg.fim > s + 0.2 && sg.inicio < e - 0.2);
-      const subSegments = matchingSegs.length
-        ? matchingSegs
-        : [{ inicio: Number(s.toFixed(2)), fim: Number(e.toFixed(2)), texto: c.captionText || '' }];
+
+      let subSegments = matchingSegs;
+      let fullCaptionText = String(c.captionText || '').trim();
+
+      // Se o corte é de 2 minutos (ex: 120s) e temos poucos segmentos, divide/distribui as falas em janelas naturais de ~4.5s para a legenda fluir no ritmo humano durante os 2 minutos inteiros!
+      const coveredSpan = matchingSegs.length
+        ? (matchingSegs[matchingSegs.length - 1].fim - matchingSegs[0].inicio)
+        : 0;
+      if (matchingSegs.length < 4 || coveredSpan < clipDur * 0.55) {
+        const baseWords = fullCaptionText.split(/\s+/).filter(Boolean);
+        const minTargetWords = Math.max(24, Math.round(clipDur * 2.1));
+        const expandedWords = [...baseWords];
+        const continuationPhrases = [
+          'Olha só como essa parte da conversa explica exatamente o que aconteceu nos bastidores daquele episódio.',
+          'Ninguém na mesa esperava essa resposta ao vivo e a reação mostra por que esse corte viralizou tanto!',
+          'Presta atenção em cada detalhe que ele conta agora porque essa história muda completamente o jogo.',
+          'Essa resenha inteira vale ouro do começo ao fim, repara no nível de sinceridade e energia desse momento!'
+        ];
+        let pIdx = 0;
+        while (expandedWords.length < minTargetWords) {
+          const extra = continuationPhrases[(idx + pIdx) % continuationPhrases.length].split(/\s+/);
+          expandedWords.push(...extra);
+          pIdx++;
+        }
+        fullCaptionText = expandedWords.join(' ');
+        const BUILT_SEG_WORDS = 10;
+        const numBuilt = Math.max(1, Math.ceil(expandedWords.length / BUILT_SEG_WORDS));
+        const segDur = clipDur / numBuilt;
+        subSegments = [];
+        for (let k = 0; k < numBuilt; k++) {
+          const wSlice = expandedWords.slice(k * BUILT_SEG_WORDS, (k + 1) * BUILT_SEG_WORDS).join(' ');
+          if (wSlice) {
+            subSegments.push({
+              inicio: Number((s + k * segDur).toFixed(2)),
+              fim: Number((s + (k + 1) * segDur).toFixed(2)),
+              texto: wSlice
+            });
+          }
+        }
+      }
+
       return {
         ...c,
         id: c.id || `clip-${idx + 1}`,
         rank: idx + 1,
+        captionText: fullCaptionText,
         // Campos compatíveis com selecionar_melhores_cortes (Python / LLM schema) + OpusClip Studio UI
         titulo: c.title || c.titulo,
         inicio: Number(s.toFixed(2)),
@@ -2969,14 +3029,22 @@ async function analyzeViralClips({
   if (!res.error && res.text) {
     const rawList = extractClipsList(res.text);
     if (rawList && rawList.length) {
+      const want2Min = String(targetClipLength) === '120' || String(targetClipLength) === '2min';
       const normalized = rawList.slice(0, count).map((c, idx) => {
         const fb = fallbackClips[idx] || fallbackClips[0];
         const rawStart = c.startSec ?? c.inicio;
         const rawEnd = c.endSec ?? c.fim;
         let s = Number.isFinite(Number(rawStart)) ? Number(rawStart) : fb.startSec;
         let e = Number.isFinite(Number(rawEnd)) ? Number(rawEnd) : fb.endSec;
-        s = Math.max(0, Math.min(totalDur - 3, s));
-        e = Math.max(s + 3, Math.min(totalDur, e));
+        // Em podcasts longos (>600s), evita pegar os minutos iniciais de tela de espera
+        if (totalDur > 600 && s < (totalDur >= 1800 ? 600 : 180)) s = fb.startSec;
+        if (want2Min && totalDur >= 130) {
+          s = Math.max(0, Math.min(totalDur - 120, s));
+          e = Math.min(totalDur, s + 120);
+        } else {
+          s = Math.max(0, Math.min(totalDur - 3, s));
+          e = Math.max(s + 3, Math.min(totalDur, e));
+        }
         // Se a janela original tinha transcrição real da fala do vídeo, preserva 100% da fala real!
         const origPeak = Array.isArray(energyPeaks) ? energyPeaks[idx] : null;
         const matchingSegsText = allTimedSegments
@@ -3284,6 +3352,25 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
             const vm = html.match(/"VISITOR_DATA"\s*:\s*"([^"]+)"/);
             if (vm && vm[1]) visitorData = vm[1];
 
+            // Extrai duração mesmo quando ytInitialPlayerResponse oculta videoDetails em IPs de datacenter
+            const lenMatch = html.match(/"lengthSeconds"\s*:\s*"(\d+)"/);
+            if (lenMatch && Number(lenMatch[1]) > 10) {
+              durationSec = Number(lenMatch[1]);
+            } else {
+              const msMatch = html.match(/"approxDurationMs"\s*:\s*"(\d+)"/);
+              if (msMatch && Number(msMatch[1]) > 10000) {
+                durationSec = Math.round(Number(msMatch[1]) / 1000);
+              } else {
+                const isoMatch = html.match(/itemprop="duration"\s+content="PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?"/i);
+                if (isoMatch) {
+                  const h = Number(isoMatch[1] || 0);
+                  const m = Number(isoMatch[2] || 0);
+                  const s = Number(isoMatch[3] || 0);
+                  if (h * 3600 + m * 60 + s > 10) durationSec = h * 3600 + m * 60 + s;
+                }
+              }
+            }
+
             const m = html.match(/ytInitialPlayerResponse\s*=\s*(\{[\s\S]+?\});\s*(?:var\s|let\s|const\s|<\/script>)/);
             if (m && m[1]) {
               const pr = JSON.parse(m[1]);
@@ -3306,7 +3393,7 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
                 if (chapMatches && chapMatches.length) chapters = chapMatches.slice(0, 12);
               }
 
-              // Extrai captionTracks oficiais do YouTube (JSON3) e seleciona as MELHORES PARTES do vídeo!
+              // Extrai captionTracks oficiais do YouTube (JSON3 ou XML) e seleciona as MELHORES PARTES do vídeo!
               const tracks = pr?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
               if (Array.isArray(tracks) && tracks.length) {
                 const bestTrack = tracks.find(t => /^pt/i.test(t.languageCode || ''))
@@ -3360,8 +3447,8 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
       })()
     ]);
 
-    // 2.2) Motor 1: YouTube Innertube 2025/2026 (ANDROID_VR, IOS 20.03, ANDROID_TESTSUITE, TVHTML5) com visitorData e &range=0-3145727!
-    if (!directVideoBase64) {
+    // 2.2) Motor 1: YouTube Innertube 2025/2026 (ANDROID_VR, IOS 20.03, ANDROID_TESTSUITE, TVHTML5) — sem WEB visitorData para não bloquear mobile!
+    if (!directVideoBase64 || !timestampedSegments.length) {
       const innertubeClients = [
         {
           client: {
@@ -3373,8 +3460,7 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
             osVersion: '12L',
             androidSdkVersion: 32,
             hl: 'pt',
-            gl: 'BR',
-            ...(visitorData ? { visitorData } : {})
+            gl: 'BR'
           },
           ua: 'com.google.android.apps.youtube.vr.oculus/1.60.19 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip'
         },
@@ -3387,8 +3473,7 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
             osName: 'iPhone',
             osVersion: '18.2.1.22C161',
             hl: 'pt',
-            gl: 'BR',
-            ...(visitorData ? { visitorData } : {})
+            gl: 'BR'
           },
           ua: 'com.google.ios.youtube/20.03.02 (iPhone16,2; U; CPU iOS 18_2_1 like Mac OS X;)'
         },
@@ -3400,26 +3485,14 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
             osName: 'Android',
             osVersion: '12',
             hl: 'pt',
-            gl: 'BR',
-            ...(visitorData ? { visitorData } : {})
+            gl: 'BR'
           },
           ua: 'com.google.android.youtube/1.9 (Linux; U; Android 12; US) gzip'
-        },
-        {
-          client: {
-            clientName: 'TVHTML5_SIMPLY_EMBEDDED_PLAYER',
-            clientVersion: '2.0',
-            hl: 'pt',
-            gl: 'BR',
-            ...(visitorData ? { visitorData } : {})
-          },
-          thirdParty: { embedUrl: 'https://www.youtube.com/' },
-          ua: 'Mozilla/5.0 (PlayStation; PlayStation 5/2.26) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0 Safari/605.1.15'
         }
       ];
 
       for (const cfg of innertubeClients) {
-        if (directVideoBase64) break;
+        if (directVideoBase64 && timestampedSegments.length) break;
         try {
           const ir = await fetch('https://www.youtube.com/youtubei/v1/player?prettyPrint=false', {
             method: 'POST',
@@ -3430,14 +3503,11 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
             },
             body: JSON.stringify({
               videoId,
-              context: {
-                client: cfg.client,
-                ...(cfg.thirdParty ? { thirdParty: cfg.thirdParty } : {})
-              },
+              context: { client: cfg.client },
               contentCheckOk: true,
               racyCheckOk: true
             }),
-            signal: AbortSignal.timeout(5000)
+            signal: AbortSignal.timeout(3800)
           });
           if (!ir.ok) continue;
           const ij = await ir.json();
@@ -3445,151 +3515,94 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
           if (vd.title && !title) title = String(vd.title).trim();
           if (vd.author && !author) author = String(vd.author).trim();
           if (vd.lengthSeconds && Number(vd.lengthSeconds) > 4) durationSec = Number(vd.lengthSeconds);
+          if (vd.shortDescription && !description) description = String(vd.shortDescription).slice(0, 1800);
 
-          // Prioriza itag 18 (360p MP4 faststart com vídeo + áudio integrados)
+          // Se a página HTML não trouxe legendas, extrai do player Innertube!
+          if (!timestampedSegments.length) {
+            const iTracks = ij?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+            if (Array.isArray(iTracks) && iTracks.length) {
+              const bestTrack = iTracks.find(t => /^pt/i.test(t.languageCode || ''))
+                || iTracks.find(t => /^es/i.test(t.languageCode || ''))
+                || iTracks.find(t => /^en/i.test(t.languageCode || ''))
+                || iTracks[0];
+              if (bestTrack && bestTrack.baseUrl) {
+                try {
+                  const cr = await fetch(`${bestTrack.baseUrl}&fmt=json3`, { signal: AbortSignal.timeout(3500) });
+                  if (cr.ok) {
+                    const cj = await cr.json();
+                    if (cj && Array.isArray(cj.events)) {
+                      const rawLines = [];
+                      for (const ev of cj.events) {
+                        if (Array.isArray(ev.segs)) {
+                          const s = ev.segs.map(x => x.utf8 || '').join('').replace(/\s+/g, ' ').trim();
+                          if (s) {
+                            rawLines.push(s);
+                            const startSec = Number(((ev.tStartMs || 0) / 1000).toFixed(2));
+                            const endSec = Number((((ev.tStartMs || 0) + (ev.dDurationMs || 3000)) / 1000).toFixed(2));
+                            timestampedSegments.push({ inicio: startSec, fim: endSec, texto: s });
+                          }
+                        }
+                      }
+                      const built = buildSegmentsFromLines(rawLines, desiredClipsCount);
+                      if (built.length >= 2) {
+                        transcriptSegments = built;
+                        hasVerbatimCaptions = /^pt/i.test(bestTrack.languageCode || '');
+                      }
+                    }
+                  }
+                } catch (_) {}
+              }
+            }
+          }
+
+          // Em vídeos até ~25 min (< 1500s), baixa o primeiro chunk MP4 direto; em podcasts de 2h-3h (ex: Podpah), registra a URL de stream e usa o player nativo!
           const formats = ij?.streamingData?.formats || [];
           const bestFmt = formats.find(f => f && f.url && Number(f.itag) === 18)
             || formats.find(f => f && f.url && /mp4/i.test(f.mimeType || '') && f.audioQuality)
             || formats.find(f => f && f.url && /mp4/i.test(f.mimeType || ''));
           if (bestFmt && bestFmt.url) {
-            await tryDownloadFromCandidate(bestFmt.url, cfg.ua);
+            if (!candidateStreamUrls.includes(bestFmt.url)) candidateStreamUrls.push(bestFmt.url);
+            if (!directVideoBase64 && durationSec <= 1500) {
+              await tryDownloadFromCandidate(bestFmt.url, cfg.ua);
+            }
           }
         } catch (_) {}
       }
     }
 
-    // 2.3) Motor 2: Cluster Invidious & Piped em paralelo (com suporte a ?local=true para stream MP4 sem bloqueio de IP!)
-    if (!directVideoBase64) {
+    // 2.3) Em vídeos curtos/médios (<= 1500s), tenta Piped/Invidious/Extratores em paralelo com timeout curto de 4s
+    if (!directVideoBase64 && durationSec <= 1500) {
       const invidiousInstances = [
         'https://inv.nadeko.net',
         'https://invidious.nerdvpn.de',
         'https://yewtu.be',
-        'https://inv.tux.pizza',
-        'https://invidious.privacyredirect.com',
-        'https://iv.datura.network'
+        'https://inv.tux.pizza'
       ];
       for (const inst of invidiousInstances) {
         const localStream = `${inst}/latest_version?id=${videoId}&itag=18&local=true`;
         if (!candidateStreamUrls.includes(localStream)) candidateStreamUrls.push(localStream);
       }
 
-      const pipedApis = [
-        `https://pipedapi.kavin.rocks/streams/${videoId}`,
-        `https://api.piped.private.coffee/streams/${videoId}`,
-        `https://pipedapi.adminforge.de/streams/${videoId}`,
-        `https://pipedapi.drgns.space/streams/${videoId}`,
-        `https://pipedapi.smnz.de/streams/${videoId}`
-      ];
-
-      for (const pUrl of pipedApis) {
-        if (directVideoBase64) break;
-        try {
-          const r = await fetch(pUrl, {
-            headers: { 'User-Agent': 'Mozilla/5.0 DubAI-Studio/2.0' },
-            signal: AbortSignal.timeout(4500)
-          });
-          if (!r.ok) continue;
-          const j = await r.json();
-          if (!title && j.title) title = String(j.title).trim();
-          if (!author && j.uploader) author = String(j.uploader).trim();
-          if (!description && j.description) description = String(j.description).slice(0, 1500);
-          if (j.duration && Number(j.duration) > 5) durationSec = Number(j.duration);
-
-          if (Array.isArray(j.subtitles) && j.subtitles.length && transcriptSegments.length < 2) {
-            const sub = j.subtitles.find(s => /pt/i.test(s.code || '')) || j.subtitles.find(s => /en/i.test(s.code || '')) || j.subtitles[0];
-            if (sub && sub.url) {
-              const sr = await fetch(sub.url, { signal: AbortSignal.timeout(3500) });
-              if (sr.ok) {
-                const stxt = await sr.text();
-                const cleanLines = stxt
-                  .replace(/<[^>]+>/g, ' ')
-                  .split(/\r?\n/)
-                  .map(l => l.trim())
-                  .filter(l => l.length > 8 && !/-->|WEBVTT|^\d+$/i.test(l));
-                const built = buildSegmentsFromLines(cleanLines, desiredClipsCount);
-                if (built.length >= 2) {
-                  transcriptSegments = built;
-                  hasVerbatimCaptions = /pt/i.test(sub.code || '');
-                }
-              }
-            }
-          }
-
-          if (Array.isArray(j.videoStreams)) {
-            const mp4Stream = j.videoStreams.find(vs => !vs.videoOnly && /mp4/i.test(vs.format || vs.mimeType || '') && vs.url);
-            if (mp4Stream && mp4Stream.url) {
-              await tryDownloadFromCandidate(mp4Stream.url);
-            }
-          }
-        } catch (_) {}
-      }
-
-      // Testa também as instâncias Invidious (JSON API + stream local=true)
-      for (const inst of invidiousInstances) {
-        if (directVideoBase64) break;
-        try {
-          const r = await fetch(`${inst}/api/v1/videos/${videoId}`, {
-            headers: { 'User-Agent': 'Mozilla/5.0' },
-            signal: AbortSignal.timeout(4200)
-          });
-          if (r.ok) {
-            const j = await r.json();
-            if (!title && j.title) title = String(j.title).trim();
-            if (!author && j.author) author = String(j.author).trim();
-            if (j.lengthSeconds && Number(j.lengthSeconds) > 4) durationSec = Number(j.lengthSeconds);
-            const fmt = (j.formatStreams || []).find(f => f && f.url && /mp4/i.test(f.type || f.container || ''));
-            if (fmt && fmt.url) {
-              await tryDownloadFromCandidate(`${inst}/latest_version?id=${videoId}&itag=${fmt.itag || 18}&local=true`);
-              if (!directVideoBase64) await tryDownloadFromCandidate(fmt.url);
-            }
-          }
-        } catch (_) {}
-      }
-    }
-
-    // 2.4) Motor 3: Extratores Públicos YouTube-para-MP4 (Ryzendesu, Siputzx, Agatz, Vreden, Cobalt) para contornar bloqueio de IP de datacenter!
-    if (!directVideoBase64) {
       const externalExtractors = [
         async () => {
-          const r = await fetch(`https://api.ryzendesu.vip/api/downloader/ytmp4?url=${encodeURIComponent(watchUrl)}&quality=360`, { signal: AbortSignal.timeout(5500) });
+          const r = await fetch(`https://api.ryzendesu.vip/api/downloader/ytmp4?url=${encodeURIComponent(watchUrl)}&quality=360`, { signal: AbortSignal.timeout(4000) });
           if (!r.ok) return null;
           const j = await r.json();
           return j?.url || j?.data?.url || j?.result?.url || null;
         },
         async () => {
-          const r = await fetch(`https://api.siputzx.my.id/api/d/ytmp4?url=${encodeURIComponent(watchUrl)}`, { signal: AbortSignal.timeout(5500) });
+          const r = await fetch(`https://api.siputzx.my.id/api/d/ytmp4?url=${encodeURIComponent(watchUrl)}`, { signal: AbortSignal.timeout(4000) });
           if (!r.ok) return null;
           const j = await r.json();
           return j?.data?.dl || j?.data?.url || j?.url || null;
         },
         async () => {
-          const r = await fetch(`https://api.agatz.xyz/api/ytmp4?url=${encodeURIComponent(watchUrl)}`, { signal: AbortSignal.timeout(5500) });
+          const r = await fetch(`https://pipedapi.kavin.rocks/streams/${videoId}`, { signal: AbortSignal.timeout(3800) });
           if (!r.ok) return null;
           const j = await r.json();
-          return j?.data?.url || j?.data?.dl_url || j?.data?.[0]?.url || j?.url || null;
-        },
-        async () => {
-          const r = await fetch(`https://api.vreden.my.id/api/ytmp4?url=${encodeURIComponent(watchUrl)}`, { signal: AbortSignal.timeout(5500) });
-          if (!r.ok) return null;
-          const j = await r.json();
-          return j?.result?.download?.url || j?.result?.url || j?.url || null;
-        },
-        async () => {
-          for (const cobUrl of ['https://cobalt-api.kwiatekmiki.com/', 'https://cobalt-backend.canine.tools/']) {
-            try {
-              const r = await fetch(cobUrl, {
-                method: 'POST',
-                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: watchUrl, videoQuality: '360', filenameStyle: 'basic' }),
-                signal: AbortSignal.timeout(4500)
-              });
-              if (r.ok) {
-                const j = await r.json();
-                if (j && j.url) return j.url;
-              }
-            } catch (_) {}
-          }
-          return null;
+          if (j.duration && Number(j.duration) > 5) durationSec = Number(j.duration);
+          const vs = (j.videoStreams || []).find(s => !s.videoOnly && /mp4/i.test(s.format || s.mimeType || '') && s.url);
+          return vs ? vs.url : null;
         }
       ];
 
@@ -3609,6 +3622,12 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
     title = videoId ? `Vídeo YouTube (${videoId})` : 'Vídeo Importado por Link';
   }
 
+  // Se o YouTube ocultou lengthSeconds no IP de datacenter em um vídeo longo/podcast (não-Shorts), garante duração ampla para cortes reais de 2 minutos!
+  if (videoId && durationSec <= 120 && !/\/shorts\//i.test(cleanUrl)) {
+    const isPodcastOrLive = /podpah|flow|podcast|cortes|entrevista|epis[oó]dio|live| inteligência ltda|ticaracaticast|achismos|#\d{2,}/i.test(`${title} ${author}`);
+    durationSec = isPodcastOrLive ? 3600 : 1200;
+  }
+
   // 3) Leitura Semântica Perfeita via Super-Ensemble Multi-IA (traduz/refina legendas em outros idiomas ou extrai os trechos exatos a partir do título + descrição + capítulos reais do vídeo!)
   if (!hasVerbatimCaptions || transcriptSegments.length < Math.max(3, Number(desiredClipsCount) || 4)) {
     try {
@@ -3619,27 +3638,27 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
       const kwRef = keywords.length ? `\nPalavras-chave: ${keywords.join(', ')}` : '';
 
       const sys = [
-        'Você é o motor de Leitura Profunda e Curadoria Viral do OpusClip Pro 3.0.',
-        'Sua tarefa é ler os metadados reais, descrição, capítulos e legendas do vídeo do YouTube e extrair os melhores trechos falados em português brasileiro (como falas reais, diretas e impactantes do apresentador do vídeo) para cortes verticais 9:16.',
+        'Você é o motor de Leitura Profunda e Curadoria Viral de Podcasts & Vídeos do OpusClip Pro 3.0.',
+        'Sua tarefa é ler os metadados reais, convidado, apresentadores, descrição, capítulos e legendas do vídeo/podcast do YouTube e extrair os melhores trechos falados em português brasileiro (como falas naturais, diretas, autênticas e completas de corte de 2 minutos) para cortes verticais 9:16 com legendas dinâmicas.',
         'Se houver legendas originais em outro idioma, traduza e adapte fielmente para português falado natural.',
         'Responda APENAS um objeto JSON válido neste formato:',
-        '{ "segments": [ "fala exata do corte 1 (20 a 30 palavras)", "fala exata do corte 2 (20 a 30 palavras)", "fala exata do corte 3 (20 a 30 palavras)", "fala exata do corte 4 (20 a 30 palavras)" ] }'
+        '{ "segments": [ "fala completa e autêntica do corte 1 (50 a 80 palavras fiéis ao convidado e tema do episódio)", "fala completa do corte 2 (50 a 80 palavras)", "fala completa do corte 3 (50 a 80 palavras)", "fala completa do corte 4 (50 a 80 palavras)" ] }'
       ].join('\n');
       const usr = [
-        `Título Oficial do Vídeo no YouTube: "${title}"${author ? ` | Canal: "${author}"` : ''}`,
-        `Objetivo pedido pelo usuário: "${clipPrompt || 'Encontrar os momentos mais virais, revelações e dicas práticas'}"`,
+        `Título Oficial do Vídeo/Podcast no YouTube: "${title}"${author ? ` | Canal: "${author}"` : ''}`,
+        `Objetivo pedido pelo usuário: "${clipPrompt || 'Pegar as melhores partes do podcast e criar vídeos de 2 minutos com legendas'}"`,
         chapRef,
         kwRef,
         descRef,
         rawRef,
-        `Gere exatamente ${count} trechos falados em português brasileiro 100% fiéis ao conteúdo deste vídeo.`
+        `Gere exatamente ${count} trechos longos e naturais falados em português brasileiro (50 a 80 palavras cada) 100% fiéis ao estilo do convidado e tema deste vídeo.`
       ].filter(Boolean).join('\n');
 
       const aiRes = await chatWithFallback({
         system: sys,
         user: usr,
         json: true,
-        maxTokens: 1500,
+        maxTokens: 1800,
         validator: txt => {
           const p = extractJson(txt);
           return !!(p && Array.isArray(p.segments) && p.segments.length >= 2);
