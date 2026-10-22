@@ -356,6 +356,24 @@ input[type="range"]{
   transition:.18s;pointer-events:none;
 }
 .opus-mini-player:hover .opus-mini-playbtn{transform:translate(-50%,-50%) scale(1.08);background:#22c55e}
+.opus-hover-dl{
+  position:absolute;top:8px;right:8px;z-index:5;
+  padding:6px 10px;border-radius:10px;
+  background:linear-gradient(135deg,#16a34a,#059669);border:1.5px solid rgba(255,255,255,.85);
+  color:#fff;font-size:11px;font-weight:900;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.45);opacity:0;transform:translateY(-6px) scale(.96);
+  transition:.2s;pointer-events:auto;
+}
+.opus-mini-player:hover .opus-hover-dl{opacity:1;transform:translateY(0) scale(1)}
+.opus-hover-dl:hover{filter:brightness(1.1);transform:scale(1.06)}
+.opus-select-chk{
+  position:absolute;top:8px;left:8px;z-index:4;
+  width:22px;height:22px;accent-color:#22c55e;cursor:pointer;
+  border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.4)
+}
+.opus-clip-row .select-hint{
+  font-size:10px;color:#64748b;margin-top:4px;
+}
 
 .opus-transcript-box{
   background:#121522;border:1px solid #23283d;border-radius:14px;
@@ -1361,8 +1379,16 @@ input[type="range"]{
           </select>
           <button type="button" class="ghost" onclick="toggleOpusPipelineJsonDrawer()" style="padding:7px 11px;font-size:11.5px;border-color:#a855f788;color:#e9d5ff">{ } JSON Pipeline</button>
           <button type="button" class="ghost" onclick="toggleOpusStudioDrawer()" style="padding:7px 12px;font-size:11.5px;border-color:#38bdf888;color:#bae6fd">✂️ Studio Editor</button>
-          <button type="button" id="opusBatchExportBtn" onclick="gerarCortesFinaisEmLote()" style="padding:7px 13px;font-size:11.5px;font-weight:900;border-radius:9px;border:1px solid #22c55e;background:linear-gradient(135deg,#16a34a,#059669);color:#fff;cursor:pointer">⬇️ [4/4] Baixar Todos (corte_1.mp4...)</button>
         </div>
+      </div>
+      <!-- 💡 BULK DOWNLOAD BAR — baixar vários clipes de uma vez -->
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 14px;border-radius:12px;background:linear-gradient(135deg,#0f1a0f,#111422);border:1.5px solid #22c55e66;margin-bottom:14px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:#cbd5e1;cursor:pointer;margin:0"><input type="checkbox" id="opusBulkSelectAll" onchange="toggleBulkSelectAll(this.checked)" style="width:16px;height:16px;accent-color:#22c55e"> Selecionar todos</label>
+          <span id="opusBulkCount" style="font-size:11.5px;font-weight:800;padding:4px 10px;border-radius:999px;background:#064e3b;color:#a7f3d0;border:1px solid #10b981">0 selecionado(s)</span>
+          <span style="font-size:11px;color:#94a3b8">Passe o cursor no clipe → clique em <b>⬇️ Download</b> para baixar um clipe individual (.mp4). Para vários, selecione e use Bulk Download.</span>
+        </div>
+        <button type="button" id="opusBatchExportBtn" onclick="gerarCortesFinaisEmLote()" style="padding:9px 16px;font-size:12.5px;font-weight:900;border-radius:10px;border:1px solid #22c55e;background:linear-gradient(135deg,#16a34a,#059669);color:#fff;cursor:pointer;box-shadow:0 6px 16px rgba(34,197,94,.3)">⬇️ Bulk Download (Baixar em Lote) — .MP4</button>
       </div>
 
       <!-- GAVETA DE INSPEÇÃO DO PIPELINE 4 ETAPAS (JSON DA TRANSCRIÇÃO WHISPER + CORTES SUGERIDOS LLM) -->
@@ -1385,7 +1411,10 @@ input[type="range"]{
             <div id="opusActiveClipHeader" style="font-weight:800;font-size:14px;color:#f8fafc">🎬 Corte #1 Selecionado</div>
             <span id="opusActiveScoreBadge" style="font-size:12px;font-weight:900;padding:3px 10px;border-radius:999px;background:#052e16;border:1px solid #22c55e;color:#4ade80">🔥 99/100</span>
           </div>
-          <button type="button" class="ghost" onclick="toggleOpusStudioDrawer(false)" style="padding:6px 12px;font-size:11.5px">✖ Fechar Editor</button>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button type="button" onclick="exportSelectedOpusClipMp4()" style="padding:8px 14px;font-size:12px;font-weight:900;border-radius:9px;border:1px solid #22c55e;background:linear-gradient(135deg,#16a34a,#059669);color:#fff;cursor:pointer">⬇️ Export / Download HD (.MP4)</button>
+            <button type="button" class="ghost" onclick="toggleOpusStudioDrawer(false)" style="padding:6px 12px;font-size:11.5px">✖ Fechar</button>
+          </div>
         </div>
 
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;align-items:start">
@@ -1484,6 +1513,11 @@ input[type="range"]{
         </div>
       </div>
 
+      <!-- 💡 DICA EDIÇÃO — como no OpusClip -->
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 14px;border-radius:12px;background:#0b1326;border:1px solid #38bdf866;margin-bottom:12px;font-size:12px;color:#e0f2fe">
+        <span style="font-weight:900;color:#38bdf8">💡 Dica Edição:</span>
+        Clique em <b>✂️ Edit clip / Legenda</b> no card para abrir o editor • ajuste <b>caption</b>, <b>trim</b> (início/fim) e <b>posição da legenda</b> • depois clique em <b style="color:#4ade80">⬇️ Export / Download HD (.MP4)</b> no canto superior direito do editor — igual ao <b>clip.opus.pro</b>.
+      </div>
       <!-- LISTA DE CORTES NO LAYOUT EXATO DO clip.opus.pro/dashboard (4 COLUNAS) -->
       <div id="opusClipsList"></div>
 
@@ -7124,6 +7158,7 @@ function downloadAvatarThumbnail(){
 // ============================================================================
 // ✂️ OPUSCLIP IA — MOTOR DE RECORTE E EDIÇÃO DE VÍDEO AI (ENGENHARIA REVERSA)
 // ============================================================================
+let opusBulkSelected = new Set();
 let opusState = {
   file: null,
   fileUrl: '',
@@ -7152,6 +7187,14 @@ let opusState = {
   ytHandshakeTimer: null,
   ytPlayConfirmedWall: 0
 };
+
+function updateOpusBulkCount(){ const el=document.getElementById('opusBulkCount'); const btn=document.getElementById('opusBatchExportBtn'); if(!el) return; const n=opusBulkSelected.size; el.textContent=n? (n+' selecionado'+(n>1?'s':'')) : '0 selecionados'; if(btn) btn.disabled = n===0; const sa=document.getElementById('opusBulkSelectAll'); if(sa) sa.checked = opusState.clips.length>0 && opusBulkSelected.size===getOpusFilteredClips().length; }
+function getOpusFilteredClips(){ let base=[...opusState.clips]; const searchQ=((document.getElementById('opusSearchTranscript')||{}).value||'').trim().toLowerCase(); const sortOrder=((document.getElementById('opusSortOrder')||{}).value||'score'); base=base.filter(c=>{ if(typeof opusActiveFilter!=='undefined'){ if(opusActiveFilter==='liked'&&c.vote!=='like') return false; if(opusActiveFilter==='top90'&&(c.viralityScore||0)<90) return false; } if(searchQ){ const hay=`${c.title||''} ${c.captionText||''} ${c.reason||''}`.toLowerCase(); if(!hay.includes(searchQ)) return false; } return true; }); if(sortOrder==='time') base.sort((a,b)=>(a.startSec||0)-(b.startSec||0)); else base.sort((a,b)=>(b.viralityScore||0)-(a.viralityScore||0)); return base; }
+function getOpusVisibleIds(){ return getOpusFilteredClips().map(c=>c.id); }
+function toggleBulkSelectAll(checked){ const vis=getOpusVisibleIds(); if(checked) vis.forEach(id=>opusBulkSelected.add(id)); else vis.forEach(id=>opusBulkSelected.delete(id)); updateOpusBulkCount(); renderOpusClipsListUI(); }
+function toggleOpusBulkItem(id, checked){ if(checked) opusBulkSelected.add(id); else opusBulkSelected.delete(id); updateOpusBulkCount(); renderOpusClipsListUI(); }
+function toastOpusClip(m,t){ try{ toast(m,t||'ok'); }catch(e){ console.log(m); } }
+function quickDownloadOpusClip(clipId, ev){ if(ev){ ev.preventDefault(); ev.stopPropagation(); } const idx=opusState.clips.findIndex(c=>c.id===clipId); if(idx>=0){ opusState.selectedIdx=idx; renderOpusClipsListUI(); exportSelectedOpusClipMp4(); } }
 
 // Escuta mensagens oficiais do YouTube IFrame Player API (enablejsapi=1) para sincronizar cada palavra da legenda ao milissegundo exato da fala no vídeo do YouTube!
 window.addEventListener('message', (ev) => {
@@ -9866,8 +9909,9 @@ function renderOpusClipsListUI(){
     const capY = Number.isFinite(Number(c.captionYRatio)) && Number(c.captionYRatio) > 0 ? Number(c.captionYRatio) : 78;
     const capScl = Number(c.captionFontScale) || 100;
 
+    const isBulkChecked = opusBulkSelected.has(c.id);
     return `<div class="opus-clip-row ${isSel ? 'active-row' : ''}" data-clip-idx="${idx}">`
-      + `<h3 class="opus-clip-row-title"><span class="rk">#${c.rank}</span> ${escapeHtml(c.title)}</h3>`
+      + `<h3 class="opus-clip-row-title" style="display:flex;align-items:center;gap:8px"><label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;font-weight:800;color:#a7f3d0" onclick="event.stopPropagation()"><input type="checkbox" class="opus-select-chk" ${isBulkChecked?'checked':''} onchange="toggleOpusBulkItem('${c.id}', this.checked)" style="accent-color:#22c55e;width:16px;height:16px"> ✓</label><span class="rk">#${c.rank}</span> ${escapeHtml(c.title)}</h3>`
       + `<div class="opus-clip-grid">`
 
       // COLUNA 1: [♡] [👎] + 99/100 VIRAL SCORE + CONCEITOS (A+, A)
@@ -9896,6 +9940,7 @@ function renderOpusClipsListUI(){
       +     `<div id="opusCardYtWrap-${idx}" class="${opusState.ytEmbedMode ? '' : 'hidden'}" style="position:absolute;inset:0;overflow:hidden;z-index:1;background:#000"></div>`
       +     `<canvas id="opusCardCanvas-${idx}" width="360" height="640" style="position:relative;z-index:2;pointer-events:none;background:transparent"></canvas>`
       +     `<div class="opus-card-click-shield" id="opusCardClickShield-${idx}" onclick="playOpusClipCard(${idx})" style="position:absolute;inset:0;z-index:3;cursor:pointer"></div>`
+      +     `<button type="button" class="opus-hover-dl" onclick="quickDownloadOpusClip('${c.id}', event)" title="Baixar este clipe — Baixa direto .MP4 (igual OpusClip)">⬇️ Download</button>`
       +     `<div class="opus-mini-playbtn" id="opusCardPlayBtn-${idx}" onclick="event.stopPropagation();playOpusClipCard(${idx})" style="z-index:4;pointer-events:auto">▶</div>`
       +   `</div>`
       + `</div>`
@@ -9983,6 +10028,7 @@ function renderOpusClipsListUI(){
       + `</div>`;
   }).join('');
 
+  try{ updateOpusBulkCount(); }catch(e){}
   setTimeout(() => {
     renderSingleOpusPreviewFrame();
     renderAllOpusCardStaticPreviews();
@@ -10125,6 +10171,7 @@ async function runOpusClipAnalysis(skipUrlCheck = false){
     }
 
     opusState.clips = data.clips;
+    try{ opusBulkSelected.clear(); updateOpusBulkCount(); }catch(e){}
     opusState.cortesSugeridos = data.cortes_sugeridos || data.clips.map(c => ({
       titulo: c.title,
       inicio: c.startSec,
@@ -10205,18 +10252,25 @@ function toggleOpusPipelineJsonDrawer(forceOpen){
 }
 
 // Etapa 4 em Lote (gerar_cortes_finais): Corta cada subclip(t_inicio, t_fim), aplica o Crop 9:16 + Legendas e baixa corte_1.mp4, corte_2.mp4...
-async function gerarCortesFinaisEmLote(){
+async function gerarCortesFinaisEmLote(forcedIds){
   if(!opusState.clips || !opusState.clips.length){
     return toast('Gere os cortes virais primeiro!', 'warn');
   }
+  let indices=null;
+  if(Array.isArray(forcedIds) && forcedIds.length){ indices=forcedIds.map(id=>opusState.clips.findIndex(c=>c.id===id)).filter(i=>i>=0); }
+  else if(typeof opusBulkSelected !== 'undefined' && opusBulkSelected.size>0){
+    const visMap=new Map(opusState.clips.map((c,i)=>[c.id,i])); indices=[...opusBulkSelected].map(id=>visMap.get(id)).filter(i=>i!=null && i>=0); if(!indices.length) indices=opusState.clips.map((_,i)=>i);
+  } else { indices=opusState.clips.map((_,i)=>i); }
+  if(!indices.length){ toastOpusClip('Selecione ao menos 1 clipe.'); return; }
   const batchBtn = document.getElementById('opusBatchExportBtn');
   if(batchBtn){
     batchBtn.disabled = true;
     batchBtn.textContent = '⏳ [6/6] Renderizando lote MP4 normal...';
   }
   try{
-    const total = opusState.clips.length;
-    for(let i = 0; i < total; i++){
+    const total = indices.length;
+    for(let k=0;k<indices.length;k++){
+      const i=indices[k];
       const c = opusState.clips[i];
       toast(`🎬 [6/6 FFmpeg] Renderizando corte_${i + 1}.mp4 MP4 normal (${fmtClockSec(c.startSec)}s até ${fmtClockSec(c.endSec)}s)...`);
       selectOpusClip(i, false);
