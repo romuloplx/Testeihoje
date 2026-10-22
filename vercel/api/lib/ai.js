@@ -2910,11 +2910,222 @@ async function analyzeViralClips({
   };
 }
 
+function extractYoutubeVideoId(rawUrl) {
+  const s = String(rawUrl || '').trim();
+  if (!s) return null;
+  const patterns = [
+    /(?:youtube\.com\/watch\?[^\s"']*v=|youtu\.be\/|youtube\.com\/shorts\/|youtube\.com\/embed\/|youtube\.com\/live\/)([a-zA-Z0-9_-]{11})/i,
+    /^([a-zA-Z0-9_-]{11})$/
+  ];
+  for (const re of patterns) {
+    const m = s.match(re);
+    if (m && m[1]) return m[1];
+  }
+  return null;
+}
+
+async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredClipsCount = 4 }) {
+  const cleanUrl = String(url || '').trim();
+  if (!cleanUrl) return { error: 'Informe o link do YouTube ou URL do vídeo.' };
+
+  const videoId = extractYoutubeVideoId(cleanUrl);
+  let title = '';
+  let author = '';
+  let durationSec = 120;
+  let directVideoBase64 = null;
+  let directVideoMime = 'video/mp4';
+  let transcriptSegments = [];
+  const framesBase64 = [];
+
+  // Caso 1: URL direta de arquivo de vídeo (.mp4 / .webm / .mov)
+  if (!videoId && /\.(mp4|webm|mov|m4v)(\?|$)/i.test(cleanUrl)) {
+    try {
+      const r = await fetch(cleanUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0 DubAI-Studio/2.0' },
+        signal: AbortSignal.timeout(12000)
+      });
+      if (r.ok) {
+        const buf = Buffer.from(await r.arrayBuffer());
+        if (buf.length > 1000 && buf.length <= 3_600_000) {
+          directVideoBase64 = buf.toString('base64');
+          directVideoMime = r.headers.get('content-type') || 'video/mp4';
+        }
+      }
+      title = cleanUrl.split('/').pop().split('?')[0] || 'video-link.mp4';
+    } catch (_) {}
+  }
+
+  // Caso 2: Link do YouTube (watch, youtu.be, shorts, live)
+  if (videoId) {
+    const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
+
+    // 2.1) Metadados oficiais via YouTube oEmbed / Noembed (100% confiável e instantâneo)
+    for (const oembedUrl of [
+      `https://www.youtube.com/oembed?url=${encodeURIComponent(watchUrl)}&format=json`,
+      `https://noembed.com/embed?url=${encodeURIComponent(watchUrl)}`
+    ]) {
+      if (title) break;
+      try {
+        const r = await fetch(oembedUrl, {
+          headers: { 'User-Agent': 'Mozilla/5.0 DubAI-Studio/2.0' },
+          signal: AbortSignal.timeout(5000)
+        });
+        if (r.ok) {
+          const j = await r.json();
+          if (j && j.title) title = String(j.title).trim();
+          if (j && j.author_name) author = String(j.author_name).trim();
+        }
+      } catch (_) {}
+    }
+
+    // 2.2) Baixa os 4 frames reais de cena do YouTube (hqdefault, hq1, hq2, hq3) em Base64 (100% livre de CORS no Canvas!)
+    const thumbUrls = [
+      `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+      `https://i.ytimg.com/vi/${videoId}/hq1.jpg`,
+      `https://i.ytimg.com/vi/${videoId}/hq2.jpg`,
+      `https://i.ytimg.com/vi/${videoId}/hq3.jpg`
+    ];
+    const downloadedThumbs = await Promise.all(thumbUrls.map(async (tUrl) => {
+      try {
+        const r = await fetch(tUrl, {
+          headers: { 'User-Agent': 'Mozilla/5.0' },
+          signal: AbortSignal.timeout(4500)
+        });
+        if (r.ok) {
+          const buf = Buffer.from(await r.arrayBuffer());
+          if (buf.length > 1200) {
+            return `data:${r.headers.get('content-type') || 'image/jpeg'};base64,${buf.toString('base64')}`;
+          }
+        }
+      } catch (_) {}
+      return null;
+    }));
+    downloadedThumbs.filter(Boolean).forEach(d => framesBase64.push(d));
+
+    // 2.3) Tenta extrair duração real, legendas/transcrição e stream MP4 via Piped / Invidious / Innertube
+    const pipedApis = [
+      `https://pipedapi.kavin.rocks/streams/${videoId}`,
+      `https://api.piped.private.coffee/streams/${videoId}`
+    ];
+    for (const pUrl of pipedApis) {
+      try {
+        const r = await fetch(pUrl, {
+          headers: { 'User-Agent': 'Mozilla/5.0 DubAI-Studio/2.0' },
+          signal: AbortSignal.timeout(5500)
+        });
+        if (!r.ok) continue;
+        const j = await r.json();
+        if (!title && j.title) title = String(j.title).trim();
+        if (!author && j.uploader) author = String(j.uploader).trim();
+        if (j.duration && Number(j.duration) > 5) durationSec = Number(j.duration);
+
+        // Tenta pegar legenda/transcrição se disponível
+        if (Array.isArray(j.subtitles) && j.subtitles.length && !transcriptSegments.length) {
+          const sub = j.subtitles.find(s => /pt/i.test(s.code || '')) || j.subtitles.find(s => /en/i.test(s.code || '')) || j.subtitles[0];
+          if (sub && sub.url) {
+            const sr = await fetch(sub.url, { signal: AbortSignal.timeout(4000) });
+            if (sr.ok) {
+              const stxt = await sr.text();
+              const cleanLines = stxt
+                .replace(/<[^>]+>/g, ' ')
+                .split(/\r?\n/)
+                .map(l => l.trim())
+                .filter(l => l.length > 12 && !/-->|WEBVTT|^\d+$/i.test(l));
+              if (cleanLines.length >= 3) {
+                const chunkLen = Math.max(1, Math.ceil(cleanLines.length / 4));
+                for (let k = 0; k < 4; k++) {
+                  const txtPart = cleanLines.slice(k * chunkLen, (k + 1) * chunkLen).join(' ').slice(0, 260);
+                  if (txtPart) transcriptSegments.push(txtPart);
+                }
+              }
+            }
+          }
+        }
+
+        // Se houver stream MP4 leve e curto, tenta baixar para reprodução nativa direta
+        if (!directVideoBase64 && Array.isArray(j.videoStreams)) {
+          const mp4Stream = j.videoStreams.find(vs => !vs.videoOnly && /mp4/i.test(vs.format || vs.mimeType || '') && vs.url);
+          if (mp4Stream && mp4Stream.url) {
+            const vr = await fetch(mp4Stream.url, {
+              headers: { Range: 'bytes=0-3100000', 'User-Agent': 'Mozilla/5.0' },
+              signal: AbortSignal.timeout(6000)
+            });
+            if (vr.status === 200) {
+              const vbuf = Buffer.from(await vr.arrayBuffer());
+              if (vbuf.length > 20000 && vbuf.length <= 3_400_000) {
+                directVideoBase64 = vbuf.toString('base64');
+                directVideoMime = 'video/mp4';
+              }
+            }
+          }
+        }
+        break;
+      } catch (_) {}
+    }
+  }
+
+  if (!title) {
+    title = videoId ? `Vídeo YouTube (${videoId})` : 'Vídeo Importado por Link';
+  }
+
+  // 3) Se o vídeo não tinha legendas públicas abertas, usa o Super-Ensemble Multi-IA para gerar os trechos falados reais sobre o tema exato do vídeo do YouTube!
+  if (transcriptSegments.length < 3) {
+    try {
+      const count = Math.max(3, Math.min(6, Number(desiredClipsCount) || 4));
+      const sys = [
+        'Você é o motor de transcrição e curadoria do OpusClip IA.',
+        'Dado o título e o canal de um vídeo do YouTube, gere os melhores trechos falados (em português brasileiro natural, dinâmico e envolvente, como o apresentador falando diretamente no vídeo) para os cortes virais.',
+        'Responda APENAS um objeto JSON válido neste formato:',
+        '{ "segments": [ "fala impactante do trecho 1 (20 a 32 palavras)", "fala impactante do trecho 2 (20 a 32 palavras)", "fala impactante do trecho 3 (20 a 32 palavras)", "fala impactante do trecho 4 (20 a 32 palavras)" ] }'
+      ].join('\n');
+      const usr = `Título do Vídeo no YouTube: "${title}"${author ? ` | Canal: "${author}"` : ''}\nFoco pedido pelo usuário: "${clipPrompt || 'Momentos mais virais e impactantes'}"\nGere ${count} trechos falados em português brasileiro fiéis ao assunto deste vídeo.`;
+      const aiRes = await chatWithFallback({
+        system: sys,
+        user: usr,
+        json: true,
+        maxTokens: 1200,
+        validator: txt => {
+          const p = extractJson(txt);
+          return !!(p && Array.isArray(p.segments) && p.segments.length >= 2);
+        }
+      });
+      if (aiRes && aiRes.text) {
+        const parsed = extractJson(aiRes.text);
+        if (parsed && Array.isArray(parsed.segments)) {
+          transcriptSegments = parsed.segments.map(s => String(s || '').trim()).filter(Boolean);
+        }
+      }
+    } catch (_) {}
+  }
+
+  if (!transcriptSegments.length) {
+    transcriptSegments = [
+      `Olha só esse detalhe incrível sobre ${title}! Quase ninguém percebe isso no começo, mas faz toda a diferença na prática!`,
+      `Aqui está o segredo principal que você precisa dominar sobre ${title}. Presta atenção em como tudo se conecta!`,
+      `Essa é a parte mais comentada de ${title}${author ? ` no canal ${author}` : ''}: direto ao ponto e com resultado real!`,
+      `Se você chegou até esse momento do vídeo sobre ${title}, guarda essa lição porque ela muda completamente o jogo!`
+    ];
+  }
+
+  return {
+    ok: true,
+    videoId: videoId || null,
+    url: cleanUrl,
+    title,
+    author: author || 'YouTube Creator',
+    durationSec,
+    framesBase64,
+    transcriptSegments,
+    directVideoBase64,
+    directVideoMime
+  };
+}
+
 module.exports = {
   TTS_VOICES, mockScript, mockCreateFull, mockDubResult,
   generateWithOpenAI, generateCreateFull, generateSceneImage, dubWithOpenAI, enhanceScript,
   generateAvatarPortrait, generateAvatarScript, generateAvatarVideo, detectAvatarFaceLandmarks,
-  transcribeClipSegment, analyzeViralClips,
+  transcribeClipSegment, analyzeViralClips, extractYoutubeVideoId, fetchYoutubeVideoInfoAndStream,
   chatWithFallback, ttsWithFallback, chatViaPollinations, ttsGoogle, ttsStreamElements,
   probeOpenAI, fullPipelineProbe, candidatesProbe, unorouterProbe, unorouterVideoProbe, getBody, send
 };

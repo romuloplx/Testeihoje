@@ -1,10 +1,20 @@
-const { transcribeClipSegment, analyzeViralClips, getBody, send } = require('./lib/ai');
+const { transcribeClipSegment, analyzeViralClips, fetchYoutubeVideoInfoAndStream, getBody, send } = require('./lib/ai');
 
 module.exports = async (req, res) => {
   try {
     if (req.method !== 'POST') return send(res, 405, { error: 'Método não permitido. Use POST.' });
     const body = await getBody(req);
     const action = String(body.action || 'analyze_clips');
+
+    if (action === 'fetch_url') {
+      const out = await fetchYoutubeVideoInfoAndStream({
+        url: body.url,
+        clipPrompt: body.clipPrompt || '',
+        desiredClipsCount: body.desiredClipsCount || 4
+      });
+      if (out.error) return send(res, 400, { error: out.error });
+      return send(res, 200, out);
+    }
 
     if (action === 'transcribe_segment') {
       const out = await transcribeClipSegment({

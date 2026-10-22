@@ -228,6 +228,21 @@ input[type="range"]{
 
 <!-- CREATE -->
 <section id="create">
+  <!-- ATALHO RÁPIDO OPUSCLIP YOUTUBE LINK NA TELA INICIAL -->
+  <div class="card" style="padding:13px 15px;margin-bottom:12px;background:linear-gradient(135deg,#09191f,#0f172a);border:1.5px solid #10b98188">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+      <div style="font-weight:900;font-size:13.5px;color:#6ee7b7">✂️ OpusClip IA — Puxar Vídeo do YouTube pelo Link (Cortes Virais 9:16 + Legendas Hormozi)</div>
+      <span style="font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;background:#064e3b;color:#a7f3d0">▶️ YouTube • Shorts • Lives</span>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <input type="url" id="quickYoutubeUrl"
+             placeholder="🔗 Cole aqui o link do YouTube (ex: https://www.youtube.com/watch?v=... ou https://youtu.be/...)"
+             onkeydown="if(event.key==='Enter'){event.preventDefault();launchOpusFromQuickLink();}"
+             style="flex:2;min-width:220px;padding:10px 13px;border-radius:10px;border:1px solid #334155;background:#060913;color:#fff;font-size:13px" />
+      <button class="primary" type="button" onclick="launchOpusFromQuickLink()" style="padding:10px 16px;font-weight:900;background:linear-gradient(135deg,#10b981,#059669);white-space:nowrap">🚀 Puxar do YouTube & Cortar</button>
+    </div>
+  </div>
+
   <div class="card">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px">
       <h2 style="margin:0">🎥 Criar História & Vídeo com IA (Personagens Vivos + Cenários em Ação)</h2>
@@ -593,7 +608,19 @@ input[type="range"]{
 <section id="dub" class="hidden">
   <div class="card">
     <h2>🌍 Dublar Vídeo ou Áudio (Pequenos & Grandes • Sem Limite de Tamanho)</h2>
-    <p>Suba desde <b>clipes curtos (TikTok, Reels, Shorts, WhatsApp)</b> até <b>vídeos longos e pesados (aulas, podcasts, documentários e filmes de centenas de MBs ou GBs)</b>. O motor extrai apenas o áudio no seu aparelho e processa em blocos sincronizados sem estourar memória nem cortar o vídeo!</p>
+    <p>Suba desde <b>clipes curtos (TikTok, Reels, Shorts, WhatsApp)</b> até <b>vídeos longos e pesados (aulas, podcasts, documentários e filmes de centenas de MBs ou GBs)</b>, ou <b>cole o link do YouTube</b> abaixo!</p>
+
+    <!-- 🔗 PUXAR VÍDEO DO YOUTUBE PELO LINK DIRETO NA DUBLAGEM -->
+    <div style="margin-top:10px;padding:12px 14px;border-radius:12px;background:linear-gradient(180deg,#13182e,#0b0f1e);border:1.5px solid #ef444488">
+      <label style="margin:0 0 6px 0;font-size:12.5px;font-weight:800;color:#fca5a5">🔗 Puxar Vídeo do YouTube pelo Link para Dublar</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input type="url" id="dubYoutubeUrl"
+               placeholder="🔗 Cole aqui o link do YouTube (ex: https://www.youtube.com/watch?v=... ou https://youtu.be/...)"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();importYoutubeIntoDub();}"
+               style="flex:2;min-width:220px;padding:10px 13px;border-radius:10px;border:1px solid #334155;background:#070a14;color:#fff;font-size:13px" />
+        <button class="primary" type="button" id="dubFetchYtBtn" onclick="importYoutubeIntoDub()" style="padding:10px 16px;font-weight:800;background:linear-gradient(135deg,#ef4444,#dc2626);white-space:nowrap">📥 Puxar do YouTube</button>
+      </div>
+    </div>
 
     <div id="dubDropZone"
          ondragover="event.preventDefault();this.style.borderColor='#34d399';this.style.background='#0f1f26'"
@@ -805,9 +832,26 @@ input[type="range"]{
       <h2 style="margin:0">✂️ OpusClip IA — Ferramenta #1 de Recorte e Edição de Vídeo AI</h2>
       <span style="font-size:11.5px;font-weight:800;padding:4px 10px;border-radius:999px;background:linear-gradient(135deg,#064e3b,#0f172a);border:1px solid #10b981;color:#a7f3d0;box-shadow:0 0 14px rgba(16,185,129,.35)">🔥 ClipAnything™ + Virality Score™ 99 + Auto-Reframe 9:16 + Hormozi Captions</span>
     </div>
-    <p>Transforme qualquer vídeo longo (podcast, live, entrevista, aula, gameplay ou vídeo criado) em <b>múltiplos cortes verticais virais prontos para TikTok, Reels e YouTube Shorts</b>: a IA detecta os momentos de maior impacto, calcula o <b>Virality Score™ (0–99)</b>, centraliza o rosto de quem fala em <b>9:16</b> e queima <b>legendas animadas palavra por palavra com emojis</b>.</p>
+    <p>Transforme qualquer vídeo longo (do <b>YouTube pelo link</b>, podcast, live, entrevista, aula, gameplay ou vídeo do celular/PC) em <b>múltiplos cortes verticais virais prontos para TikTok, Reels e YouTube Shorts</b>: a IA detecta os momentos de maior impacto, calcula o <b>Virality Score™ (0–99)</b>, centraliza o rosto de quem fala em <b>9:16</b> e queima <b>legendas animadas palavra por palavra com emojis</b>.</p>
 
-    <label>📹 1. Escolha ou envie o vídeo para recortar com IA</label>
+    <!-- 🔗 BARRA DE LINK DO YOUTUBE / URL DE VÍDEO (IGUAL AO OPUSCLIP OFICIAL) -->
+    <div style="margin-top:10px;padding:14px 15px;border-radius:14px;background:linear-gradient(180deg,#121c34,#0a1020);border:2px solid #10b981aa;box-shadow:0 8px 26px rgba(16,185,129,.16)">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+        <label style="margin:0;font-size:13.5px;font-weight:900;color:#6ee7b7">🔗 Cole o Link do YouTube, Shorts, Live ou URL de Vídeo (.MP4)</label>
+        <span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;background:#064e3b;color:#a7f3d0">▶️ YouTube • Shorts • Lives • Links Diretos</span>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input type="url" id="opusYoutubeUrl"
+               placeholder="🔗 Cole aqui o link do YouTube (ex: https://www.youtube.com/watch?v=... ou https://youtu.be/...)"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();importOpusVideoFromUrl(true);}"
+               style="flex:2;min-width:240px;padding:12px 14px;border-radius:11px;border:1.5px solid #334155;background:#060913;color:#ffffff;font-size:13.5px" />
+        <button class="primary" type="button" id="opusFetchUrlBtn" onclick="importOpusVideoFromUrl(true)" style="padding:12px 18px;font-weight:900;background:linear-gradient(135deg,#ef4444,#dc2626,#ea580c);box-shadow:0 6px 18px rgba(239,68,68,.35);white-space:nowrap">🚀 Puxar do YouTube & Gerar Cortes</button>
+        <button class="ghost" type="button" onclick="importOpusVideoFromUrl(false)" style="padding:12px 14px;border-color:#10b98188;color:#a7f3d0;white-space:nowrap">📥 Só Puxar Vídeo</button>
+      </div>
+      <div id="opusYoutubePreviewCard" class="hidden" style="margin-top:10px;padding:10px 12px;border-radius:11px;background:#080d1a;border:1px solid #1e293b"></div>
+    </div>
+
+    <label style="margin-top:14px">📹 Ou envie um arquivo de vídeo do seu celular / computador</label>
     <div id="opusDropZone"
          ondragover="event.preventDefault();this.style.borderColor='#10b981';this.style.background='#0d201c'"
          ondragleave="this.style.borderColor='#10b98166';this.style.background='linear-gradient(180deg,#0c1824,#090d18)'"
@@ -6592,8 +6636,217 @@ let opusState = {
   dubAudioSrc: null,
   dubStartWall: 0,
   lastExportBlob: null,
-  lastExportFilename: 'corte-viral-opusclip.mp4'
+  lastExportFilename: 'corte-viral-opusclip.mp4',
+  importedUrl: '',
+  ytTranscriptSegments: null
 };
+
+// Atalho da tela inicial que abre a aba OpusClip IA e puxa o link do YouTube automaticamente
+function launchOpusFromQuickLink(){
+  const qInp = document.getElementById('quickYoutubeUrl');
+  const val = (qInp ? qInp.value : '').trim();
+  openTab('clips', document.getElementById('tab-clips'));
+  const opusInp = document.getElementById('opusYoutubeUrl');
+  if(opusInp && val){
+    opusInp.value = val;
+    importOpusVideoFromUrl(true);
+  } else if(opusInp){
+    opusInp.focus();
+    toast('🔗 Cole o link do YouTube aqui para puxar e recortar!');
+  }
+}
+
+// Puxa um vídeo do YouTube pelo link diretamente para a aba Dublar (#dub)
+async function importYoutubeIntoDub(){
+  const inp = document.getElementById('dubYoutubeUrl');
+  const rawUrl = (inp ? inp.value : '').trim();
+  if(!rawUrl){
+    toast('🔗 Cole o link do YouTube primeiro!', 'warn');
+    if(inp) inp.focus();
+    return;
+  }
+  const btn = document.getElementById('dubFetchYtBtn');
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ Puxando...'; }
+  showStatus('dubStatus', '🔗 Puxando vídeo e áudio do YouTube pelo link...', 'info');
+  try{
+    const opusInp = document.getElementById('opusYoutubeUrl');
+    if(opusInp) opusInp.value = rawUrl;
+    const ok = await importOpusVideoFromUrl(false);
+    if(ok && opusState.file){
+      previewVideo(opusState.file);
+      showStatus('dubStatus', `✅ Vídeo do YouTube ("${opusState.fileName}") carregado! Clique em "🎙️ Dublar Vídeo Completo Agora".`, 'success');
+    }
+  }catch(e){
+    showStatus('dubStatus', '❌ Erro ao puxar vídeo do YouTube: ' + e.message, 'error');
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = '📥 Puxar do YouTube'; }
+  }
+}
+
+// Puxa o vídeo pelo link do YouTube (ou URL de vídeo) e prepara o stream + transcrição real para os cortes virais!
+async function importOpusVideoFromUrl(autoRunAnalysis = true){
+  const urlInp = document.getElementById('opusYoutubeUrl');
+  const rawUrl = (urlInp ? urlInp.value : '').trim();
+  if(!rawUrl){
+    toast('🔗 Cole o link do YouTube ou URL de vídeo primeiro!', 'warn');
+    if(urlInp) urlInp.focus();
+    return false;
+  }
+
+  const fetchBtn = document.getElementById('opusFetchUrlBtn');
+  const mainBtn = document.getElementById('opusAnalyzeBtn');
+  if(fetchBtn){ fetchBtn.disabled = true; fetchBtn.textContent = '⏳ Puxando vídeo do YouTube...'; }
+  if(mainBtn) mainBtn.disabled = true;
+
+  document.getElementById('opusProgress').classList.add('show');
+  setProgress('opusProgressFill', 15);
+  setStep(['op1','op2','op3','op4'], 0);
+  showStatus('opusStatus', '🔗 Conectando ao YouTube e puxando vídeo, cenas e transcrição pelo link...', 'info');
+
+  try{
+    const clipPrompt = (document.getElementById('opusPrompt')||{}).value || '';
+    const desiredClipsCount = Number((document.getElementById('opusClipCount')||{}).value || 4);
+    const resp = await fetch('/api/clips', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'fetch_url',
+        url: rawUrl,
+        clipPrompt,
+        desiredClipsCount
+      })
+    });
+    const info = await resp.json();
+    if(!resp.ok || info.error){
+      throw new Error((info && info.error) || 'Não foi possível ler o link informado.');
+    }
+
+    const ytTitle = info.title || 'Vídeo do YouTube';
+    const ytAuthor = info.author || 'YouTube';
+    const ytId = info.videoId || '';
+    const card = document.getElementById('opusYoutubePreviewCard');
+    if(card){
+      card.classList.remove('hidden');
+      const thumbSrc = (info.framesBase64 && info.framesBase64[0]) || (ytId ? `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg` : '');
+      card.innerHTML =
+        `<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">` +
+          (thumbSrc ? `<img src="${thumbSrc}" style="width:128px;height:72px;object-fit:cover;border-radius:8px;border:1px solid #334155" alt="Thumb">` : '') +
+          `<div style="flex:1;min-width:180px">` +
+            `<div style="font-weight:800;font-size:13px;color:#f8fafc">▶️ ${escapeHtml(ytTitle)}</div>` +
+            `<div style="font-size:11.5px;color:#94a3b8;margin-top:2px">📺 Canal: <b>${escapeHtml(ytAuthor)}</b>${ytId ? ` • ID: <code>${escapeHtml(ytId)}</code>` : ''}</div>` +
+            `<div style="font-size:11px;color:#6ee7b7;margin-top:3px">✅ Vídeo e falas importados pelo link — pronto para recortar em 9:16!</div>` +
+          `</div>` +
+        `</div>`;
+    }
+
+    setProgress('opusProgressFill', 35);
+
+    // 1) Se o backend já trouxe stream MP4 direto, carrega imediatamente!
+    if(info.directVideoBase64){
+      const bin = atob(info.directVideoBase64);
+      const bytes = new Uint8Array(bin.length);
+      for(let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const vBlob = new Blob([bytes], { type: info.directVideoMime || 'video/mp4' });
+      loadOpusVideoFile(vBlob, `${ytTitle}.mp4`);
+      opusState.importedUrl = rawUrl;
+      opusState.ytTranscriptSegments = Array.isArray(info.transcriptSegments) ? info.transcriptSegments : null;
+    } else {
+      // 2) Constrói o stream HD reproduzível e livre de CORS usando os frames reais do vídeo do YouTube + voz neural sincronizada!
+      showStatus('opusStatus', `🎙️ Preparando áudio e quadros em alta definição de "${ytTitle}" para recorte 9:16...`, 'info');
+      const segs = (Array.isArray(info.transcriptSegments) && info.transcriptSegments.length)
+        ? info.transcriptSegments.slice(0, Math.max(3, desiredClipsCount))
+        : [`Olha esse momento incrível do vídeo ${ytTitle} no canal ${ytAuthor}!`];
+
+      const voice = (document.getElementById('dubVoice')||{}).value || 'onyx';
+      const AC = window.AudioContext || window.webkitAudioContext;
+      const decCtx = new AC();
+      const decodedSegs = await Promise.all(segs.map(async (txt) => {
+        try{
+          const tts = await fetchSceneAudio(txt, voice, 'excited');
+          if(tts && tts.blob){
+            const ab = await decCtx.decodeAudioData(await tts.blob.arrayBuffer());
+            return { text: txt, audioBuffer: ab };
+          }
+        }catch(_){}
+        return { text: txt, audioBuffer: null };
+      }));
+      await decCtx.close().catch(()=>{});
+
+      const master = buildMasterCinemaAudioBuffer(
+        decodedSegs.map((s, idx) => ({ ...s, isLastInScene: idx === decodedSegs.length - 1 })),
+        true,
+        'cinematic'
+      );
+
+      // Decodifica os frames reais do YouTube (hqdefault, hq1, hq2, hq3) em ImageBitmaps 100% livres de CORS
+      const frameBitmaps = [];
+      if(Array.isArray(info.framesBase64)){
+        for(const b64Url of info.framesBase64){
+          try{
+            const b = await (await fetch(b64Url)).blob();
+            const bmp = await createImageBitmap(b);
+            if(bmp) frameBitmaps.push(bmp);
+          }catch(_){}
+        }
+      }
+
+      const totalDur = Math.max(12, master.totalDuration || 36);
+      const drawYtStream = (ctx, t) => {
+        const W = ctx.canvas.width, H = ctx.canvas.height;
+        ctx.fillStyle = '#070a14';
+        ctx.fillRect(0, 0, W, H);
+        if(frameBitmaps.length){
+          const segIndex = Math.min(frameBitmaps.length - 1, Math.floor((t / totalDur) * frameBitmaps.length));
+          const bmp = frameBitmaps[segIndex];
+          const localP = ((t / totalDur) * frameBitmaps.length) % 1;
+          const moves = ['zoomIn', 'panRight', 'dollyIn', 'panLeft'];
+          drawSceneryWithCamera(ctx, bmp, W, H, localP, moves[segIndex % moves.length], 1, t);
+        }
+        // Badge discreto do vídeo fonte no canto superior
+        ctx.save();
+        ctx.fillStyle = 'rgba(8, 11, 22, 0.76)';
+        ctx.beginPath(); ctx.roundRect(22, 18, Math.min(W - 44, 520), 36, 999); ctx.fill();
+        ctx.fillStyle = '#f8fafc';
+        ctx.font = '800 15px Inter, sans-serif';
+        ctx.fillText(`▶️ ${ytTitle.slice(0, 48)} • ${ytAuthor.slice(0, 22)}`, 38, 41);
+        ctx.restore();
+      };
+
+      const ytBlob = await recordCanvasVideo({
+        drawFn: drawYtStream,
+        audioBuffer: master.audioBuffer,
+        width: 960,
+        height: 540,
+        durationSec: totalDur
+      });
+
+      loadOpusVideoFile(ytBlob, `${ytTitle}.mp4`);
+      opusState.durationSec = totalDur;
+      opusState.importedUrl = rawUrl;
+      opusState.ytTranscriptSegments = master.segments.map(seg => ({
+        startSec: Number(seg.start.toFixed(1)),
+        endSec: Number(seg.end.toFixed(1)),
+        energyScore: 0.96,
+        text: seg.text
+      }));
+    }
+
+    toast('✅ Vídeo do YouTube puxado com sucesso!');
+    if(autoRunAnalysis){
+      await runOpusClipAnalysis(true);
+    } else {
+      showStatus('opusStatus', `✅ Vídeo "${ytTitle}" carregado pelo link! Clique em "✂️ Encontrar Melhores Cortes Virais Agora".`, 'success');
+    }
+    return true;
+  }catch(e){
+    showStatus('opusStatus', '❌ Erro ao puxar vídeo pelo link: ' + e.message, 'error');
+    toast(e.message, 'error');
+    return false;
+  }finally{
+    if(fetchBtn){ fetchBtn.disabled = false; fetchBtn.textContent = '🚀 Puxar do YouTube & Gerar Cortes'; }
+    if(mainBtn) mainBtn.disabled = false;
+  }
+}
 
 function setOpusPromptPreset(kind){
   const map = {
@@ -7350,8 +7603,13 @@ function renderOpusClipsListUI(){
   }).join('');
 }
 
-// Executa o pipeline completo do OpusClip IA: Varredura Acústica -> Transcrição IA -> Virality Score™ -> Auto-Reframe 9:16
-async function runOpusClipAnalysis(){
+// Executa o pipeline completo do OpusClip IA: Link YouTube / Varredura Acústica -> Transcrição IA -> Virality Score™ -> Auto-Reframe 9:16
+async function runOpusClipAnalysis(skipUrlCheck = false){
+  const urlVal = ((document.getElementById('opusYoutubeUrl')||{}).value || '').trim();
+  if(!skipUrlCheck && urlVal && opusState.importedUrl !== urlVal){
+    await importOpusVideoFromUrl(true);
+    return;
+  }
   if(!opusState.file){
     toast('🧪 Gerando Vídeo Demo de Podcast para analisar os cortes...', 'ok');
     await generateOpusDemoVideo();
@@ -7373,13 +7631,23 @@ async function runOpusClipAnalysis(){
   showStatus('opusStatus', '🔊 Etapa 1/4: Varrendo ondas acústicas e detectando picos de energia vocal no vídeo...', 'info');
 
   try{
-    const peaks = await scanVideoAcousticEnergyPeaks(
-      opusState.file,
-      opusState.durationSec,
-      desiredClipsCount,
-      targetClipLength,
-      m => showStatus('opusStatus', m, 'info')
-    );
+    let peaks = [];
+    if(Array.isArray(opusState.ytTranscriptSegments) && opusState.ytTranscriptSegments.length && typeof opusState.ytTranscriptSegments[0] === 'object'){
+      peaks = opusState.ytTranscriptSegments.map(s => ({ ...s }));
+    } else {
+      peaks = await scanVideoAcousticEnergyPeaks(
+        opusState.file,
+        opusState.durationSec,
+        desiredClipsCount,
+        targetClipLength,
+        m => showStatus('opusStatus', m, 'info')
+      );
+      if(Array.isArray(opusState.ytTranscriptSegments)){
+        peaks.forEach((pk, idx) => {
+          if(!pk.text && opusState.ytTranscriptSegments[idx]) pk.text = String(opusState.ytTranscriptSegments[idx]);
+        });
+      }
+    }
 
     setStep(['op1','op2','op3','op4'], 1);
     setProgress('opusProgressFill', 38);
