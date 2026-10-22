@@ -220,6 +220,7 @@ input[type="range"]{
 
 <div class="tabs">
   <button id="tab-create" class="active" onclick="openTab('create',this)">🎬 Criar</button>
+  <button id="tab-clips" onclick="openTab('clips',this)">✂️ OpusClip IA <span class="kbd" style="margin-left:4px;background:#064e3b;border-color:#10b981;color:#a7f3d0">#1 CORTES</span></button>
   <button id="tab-avatar" onclick="openTab('avatar',this)">🗣️ Avatar <span class="kbd" style="margin-left:4px;background:#3b0764;border-color:#7c3aed;color:#e9d5ff">NOVO</span></button>
   <button id="tab-dub" onclick="openTab('dub',this)">🌍 Dublar</button>
   <button id="tab-projects" onclick="openTab('projects',this)">📁 Projetos <span id="projCount" class="kbd" style="margin-left:4px">0</span></button>
@@ -797,6 +798,182 @@ input[type="range"]{
   </div>
 </section>
 
+<!-- OPUSCLIP IA — FERRAMENTA #1 DE RECORTE E EDIÇÃO DE VÍDEO AI -->
+<section id="clips" class="hidden">
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+      <h2 style="margin:0">✂️ OpusClip IA — Ferramenta #1 de Recorte e Edição de Vídeo AI</h2>
+      <span style="font-size:11.5px;font-weight:800;padding:4px 10px;border-radius:999px;background:linear-gradient(135deg,#064e3b,#0f172a);border:1px solid #10b981;color:#a7f3d0;box-shadow:0 0 14px rgba(16,185,129,.35)">🔥 ClipAnything™ + Virality Score™ 99 + Auto-Reframe 9:16 + Hormozi Captions</span>
+    </div>
+    <p>Transforme qualquer vídeo longo (podcast, live, entrevista, aula, gameplay ou vídeo criado) em <b>múltiplos cortes verticais virais prontos para TikTok, Reels e YouTube Shorts</b>: a IA detecta os momentos de maior impacto, calcula o <b>Virality Score™ (0–99)</b>, centraliza o rosto de quem fala em <b>9:16</b> e queima <b>legendas animadas palavra por palavra com emojis</b>.</p>
+
+    <label>📹 1. Escolha ou envie o vídeo para recortar com IA</label>
+    <div id="opusDropZone"
+         ondragover="event.preventDefault();this.style.borderColor='#10b981';this.style.background='#0d201c'"
+         ondragleave="this.style.borderColor='#10b98166';this.style.background='linear-gradient(180deg,#0c1824,#090d18)'"
+         ondrop="onDropOpusFile(event)"
+         onclick="document.getElementById('opusVideoFile').click()"
+         style="cursor:pointer;padding:18px 14px;border-radius:14px;border:2px dashed #10b98166;background:linear-gradient(180deg,#0c1824,#090d18);text-align:center;transition:.2s">
+      <div style="font-size:26px;margin-bottom:4px">🎬✂️</div>
+      <div style="font-weight:800;font-size:14px;color:#ecfdf5">Toque para enviar seu vídeo (.MP4, .MOV, .WEBM, .MKV — qualquer tamanho)</div>
+      <div style="font-size:12px;color:#94a3b8;margin-top:3px">Podcasts, entrevistas, lives, aulas, vlogs ou filmes • Sem limite de duração</div>
+      <input type="file" id="opusVideoFile" accept="video/*,.mp4,.mov,.webm,.mkv,.avi,.m4v" onchange="loadOpusVideoFile(this.files[0])" style="display:none">
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+      <button class="ghost" type="button" onclick="useStudioVideoInOpus()" style="border-color:#38bdf888;color:#bae6fd">🎬 Puxar Último Vídeo Criado / Dublado no Estúdio</button>
+      <button class="ghost" type="button" onclick="generateOpusDemoVideo()" style="border-color:#10b98188;color:#a7f3d0">🧪 Gerar Vídeo Demo de Podcast / Entrevista p/ Testar Agora</button>
+    </div>
+
+    <div id="opusFileMeta" class="hidden" style="margin-top:10px;padding:10px 12px;border-radius:10px;background:#0b1324;border:1px solid #1e293b;font-size:12.5px;color:#cbd5e1;line-height:1.5"></div>
+    <video id="opusSourceVideo" playsinline preload="auto" class="hidden" style="display:none"></video>
+
+    <div style="margin-top:14px;padding:12px 14px;border-radius:12px;background:linear-gradient(180deg,#11182c,#0b0f1d);border:1px solid #10b98155">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+        <label style="margin:0;color:#a7f3d0">🎯 2. ClipAnything™ Prompt — O que a IA deve buscar nos cortes?</label>
+        <span style="font-size:11px;color:#94a3b8">Inspirado no OpusClip ClipAnything™</span>
+      </div>
+      <input type="text" id="opusPrompt" value="Encontre os momentos mais virais, revelações impactantes, dicas práticas e picos de emoção com alto potencial de retenção" placeholder="Ex: Momentos mais engraçadas, maiores segredos revelados, respostas polêmicas..." style="width:100%;padding:11px 13px;border-radius:10px;border:1px solid var(--border);background:#080b16;color:#f8fafc;font-size:13.5px" />
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+        <button class="ghost" type="button" onclick="setOpusPromptPreset('viral')" style="font-size:11.5px;padding:5px 10px;border-color:#f59e0b66;color:#fde68a">🔥 Momentos Mais Virais & Polêmicos</button>
+        <button class="ghost" type="button" onclick="setOpusPromptPreset('tips')" style="font-size:11.5px;padding:5px 10px;border-color:#10b98166;color:#a7f3d0">💎 Melhores Dicas & Segredos</button>
+        <button class="ghost" type="button" onclick="setOpusPromptPreset('funny')" style="font-size:11.5px;padding:5px 10px;border-color:#38bdf866;color:#bae6fd">😂 Reações & Momentos Engraçados</button>
+        <button class="ghost" type="button" onclick="setOpusPromptPreset('emotion')" style="font-size:11.5px;padding:5px 10px;border-color:#a855f766;color:#e9d5ff">⚡ Ganchos de Alto Impacto Emocional</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>⏱️ Duração ideal de cada corte</label>
+        <select id="opusClipDuration">
+          <option value="15-30">⚡ Curto Explosivo (15s a 30s — TikTok / Reels)</option>
+          <option value="30-60" selected>🔥 Ideal Viral (30s a 60s — Shorts / Reels / TikTok)</option>
+          <option value="60-90">🎬 Corte Completo (60s a 90s — Podcast / História)</option>
+          <option value="auto">🤖 Automático IA (Adapta ao melhor gancho)</option>
+        </select>
+      </div>
+      <div>
+        <label>🔢 Quantidade de cortes virais</label>
+        <select id="opusClipCount">
+          <option value="3">3 Melhores Cortes (Top 3)</option>
+          <option value="4" selected>4 Cortes Virais (Recomendado)</option>
+          <option value="6">6 Cortes Virais</option>
+          <option value="8">8 Cortes Virais (Máximo)</option>
+        </select>
+      </div>
+      <div>
+        <label>📐 Enquadramento IA (Auto-Reframe)</label>
+        <select id="opusReframeMode" onchange="onChangeOpusVisualSettings()">
+          <option value="auto_face" selected>🎯 Auto-Reframe 9:16 (Rastreia Rosto / Sujeito em Ação)</option>
+          <option value="split_podcast">🎙️ Split-Screen Podcast 9:16 (2 Pessoas: Topo & Base)</option>
+          <option value="cinema_blur">✨ Cinema Fit 9:16 (Vídeo Inteiro + Fundo Blur Dinâmico)</option>
+          <option value="1:1">🟦 Quadrado 1:1 (Feed Instagram / LinkedIn)</option>
+          <option value="16:9">🖥️ Horizontal 16:9 (YouTube)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>💬 Estilo de Legenda Dinâmica (OpusClip Captions)</label>
+        <select id="opusCaptionStyle" onchange="onChangeOpusVisualSettings()">
+          <option value="hormozi" selected>🔥 Hormozi Bold (Amarelo + Verde Pop + Caixa Preta + Emojis)</option>
+          <option value="neon">⚡ Opus Neon (Ciano + Roxo Glow + Destaque Ativo)</option>
+          <option value="impact">🎯 Viral Impact (Branco + Destaque Vermelho Forte)</option>
+          <option value="minimal">🎬 Minimal Studio (Legenda Limpa de Cinema)</option>
+          <option value="none">🚫 Sem Legenda Queimada</option>
+        </select>
+      </div>
+      <div>
+        <label>🏷️ Gancho Viral no Topo (Hook Banner)</label>
+        <select id="opusHookBannerMode" onchange="onChangeOpusVisualSettings()">
+          <option value="first5s" selected>🔥 Mostrar Gancho nos Primeiros 5s (Prende o Scroll)</option>
+          <option value="always">📌 Mostrar Gancho no Topo Durante Todo o Corte</option>
+          <option value="none">🚫 Sem Banner no Topo</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+      <button class="primary" id="opusAnalyzeBtn" onclick="runOpusClipAnalysis()" style="flex:1;min-width:250px;background:linear-gradient(135deg,#10b981,#059669,#0284c7);box-shadow:0 8px 25px rgba(16,185,129,.35)">✂️ Encontrar Melhores Cortes Virais Agora (OpusClip IA)</button>
+    </div>
+
+    <div class="progress-wrap" id="opusProgress">
+      <div class="progress-bar"><div class="progress-fill" id="opusProgressFill"></div></div>
+      <div class="progress-steps">
+        <span id="op1" class="active">Picos Acústicos</span>
+        <span id="op2">Transcrição IA</span>
+        <span id="op3">Virality Score™</span>
+        <span id="op4">Auto-Reframe 9:16</span>
+      </div>
+    </div>
+
+    <div class="status" id="opusStatus"></div>
+
+    <!-- WORKSPACE INTERATIVO OPUSCLIP: EDITOR 9:16 AO VIVO + RANKING DE CORTES VIRAIS -->
+    <div id="opusResultWrap" class="hidden" style="margin-top:16px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;align-items:start">
+
+        <!-- COLUNA 1: PLAYER & EDITOR 9:16 INTERATIVO AO VIVO -->
+        <div style="background:linear-gradient(180deg,#0d1326,#080b16);border:1.5px solid #10b98188;border-radius:16px;padding:14px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+            <div id="opusActiveClipHeader" style="font-weight:800;font-size:13.5px;color:#6ee7b7">🎬 Corte #1 Selecionado</div>
+            <span id="opusActiveScoreBadge" style="font-size:12px;font-weight:900;padding:3px 10px;border-radius:999px;background:#064e3b;border:1px solid #10b981;color:#ecfdf5">🔥 98/100</span>
+          </div>
+
+          <div style="display:flex;justify-content:center;align-items:center;background:#04060d;border-radius:12px;padding:8px;border:1px solid #1e293b">
+            <canvas id="opusPreviewCanvas" width="540" height="960" style="max-width:100%;max-height:430px;width:auto;height:auto;border-radius:10px;display:block;cursor:pointer" onclick="toggleOpusPreviewPlayback()"></canvas>
+          </div>
+
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+            <button class="primary" type="button" id="opusPlayBtn" onclick="toggleOpusPreviewPlayback()" style="flex:1;padding:10px 12px">▶️ Assistir Corte Ao Vivo</button>
+            <button class="ghost" type="button" onclick="restartOpusPreviewClip()" style="padding:10px 12px">🔄 Do Início</button>
+          </div>
+
+          <!-- AJUSTE FINO DE RECORTE E TEXTO EM TEMPO REAL -->
+          <div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:#0b1020;border:1px solid #1e293b">
+            <div style="font-size:11.5px;font-weight:800;color:#93c5fd;margin-bottom:6px">✂️ Ajuste Fino de Tempo, Gancho e Legenda (Tempo Real)</div>
+            <div class="row" style="margin-top:0">
+              <div style="min-width:110px">
+                <label style="margin-top:0;font-size:11px">⏱️ Início (seg)</label>
+                <input type="number" step="0.5" id="opusEditStart" onchange="onEditSelectedOpusClip()" style="padding:7px 9px;font-size:12.5px">
+              </div>
+              <div style="min-width:110px">
+                <label style="margin-top:0;font-size:11px">⏱️ Fim (seg)</label>
+                <input type="number" step="0.5" id="opusEditEnd" onchange="onEditSelectedOpusClip()" style="padding:7px 9px;font-size:12.5px">
+              </div>
+            </div>
+            <label style="margin-top:6px;font-size:11px">🏷️ Banner Gancho no Topo</label>
+            <input type="text" id="opusEditHookBanner" oninput="onEditSelectedOpusClip()" style="padding:7px 9px;font-size:12.5px;width:100%;border-radius:8px;border:1px solid var(--border);background:#070a14;color:#fff">
+            <label style="margin-top:6px;font-size:11px">💬 Legenda Animada Hormozi do Corte (edite livremente)</label>
+            <textarea id="opusEditCaption" rows="2" oninput="onEditSelectedOpusClip()" style="padding:7px 9px;font-size:12px;min-height:54px"></textarea>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+            <button type="button" id="opusExportMp4Btn" onclick="exportSelectedOpusClipMp4()" style="width:100%;padding:14px 16px;border:none;border-radius:12px;font-size:14.5px;font-weight:900;cursor:pointer;color:#022c22;background:linear-gradient(135deg,#34d399,#10b981,#06b6d4);box-shadow:0 8px 24px rgba(16,185,129,.35)">⬇️ GERAR E BAIXAR ESTE CORTE VIRAL (.MP4 GALERIA)</button>
+            <button type="button" onclick="shareOpusClipToGallery()" style="width:100%;padding:11px 14px;border:1.5px solid #38bdf8;border-radius:12px;font-size:13.5px;font-weight:800;cursor:pointer;color:#e0f2fe;background:#0f172a">📲 Salvar Direto na Galeria / Enviar (TikTok, Reels, Shorts)</button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="ghost" type="button" id="opusDubClipBtn" onclick="dubSelectedOpusClip()" style="flex:1;font-size:12px;border-color:#a855f788;color:#e9d5ff">🎙️ Dublar Corte em PT-BR com Voz IA</button>
+              <button class="ghost" type="button" onclick="downloadSelectedOpusClipSrt()" style="font-size:12px">📜 Baixar .SRT</button>
+            </div>
+          </div>
+          <video id="opusExportedVideo" controls playsinline class="hidden" style="width:100%;max-height:380px;border-radius:10px;background:#000;margin-top:10px"></video>
+        </div>
+
+        <!-- COLUNA 2: RANKING DE CORTES VIRAIS COM VIRALITY SCORE™ -->
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+            <div style="font-weight:800;font-size:14px;color:#e2e8f0">🏆 Ranking de Cortes Virais (Virality Score™)</div>
+            <span id="opusProviderBadge" style="font-size:11px;padding:3px 9px;border-radius:999px;background:#1e1b4b;border:1px solid #818cf8;color:#e0e7ff">🤖 OpusClip Multi-IA</span>
+          </div>
+          <div id="opusClipsList" style="display:flex;flex-direction:column;gap:10px"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- PROJECTS -->
 <section id="projects" class="hidden">
   <div class="card">
@@ -867,6 +1044,7 @@ async function checkHealth(){
 }
 
 function openTab(id, button){
+  if(id !== 'clips' && typeof stopOpusPreviewPlayback === 'function') stopOpusPreviewPlayback();
   document.querySelectorAll('main section').forEach(s=>s.classList.add('hidden'));
   const sec=document.getElementById(id);
   if(sec) sec.classList.remove('hidden');
@@ -6394,6 +6572,1082 @@ function downloadAvatarThumbnail(){
   }
   ['pointerdown','touchstart','keydown'].forEach(ev => window.addEventListener(ev, unlock, { once:true, passive:true }));
 })();
+
+// ============================================================================
+// ✂️ OPUSCLIP IA — MOTOR DE RECORTE E EDIÇÃO DE VÍDEO AI (ENGENHARIA REVERSA)
+// ============================================================================
+let opusState = {
+  file: null,
+  fileUrl: '',
+  fileName: '',
+  durationSec: 0,
+  videoW: 1280,
+  videoH: 720,
+  mono12k: null,
+  clips: [],
+  selectedIdx: 0,
+  playing: false,
+  rafId: null,
+  dubAudioCtx: null,
+  dubAudioSrc: null,
+  dubStartWall: 0,
+  lastExportBlob: null,
+  lastExportFilename: 'corte-viral-opusclip.mp4'
+};
+
+function setOpusPromptPreset(kind){
+  const map = {
+    viral: 'Encontre os momentos mais virais, revelações polêmicas, ganchos fortes nos primeiros 3 segundos e picos de retenção',
+    tips: 'Extraia as melhores dicas práticas, segredos revelados, tutoriais diretos e lições de maior valor para salvar e compartilhar',
+    funny: 'Encontre os momentos mais engraçados, reações espontâneas, risadas e surpresas inesperadas no vídeo',
+    emotion: 'Identifique os momentos de maior impacto emocional, viradas dramáticas, superação e frases que arrepiam'
+  };
+  const inp = document.getElementById('opusPrompt');
+  if(inp && map[kind]){
+    inp.value = map[kind];
+    toast('🎯 Filtro ClipAnything™ aplicado!');
+  }
+}
+
+function onDropOpusFile(ev){
+  ev.preventDefault();
+  const dz = document.getElementById('opusDropZone');
+  if(dz){ dz.style.borderColor='#10b98166'; dz.style.background='linear-gradient(180deg,#0c1824,#090d18)'; }
+  const f = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0];
+  if(f) loadOpusVideoFile(f);
+}
+
+function loadOpusVideoFile(file, customLabel = ''){
+  if(!file) return;
+  stopOpusPreviewPlayback();
+  if(opusState.fileUrl) URL.revokeObjectURL(opusState.fileUrl);
+  opusState.file = file;
+  opusState.fileName = customLabel || file.name || 'video-opusclip.mp4';
+  opusState.fileUrl = URL.createObjectURL(file);
+  opusState.mono12k = null;
+  opusState.clips = [];
+  opusState.lastExportBlob = null;
+
+  const v = document.getElementById('opusSourceVideo');
+  v.src = opusState.fileUrl;
+  v.muted = false;
+  v.playsInline = true;
+  const meta = document.getElementById('opusFileMeta');
+  if(meta){
+    meta.classList.remove('hidden');
+    meta.innerHTML = `📹 <b>${escapeHtml(opusState.fileName)}</b> • <b>${fmtHumanBytes(file.size || 0)}</b> • Lendo metadados do vídeo...`;
+  }
+  v.onloadedmetadata = () => {
+    opusState.durationSec = isFinite(v.duration) && v.duration > 0 ? v.duration : 60;
+    opusState.videoW = v.videoWidth || 1280;
+    opusState.videoH = v.videoHeight || 720;
+    if(meta){
+      meta.innerHTML =
+        `📹 <b>${escapeHtml(opusState.fileName)}</b> • Tamanho: <b>${fmtHumanBytes(file.size || 0)}</b> • Duração: <b>${fmtClockSec(opusState.durationSec)}</b> • Resolução Original: <b>${opusState.videoW}×${opusState.videoH}</b>` +
+        `<br><span style="color:#6ee7b7">✅ Pronto para o OpusClip IA! Clique em <b>✂️ Encontrar Melhores Cortes Virais Agora</b> abaixo.</span>`;
+    }
+  };
+  toast('📹 Vídeo carregado no OpusClip IA: ' + opusState.fileName);
+}
+
+async function useStudioVideoInOpus(){
+  const candidateBlob = lastCreatedVideoBlob || lastDubVideoBlob || lastAvatarVideoBlob || currentDubFile;
+  if(candidateBlob){
+    const name = lastCreatedVideoBlob ? (lastCreatedVideoFilename || 'historia-criada.mp4')
+      : lastDubVideoBlob ? (lastDubVideoFilename || 'video-dublado.mp4')
+      : lastAvatarVideoBlob ? (lastAvatarVideoFilename || 'avatar-ia.mp4')
+      : (currentDubFile.name || 'video-estudio.mp4');
+    loadOpusVideoFile(candidateBlob, name);
+    return;
+  }
+  toast('🧪 Nenhum vídeo anterior na sessão — gerando Vídeo Demo de Podcast agora!', 'ok');
+  await generateOpusDemoVideo();
+}
+
+// Gera um Vídeo Demo de Podcast / Entrevista Multi-Câmera de 36s direto no navegador para testar o OpusClip IA em 1 clique!
+async function generateOpusDemoVideo(){
+  const btn = document.getElementById('opusAnalyzeBtn');
+  if(btn) btn.disabled = true;
+  showStatus('opusStatus', '🧪 Gerando Vídeo Demo de Podcast com 2 apresentadores (36s) para você testar os cortes virais...', 'info');
+  try{
+    const durSec = 36;
+    const SR = 24000;
+    const totalSamples = durSec * SR;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const tmpCtx = new AC({ sampleRate: SR });
+    const audioBuffer = tmpCtx.createBuffer(1, totalSamples, SR);
+    const ch = audioBuffer.getChannelData(0);
+
+    // Cria 3 picos claros de energia vocal simulando momentos virais de um podcast (2s-11s, 13s-23s, 25s-35s)
+    const windows = [
+      { s: 1.5, e: 11.5, amp: 0.55, f0: 135 },
+      { s: 13.0, e: 23.5, amp: 0.62, f0: 175 },
+      { s: 25.0, e: 35.0, amp: 0.58, f0: 145 }
+    ];
+    for(const w of windows){
+      const i0 = Math.floor(w.s * SR), i1 = Math.floor(w.e * SR);
+      for(let i = i0; i < i1 && i < totalSamples; i++){
+        const t = i / SR;
+        const syll = Math.max(0, Math.sin(2 * Math.PI * 3.8 * t) + 0.5 * Math.sin(2 * Math.PI * 1.9 * t));
+        const sig = (Math.sin(2 * Math.PI * w.f0 * t) * 0.55 + Math.sin(2 * Math.PI * w.f0 * 2 * t) * 0.28 + Math.sin(2 * Math.PI * w.f0 * 3 * t) * 0.15);
+        ch[i] = Math.max(-0.92, Math.min(0.92, sig * syll * w.amp * 0.5));
+      }
+    }
+    await tmpCtx.close().catch(()=>{});
+
+    const drawPodcastDemo = (ctx, t) => {
+      const W = ctx.canvas.width, H = ctx.canvas.height;
+      const g = ctx.createLinearGradient(0, 0, W, H);
+      g.addColorStop(0, '#090d1e'); g.addColorStop(0.5, '#161b36'); g.addColorStop(1, '#0b1324');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+      // Qual apresentador está falando neste momento (esquerda vs direita)
+      const activeHost = (t >= 12.5 && t < 24.2) ? 1 : 0;
+
+      // Desenha os 2 hosts lado a lado no estúdio 16:9 (Host 0 em x=0.28, Host 1 em x=0.72)
+      const hosts = [
+        { cx: W * 0.28, cy: H * 0.54, name: 'Lucas (Host)', jacket: '#1e3a8a', skin: '#f1c29d', hair: '#1e1b18', accent: '#38bdf8' },
+        { cx: W * 0.72, cy: H * 0.54, name: 'Marina (Convidada)', jacket: '#581c87', skin: '#f5cba7', hair: '#3b1d11', accent: '#f472b6' }
+      ];
+      hosts.forEach((h, idx) => {
+        const isTalking = idx === activeHost;
+        const talkEnv = isTalking ? Math.abs(Math.sin(t * 9.5)) : 0;
+        const bob = isTalking ? Math.sin(t * 4.2) * 4 : Math.sin(t * 1.6 + idx) * 1.5;
+
+        ctx.save();
+        ctx.translate(h.cx, h.cy + bob);
+        if(isTalking){
+          const rg = ctx.createRadialGradient(0, -30, 20, 0, -30, 175);
+          rg.addColorStop(0, h.accent + '55'); rg.addColorStop(1, 'transparent');
+          ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(0, -30, 175, 0, Math.PI*2); ctx.fill();
+        }
+        // Ombros / Jaqueta
+        ctx.fillStyle = h.jacket;
+        ctx.beginPath(); ctx.roundRect(-95, 25, 190, 155, 42); ctx.fill();
+        // Pescoço e Cabeça
+        ctx.fillStyle = h.skin;
+        ctx.fillRect(-20, -10, 40, 45);
+        ctx.beginPath(); ctx.ellipse(0, -52, 54, 64, 0, 0, Math.PI*2); ctx.fill();
+        // Cabelo
+        ctx.fillStyle = h.hair;
+        ctx.beginPath(); ctx.ellipse(0, -92, 58, 30, 0, Math.PI, Math.PI*2); ctx.fill();
+        // Olhos
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath(); ctx.arc(-20, -56, 5.5, 0, Math.PI*2); ctx.arc(20, -56, 5.5, 0, Math.PI*2); ctx.fill();
+        // Boca animada
+        ctx.fillStyle = '#7f1d1d';
+        const mH = 4 + talkEnv * 14;
+        ctx.beginPath(); ctx.ellipse(0, -24, 15 + talkEnv * 4, mH * 0.5, 0, 0, Math.PI*2); ctx.fill();
+        // Microfone de Podcast
+        ctx.fillStyle = '#1e293b';
+        ctx.beginPath(); ctx.roundRect(idx === 0 ? 35 : -65, 5, 30, 52, 12); ctx.fill();
+        ctx.restore();
+      });
+
+      ctx.fillStyle = 'rgba(10,14,28,0.82)';
+      ctx.beginPath(); ctx.roundRect(28, 22, 390, 40, 999); ctx.fill();
+      ctx.fillStyle = '#6ee7b7';
+      ctx.font = '800 17px Inter, sans-serif';
+      ctx.fillText('🎙️ PODCAST STUDIO • EPISÓDIO #42 (DEMO)', 48, 48);
+    };
+
+    const demoBlob = await recordCanvasVideo({
+      drawFn: drawPodcastDemo,
+      audioBuffer,
+      width: 960,
+      height: 540,
+      durationSec: durSec
+    });
+    loadOpusVideoFile(demoBlob, 'podcast-studio-episodio-42.mp4');
+    showStatus('opusStatus', '✅ Vídeo Demo de Podcast (36s) carregado! Agora clique em "✂️ Encontrar Melhores Cortes Virais Agora".', 'success');
+  }catch(e){
+    showStatus('opusStatus', '❌ Falha ao gerar vídeo demo: ' + e.message, 'error');
+  }finally{
+    if(btn) btn.disabled = false;
+  }
+}
+
+// Varre a energia acústica real do vídeo para encontrar os momentos mais intensos e extrair o áudio de cada janela
+async function scanVideoAcousticEnergyPeaks(file, durationSec, desiredCount, targetLenCode, onMsg){
+  const msg = typeof onMsg === 'function' ? onMsg : ()=>{};
+  const totalDur = Math.max(6, durationSec || 60);
+  const count = Math.max(1, Math.min(8, Number(desiredCount) || 4));
+  const clipSpan = targetLenCode === '15-30' ? Math.min(24, totalDur * 0.45)
+    : targetLenCode === '60-90' ? Math.min(68, totalDur * 0.75)
+    : Math.min(36, Math.max(8, totalDur * 0.50));
+
+  let mono12k = opusState.mono12k;
+  const SR = 12000;
+
+  if(!mono12k && file && file.size < 110 * 1024 * 1024){
+    try{
+      msg('🔊 Analisando ondas de voz, picos de emoção e ritmo do vídeo...');
+      const AC = window.AudioContext || window.webkitAudioContext;
+      const ac = new AC();
+      const arr = await file.arrayBuffer();
+      const dec = await ac.decodeAudioData(arr);
+      const off = new OfflineAudioContext(1, Math.max(1, Math.ceil(dec.duration * SR)), SR);
+      const src = off.createBufferSource();
+      src.buffer = dec;
+      src.connect(off.destination);
+      src.start();
+      const rendered = await off.startRendering();
+      mono12k = new Float32Array(rendered.getChannelData(0));
+      opusState.mono12k = mono12k;
+      await ac.close().catch(()=>{});
+    }catch(e){
+      console.warn('Fallback de varredura acústica:', e);
+    }
+  }
+
+  const candidates = [];
+  if(mono12k && mono12k.length > SR * 3){
+    // Calcula energia RMS em janelas de 1 segundo
+    const totalSecFloor = Math.floor(mono12k.length / SR);
+    const secRms = new Float32Array(totalSecFloor);
+    let maxRms = 0.001;
+    for(let s = 0; s < totalSecFloor; s++){
+      let sum = 0;
+      const base = s * SR;
+      for(let i = 0; i < SR; i += 4){
+        const v = mono12k[base + i];
+        sum += v * v;
+      }
+      const r = Math.sqrt(sum / (SR / 4));
+      secRms[s] = r;
+      if(r > maxRms) maxRms = r;
+    }
+
+    const winSec = Math.max(5, Math.min(Math.floor(totalSecFloor * 0.8), Math.round(clipSpan)));
+    const stepSec = Math.max(2, Math.floor(winSec / 4));
+    const scoredWindows = [];
+    for(let s0 = 0; s0 <= Math.max(0, totalSecFloor - winSec); s0 += stepSec){
+      let sum = 0, hookBoost = 0;
+      for(let k = 0; k < winSec && (s0 + k) < totalSecFloor; k++){
+        const val = secRms[s0 + k] / maxRms;
+        sum += val;
+        if(k < 4) hookBoost += val * 1.35; // Valoriza ganchos fortes nos primeiros 4s!
+      }
+      const score = (sum / winSec) * 0.7 + (hookBoost / 4) * 0.3;
+      scoredWindows.push({ startSec: s0, endSec: Math.min(totalDur, s0 + winSec), energyScore: Math.min(0.99, Math.max(0.75, score)) });
+    }
+    scoredWindows.sort((a, b) => b.energyScore - a.energyScore);
+
+    for(const w of scoredWindows){
+      if(candidates.length >= count) break;
+      const overlaps = candidates.some(c => Math.abs(c.startSec - w.startSec) < winSec * 0.55);
+      if(!overlaps) candidates.push(w);
+    }
+  }
+
+  // Completa janelas se o vídeo for curto ou sem trilha decodificada
+  while(candidates.length < count){
+    const idx = candidates.length;
+    const span = Math.min(clipSpan, Math.max(5, totalDur / Math.max(1, count)));
+    const startSec = Math.max(0, Math.min(totalDur - span, idx * ((totalDur - span) / Math.max(1, count - 1 || 1))));
+    candidates.push({
+      startSec: Number(startSec.toFixed(1)),
+      endSec: Number(Math.min(totalDur, startSec + span).toFixed(1)),
+      energyScore: Number((0.96 - idx * 0.03).toFixed(2))
+    });
+  }
+
+  // Extrai snippet WAV 12kHz (até 18s) das top 3 janelas para transcrição IA rápida
+  for(let i = 0; i < candidates.length; i++){
+    const c = candidates[i];
+    if(mono12k && i < 3){
+      const s0 = Math.max(0, Math.floor(c.startSec * SR));
+      const s1 = Math.min(mono12k.length, Math.floor(Math.min(c.endSec, c.startSec + 18) * SR));
+      if(s1 - s0 > SR){
+        const slice = mono12k.subarray(s0, s1);
+        const wavBytes = encodeWavMono(slice, SR);
+        c.audioBase64 = bytesToBase64(wavBytes);
+      }
+    }
+  }
+  return candidates;
+}
+
+// Detecta a posição horizontal do rosto/apresentador ativo no frame do vídeo para o Auto-Reframe 9:16
+async function detectVideoSpeakerFocusX(videoEl, timeSec){
+  if(!videoEl || !videoEl.videoWidth) return 0.5;
+  try{
+    await new Promise(res => {
+      const onSeek = () => { videoEl.removeEventListener('seeked', onSeek); res(); };
+      videoEl.addEventListener('seeked', onSeek, { once: true });
+      try{ videoEl.currentTime = Math.max(0, timeSec); }catch(_){ res(); }
+      setTimeout(res, 350);
+    });
+    const cv = document.createElement('canvas');
+    const W = 160, H = 90;
+    cv.width = W; cv.height = H;
+    const ctx = cv.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(videoEl, 0, 0, W, H);
+    const data = ctx.getImageData(0, 0, W, H).data;
+
+    let weightedX = 0, totalWeight = 0;
+    for(let y = Math.floor(H * 0.12); y < Math.floor(H * 0.72); y++){
+      for(let x = Math.floor(W * 0.10); x < Math.floor(W * 0.90); x++){
+        const idx = (y * W + x) * 4;
+        const r = data[idx], g = data[idx + 1], b = data[idx + 2];
+        const isSkin = (r > 85 && g > 45 && b > 25 && r > g && g > b * 0.85 && (r - Math.min(g, b)) > 18);
+        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+        const w = isSkin ? 4.5 : (lum > 45 && lum < 235 ? 0.35 : 0.05);
+        weightedX += (x / W) * w;
+        totalWeight += w;
+      }
+    }
+    if(totalWeight > 0){
+      const fx = weightedX / totalWeight;
+      return Math.max(0.24, Math.min(0.76, fx));
+    }
+  }catch(_){}
+  return 0.5;
+}
+
+// Mapa de Auto-Emojis contextuais estilo OpusClip Hormozi Captions
+function pickOpusEmojiForPhrase(phraseText){
+  const t = String(phraseText || '').toLowerCase();
+  if(/segredo|ninguém|verdade|revela|olha|atenção|presta/i.test(t)) return '🔥';
+  if(/dinheiro|ouro|valor|lucro|rico|milh|resultado/i.test(t)) return '💎';
+  if(/rápido|agora|hoje|segundo|velocidade|explod/i.test(t)) return '⚡';
+  if(/ideia|dica|aprende|entend|mente|cérebro/i.test(t)) return '💡';
+  if(/futuro|foguete|crescer|topo|sucesso|viral/i.test(t)) return '🚀';
+  if(/incrível|impossível|absurdo|nunca|choque/i.test(t)) return '🤯';
+  return '🎯';
+}
+
+// Constrói blocos curtos de 3–4 palavras estilo OpusClip Hormozi (com destaque palavra por palavra!)
+function buildOpusWordByWordCues(text, clipDurationSec){
+  const clean = String(text || '').replace(/\s+/g, ' ').trim();
+  if(!clean) return [];
+  const rawWords = clean.split(' ').filter(Boolean);
+  if(!rawWords.length) return [];
+
+  const totalDur = Math.max(1.5, clipDurationSec || 10);
+  const weights = rawWords.map(w => Math.max(2, w.length) + (/[,.!?;:]$/.test(w) ? 2.5 : 0));
+  const totalW = weights.reduce((a, b) => a + b, 0) || 1;
+
+  let cursor = 0.08;
+  const usableDur = Math.max(1.0, totalDur - 0.16);
+  const timedWords = rawWords.map((w, i) => {
+    const d = (weights[i] / totalW) * usableDur;
+    const start = cursor;
+    const end = cursor + d;
+    cursor = end;
+    const isHighlight = w.replace(/[^a-zA-ZÀ-ÿ0-9]/g, '').length >= 6 || /[!?🔥⚡💎]/.test(w) || (i % 4 === 1);
+    return { word: w, start, end, isHighlight };
+  });
+
+  // Agrupa de 3 em 3 palavras (padrão ouro OpusClip / Hormozi Shorts)
+  const phrases = [];
+  const WORDS_PER_PHRASE = 3;
+  for(let i = 0; i < timedWords.length; i += WORDS_PER_PHRASE){
+    const slice = timedWords.slice(i, i + WORDS_PER_PHRASE);
+    const phraseStr = slice.map(x => x.word).join(' ');
+    phrases.push({
+      start: slice[0].start,
+      end: slice[slice.length - 1].end,
+      words: slice,
+      emoji: pickOpusEmojiForPhrase(phraseStr)
+    });
+  }
+  return phrases;
+}
+
+// Renderiza 1 frame completo do OpusClip (Auto-Reframe 9:16 / Split-Screen Podcast / Cinema Blur + Hook Banner + Legendas Hormozi)
+function drawOpusReframedFrame(ctx, videoEl, clip, relSec){
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  const reframeMode = (document.getElementById('opusReframeMode')||{}).value || clip.reframeMode || 'auto_face';
+  const captionStyle = (document.getElementById('opusCaptionStyle')||{}).value || 'hormozi';
+  const hookMode = (document.getElementById('opusHookBannerMode')||{}).value || 'first5s';
+
+  ctx.fillStyle = '#05070f';
+  ctx.fillRect(0, 0, W, H);
+
+  const vw = (videoEl && videoEl.videoWidth) || 1280;
+  const vh = (videoEl && videoEl.videoHeight) || 720;
+
+  if(videoEl && vw > 0 && vh > 0){
+    if(reframeMode === 'split_podcast' && W < H){
+      // 🎙️ MODO PODCAST SPLIT-SCREEN 9:16: Pessoa 1 no topo (x=0.28), Pessoa 2 na base (x=0.72)
+      const halfH = Math.floor(H * 0.5);
+      const targetAspect = W / halfH;
+      let sw = vh * targetAspect;
+      let sh = vh;
+      if(sw > vw){ sw = vw; sh = vw / targetAspect; }
+      const sy = Math.max(0, (vh - sh) * 0.35);
+
+      const sxLeft = Math.max(0, Math.min(vw - sw, vw * 0.27 - sw * 0.5));
+      const sxRight = Math.max(0, Math.min(vw - sw, vw * 0.73 - sw * 0.5));
+
+      try{
+        ctx.drawImage(videoEl, sxLeft, sy, sw, sh, 0, 0, W, halfH);
+        ctx.drawImage(videoEl, sxRight, sy, sw, sh, 0, halfH, W, H - halfH);
+      }catch(_){}
+
+      // Linha divisória neon entre as duas câmeras do podcast
+      ctx.fillStyle = '#10b981';
+      ctx.fillRect(0, halfH - 2, W, 4);
+    } else if(reframeMode === 'cinema_blur' && W < H){
+      // ✨ MODO CINEMA FIT 9:16: Fundo preenchido suave + Vídeo 16:9 inteiro centralizado com moldura neon
+      const bgScale = Math.max(W / vw, H / vh) * 1.18;
+      const bgW = vw * bgScale, bgH = vh * bgScale;
+      try{
+        ctx.save();
+        ctx.globalAlpha = 0.38;
+        ctx.drawImage(videoEl, (W - bgW) * 0.5, (H - bgH) * 0.5, bgW, bgH);
+        ctx.restore();
+      }catch(_){}
+      ctx.fillStyle = 'rgba(5, 8, 20, 0.52)';
+      ctx.fillRect(0, 0, W, H);
+
+      const fitW = W * 0.94;
+      const fitH = fitW * (vh / vw);
+      const fx = (W - fitW) * 0.5;
+      const fy = (H - fitH) * 0.44;
+      ctx.save();
+      ctx.beginPath(); ctx.roundRect(fx, fy, fitW, fitH, 16); ctx.clip();
+      try{ ctx.drawImage(videoEl, fx, fy, fitW, fitH); }catch(_){}
+      ctx.restore();
+      ctx.strokeStyle = 'rgba(16, 185, 129, 0.65)';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.roundRect(fx, fy, fitW, fitH, 16); ctx.stroke();
+    } else {
+      // 🎯 AUTO-REFRAME 9:16 COM RASTREAMENTO FACIAL / SUJEITO FALANDO
+      const targetAspect = W / H;
+      const srcAspect = vw / vh;
+      let sx = 0, sy = 0, sw = vw, sh = vh;
+      const baseFocusX = Number.isFinite(clip.focusX) ? clip.focusX : 0.5;
+      const dynamicPan = Math.sin(relSec * 0.85) * 0.03;
+      const focusX = Math.max(0.18, Math.min(0.82, baseFocusX + dynamicPan));
+
+      if(srcAspect > targetAspect){
+        sw = vh * targetAspect;
+        sx = Math.max(0, Math.min(vw - sw, vw * focusX - sw * 0.5));
+      } else {
+        sh = vw / targetAspect;
+        sy = Math.max(0, Math.min(vh - sh, vh * 0.38 - sh * 0.5));
+      }
+      try{ ctx.drawImage(videoEl, sx, sy, sw, sh, 0, 0, W, H); }catch(_){}
+    }
+  }
+
+  // Vinheta superior e inferior para leitura perfeita do Hook Banner e das Legendas Hormozi
+  const botGrad = ctx.createLinearGradient(0, H * 0.58, 0, H);
+  botGrad.addColorStop(0, 'rgba(0,0,0,0)');
+  botGrad.addColorStop(0.65, 'rgba(4,6,14,0.48)');
+  botGrad.addColorStop(1, 'rgba(4,6,14,0.86)');
+  ctx.fillStyle = botGrad;
+  ctx.fillRect(0, H * 0.58, W, H * 0.42);
+
+  // 2) TOP VIRAL HOOK BANNER (Prende a atenção nos primeiros segundos!)
+  const showHook = hookMode === 'always' || (hookMode === 'first5s' && relSec <= 5.2);
+  const hookText = String(clip.hookBanner || clip.title || '').trim();
+  if(showHook && hookText){
+    ctx.save();
+    const hFont = Math.max(15, Math.round(W * 0.040));
+    ctx.font = `900 ${hFont}px Inter, system-ui, sans-serif`;
+    const maxW = W * 0.86;
+    const words = hookText.toUpperCase().split(/\s+/);
+    const lines = [];
+    let cur = '';
+    for(const w of words){
+      const test = cur ? cur + ' ' + w : w;
+      if(ctx.measureText(test).width > maxW && cur){ lines.push(cur); cur = w; }
+      else cur = test;
+    }
+    if(cur) lines.push(cur);
+
+    const lineH = Math.round(hFont * 1.28);
+    const boxW = Math.min(W * 0.92, Math.max(...lines.map(l => ctx.measureText(l).width)) + 34);
+    const boxH = lines.length * lineH + 22;
+    const bx = (W - boxW) * 0.5;
+    const by = Math.round(H * 0.055);
+
+    ctx.fillStyle = 'rgba(10, 12, 24, 0.92)';
+    ctx.strokeStyle = '#facc15';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.roundRect(bx, by, boxW, boxH, 14); ctx.fill(); ctx.stroke();
+
+    ctx.fillStyle = '#fef08a';
+    ctx.textAlign = 'center';
+    lines.forEach((l, idx) => {
+      ctx.fillText(l, W * 0.5, by + 16 + (idx + 0.78) * lineH);
+    });
+    ctx.restore();
+  }
+
+  // 3) LEGENDAS DINÂMICAS OPUSCLIP (HORMOZI WORD-BY-WORD + AUTO-EMOJI + POP ANIMATION)
+  if(captionStyle !== 'none'){
+    const clipDur = Math.max(2, (clip.endSec || 30) - (clip.startSec || 0));
+    if(!clip._cues || clip._cuesText !== clip.captionText || clip._cuesDur !== clipDur){
+      clip._cues = buildOpusWordByWordCues(clip.captionText, clipDur);
+      clip._cuesText = clip.captionText;
+      clip._cuesDur = clipDur;
+    }
+    const cues = clip._cues || [];
+    const activeCue = cues.find(c => relSec >= c.start && relSec <= c.end + 0.08) || cues[Math.min(cues.length - 1, Math.floor((relSec / clipDur) * cues.length))];
+
+    if(activeCue && activeCue.words && activeCue.words.length){
+      ctx.save();
+      const baseFont = Math.max(22, Math.round(W * 0.064));
+      ctx.font = `900 ${baseFont}px Inter, system-ui, sans-serif`;
+      const yPos = Math.round(H * 0.79);
+
+      // Emoji contextual flutuante acima da frase (estilo OpusClip)
+      if(activeCue.emoji && captionStyle !== 'minimal'){
+        const emoSize = Math.round(baseFont * 1.15);
+        ctx.font = `${emoSize}px sans-serif`;
+        ctx.textAlign = 'center';
+        const bounce = Math.sin(relSec * 8) * 3;
+        ctx.fillText(activeCue.emoji, W * 0.5, yPos - baseFont * 1.25 + bounce);
+      }
+
+      ctx.font = `900 ${baseFont}px Inter, system-ui, sans-serif`;
+      const fullLine = activeCue.words.map(w => w.word.toUpperCase()).join(' ');
+      const totalLineW = ctx.measureText(fullLine).width;
+
+      if(captionStyle === 'minimal'){
+        ctx.fillStyle = 'rgba(8, 10, 20, 0.78)';
+        ctx.beginPath();
+        ctx.roundRect((W - totalLineW) * 0.5 - 18, yPos - baseFont, totalLineW + 36, baseFont * 1.38, 10);
+        ctx.fill();
+      }
+
+      let cursorX = (W - totalLineW) * 0.5;
+      activeCue.words.forEach((wObj, wIdx) => {
+        const wordStr = wObj.word.toUpperCase();
+        const wordW = ctx.measureText(wordStr).width;
+        const spaceW = ctx.measureText(' ').width;
+        const isCurrent = relSec >= wObj.start && relSec <= wObj.end + 0.05;
+
+        ctx.save();
+        const wordCenterX = cursorX + wordW * 0.5;
+        const wordCenterY = yPos - baseFont * 0.32;
+        if(isCurrent){
+          ctx.translate(wordCenterX, wordCenterY);
+          ctx.scale(1.12, 1.12);
+          ctx.translate(-wordCenterX, -wordCenterY);
+        }
+
+        // Pill de destaque atrás da palavra ativa no estilo Hormozi / Impact
+        if(isCurrent && (captionStyle === 'hormozi' || captionStyle === 'impact')){
+          ctx.fillStyle = captionStyle === 'hormozi' ? '#16a34a' : '#dc2626';
+          ctx.beginPath();
+          ctx.roundRect(cursorX - 7, yPos - baseFont * 0.96, wordW + 14, baseFont * 1.18, 8);
+          ctx.fill();
+        }
+
+        // Contorno preto pesado estilo Shorts/TikTok
+        ctx.lineWidth = Math.max(5, Math.round(baseFont * 0.20));
+        ctx.strokeStyle = '#000000';
+        ctx.lineJoin = 'round';
+        ctx.strokeText(wordStr, cursorX, yPos);
+
+        // Cor da palavra segundo o tema OpusClip escolhido
+        if(captionStyle === 'hormozi'){
+          ctx.fillStyle = isCurrent ? '#ffffff' : (wObj.isHighlight ? '#facc15' : '#ffffff');
+        } else if(captionStyle === 'neon'){
+          ctx.shadowColor = isCurrent ? '#38bdf8' : '#a855f7';
+          ctx.shadowBlur = isCurrent ? 16 : 8;
+          ctx.fillStyle = isCurrent ? '#38bdf8' : (wObj.isHighlight ? '#e879f9' : '#ffffff');
+        } else if(captionStyle === 'impact'){
+          ctx.fillStyle = isCurrent ? '#ffffff' : (wObj.isHighlight ? '#fde047' : '#ffffff');
+        } else {
+          ctx.fillStyle = isCurrent ? '#38bdf8' : '#ffffff';
+        }
+        ctx.fillText(wordStr, cursorX, yPos);
+        ctx.restore();
+
+        cursorX += wordW + spaceW;
+      });
+      ctx.restore();
+    }
+  }
+
+  // 4) BARRA DE PROGRESSO VIRAL NO RODAPÉ
+  const clipDur = Math.max(1, (clip.endSec || 30) - (clip.startSec || 0));
+  const progP = Math.max(0, Math.min(1, relSec / clipDur));
+  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  ctx.fillRect(0, H - 6, W, 6);
+  ctx.fillStyle = '#10b981';
+  ctx.fillRect(0, H - 6, W * progP, 6);
+}
+
+function updateOpusCanvasAspect(){
+  const cv = document.getElementById('opusPreviewCanvas');
+  if(!cv) return;
+  const mode = (document.getElementById('opusReframeMode')||{}).value || 'auto_face';
+  if(mode === '1:1'){ cv.width = 720; cv.height = 720; }
+  else if(mode === '16:9'){ cv.width = 960; cv.height = 540; }
+  else { cv.width = 540; cv.height = 960; }
+}
+
+function onChangeOpusVisualSettings(){
+  updateOpusCanvasAspect();
+  opusState.lastExportBlob = null;
+  renderSingleOpusPreviewFrame();
+}
+
+function renderSingleOpusPreviewFrame(){
+  const cv = document.getElementById('opusPreviewCanvas');
+  const v = document.getElementById('opusSourceVideo');
+  const clip = opusState.clips[opusState.selectedIdx];
+  if(!cv || !clip) return;
+  const ctx = cv.getContext('2d');
+  const relSec = v ? Math.max(0, (v.currentTime || clip.startSec) - clip.startSec) : 0.8;
+  drawOpusReframedFrame(ctx, v, clip, relSec);
+}
+
+function stopOpusPreviewPlayback(){
+  opusState.playing = false;
+  if(opusState.rafId){ cancelAnimationFrame(opusState.rafId); opusState.rafId = null; }
+  const v = document.getElementById('opusSourceVideo');
+  if(v){ try{ v.pause(); }catch(_){} }
+  if(opusState.dubAudioSrc){ try{ opusState.dubAudioSrc.stop(); }catch(_){} opusState.dubAudioSrc = null; }
+  if(opusState.dubAudioCtx){ try{ opusState.dubAudioCtx.close(); }catch(_){} opusState.dubAudioCtx = null; }
+  const playBtn = document.getElementById('opusPlayBtn');
+  if(playBtn) playBtn.textContent = '▶️ Assistir Corte Ao Vivo';
+}
+
+async function toggleOpusPreviewPlayback(){
+  if(opusState.playing){
+    stopOpusPreviewPlayback();
+    return;
+  }
+  const clip = opusState.clips[opusState.selectedIdx];
+  const v = document.getElementById('opusSourceVideo');
+  const cv = document.getElementById('opusPreviewCanvas');
+  if(!clip || !v || !cv) return;
+
+  updateOpusCanvasAspect();
+  const ctx = cv.getContext('2d');
+  opusState.playing = true;
+  const playBtn = document.getElementById('opusPlayBtn');
+  if(playBtn) playBtn.textContent = '⏸️ Pausar Corte';
+
+  if(v.currentTime < clip.startSec || v.currentTime >= clip.endSec - 0.15){
+    try{ v.currentTime = clip.startSec; }catch(_){}
+  }
+
+  // Se o corte já foi dublado em PT-BR pela IA, toca o áudio dublado sincronizado e silencia o original!
+  if(clip.dubbedAudioBuffer){
+    v.muted = true;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const ac = new AC();
+    const src = ac.createBufferSource();
+    src.buffer = clip.dubbedAudioBuffer;
+    src.connect(ac.destination);
+    const offset = Math.max(0, (v.currentTime || clip.startSec) - clip.startSec);
+    src.start(0, Math.min(clip.dubbedAudioBuffer.duration - 0.05, offset));
+    opusState.dubAudioCtx = ac;
+    opusState.dubAudioSrc = src;
+  } else {
+    v.muted = false;
+  }
+
+  await v.play().catch(()=>{});
+
+  const tick = () => {
+    if(!opusState.playing) return;
+    const nowT = v.currentTime || clip.startSec;
+    if(nowT >= clip.endSec || v.ended){
+      stopOpusPreviewPlayback();
+      try{ v.currentTime = clip.startSec; }catch(_){}
+      renderSingleOpusPreviewFrame();
+      return;
+    }
+    const relSec = Math.max(0, nowT - clip.startSec);
+    drawOpusReframedFrame(ctx, v, clip, relSec);
+    opusState.rafId = requestAnimationFrame(tick);
+  };
+  opusState.rafId = requestAnimationFrame(tick);
+}
+
+function restartOpusPreviewClip(){
+  const clip = opusState.clips[opusState.selectedIdx];
+  const v = document.getElementById('opusSourceVideo');
+  if(!clip || !v) return;
+  stopOpusPreviewPlayback();
+  try{ v.currentTime = clip.startSec; }catch(_){}
+  setTimeout(() => toggleOpusPreviewPlayback(), 60);
+}
+
+function selectOpusClip(idx, autoPlay = false){
+  if(!opusState.clips || !opusState.clips[idx]) return;
+  stopOpusPreviewPlayback();
+  opusState.selectedIdx = idx;
+  opusState.lastExportBlob = null;
+  const expVid = document.getElementById('opusExportedVideo');
+  if(expVid) expVid.classList.add('hidden');
+
+  const clip = opusState.clips[idx];
+  document.getElementById('opusActiveClipHeader').textContent = `🎬 Corte #${clip.rank}: ${clip.title}`;
+  document.getElementById('opusActiveScoreBadge').textContent = `🔥 ${clip.viralityScore}/100`;
+  document.getElementById('opusEditStart').value = clip.startSec;
+  document.getElementById('opusEditEnd').value = clip.endSec;
+  document.getElementById('opusEditHookBanner').value = clip.hookBanner || clip.title;
+  document.getElementById('opusEditCaption').value = clip.captionText || '';
+
+  renderOpusClipsListUI();
+
+  const v = document.getElementById('opusSourceVideo');
+  if(v){
+    const onSeeked = () => {
+      v.removeEventListener('seeked', onSeeked);
+      renderSingleOpusPreviewFrame();
+      if(autoPlay) toggleOpusPreviewPlayback();
+    };
+    v.addEventListener('seeked', onSeeked, { once: true });
+    try{ v.currentTime = clip.startSec + 0.2; }catch(_){ renderSingleOpusPreviewFrame(); }
+  }
+}
+
+function onEditSelectedOpusClip(){
+  const clip = opusState.clips[opusState.selectedIdx];
+  if(!clip) return;
+  const s = parseFloat(document.getElementById('opusEditStart').value);
+  const e = parseFloat(document.getElementById('opusEditEnd').value);
+  if(isFinite(s) && s >= 0) clip.startSec = Number(s.toFixed(1));
+  if(isFinite(e) && e > clip.startSec + 2) clip.endSec = Number(Math.min(opusState.durationSec || 3600, e).toFixed(1));
+  clip.durationSec = Number(Math.max(2, clip.endSec - clip.startSec).toFixed(1));
+  clip.hookBanner = document.getElementById('opusEditHookBanner').value;
+  clip.captionText = document.getElementById('opusEditCaption').value;
+  clip._cues = null;
+  opusState.lastExportBlob = null;
+  renderSingleOpusPreviewFrame();
+  renderOpusClipsListUI();
+}
+
+function renderOpusClipsListUI(){
+  const listEl = document.getElementById('opusClipsList');
+  if(!listEl) return;
+  listEl.innerHTML = opusState.clips.map((c, idx) => {
+    const isSel = idx === opusState.selectedIdx;
+    const scoreColor = c.viralityScore >= 95 ? '#10b981' : c.viralityScore >= 90 ? '#38bdf8' : '#f59e0b';
+    const m = c.metrics || { hook: 96, flow: 94, value: 95, trend: 93 };
+    return `<div onclick="selectOpusClip(${idx}, false)" style="cursor:pointer;padding:12px 14px;border-radius:14px;background:${isSel ? 'linear-gradient(180deg,#112233,#0a1220)' : '#0c1020'};border:${isSel ? '2px solid #10b981' : '1px solid #1e293b'};transition:.18s">`
+      + `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">`
+      +   `<span style="font-weight:900;font-size:13.5px;color:#f8fafc">#${c.rank} • ${escapeHtml(c.title)}</span>`
+      +   `<span style="font-weight:900;font-size:12.5px;padding:3px 10px;border-radius:999px;background:#052e16;border:1.5px solid ${scoreColor};color:#a7f3d0">🔥 Score ${c.viralityScore}/100</span>`
+      + `</div>`
+      + `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:7px;font-size:11px;font-weight:700">`
+      +   `<span style="padding:2px 7px;border-radius:6px;background:#172554;color:#93c5fd">⏱️ ${fmtClockSec(c.startSec)} – ${fmtClockSec(c.endSec)} (${Math.round(c.durationSec)}s)</span>`
+      +   `<span style="padding:2px 7px;border-radius:6px;background:#1e1b4b;color:#c4b5fd">🎣 Gancho ${m.hook}</span>`
+      +   `<span style="padding:2px 7px;border-radius:6px;background:#064e3b;color:#a7f3d0">⚡ Ritmo ${m.flow}</span>`
+      +   `<span style="padding:2px 7px;border-radius:6px;background:#3b0764;color:#f3e8ff">💎 Valor ${m.value}</span>`
+      +   `<span style="padding:2px 7px;border-radius:6px;background:#451a03;color:#fde68a">📈 Trend ${m.trend}</span>`
+      + `</div>`
+      + `<div style="margin-top:7px;font-size:11.5px;color:#94a3b8;line-height:1.45">💡 <b>Por que viraliza:</b> ${escapeHtml(c.reason)}</div>`
+      + `<div style="margin-top:6px;padding:7px 9px;border-radius:8px;background:#070a14;border:1px solid #1e293b;font-size:11.5px;color:#e2e8f0;font-style:italic">"${escapeHtml(c.captionText)}"</div>`
+      + `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:9px" onclick="event.stopPropagation()">`
+      +   `<button class="primary" type="button" onclick="selectOpusClip(${idx}, true)" style="padding:7px 12px;font-size:12px">▶️ Assistir Corte #${c.rank}</button>`
+      +   `<button class="ghost" type="button" onclick="selectOpusClip(${idx}, false);exportSelectedOpusClipMp4()" style="padding:7px 12px;font-size:12px;border-color:#10b98188;color:#a7f3d0">⬇️ Baixar .MP4</button>`
+      +   `<button class="ghost" type="button" onclick="copyText(${JSON.stringify(c.title + '\n\n' + (c.hashtags || '#shorts #viral'))})" style="padding:7px 10px;font-size:11.5px">📋 Copiar Título & Tags</button>`
+      + `</div>`
+      + `</div>`;
+  }).join('');
+}
+
+// Executa o pipeline completo do OpusClip IA: Varredura Acústica -> Transcrição IA -> Virality Score™ -> Auto-Reframe 9:16
+async function runOpusClipAnalysis(){
+  if(!opusState.file){
+    toast('🧪 Gerando Vídeo Demo de Podcast para analisar os cortes...', 'ok');
+    await generateOpusDemoVideo();
+    if(!opusState.file) return;
+  }
+
+  stopOpusPreviewPlayback();
+  const btn = document.getElementById('opusAnalyzeBtn');
+  const clipPrompt = (document.getElementById('opusPrompt')||{}).value || '';
+  const targetClipLength = (document.getElementById('opusClipDuration')||{}).value || '30-60';
+  const desiredClipsCount = Number((document.getElementById('opusClipCount')||{}).value || 4);
+  const aiModel = (document.getElementById('aiModel')||{}).value || 'auto-router';
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Analisando vídeo e gerando cortes virais...';
+  document.getElementById('opusProgress').classList.add('show');
+  setProgress('opusProgressFill', 12);
+  setStep(['op1','op2','op3','op4'], 0);
+  showStatus('opusStatus', '🔊 Etapa 1/4: Varrendo ondas acústicas e detectando picos de energia vocal no vídeo...', 'info');
+
+  try{
+    const peaks = await scanVideoAcousticEnergyPeaks(
+      opusState.file,
+      opusState.durationSec,
+      desiredClipsCount,
+      targetClipLength,
+      m => showStatus('opusStatus', m, 'info')
+    );
+
+    setStep(['op1','op2','op3','op4'], 1);
+    setProgress('opusProgressFill', 38);
+    showStatus('opusStatus', '🎙️ Etapa 2/4: Transcrevendo falas reais dos momentos de maior impacto com IA...', 'info');
+
+    // Transcreve até 2 janelas principais em paralelo para alimentar o motor OpusClip com a fala real do vídeo
+    const toTranscribe = peaks.filter(p => p.audioBase64).slice(0, 2);
+    await Promise.all(toTranscribe.map(async (pk) => {
+      try{
+        const r = await fetch('/api/clips', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'transcribe_segment', audioBase64: pk.audioBase64, audioMime: 'audio/wav' })
+        });
+        const j = await r.json();
+        if(j && j.text && !j.silent) pk.text = j.text;
+      }catch(_){}
+      delete pk.audioBase64;
+    }));
+    peaks.forEach(p => { delete p.audioBase64; });
+
+    setStep(['op1','op2','op3','op4'], 2);
+    setProgress('opusProgressFill', 66);
+    showStatus('opusStatus', '🧠 Etapa 3/4: Calculando Virality Score™ (Gancho, Ritmo, Valor e Trend) e criando legendas Hormozi...', 'info');
+
+    const resp = await fetch('/api/clips', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'analyze_clips',
+        fileName: opusState.fileName,
+        durationSec: opusState.durationSec,
+        clipPrompt,
+        targetClipLength,
+        desiredClipsCount,
+        energyPeaks: peaks,
+        aiModel
+      })
+    });
+    const data = await resp.json();
+    if(!resp.ok || !data.clips || !data.clips.length){
+      throw new Error((data && data.error) || 'Não foi possível gerar os cortes virais.');
+    }
+
+    setStep(['op1','op2','op3','op4'], 3);
+    setProgress('opusProgressFill', 88);
+    showStatus('opusStatus', '🎯 Etapa 4/4: Calibrando Auto-Reframe 9:16 (rastreamento facial do apresentador em cada corte)...', 'info');
+
+    const v = document.getElementById('opusSourceVideo');
+    for(let i = 0; i < data.clips.length; i++){
+      const c = data.clips[i];
+      c.focusX = await detectVideoSpeakerFocusX(v, c.startSec + Math.min(2.5, c.durationSec * 0.3));
+    }
+
+    opusState.clips = data.clips;
+    document.getElementById('opusProviderBadge').textContent = `🤖 IA: ${data.provider || 'OpusClip Multi-IA'}`;
+    document.getElementById('opusResultWrap').classList.remove('hidden');
+    updateOpusCanvasAspect();
+    selectOpusClip(0, false);
+
+    setProgress('opusProgressFill', 100);
+    showStatus('opusStatus', `✅ ${data.clips.length} Cortes Virais prontos (Score até ${data.clips[0].viralityScore}/100)! Clique em ▶️ Assistir ou ⬇️ Baixar .MP4.`, 'success');
+    toast(`🔥 ${data.clips.length} Cortes Virais encontrados pelo OpusClip IA!`);
+    if(data.project) saveProject(data.project);
+    setTimeout(() => {
+      document.getElementById('opusResultWrap').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 180);
+  }catch(e){
+    showStatus('opusStatus', '❌ Erro na análise OpusClip: ' + e.message, 'error');
+    toast(e.message, 'error');
+  }finally{
+    btn.disabled = false;
+    btn.textContent = '✂️ Encontrar Melhores Cortes Virais Agora (OpusClip IA)';
+    setTimeout(() => { document.getElementById('opusProgress').classList.remove('show'); }, 1400);
+  }
+}
+
+// Dubla o corte selecionado em Português com a mesma voz neural travada do início ao fim!
+async function dubSelectedOpusClip(){
+  const clip = opusState.clips[opusState.selectedIdx];
+  if(!clip) return toast('Selecione um corte primeiro', 'warn');
+  const btn = document.getElementById('opusDubClipBtn');
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ Dublando corte com Voz IA...'; }
+  stopOpusPreviewPlayback();
+  try{
+    const voice = (document.getElementById('dubVoice')||{}).value || 'onyx';
+    const res = await fetchSceneAudio(clip.captionText, voice, 'excited');
+    if(!res || !res.blob) throw new Error((res && res.error) || 'Falha ao sintetizar voz dublada');
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const ac = new AC();
+    const arr = await res.blob.arrayBuffer();
+    clip.dubbedAudioBuffer = await ac.decodeAudioData(arr);
+    await ac.close().catch(()=>{});
+    opusState.lastExportBlob = null;
+    toast('🎙️ Corte dublado com Voz Neural IA! Clique em ▶️ Assistir Corte Ao Vivo.');
+    toggleOpusPreviewPlayback();
+  }catch(e){
+    toast('❌ ' + e.message, 'error');
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = '🎙️ Dublar Corte em PT-BR com Voz IA'; }
+  }
+}
+
+// Extrai o AudioBuffer exato do trecho [startSec, endSec] para gravar no .MP4 exportado
+async function extractOpusClipAudioBuffer(clip){
+  const dur = Math.max(2, clip.endSec - clip.startSec);
+  if(clip.dubbedAudioBuffer) return clip.dubbedAudioBuffer;
+
+  const SR = 24000;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const tmpCtx = new AC({ sampleRate: SR });
+  const totalSamples = Math.max(SR, Math.ceil(dur * SR));
+  const outBuf = tmpCtx.createBuffer(1, totalSamples, SR);
+  const outCh = outBuf.getChannelData(0);
+
+  if(opusState.mono12k && opusState.mono12k.length > 0){
+    const s0 = Math.max(0, Math.floor(clip.startSec * 12000));
+    for(let i = 0; i < totalSamples; i++){
+      const srcPos = s0 + i * 0.5;
+      const idx = Math.floor(srcPos);
+      if(idx < opusState.mono12k.length){
+        const frac = srcPos - idx;
+        outCh[i] = opusState.mono12k[idx] * (1 - frac) + (opusState.mono12k[idx + 1] || 0) * frac;
+      }
+    }
+  }
+  await tmpCtx.close().catch(()=>{});
+  return outBuf;
+}
+
+// Exporta o Corte Viral selecionado em vídeo .MP4 real a 30fps (com Auto-Reframe 9:16 + Hook Banner + Legendas Hormozi queimadas na tela!)
+async function exportSelectedOpusClipMp4(opts = {}){
+  const silentExport = !!(opts && opts.silentExport);
+  const clip = opusState.clips[opusState.selectedIdx];
+  if(!clip || !opusState.fileUrl) return toast('Gere os cortes virais primeiro!', 'warn');
+
+  if(opusState.lastExportBlob){
+    if(!silentExport){
+      triggerBlobDownload(opusState.lastExportBlob, opusState.lastExportFilename);
+      toast('⬇️ Download iniciado: ' + opusState.lastExportFilename);
+    }
+    return opusState.lastExportBlob;
+  }
+
+  stopOpusPreviewPlayback();
+  const btn = document.getElementById('opusExportMp4Btn');
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ Renderizando Corte Viral .MP4 (30fps)...'; }
+  document.getElementById('opusProgress').classList.add('show');
+  showStatus('opusStatus', `🎬 Renderizando Corte #${clip.rank} com Auto-Reframe e Legendas Hormozi em .MP4...`, 'info');
+
+  let exportVid = null;
+  try{
+    exportVid = document.createElement('video');
+    exportVid.src = opusState.fileUrl;
+    exportVid.muted = true;
+    exportVid.playsInline = true;
+    exportVid.preload = 'auto';
+    await new Promise((res, rej) => {
+      const ok = () => { cleanup(); res(); };
+      const err = () => { cleanup(); rej(new Error('Falha ao preparar vídeo fonte para exportação.')); };
+      const cleanup = () => {
+        exportVid.removeEventListener('canplay', ok);
+        exportVid.removeEventListener('loadeddata', ok);
+        exportVid.removeEventListener('error', err);
+      };
+      if(exportVid.readyState >= 2) return res();
+      exportVid.addEventListener('canplay', ok, { once: true });
+      exportVid.addEventListener('loadeddata', ok, { once: true });
+      exportVid.addEventListener('error', err, { once: true });
+      exportVid.load();
+      setTimeout(ok, 2200);
+    });
+
+    exportVid.currentTime = clip.startSec;
+    await new Promise(r => {
+      const onS = () => { exportVid.removeEventListener('seeked', onS); r(); };
+      exportVid.addEventListener('seeked', onS, { once: true });
+      setTimeout(r, 600);
+    });
+
+    const mode = (document.getElementById('opusReframeMode')||{}).value || 'auto_face';
+    const dim = mode === '1:1' ? { w: 720, h: 720 } : mode === '16:9' ? { w: 960, h: 540 } : { w: 540, h: 960 };
+    const clipDur = Math.max(2, clip.endSec - clip.startSec);
+    const clipAudioBuf = await extractOpusClipAudioBuffer(clip);
+
+    await exportVid.play().catch(()=>{});
+
+    const drawFn = (ctx, t) => {
+      drawOpusReframedFrame(ctx, exportVid, clip, t);
+    };
+
+    const blob = await recordCanvasVideo({
+      drawFn,
+      audioBuffer: clipAudioBuf,
+      width: dim.w,
+      height: dim.h,
+      durationSec: clipDur,
+      onProgress: p => {
+        setProgress('opusProgressFill', Math.round(p * 100));
+      }
+    });
+
+    try{ exportVid.pause(); exportVid.src = ''; }catch(_){}
+    const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
+    const slug = String(clip.title || `corte-viral-${clip.rank}`).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 34) || `corte-${clip.rank}`;
+    opusState.lastExportBlob = blob;
+    opusState.lastExportFilename = `opusclip-${clip.rank}-${slug}.${ext}`;
+
+    const expVidEl = document.getElementById('opusExportedVideo');
+    if(expVidEl){
+      expVidEl.src = URL.createObjectURL(blob);
+      expVidEl.classList.remove('hidden');
+    }
+
+    if(!silentExport){
+      triggerBlobDownload(blob, opusState.lastExportFilename);
+      toast('✅ Corte Viral .MP4 baixado com sucesso!');
+    }
+    showStatus('opusStatus', `✅ Corte #${clip.rank} exportado com sucesso (${opusState.lastExportFilename})!`, 'success');
+    return blob;
+  }catch(e){
+    showStatus('opusStatus', '❌ Erro ao exportar corte: ' + e.message, 'error');
+    toast(e.message, 'error');
+    return null;
+  }finally{
+    if(exportVid){ try{ exportVid.pause(); exportVid.src = ''; }catch(_){} }
+    if(btn){ btn.disabled = false; btn.textContent = '⬇️ GERAR E BAIXAR ESTE CORTE VIRAL (.MP4 GALERIA)'; }
+    setTimeout(() => { document.getElementById('opusProgress').classList.remove('show'); }, 1200);
+  }
+}
+
+async function shareOpusClipToGallery(){
+  let blob = opusState.lastExportBlob;
+  if(!blob){
+    blob = await exportSelectedOpusClipMp4({ silentExport: true });
+    if(!blob) return;
+  }
+  const filename = opusState.lastExportFilename || 'corte-viral-opusclip.mp4';
+  const file = new File([blob], filename, { type: blob.type || 'video/mp4' });
+  if(navigator.canShare && navigator.canShare({ files: [file] })){
+    try{
+      await navigator.share({ title: filename, text: 'Corte viral criado no DubAI PRO (OpusClip IA)', files: [file] });
+      toast('📲 Compartilhado com sucesso!');
+      return;
+    }catch(e){
+      if(e && e.name === 'AbortError') return;
+    }
+  }
+  triggerBlobDownload(blob, filename);
+  toast('⬇️ Vídeo salvo na pasta de Downloads / Galeria!');
+}
+
+function downloadSelectedOpusClipSrt(){
+  const clip = opusState.clips[opusState.selectedIdx];
+  if(!clip) return toast('Selecione um corte primeiro', 'warn');
+  const dur = Math.max(2, clip.endSec - clip.startSec);
+  const cues = buildOpusWordByWordCues(clip.captionText, dur);
+  let srt = '';
+  cues.forEach((c, idx) => {
+    const line = c.words.map(w => w.word).join(' ');
+    srt += `${idx + 1}\n${fmtSRT(c.start)} --> ${fmtSRT(c.end)}\n${line}\n\n`;
+  });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([srt], { type: 'application/x-subrip' }));
+  a.download = `opusclip-corte-${clip.rank}.srt`;
+  a.click();
+  toast('📜 Legendas .SRT do corte baixadas!');
+}
 
 // Init
 initAvatarPresets();

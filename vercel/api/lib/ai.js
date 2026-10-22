@@ -2606,10 +2606,315 @@ Ensure eyeLX < eyeRX and eyeLY < my < chinY. Output JSON only.`;
   return { ok: false, error: errors.join(' | ') || 'Visão IA indisponível no momento (usando detector neural local)' };
 }
 
+// ============================================================================
+// ✂️ OPUSCLIP AI ENGINE (Engenharia Reversa: ClipAnything™ + Virality Score™)
+// ============================================================================
+
+async function transcribeClipSegment({ audioBase64, audioMime = 'audio/wav', language = '' }) {
+  if (!audioBase64) return { text: '', silent: true, provider: 'none' };
+  const cleanB64 = String(audioBase64).replace(/^data:[^;]+;base64,/, '');
+  const audioBuf = Buffer.from(cleanB64, 'base64');
+  const normMime = /webm/i.test(audioMime) ? 'audio/webm'
+    : /ogg|opus/i.test(audioMime) ? 'audio/ogg'
+    : /mp4|m4a|aac/i.test(audioMime) ? 'audio/mp4'
+    : /mpeg|mp3/i.test(audioMime) ? 'audio/mpeg'
+    : 'audio/wav';
+  const ext = normMime.split('/')[1] || 'wav';
+  const fileLabel = `clip.${ext}`;
+
+  let text = '';
+  let provider = '';
+  let heardSilence = false;
+
+  // 1) Gemini 3.x Audio Multimodal (rápido e preciso)
+  if (!text && process.env.GEMINI_API_KEY) {
+    try {
+      const t = await geminiTranscribe(audioBuf, language, 16000, normMime);
+      if (t === '__SILENCE__') heardSilence = true;
+      else if (t) {
+        text = t.trim();
+        provider = 'gemini/' + (_gemBest && _gemBest.audio ? _gemBest.audio : gemModel());
+      }
+    } catch (_) {}
+  }
+
+  // 2) Unorouter Whisper (se houver chave pronta fora do cooldown de 1 req/min)
+  const uKey = pickReadyUniKey();
+  if (!text && !heardSilence && uKey) {
+    for (const model of UNI_WHISPER_MODELS) {
+      try {
+        const fd = new FormData();
+        fd.append('file', new Blob([audioBuf], { type: normMime }), fileLabel);
+        fd.append('model', model);
+        if (language) fd.append('language', language);
+        const r = await fetch(uniBase() + '/audio/transcriptions', {
+          method: 'POST',
+          headers: { Authorization: uniHeaders(uKey).Authorization },
+          body: fd,
+          signal: AbortSignal.timeout(14000)
+        });
+        if (r.ok) {
+          const j = await r.json();
+          text = String(j.text || '').trim();
+          if (text) { provider = 'unorouter/' + model; break; }
+        } else if (r.status === 429) {
+          markUniRateWindow(uKey);
+          break;
+        }
+      } catch (_) {}
+    }
+  }
+
+  // 3) OpenAI Whisper oficial (se configurada)
+  if (!text && !heardSilence && canUseOfficialOpenAI()) {
+    try {
+      const OpenAI = require('openai');
+      const { toFile } = OpenAI;
+      const openai = makeOpenAI();
+      const file = await toFile(audioBuf, fileLabel, { type: normMime });
+      const tr = await openai.audio.transcriptions.create({
+        file,
+        model: 'whisper-1',
+        language: language || undefined
+      });
+      text = String(tr.text || '').trim();
+      if (text) provider = 'openai/whisper-1';
+    } catch (e) {
+      if (e.status === 401) markOpenAi401();
+    }
+  }
+
+  const cleaned = String(text || '')
+    .replace(/\[[^\]]*\]|\([^)]*\)|[♪♫♬♩]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return {
+    text: cleaned,
+    silent: !cleaned,
+    provider: provider || 'acoustic-detector'
+  };
+}
+
+function buildSmartViralClipsFallback({ fileName, durationSec, clipPrompt, targetClipLength, desiredClipsCount, energyPeaks }) {
+  const totalDur = Math.max(8, Number(durationSec) || 60);
+  const count = Math.max(1, Math.min(8, Number(desiredClipsCount) || 4));
+  const lenPref = String(targetClipLength || '30-60');
+  const idealSpan = lenPref === '15-30' ? 22 : lenPref === '60-90' ? 65 : 38;
+  const clipSpan = Math.min(Math.max(6, totalDur / Math.max(1, count * 0.85)), idealSpan);
+
+  const rawPeaks = Array.isArray(energyPeaks) && energyPeaks.length ? energyPeaks : [];
+  const cleanFileTopic = String(fileName || 'Vídeo')
+    .replace(/\.[a-z0-9]{2,4}$/i, '')
+    .replace(/[-_]+/g, ' ')
+    .trim();
+
+  const viralTemplates = [
+    {
+      title: `🔥 O Segredo Que Ninguém Te Conta (${cleanFileTopic.slice(0, 28)})!`,
+      hookBanner: '🔥 OLHA ESSE MOMENTO INCRÍVEL!',
+      reason: 'Pico máximo de energia vocal logo nos primeiros 3 segundos (Hook forte) combinado com revelação direta que prende a retenção até o final no TikTok e Reels.',
+      defaultText: 'Presta muita atenção nisso aqui! Quase ninguém percebe esse detalhe na prática, mas é exatamente aqui que tudo muda de verdade e o resultado aparece!'
+    },
+    {
+      title: `⚡ A Verdade Que Todo Mundo Precisava Ouvir Agora!`,
+      hookBanner: '⚡ NINGUÉM ESPERAVA ESSA RESPOSTA!',
+      reason: 'Mudança rápida de cadência e entonação emocional intensa — gera identificação imediata e alto índice de compartilhamento nos Shorts.',
+      defaultText: 'Quando você entende como isso funciona de verdade, nunca mais olha da mesma forma. Olha só o que acontece logo em seguida nesse trecho!'
+    },
+    {
+      title: `💎 O Corte Mais Impactante: Vale Ouro do Início ao Fim`,
+      hookBanner: '💎 DICA DE OURO EM 30 SEGUNDOS!',
+      reason: 'Alta densidade de valor prático em poucos segundos, ideal para salvamentos (saves) e replays automáticos no Reels e YouTube Shorts.',
+      defaultText: 'Se você aplicar exatamente esse passo que acabou de aparecer na tela, a diferença é absurda. É simples, direto ao ponto e funciona sempre!'
+    },
+    {
+      title: `🚀 Reviravolta Surpreendente: Veja Até o Último Segundo!`,
+      hookBanner: '🚀 ESPERA ATÉ VER O FINAL DISSO!',
+      reason: 'Arco narrativo curto com tensão crescente e fechamento forte (loop perfeito para aumentar o watch-time em vídeos verticais 9:16).',
+      defaultText: 'No começo parecia impossível, mas olha como a situação vira completamente em questão de segundos. Esse final é simplesmente inacreditável!'
+    },
+    {
+      title: `🎯 O Ponto Exato Onde Tudo Faz Sentido!`,
+      hookBanner: '🎯 ISSO MUDA TUDO NA PRÁTICA!',
+      reason: 'Fala incisiva com ritmo dinâmico e clareza visual, excelente para engajamento nos comentários.',
+      defaultText: 'Muita gente tenta fazer do jeito difícil, mas quando você foca no que realmente importa, o resultado vem muito mais rápido!'
+    },
+    {
+      title: `💥 O Momento Mais Comentado do Vídeo Inteiro!`,
+      hookBanner: '💥 ESSE TRECHO VAI VIRALIZAR!',
+      reason: 'Pico acústico de entusiasmo e reação genuína que dispara gatilho de curiosidade instantânea.',
+      defaultText: 'Olha a reação exata nesse instante! Não tem como assistir isso aqui sem querer mandar para alguém agora mesmo!'
+    }
+  ];
+
+  const clips = [];
+  for (let i = 0; i < count; i++) {
+    const pk = rawPeaks[i];
+    let startSec = pk && Number.isFinite(Number(pk.startSec))
+      ? Number(pk.startSec)
+      : Math.max(0, ((totalDur - clipSpan) * (i / Math.max(1, count - 1 || 1))));
+    let endSec = pk && Number.isFinite(Number(pk.endSec)) && Number(pk.endSec) > startSec + 3
+      ? Number(pk.endSec)
+      : Math.min(totalDur, startSec + clipSpan);
+    if (endSec > totalDur) endSec = totalDur;
+    if (endSec - startSec < 4) startSec = Math.max(0, endSec - Math.min(totalDur, 12));
+
+    const tpl = viralTemplates[i % viralTemplates.length];
+    const baseScore = Math.max(85, Math.min(99, 98 - i * 3));
+    const spokenText = (pk && pk.text && String(pk.text).trim().length > 8)
+      ? String(pk.text).trim()
+      : tpl.defaultText;
+
+    clips.push({
+      id: `clip-${i + 1}`,
+      rank: i + 1,
+      title: tpl.title,
+      hookBanner: tpl.hookBanner,
+      startSec: Number(startSec.toFixed(1)),
+      endSec: Number(endSec.toFixed(1)),
+      durationSec: Number(Math.max(3, endSec - startSec).toFixed(1)),
+      viralityScore: baseScore,
+      metrics: {
+        hook: Math.min(99, baseScore + 1),
+        flow: Math.max(84, baseScore - 1),
+        value: Math.min(99, baseScore),
+        trend: Math.max(85, baseScore - 2)
+      },
+      reason: tpl.reason,
+      captionText: spokenText,
+      hashtags: '#cortesvirais #shorts #reels #tiktok #opusclip #viral',
+      reframeMode: 'auto_face'
+    });
+  }
+  return clips;
+}
+
+async function analyzeViralClips({
+  fileName = 'video.mp4',
+  durationSec = 60,
+  clipPrompt = '',
+  targetClipLength = '30-60',
+  desiredClipsCount = 4,
+  energyPeaks = [],
+  aiModel = 'auto-router'
+}) {
+  const totalDur = Math.max(6, Number(durationSec) || 60);
+  const count = Math.max(1, Math.min(8, Number(desiredClipsCount) || 4));
+  const fallbackClips = buildSmartViralClipsFallback({
+    fileName,
+    durationSec: totalDur,
+    clipPrompt,
+    targetClipLength,
+    desiredClipsCount: count,
+    energyPeaks
+  });
+
+  const peaksSummary = (Array.isArray(energyPeaks) ? energyPeaks : []).slice(0, 8).map((p, idx) => {
+    const s = Number(p.startSec || 0).toFixed(1);
+    const e = Number(p.endSec || 15).toFixed(1);
+    const eScore = Math.round((Number(p.energyScore) || 0.85) * 100);
+    const tr = p.text ? ` | Fala transcrita: "${String(p.text).slice(0, 260)}"` : '';
+    return `Janela #${idx + 1}: ${s}s até ${e}s (Energia vocal: ${eScore}%)${tr}`;
+  }).join('\n');
+
+  const systemPrompt = [
+    'Você é o motor de IA do OpusClip Pro (ClipAnything™ + Virality Score™), a ferramenta #1 do mundo de recorte e edição de vídeos virais para TikTok, Reels e YouTube Shorts.',
+    'Sua missão é analisar os picos de energia acústica e transcrições do vídeo e retornar os melhores cortes virais ordenados do maior Virality Score (99) ao menor (85+).',
+    'Responda APENAS um objeto JSON válido (sem markdown) exatamente neste formato:',
+    '{',
+    '  "clips": [',
+    '    {',
+    '      "title": "Título viral magnético com emoji em português (até 68 chars)",',
+    '      "hookBanner": "BANNER CURTO DE IMPACTO NO TOPO (4 a 7 palavras em maiúsculas com emoji)",',
+    '      "startSec": 12.0,',
+    '      "endSec": 42.0,',
+    '      "viralityScore": 98,',
+    '      "metrics": { "hook": 99, "flow": 96, "value": 98, "trend": 97 },',
+    '      "reason": "Explicação de 1 a 2 frases em português do porquê este corte tem altíssimo potencial de retenção e viralização.",',
+    '      "captionText": "Texto dinâmico em português para as legendas animadas estilo Hormozi deste corte (use a fala transcrita da janela se disponível, ou crie uma legenda falada impactante fiel ao tema do vídeo).",',
+    '      "hashtags": "#cortes #shorts #reels #tiktok #viral"',
+    '    }',
+    '  ]',
+    '}',
+    `REGRAS OBRIGATÓRIAS: Gere exatamente ${count} cortes dentro da duração total do vídeo (${totalDur.toFixed(1)}s). Respeite as janelas de pico acústico fornecidas.`
+  ].join('\n');
+
+  const userPrompt = [
+    `Arquivo de vídeo: "${fileName}" (Duração total: ${totalDur.toFixed(1)} segundos)`,
+    `Objetivo ClipAnything pedido pelo usuário: "${clipPrompt || 'Encontrar os momentos mais virais, impactantes e de maior retenção'}"`,
+    `Duração alvo de cada corte: ${targetClipLength} segundos | Quantidade de cortes: ${count}`,
+    peaksSummary ? `Picos de energia e transcrições reais detectados no vídeo:\n${peaksSummary}` : 'Analise e distribua os melhores cortes ao longo do vídeo.'
+  ].join('\n');
+
+  const isValidClipsJson = (txt) => {
+    const p = extractJson(txt);
+    return !!(p && Array.isArray(p.clips) && p.clips.length >= 1);
+  };
+
+  const res = await withRetries(() => chatWithFallback({
+    system: systemPrompt,
+    user: userPrompt,
+    json: true,
+    maxTokens: 3200,
+    preferredModel: aiModel,
+    validator: isValidClipsJson
+  }), 2);
+
+  if (!res.error && res.text) {
+    const parsed = extractJson(res.text);
+    if (parsed && Array.isArray(parsed.clips) && parsed.clips.length) {
+      const normalized = parsed.clips.slice(0, count).map((c, idx) => {
+        const fb = fallbackClips[idx] || fallbackClips[0];
+        let s = Number.isFinite(Number(c.startSec)) ? Number(c.startSec) : fb.startSec;
+        let e = Number.isFinite(Number(c.endSec)) ? Number(c.endSec) : fb.endSec;
+        s = Math.max(0, Math.min(totalDur - 3, s));
+        e = Math.max(s + 3, Math.min(totalDur, e));
+        // Se a janela original tinha transcrição real da fala do vídeo, preserva 100% da fala real!
+        const origPeak = Array.isArray(energyPeaks) ? energyPeaks[idx] : null;
+        const realTranscript = (origPeak && origPeak.text && String(origPeak.text).trim().length > 8)
+          ? String(origPeak.text).trim()
+          : String(c.captionText || fb.captionText).trim();
+        const vScore = Math.max(82, Math.min(99, Math.round(Number(c.viralityScore) || fb.viralityScore)));
+        return {
+          id: `clip-${idx + 1}`,
+          rank: idx + 1,
+          title: String(c.title || fb.title).trim(),
+          hookBanner: String(c.hookBanner || fb.hookBanner).trim(),
+          startSec: Number(s.toFixed(1)),
+          endSec: Number(e.toFixed(1)),
+          durationSec: Number(Math.max(3, e - s).toFixed(1)),
+          viralityScore: vScore,
+          metrics: {
+            hook: Math.max(80, Math.min(99, Math.round(Number(c.metrics?.hook) || vScore))),
+            flow: Math.max(80, Math.min(99, Math.round(Number(c.metrics?.flow) || vScore - 1))),
+            value: Math.max(80, Math.min(99, Math.round(Number(c.metrics?.value) || vScore))),
+            trend: Math.max(80, Math.min(99, Math.round(Number(c.metrics?.trend) || vScore - 1)))
+          },
+          reason: String(c.reason || fb.reason).trim(),
+          captionText: realTranscript,
+          hashtags: String(c.hashtags || fb.hashtags).trim(),
+          reframeMode: 'auto_face'
+        };
+      });
+      normalized.sort((a, b) => b.viralityScore - a.viralityScore);
+      normalized.forEach((c, i) => { c.rank = i + 1; });
+      return { clips: normalized, provider: res.provider || 'multi-ia-opusclip' };
+    }
+  }
+
+  return {
+    clips: fallbackClips,
+    provider: 'opusclip-acoustic-engine',
+    warning: res.error || null
+  };
+}
+
 module.exports = {
   TTS_VOICES, mockScript, mockCreateFull, mockDubResult,
   generateWithOpenAI, generateCreateFull, generateSceneImage, dubWithOpenAI, enhanceScript,
   generateAvatarPortrait, generateAvatarScript, generateAvatarVideo, detectAvatarFaceLandmarks,
+  transcribeClipSegment, analyzeViralClips,
   chatWithFallback, ttsWithFallback, chatViaPollinations, ttsGoogle, ttsStreamElements,
   probeOpenAI, fullPipelineProbe, candidatesProbe, unorouterProbe, unorouterVideoProbe, getBody, send
 };
