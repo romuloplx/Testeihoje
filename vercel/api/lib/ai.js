@@ -2610,8 +2610,8 @@ Ensure eyeLX < eyeRX and eyeLY < my < chinY. Output JSON only.`;
 // ✂️ OPUSCLIP AI ENGINE (Engenharia Reversa: ClipAnything™ + Virality Score™)
 // ============================================================================
 
-async function transcribeClipSegment({ audioBase64, audioMime = 'audio/wav', language = '' }) {
-  if (!audioBase64) return { text: '', silent: true, provider: 'none' };
+async function transcribeClipSegment({ audioBase64, audioMime = 'audio/wav', language = '', offsetSec = 0, durationSec = 20 }) {
+  if (!audioBase64) return { text: '', segments: [], silent: true, provider: 'none' };
   const cleanB64 = String(audioBase64).replace(/^data:[^;]+;base64,/, '');
   const audioBuf = Buffer.from(cleanB64, 'base64');
   const normMime = /webm/i.test(audioMime) ? 'audio/webm'
@@ -2621,8 +2621,11 @@ async function transcribeClipSegment({ audioBase64, audioMime = 'audio/wav', lan
     : 'audio/wav';
   const ext = normMime.split('/')[1] || 'wav';
   const fileLabel = `clip.${ext}`;
+  const baseOffset = Math.max(0, Number(offsetSec) || 0);
+  const segSpan = Math.max(2, Number(durationSec) || 20);
 
   let text = '';
+  let rawWhisperSegments = [];
   let provider = '';
   let heardSilence = false;
 
@@ -2638,7 +2641,7 @@ async function transcribeClipSegment({ audioBase64, audioMime = 'audio/wav', lan
     } catch (_) {}
   }
 
-  // 2) Unorouter Whisper (se houver chave pronta fora do cooldown de 1 req/min)
+  // 2) Unorouter Whisper com Timestamps (verbose_json)
   const uKey = pickReadyUniKey();
   if (!text && !heardSilence && uKey) {
     for (const model of UNI_WHISPER_MODELS) {
@@ -2646,6 +2649,7 @@ async function transcribeClipSegment({ audioBase64, audioMime = 'audio/wav', lan
         const fd = new FormData();
         fd.append('file', new Blob([audioBuf], { type: normMime }), fileLabel);
         fd.append('model', model);
+        fd.append('response_format', 'verbose_json');
         if (language) fd.append('language', language);
         const r = await fetch(uniBase() + '/audio/transcriptions', {
           method: 'POST',
@@ -2656,6 +2660,7 @@ async function transcribeClipSegment({ audioBase64, audioMime = 'audio/wav', lan
         if (r.ok) {
           const j = await r.json();
           text = String(j.text || '').trim();
+          if (Array.isArray(j.segments)) rawWhisperSegments = j.segments;
           if (text) { provider = 'unorouter/' + model; break; }
         } else if (r.status === 429) {
           markUniRateWindow(uKey);
@@ -2665,7 +2670,7 @@ async function transcribeClipSegment({ audioBase64, audioMime = 'audio/wav', lan
     }
   }
 
-  // 3) OpenAI Whisper oficial (se configurada)
+  // 3) OpenAI Whisper oficial com Timestamps (verbose_json)
   if (!text && !heardSilence && canUseOfficialOpenAI()) {
     try {
       const OpenAI = require('openai');
@@ -2675,9 +2680,11 @@ async function transcribeClipSegment({ audioBase64, audioMime = 'audio/wav', lan
       const tr = await openai.audio.transcriptions.create({
         file,
         model: 'whisper-1',
+        response_format: 'verbose_json',
         language: language || undefined
       });
       text = String(tr.text || '').trim();
+      if (Array.isArray(tr.segments)) rawWhisperSegments = tr.segments;
       if (text) provider = 'openai/whisper-1';
     } catch (e) {
       if (e.status === 401) markOpenAi401();
@@ -2689,8 +2696,35 @@ async function transcribeClipSegment({ audioBase64, audioMime = 'audio/wav', lan
     .replace(/\s+/g, ' ')
     .trim();
 
+  // Extrai trechos formatados com tempo exatamente como em transcriver_audio (Whisper): [{ inicio, fim, texto }]
+  const segments = [];
+  if (rawWhisperSegments.length) {
+    for (const seg of rawWhisperSegments) {
+      const t = String(seg.text || '').replace(/\s+/g, ' ').trim();
+      if (!t) continue;
+      segments.push({
+        inicio: Number((baseOffset + Number(seg.start || 0)).toFixed(2)),
+        fim: Number((baseOffset + Number(seg.end || 0)).toFixed(2)),
+        texto: t
+      });
+    }
+  } else if (cleaned) {
+    const clauses = cleaned.match(/[^.!?]+[.!?]*/g) || [cleaned];
+    const cleanClauses = clauses.map(c => c.trim()).filter(Boolean);
+    const totalChars = cleanClauses.reduce((acc, c) => acc + c.length, 0) || 1;
+    let cursor = baseOffset;
+    for (const cl of cleanClauses) {
+      const d = Math.max(1.2, (cl.length / totalChars) * segSpan);
+      const inicio = Number(cursor.toFixed(2));
+      const fim = Number((cursor + d).toFixed(2));
+      cursor += d;
+      segments.push({ inicio, fim, texto: cl });
+    }
+  }
+
   return {
     text: cleaned,
+    segments,
     silent: !cleaned,
     provider: provider || 'acoustic-detector'
   };
@@ -2797,6 +2831,7 @@ async function analyzeViralClips({
   targetClipLength = '30-60',
   desiredClipsCount = 4,
   energyPeaks = [],
+  transcricaoSegmentos = [],
   aiModel = 'auto-router'
 }) {
   const totalDur = Math.max(6, Number(durationSec) || 60);
@@ -2810,6 +2845,37 @@ async function analyzeViralClips({
     energyPeaks
   });
 
+  // Constrói a lista unificada de segmentos com timestamps [{ inicio, fim, texto }] (ETAPA 2 -> ETAPA 3)
+  const allTimedSegments = Array.isArray(transcricaoSegmentos) && transcricaoSegmentos.length
+    ? transcricaoSegmentos.map(s => ({
+        inicio: Number(Number(s.inicio ?? s.startSec ?? s.start ?? 0).toFixed(2)),
+        fim: Number(Number(s.fim ?? s.endSec ?? s.end ?? 5).toFixed(2)),
+        texto: String(s.texto ?? s.text ?? '').trim()
+      })).filter(s => s.texto)
+    : [];
+
+  if (!allTimedSegments.length && Array.isArray(energyPeaks)) {
+    for (const pk of energyPeaks) {
+      if (Array.isArray(pk.segments) && pk.segments.length) {
+        for (const sg of pk.segments) {
+          if (sg && (sg.texto || sg.text)) {
+            allTimedSegments.push({
+              inicio: Number(Number(sg.inicio ?? sg.start ?? pk.startSec ?? 0).toFixed(2)),
+              fim: Number(Number(sg.fim ?? sg.end ?? pk.endSec ?? 10).toFixed(2)),
+              texto: String(sg.texto || sg.text).trim()
+            });
+          }
+        }
+      } else if (pk && pk.text) {
+        allTimedSegments.push({
+          inicio: Number(Number(pk.startSec || 0).toFixed(2)),
+          fim: Number(Number(pk.endSec || 15).toFixed(2)),
+          texto: String(pk.text).trim()
+        });
+      }
+    }
+  }
+
   const peaksSummary = (Array.isArray(energyPeaks) ? energyPeaks : []).slice(0, 8).map((p, idx) => {
     const s = Number(p.startSec || 0).toFixed(1);
     const e = Number(p.endSec || 15).toFixed(1);
@@ -2818,38 +2884,54 @@ async function analyzeViralClips({
     return `Janela #${idx + 1}: ${s}s até ${e}s (Energia vocal: ${eScore}%)${tr}`;
   }).join('\n');
 
+  const segmentsJsonBlock = allTimedSegments.length
+    ? `\nTranscrição do vídeo com timestamps (formato Whisper [{inicio, fim, texto}]):\n${JSON.stringify(allTimedSegments.slice(0, 60), null, 2)}`
+    : '';
+
   const systemPrompt = [
-    'Você é o motor de IA do OpusClip Pro (ClipAnything™ + Virality Score™), a ferramenta #1 do mundo de recorte e edição de vídeos virais para TikTok, Reels e YouTube Shorts.',
-    'Sua missão é analisar os picos de energia acústica e transcrições do vídeo e retornar os melhores cortes virais ordenados do maior Virality Score (99) ao menor (85+).',
-    'Responda APENAS um objeto JSON válido (sem markdown) exatamente neste formato:',
+    'Você é um editor especialista em vídeos virais (TikTok, Reels, YouTube Shorts) e o motor de Curadoria Semântica do OpusClip Pro (ClipAnything™ + Virality Score™).',
+    'Sua tarefa é analisar a transcrição de um vídeo com timestamps e picos de energia acústica e identificar os melhores cortes virais.',
+    'Regras:',
+    `- Gere exatamente ${count} cortes virais dentro da duração total do vídeo (${totalDur.toFixed(1)}s).`,
+    '- Cada corte precisa ter uma história completa (Gancho forte no início, desenvolvimento e conclusão impactante).',
+    '- Retorne ESTRITAMENTE um JSON válido (sem markdown) no formato:',
     '{',
     '  "clips": [',
     '    {',
-    '      "title": "Título viral magnético com emoji em português (até 68 chars)",',
-    '      "hookBanner": "BANNER CURTO DE IMPACTO NO TOPO (4 a 7 palavras em maiúsculas com emoji)",',
-    '      "startSec": 12.0,',
-    '      "endSec": 42.0,',
-    '      "viralityScore": 98,',
+    '      "titulo": "Título Curto e Viral do Corte com Emoji",',
+    '      "hookBanner": "BANNER CURTO DE IMPACTO NO TOPO (4 a 7 palavras em maiúsculas)",',
+    '      "inicio": 12.5,',
+    '      "fim": 55.0,',
+    '      "score_viralidade": 98,',
     '      "metrics": { "hook": 99, "flow": 96, "value": 98, "trend": 97 },',
-    '      "reason": "Explicação de 1 a 2 frases em português do porquê este corte tem altíssimo potencial de retenção e viralização.",',
-    '      "captionText": "Texto dinâmico em português para as legendas animadas estilo Hormozi deste corte (use a fala transcrita da janela se disponível, ou crie uma legenda falada impactante fiel ao tema do vídeo).",',
+    '      "motivo": "Explicação breve do porquê este gancho e arco narrativo viralizam.",',
+    '      "captionText": "Texto falado exato deste corte para queimar nas legendas dinâmicas 9:16",',
     '      "hashtags": "#cortes #shorts #reels #tiktok #viral"',
     '    }',
     '  ]',
-    '}',
-    `REGRAS OBRIGATÓRIAS: Gere exatamente ${count} cortes dentro da duração total do vídeo (${totalDur.toFixed(1)}s). Respeite as janelas de pico acústico fornecidas.`
+    '}'
   ].join('\n');
 
   const userPrompt = [
     `Arquivo de vídeo: "${fileName}" (Duração total: ${totalDur.toFixed(1)} segundos)`,
     `Objetivo ClipAnything pedido pelo usuário: "${clipPrompt || 'Encontrar os momentos mais virais, impactantes e de maior retenção'}"`,
     `Duração alvo de cada corte: ${targetClipLength} segundos | Quantidade de cortes: ${count}`,
-    peaksSummary ? `Picos de energia e transcrições reais detectados no vídeo:\n${peaksSummary}` : 'Analise e distribua os melhores cortes ao longo do vídeo.'
-  ].join('\n');
+    peaksSummary ? `Picos de energia e transcrições reais detectados no vídeo:\n${peaksSummary}` : '',
+    segmentsJsonBlock
+  ].filter(Boolean).join('\n');
+
+  const extractClipsList = (txt) => {
+    const p = extractJson(txt);
+    if (!p) return null;
+    if (Array.isArray(p)) return p;
+    if (Array.isArray(p.clips)) return p.clips;
+    if (Array.isArray(p.cortes)) return p.cortes;
+    return null;
+  };
 
   const isValidClipsJson = (txt) => {
-    const p = extractJson(txt);
-    return !!(p && Array.isArray(p.clips) && p.clips.length >= 1);
+    const list = extractClipsList(txt);
+    return !!(list && list.length >= 1);
   };
 
   const res = await withRetries(() => chatWithFallback({
@@ -2861,26 +2943,61 @@ async function analyzeViralClips({
     validator: isValidClipsJson
   }), 2);
 
+  const attachSubSegmentsAndSchema = (clipList) => {
+    return clipList.map((c, idx) => {
+      const s = Number(c.startSec ?? c.inicio ?? 0);
+      const e = Number(c.endSec ?? c.fim ?? 30);
+      const matchingSegs = allTimedSegments.filter(sg => sg.fim > s + 0.2 && sg.inicio < e - 0.2);
+      const subSegments = matchingSegs.length
+        ? matchingSegs
+        : [{ inicio: Number(s.toFixed(2)), fim: Number(e.toFixed(2)), texto: c.captionText || '' }];
+      return {
+        ...c,
+        id: c.id || `clip-${idx + 1}`,
+        rank: idx + 1,
+        // Campos compatíveis com selecionar_melhores_cortes (Python / LLM schema) + OpusClip Studio UI
+        titulo: c.title || c.titulo,
+        inicio: Number(s.toFixed(2)),
+        fim: Number(e.toFixed(2)),
+        score_viralidade: c.viralityScore || c.score_viralidade,
+        motivo: c.reason || c.motivo,
+        subSegments
+      };
+    });
+  };
+
   if (!res.error && res.text) {
-    const parsed = extractJson(res.text);
-    if (parsed && Array.isArray(parsed.clips) && parsed.clips.length) {
-      const normalized = parsed.clips.slice(0, count).map((c, idx) => {
+    const rawList = extractClipsList(res.text);
+    if (rawList && rawList.length) {
+      const normalized = rawList.slice(0, count).map((c, idx) => {
         const fb = fallbackClips[idx] || fallbackClips[0];
-        let s = Number.isFinite(Number(c.startSec)) ? Number(c.startSec) : fb.startSec;
-        let e = Number.isFinite(Number(c.endSec)) ? Number(c.endSec) : fb.endSec;
+        const rawStart = c.startSec ?? c.inicio;
+        const rawEnd = c.endSec ?? c.fim;
+        let s = Number.isFinite(Number(rawStart)) ? Number(rawStart) : fb.startSec;
+        let e = Number.isFinite(Number(rawEnd)) ? Number(rawEnd) : fb.endSec;
         s = Math.max(0, Math.min(totalDur - 3, s));
         e = Math.max(s + 3, Math.min(totalDur, e));
         // Se a janela original tinha transcrição real da fala do vídeo, preserva 100% da fala real!
         const origPeak = Array.isArray(energyPeaks) ? energyPeaks[idx] : null;
-        const realTranscript = (origPeak && origPeak.text && String(origPeak.text).trim().length > 8)
-          ? String(origPeak.text).trim()
-          : String(c.captionText || fb.captionText).trim();
-        const vScore = Math.max(82, Math.min(99, Math.round(Number(c.viralityScore) || fb.viralityScore)));
+        const matchingSegsText = allTimedSegments
+          .filter(sg => sg.fim > s + 0.3 && sg.inicio < e - 0.3)
+          .map(sg => sg.texto)
+          .join(' ')
+          .trim();
+        const realTranscript = matchingSegsText.length > 8
+          ? matchingSegsText
+          : (origPeak && origPeak.text && String(origPeak.text).trim().length > 8)
+            ? String(origPeak.text).trim()
+            : String(c.captionText || fb.captionText).trim();
+        const rawScore = c.viralityScore ?? c.score_viralidade;
+        const vScore = Math.max(82, Math.min(99, Math.round(Number(rawScore) || fb.viralityScore)));
+        const titleStr = String(c.title || c.titulo || fb.title).trim();
+        const reasonStr = String(c.reason || c.motivo || fb.reason).trim();
         return {
           id: `clip-${idx + 1}`,
           rank: idx + 1,
-          title: String(c.title || fb.title).trim(),
-          hookBanner: String(c.hookBanner || fb.hookBanner).trim(),
+          title: titleStr,
+          hookBanner: String(c.hookBanner || titleStr.toUpperCase().slice(0, 42) || fb.hookBanner).trim(),
           startSec: Number(s.toFixed(1)),
           endSec: Number(e.toFixed(1)),
           durationSec: Number(Math.max(3, e - s).toFixed(1)),
@@ -2891,20 +3008,40 @@ async function analyzeViralClips({
             value: Math.max(80, Math.min(99, Math.round(Number(c.metrics?.value) || vScore))),
             trend: Math.max(80, Math.min(99, Math.round(Number(c.metrics?.trend) || vScore - 1)))
           },
-          reason: String(c.reason || fb.reason).trim(),
+          reason: reasonStr,
           captionText: realTranscript,
           hashtags: String(c.hashtags || fb.hashtags).trim(),
           reframeMode: 'auto_face'
         };
       });
       normalized.sort((a, b) => b.viralityScore - a.viralityScore);
-      normalized.forEach((c, i) => { c.rank = i + 1; });
-      return { clips: normalized, provider: res.provider || 'multi-ia-opusclip' };
+      const enriched = attachSubSegmentsAndSchema(normalized);
+      return {
+        clips: enriched,
+        cortes_sugeridos: enriched.map(c => ({
+          titulo: c.titulo,
+          inicio: c.inicio,
+          fim: c.fim,
+          score_viralidade: c.score_viralidade,
+          motivo: c.motivo
+        })),
+        transcricao_segmentos: allTimedSegments,
+        provider: res.provider || 'multi-ia-opusclip'
+      };
     }
   }
 
+  const enrichedFallback = attachSubSegmentsAndSchema(fallbackClips);
   return {
-    clips: fallbackClips,
+    clips: enrichedFallback,
+    cortes_sugeridos: enrichedFallback.map(c => ({
+      titulo: c.titulo,
+      inicio: c.inicio,
+      fim: c.fim,
+      score_viralidade: c.score_viralidade,
+      motivo: c.motivo
+    })),
+    transcricao_segmentos: allTimedSegments,
     provider: 'opusclip-acoustic-engine',
     warning: res.error || null
   };
@@ -2938,6 +3075,7 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
   let directVideoBase64 = null;
   let directVideoMime = 'video/mp4';
   let transcriptSegments = [];
+  let timestampedSegments = [];
   let hasVerbatimCaptions = false;
   const framesBase64 = [];
 
@@ -3064,8 +3202,13 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
                       const rawLines = [];
                       for (const ev of cj.events) {
                         if (Array.isArray(ev.segs)) {
-                          const s = ev.segs.map(x => x.utf8 || '').join('').trim();
-                          if (s) rawLines.push(s);
+                          const s = ev.segs.map(x => x.utf8 || '').join('').replace(/\s+/g, ' ').trim();
+                          if (s) {
+                            rawLines.push(s);
+                            const startSec = Number(((ev.tStartMs || 0) / 1000).toFixed(2));
+                            const endSec = Number((((ev.tStartMs || 0) + (ev.dDurationMs || 3000)) / 1000).toFixed(2));
+                            timestampedSegments.push({ inicio: startSec, fim: endSec, texto: s });
+                          }
                         }
                       }
                       const built = buildSegmentsFromLines(rawLines, desiredClipsCount);
@@ -3284,6 +3427,7 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
     durationSec,
     framesBase64,
     transcriptSegments,
+    timestampedSegments,
     hasVerbatimCaptions,
     directVideoBase64,
     directVideoMime

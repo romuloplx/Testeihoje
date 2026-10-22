@@ -1267,10 +1267,10 @@ input[type="range"]{
     <div class="progress-wrap" id="opusProgress">
       <div class="progress-bar"><div class="progress-fill" id="opusProgressFill"></div></div>
       <div class="progress-steps">
-        <span id="op1" class="active">Picos Acústicos</span>
-        <span id="op2">Transcrição IA</span>
-        <span id="op3">Virality Score™</span>
-        <span id="op4">Auto-Reframe 9:16</span>
+        <span id="op1" class="active">[1/4] Download / Vídeo</span>
+        <span id="op2">[2/4] Whisper Timestamps</span>
+        <span id="op3">[3/4] Curadoria LLM</span>
+        <span id="op4">[4/4] Crop 9:16 + Legendas</span>
       </div>
     </div>
 
@@ -1281,8 +1281,8 @@ input[type="range"]{
          ==================================================================== -->
     <div id="opusResultWrap" class="hidden" style="margin-top:20px">
 
-      <!-- BARRA DE FILTROS, ORDENAÇÃO E BUSCA DA PÁGINA DE RESULTADOS -->
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:12px 14px;border-radius:14px;background:#111422;border:1px solid #23283d;margin-bottom:16px">
+      <!-- BARRA DE FILTROS, ORDENAÇÃO, EXPORTAÇÃO EM LOTE E JSON DO PIPELINE -->
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:12px 14px;border-radius:14px;background:#111422;border:1px solid #23283d;margin-bottom:14px">
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
           <button type="button" class="ghost" id="opusFilterAll" onclick="setOpusClipFilter('all')" style="padding:6px 12px;font-size:11.5px;border-color:#22c55e;color:#bbf7d0;background:#064e3b">🎬 All clips</button>
           <button type="button" class="ghost" id="opusFilterLiked" onclick="setOpusClipFilter('liked')" style="padding:6px 12px;font-size:11.5px">❤️ Liked</button>
@@ -1290,13 +1290,27 @@ input[type="range"]{
           <span id="opusProviderBadge" style="font-size:11px;padding:4px 10px;border-radius:999px;background:#171b2e;border:1px solid #334155;color:#a5b4fc">🤖 ClipAnything™ 3.0</span>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <input type="text" id="opusSearchTranscript" oninput="renderOpusClipsListUI()" placeholder="🔍 Search in transcript..." style="width:185px;padding:7px 11px;margin:0;font-size:12px;border-radius:9px;background:#090b13;border:1px solid #282e46" />
+          <input type="text" id="opusSearchTranscript" oninput="renderOpusClipsListUI()" placeholder="🔍 Search in transcript..." style="width:175px;padding:7px 11px;margin:0;font-size:12px;border-radius:9px;background:#090b13;border:1px solid #282e46" />
           <select id="opusSortOrder" onchange="renderOpusClipsListUI()" style="width:auto;padding:7px 10px;margin:0;font-size:12px;border-radius:9px;background:#090b13;border:1px solid #282e46">
             <option value="score" selected>🔥 Sort: Virality Score (High → Low)</option>
             <option value="time">⏱️ Sort: Timeline Order</option>
           </select>
+          <button type="button" class="ghost" onclick="toggleOpusPipelineJsonDrawer()" style="padding:7px 11px;font-size:11.5px;border-color:#a855f788;color:#e9d5ff">{ } JSON Pipeline</button>
           <button type="button" class="ghost" onclick="toggleOpusStudioDrawer()" style="padding:7px 12px;font-size:11.5px;border-color:#38bdf888;color:#bae6fd">✂️ Studio Editor</button>
+          <button type="button" id="opusBatchExportBtn" onclick="gerarCortesFinaisEmLote()" style="padding:7px 13px;font-size:11.5px;font-weight:900;border-radius:9px;border:1px solid #22c55e;background:linear-gradient(135deg,#16a34a,#059669);color:#fff;cursor:pointer">⬇️ [4/4] Baixar Todos (corte_1.mp4...)</button>
         </div>
+      </div>
+
+      <!-- GAVETA DE INSPEÇÃO DO PIPELINE 4 ETAPAS (JSON DA TRANSCRIÇÃO WHISPER + CORTES SUGERIDOS LLM) -->
+      <div id="opusPipelineJsonDrawer" class="hidden" style="background:#0a0d18;border:1.5px solid #a855f788;border-radius:16px;padding:14px 16px;margin-bottom:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <span style="font-size:12.5px;font-weight:900;color:#e9d5ff">🧠 Pipeline 4 Etapas (Whisper Timestamps `[inicio, fim, texto]` → LLM `cortes_sugeridos` → Crop 9:16 `x1..x2` + Legendas)</span>
+          <div style="display:flex;gap:6px">
+            <button type="button" class="ghost" onclick="copyText(document.getElementById('opusPipelineJsonPre').innerText)" style="padding:5px 10px;font-size:11px">📋 Copiar JSON</button>
+            <button type="button" class="ghost" onclick="toggleOpusPipelineJsonDrawer(false)" style="padding:5px 10px;font-size:11px">✖ Fechar</button>
+          </div>
+        </div>
+        <pre id="opusPipelineJsonPre" style="margin:0;padding:12px;border-radius:10px;background:#060811;border:1px solid #1e293b;color:#a7f3d0;font-size:11.5px;line-height:1.5;max-height:260px;overflow:auto;white-space:pre-wrap"></pre>
       </div>
 
       <!-- GAVETA DO EDITOR COMPLETO OPUSCLIP STUDIO (ABRE AO CLICAR EM "✂️ Edit clip") -->
@@ -7120,9 +7134,10 @@ async function importOpusVideoFromUrl(autoRunAnalysis = true){
       loadOpusVideoFile(vBlob, `${ytTitle}.mp4`);
       opusState.importedUrl = rawUrl;
       opusState.ytTranscriptSegments = Array.isArray(info.transcriptSegments) ? info.transcriptSegments : null;
+      opusState.whisperSegments = Array.isArray(info.timestampedSegments) && info.timestampedSegments.length ? info.timestampedSegments : null;
     } else {
-      // 2) Constrói o stream HD reproduzível, 100% LIMPO (SEM MARCA D'ÁGUA) e livre de CORS usando os frames reais do vídeo do YouTube + voz neural travada!
-      showStatus('opusStatus', `🎙️ Preparando stream HD sem marca d'água e sincronia vocal de "${ytTitle}"...`, 'info');
+      // 2) Constrói o stream HD reproduzível, 100% LIMPO (SEM MARCA D'ÁGUA) e livre de CORS usando os frames reais do YouTube + voz neural travada!
+      showStatus('opusStatus', `[1/4] Preparando stream HD sem marca d'água e sincronia vocal de "${ytTitle}"...`, 'info');
       const segs = (Array.isArray(info.transcriptSegments) && info.transcriptSegments.length)
         ? info.transcriptSegments.slice(0, Math.max(3, desiredClipsCount))
         : [`Olha esse momento incrível do vídeo ${ytTitle} no canal ${ytAuthor}!`];
@@ -7185,6 +7200,11 @@ async function importOpusVideoFromUrl(autoRunAnalysis = true){
         endSec: Number(seg.end.toFixed(1)),
         energyScore: 0.97,
         text: seg.text
+      }));
+      opusState.whisperSegments = master.segments.map(seg => ({
+        inicio: Number(seg.start.toFixed(2)),
+        fim: Number(seg.end.toFixed(2)),
+        texto: seg.text
       }));
     }
 
@@ -7597,6 +7617,11 @@ async function generateOpusDemoVideo(){
     opusState.durationSec = durSec;
     opusState.fullAudioBuffer = master.audioBuffer;
     opusState.ytTranscriptSegments = timedSegs;
+    opusState.whisperSegments = timedSegs.map(s => ({
+      inicio: Number(s.startSec.toFixed(2)),
+      fim: Number(s.endSec.toFixed(2)),
+      texto: s.text
+    }));
     drawOpusLiveTimelineHeatmap();
     showStatus('opusStatus', '✅ Vídeo de Podcast com Voz Real carregado! Cortando as melhores partes e aplicando legendas...', 'success');
   }catch(e){
@@ -7802,64 +7827,99 @@ function pickOpusEmojiForPhrase(phraseText){
   return '🎯';
 }
 
-// Constrói blocos curtos de 3 palavras estilo OpusClip Pro 3.0 com Sincronia Acústica Real (Syllable Energy Lock!)
-function buildOpusWordByWordCues(text, clipDurationSec, clipStartSec = 0){
+// Constrói blocos curtos de 3 palavras estilo OpusClip Pro 3.0 com Timestamps Whisper ([inicio, fim, texto]) + Sincronia Acústica Real!
+function buildOpusWordByWordCues(text, clipDurationSec, clipStartSec = 0, subSegments = null){
   const clean = String(text || '').replace(/\s+/g, ' ').trim();
   if(!clean) return [];
   const rawWords = clean.split(' ').filter(Boolean);
   if(!rawWords.length) return [];
 
   const totalDur = Math.max(1.5, clipDurationSec || 10);
+  let timedWords = [];
 
-  // Detecta onde a voz começa e termina dentro do corte usando a onda acústica real (mono12k)
-  let speechStartOffset = 0.06;
-  let speechEndOffset = totalDur - 0.10;
-  if(opusState.mono12k && opusState.mono12k.length > 12000){
-    const SR = 12000;
-    const s0 = Math.max(0, Math.floor((clipStartSec || 0) * SR));
-    const s1 = Math.min(opusState.mono12k.length, Math.floor(((clipStartSec || 0) + totalDur) * SR));
-    if(s1 - s0 > SR){
-      let peakAmp = 0.001;
-      for(let i = s0; i < s1; i += 20){
-        const a = Math.abs(opusState.mono12k[i]);
-        if(a > peakAmp) peakAmp = a;
-      }
-      const thresh = peakAmp * 0.14;
-      for(let i = s0; i < s1; i += 60){
-        if(Math.abs(opusState.mono12k[i]) > thresh){
-          speechStartOffset = Math.max(0.04, Math.min(1.1, (i - s0) / SR));
-          break;
+  // Se temos segmentos reais com timestamps do Whisper ([{inicio, fim, texto}]), trava cada palavra ao seu segmento exato!
+  const validSubs = Array.isArray(subSegments) ? subSegments.filter(s => s && s.texto && isFinite(s.inicio) && isFinite(s.fim) && s.fim > s.inicio) : [];
+  if(validSubs.length >= 1){
+    let globalWordIdx = 0;
+    validSubs.forEach((seg) => {
+      const segWords = String(seg.texto || '').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+      if(!segWords.length) return;
+      const relStart = Math.max(0.02, Math.min(totalDur - 0.2, (Number(seg.inicio) || 0) - (clipStartSec || 0)));
+      const relEnd = Math.max(relStart + 0.25, Math.min(totalDur - 0.02, (Number(seg.fim) || totalDur) - (clipStartSec || 0)));
+      const segDur = Math.max(0.25, relEnd - relStart);
+      const weights = segWords.map(w => {
+        const cleanW = w.replace(/[^a-zA-ZÀ-ÿ0-9]/g, '');
+        const syllEst = Math.max(1, Math.round(cleanW.length / 2.6));
+        const punctPause = /[.!?]$/.test(w) ? 1.85 : /[,;:]$/.test(w) ? 1.15 : 0;
+        return syllEst + punctPause;
+      });
+      const totalW = weights.reduce((a, b) => a + b, 0) || 1;
+      let cursor = relStart;
+      segWords.forEach((w, idx) => {
+        const d = (weights[idx] / totalW) * segDur;
+        const start = cursor;
+        const end = cursor + d;
+        cursor = end;
+        const cleanW = w.replace(/[^a-zA-ZÀ-ÿ0-9]/g, '');
+        const isPowerWord = /^(segredo|verdade|nunca|sempre|agora|dinheiro|milhões|incrível|impossível|absurdo|atenção|olha|resultado|sucesso|viral|erro|cuidado|ouro|muda|tudo)$/i.test(cleanW);
+        const isHighlight = isPowerWord || cleanW.length >= 6 || /[!?🔥⚡💎]/.test(w) || (globalWordIdx % 3 === 1);
+        globalWordIdx++;
+        timedWords.push({ word: w, start, end, isHighlight, isPowerWord });
+      });
+    });
+  }
+
+  // Fallback para Sincronia Acústica Real (Syllable Energy Lock via mono12k)
+  if(!timedWords.length){
+    let speechStartOffset = 0.06;
+    let speechEndOffset = totalDur - 0.10;
+    if(opusState.mono12k && opusState.mono12k.length > 12000){
+      const SR = 12000;
+      const s0 = Math.max(0, Math.floor((clipStartSec || 0) * SR));
+      const s1 = Math.min(opusState.mono12k.length, Math.floor(((clipStartSec || 0) + totalDur) * SR));
+      if(s1 - s0 > SR){
+        let peakAmp = 0.001;
+        for(let i = s0; i < s1; i += 20){
+          const a = Math.abs(opusState.mono12k[i]);
+          if(a > peakAmp) peakAmp = a;
         }
-      }
-      for(let i = s1 - 1; i > s0; i -= 60){
-        if(Math.abs(opusState.mono12k[i]) > thresh){
-          speechEndOffset = Math.max(speechStartOffset + 1.0, Math.min(totalDur - 0.05, (i - s0) / SR));
-          break;
+        const thresh = peakAmp * 0.14;
+        for(let i = s0; i < s1; i += 60){
+          if(Math.abs(opusState.mono12k[i]) > thresh){
+            speechStartOffset = Math.max(0.04, Math.min(1.1, (i - s0) / SR));
+            break;
+          }
+        }
+        for(let i = s1 - 1; i > s0; i -= 60){
+          if(Math.abs(opusState.mono12k[i]) > thresh){
+            speechEndOffset = Math.max(speechStartOffset + 1.0, Math.min(totalDur - 0.05, (i - s0) / SR));
+            break;
+          }
         }
       }
     }
+
+    const weights = rawWords.map(w => {
+      const cleanW = w.replace(/[^a-zA-ZÀ-ÿ0-9]/g, '');
+      const syllEst = Math.max(1, Math.round(cleanW.length / 2.6));
+      const punctPause = /[.!?]$/.test(w) ? 1.85 : /[,;:]$/.test(w) ? 1.15 : 0;
+      return syllEst + punctPause;
+    });
+    const totalW = weights.reduce((a, b) => a + b, 0) || 1;
+
+    let cursor = speechStartOffset;
+    const usableDur = Math.max(1.0, speechEndOffset - speechStartOffset);
+    timedWords = rawWords.map((w, i) => {
+      const d = (weights[i] / totalW) * usableDur;
+      const start = cursor;
+      const end = cursor + d;
+      cursor = end;
+      const cleanW = w.replace(/[^a-zA-ZÀ-ÿ0-9]/g, '');
+      const isPowerWord = /^(segredo|verdade|nunca|sempre|agora|dinheiro|milhões|incrível|impossível|absurdo|atenção|olha|resultado|sucesso|viral|erro|cuidado|ouro|muda|tudo)$/i.test(cleanW);
+      const isHighlight = isPowerWord || cleanW.length >= 6 || /[!?🔥⚡💎]/.test(w) || (i % 3 === 1);
+      return { word: w, start, end, isHighlight, isPowerWord };
+    });
   }
-
-  const weights = rawWords.map(w => {
-    const cleanW = w.replace(/[^a-zA-ZÀ-ÿ0-9]/g, '');
-    const syllEst = Math.max(1, Math.round(cleanW.length / 2.6));
-    const punctPause = /[.!?]$/.test(w) ? 1.85 : /[,;:]$/.test(w) ? 1.15 : 0;
-    return syllEst + punctPause;
-  });
-  const totalW = weights.reduce((a, b) => a + b, 0) || 1;
-
-  let cursor = speechStartOffset;
-  const usableDur = Math.max(1.0, speechEndOffset - speechStartOffset);
-  const timedWords = rawWords.map((w, i) => {
-    const d = (weights[i] / totalW) * usableDur;
-    const start = cursor;
-    const end = cursor + d;
-    cursor = end;
-    const cleanW = w.replace(/[^a-zA-ZÀ-ÿ0-9]/g, '');
-    const isPowerWord = /^(segredo|verdade|nunca|sempre|agora|dinheiro|milhões|incrível|impossível|absurdo|atenção|olha|resultado|sucesso|viral|erro|cuidado|ouro|muda|tudo)$/i.test(cleanW);
-    const isHighlight = isPowerWord || cleanW.length >= 6 || /[!?🔥⚡💎]/.test(w) || (i % 3 === 1);
-    return { word: w, start, end, isHighlight, isPowerWord };
-  });
 
   // Agrupa de 3 em 3 palavras (padrão ouro OpusClip Pro / Alex Hormozi Shorts)
   const phrases = [];
@@ -7891,7 +7951,7 @@ function drawOpusReframedFrame(ctx, videoEl, clip, relSec){
 
   const clipDur = Math.max(2, (clip.endSec || 30) - (clip.startSec || 0));
   if(!clip._cues || clip._cuesText !== clip.captionText || clip._cuesDur !== clipDur){
-    clip._cues = buildOpusWordByWordCues(clip.captionText, clipDur, clip.startSec || 0);
+    clip._cues = buildOpusWordByWordCues(clip.captionText, clipDur, clip.startSec || 0, clip.subSegments);
     clip._cuesText = clip.captionText;
     clip._cuesDur = clipDur;
   }
@@ -8693,7 +8753,7 @@ function renderOpusClipsListUI(){
     const clipDur = Math.max(2, (c.endSec || 30) - (c.startSec || 0));
     const m = c.metrics || { hook: 97, flow: 95, value: 96, trend: 94 };
     if(!c._cues || c._cuesText !== c.captionText || c._cuesDur !== clipDur){
-      c._cues = buildOpusWordByWordCues(c.captionText, clipDur, c.startSec || 0);
+      c._cues = buildOpusWordByWordCues(c.captionText, clipDur, c.startSec || 0, c.subSegments);
       c._cuesText = c.captionText;
       c._cuesDur = clipDur;
     }
@@ -8807,7 +8867,7 @@ async function runOpusClipAnalysis(skipUrlCheck = false){
   document.getElementById('opusProgress').classList.add('show');
   setProgress('opusProgressFill', 12);
   setStep(['op1','op2','op3','op4'], 0);
-  showStatus('opusStatus', '🔊 Etapa 1/4: Varrendo ondas acústicas e detectando picos de energia vocal no vídeo...', 'info');
+  showStatus('opusStatus', '📥 [1/4] Baixando/carregando vídeo e varrendo ondas acústicas de maior impacto...', 'info');
 
   try{
     let peaks = [];
@@ -8830,27 +8890,53 @@ async function runOpusClipAnalysis(skipUrlCheck = false){
 
     setStep(['op1','op2','op3','op4'], 1);
     setProgress('opusProgressFill', 38);
-    showStatus('opusStatus', '🎙️ Etapa 2/4: Transcrevendo falas reais dos momentos de maior impacto com IA...', 'info');
+    showStatus('opusStatus', '🎙️ [2/4] Transcrevendo áudio com Whisper (verbose_json com timestamps [{inicio, fim, texto}])...', 'info');
 
-    // Transcreve TODAS as janelas candidatas em paralelo para leitura 100% real e completa da fala do vídeo!
+    // Transcreve TODAS as janelas candidatas em paralelo e coleta os segmentos exatos [{inicio, fim, texto}] do Whisper!
+    const collectedWhisperSegments = Array.isArray(opusState.whisperSegments) ? [...opusState.whisperSegments] : [];
     const toTranscribe = peaks.filter(p => p.audioBase64);
     await Promise.all(toTranscribe.map(async (pk) => {
       try{
         const r = await fetch('/api/clips', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'transcribe_segment', audioBase64: pk.audioBase64, audioMime: 'audio/wav' })
+          body: JSON.stringify({
+            action: 'transcribe_segment',
+            audioBase64: pk.audioBase64,
+            audioMime: 'audio/wav',
+            offsetSec: pk.startSec,
+            durationSec: Math.max(2, (pk.endSec || 20) - (pk.startSec || 0))
+          })
         });
         const j = await r.json();
         if(j && j.text && !j.silent) pk.text = j.text;
+        if(j && Array.isArray(j.segments) && j.segments.length){
+          pk.subSegments = j.segments;
+          j.segments.forEach(seg => collectedWhisperSegments.push(seg));
+        }
       }catch(_){}
       delete pk.audioBase64;
     }));
     peaks.forEach(p => { delete p.audioBase64; });
 
+    // Garante lista ordenada de segmentos [{inicio, fim, texto}] para a Etapa 3 (Curadoria Semântica LLM)
+    if(!collectedWhisperSegments.length){
+      peaks.forEach(pk => {
+        if(pk.text){
+          collectedWhisperSegments.push({
+            inicio: Number((pk.startSec || 0).toFixed(2)),
+            fim: Number((pk.endSec || 15).toFixed(2)),
+            texto: String(pk.text).trim()
+          });
+        }
+      });
+    }
+    collectedWhisperSegments.sort((a, b) => (a.inicio || 0) - (b.inicio || 0));
+    opusState.whisperSegments = collectedWhisperSegments;
+
     setStep(['op1','op2','op3','op4'], 2);
     setProgress('opusProgressFill', 66);
-    showStatus('opusStatus', '🧠 Etapa 3/4: Calculando Virality Score™ (Gancho, Ritmo, Valor e Trend) e criando legendas Hormozi...', 'info');
+    showStatus('opusStatus', '🧠 [3/4] Analisando texto com IA para selecionar os melhores ganchos (JSON [{titulo, inicio, fim, score_viralidade, motivo}])...', 'info');
 
     const resp = await fetch('/api/clips', {
       method: 'POST',
@@ -8863,6 +8949,7 @@ async function runOpusClipAnalysis(skipUrlCheck = false){
         targetClipLength,
         desiredClipsCount,
         energyPeaks: peaks,
+        transcricaoSegmentos: collectedWhisperSegments,
         aiModel
       })
     });
@@ -8873,7 +8960,7 @@ async function runOpusClipAnalysis(skipUrlCheck = false){
 
     setStep(['op1','op2','op3','op4'], 3);
     setProgress('opusProgressFill', 88);
-    showStatus('opusStatus', '🎯 Etapa 4/4: Rastreando rosto e movimento do apresentador segundo a segundo (Auto-Reframe 3.0 Sem Marca d\'Água)...', 'info');
+    showStatus('opusStatus', '🎬 [4/4] Cortando e redimensionando vídeos para 9:16 (nova_largura = int(altura_orig * 9/16)) + aplicando legendas dinâmicas...', 'info');
 
     const v = document.getElementById('opusSourceVideo');
     for(let i = 0; i < data.clips.length; i++){
@@ -8882,6 +8969,18 @@ async function runOpusClipAnalysis(skipUrlCheck = false){
     }
 
     opusState.clips = data.clips;
+    opusState.cortesSugeridos = data.cortes_sugeridos || data.clips.map(c => ({
+      titulo: c.title,
+      inicio: c.startSec,
+      fim: c.endSec,
+      score_viralidade: c.viralityScore,
+      motivo: c.reason
+    }));
+    if(Array.isArray(data.transcricao_segmentos) && data.transcricao_segmentos.length){
+      opusState.whisperSegments = data.transcricao_segmentos;
+    }
+    updateOpusPipelineJsonPre();
+
     document.getElementById('opusProviderBadge').textContent = `🤖 IA: ${data.provider || 'OpusClip Multi-IA'}`;
     document.getElementById('opusResultWrap').classList.remove('hidden');
     updateOpusCanvasAspect();
@@ -8889,8 +8988,8 @@ async function runOpusClipAnalysis(skipUrlCheck = false){
     selectOpusClip(0, true);
 
     setProgress('opusProgressFill', 100);
-    showStatus('opusStatus', `✅ ${data.clips.length} Melhores Partes do Vídeo cortadas e legendadas (Score até ${data.clips[0].viralityScore}/100 • 100% Sem Marca d'Água)! Reproduzindo Corte #1 agora.`, 'success');
-    toast(`🔥 ${data.clips.length} Melhores Partes cortadas e legendadas!`);
+    showStatus('opusStatus', `✅ Pipeline [4/4] Concluído! ${data.clips.length} Melhores Partes cortadas em 9:16 e legendadas (Score até ${data.clips[0].viralityScore}/100 • 100% Sem Marca d'Água)!`, 'success');
+    toast(`🔥 ${data.clips.length} Melhores Partes cortadas em 9:16 e legendadas!`);
     if(data.project) saveProject(data.project);
     setTimeout(() => {
       document.getElementById('opusResultWrap').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -8902,6 +9001,84 @@ async function runOpusClipAnalysis(skipUrlCheck = false){
     btn.disabled = false;
     btn.textContent = '⚡ Get clips in 1 click (Gerar Cortes Virais Agora)';
     setTimeout(() => { document.getElementById('opusProgress').classList.remove('show'); }, 1400);
+  }
+}
+
+// Atualiza o painel JSON com a Transcrição Whisper [{inicio, fim, texto}], os Cortes Sugeridos [{titulo, inicio, fim, score_viralidade, motivo}] e a Geometria Crop 9:16
+function updateOpusPipelineJsonPre(){
+  const pre = document.getElementById('opusPipelineJsonPre');
+  if(!pre) return;
+  const larguraOrig = opusState.videoW || 1280;
+  const alturaOrig = opusState.videoH || 720;
+  const novaLargura = Math.floor(alturaOrig * (9 / 16));
+  const xCenter = larguraOrig / 2;
+  const x1 = Math.round(xCenter - (novaLargura / 2));
+  const x2 = Math.round(xCenter + (novaLargura / 2));
+
+  const payload = {
+    etapa_1_midia: {
+      arquivo: opusState.fileName || 'video_original.mp4',
+      duracao_segundos: Number((opusState.durationSec || 0).toFixed(2)),
+      resolucao_original: `${larguraOrig}x${alturaOrig}`
+    },
+    etapa_2_transcricao_whisper: opusState.whisperSegments || [],
+    etapa_3_cortes_sugeridos: opusState.cortesSugeridos || [],
+    etapa_4_crop_vertical_9x16: {
+      formula: 'nova_largura = int(altura_orig * (9 / 16))',
+      largura_orig: larguraOrig,
+      altura_orig: alturaOrig,
+      nova_largura: novaLargura,
+      x1,
+      y1: 0,
+      x2,
+      y2: alturaOrig,
+      arquivos_saida: (opusState.clips || []).map((_, idx) => `corte_${idx + 1}.mp4`)
+    }
+  };
+  pre.textContent = JSON.stringify(payload, null, 2);
+}
+
+function toggleOpusPipelineJsonDrawer(forceOpen){
+  const dr = document.getElementById('opusPipelineJsonDrawer');
+  if(!dr) return;
+  updateOpusPipelineJsonPre();
+  const willOpen = typeof forceOpen === 'boolean' ? forceOpen : dr.classList.contains('hidden');
+  dr.classList.toggle('hidden', !willOpen);
+}
+
+// Etapa 4 em Lote (gerar_cortes_finais): Corta cada subclip(t_inicio, t_fim), aplica o Crop 9:16 + Legendas e baixa corte_1.mp4, corte_2.mp4...
+async function gerarCortesFinaisEmLote(){
+  if(!opusState.clips || !opusState.clips.length){
+    return toast('Gere os cortes virais primeiro!', 'warn');
+  }
+  const batchBtn = document.getElementById('opusBatchExportBtn');
+  if(batchBtn){
+    batchBtn.disabled = true;
+    batchBtn.textContent = '⏳ [4/4] Renderizando lote 9:16...';
+  }
+  try{
+    const total = opusState.clips.length;
+    for(let i = 0; i < total; i++){
+      const c = opusState.clips[i];
+      toast(`🎬 [4/4] Renderizando corte_${i + 1}.mp4 (${fmtClockSec(c.startSec)}s até ${fmtClockSec(c.endSec)}s)...`);
+      selectOpusClip(i, false);
+      opusState.lastExportBlob = null;
+      const blob = await exportSelectedOpusClipMp4({ silentExport: true });
+      if(blob){
+        const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
+        const nomeSaida = `corte_${i + 1}.${ext}`;
+        triggerBlobDownload(blob, nomeSaida);
+      }
+    }
+    showStatus('opusStatus', `🎉 Pipeline [4/4] Finalizado! Todos os ${total} cortes verticais 9:16 (corte_1.mp4 .. corte_${total}.mp4) foram gerados e baixados!`, 'success');
+    toast(`🎉 Todos os ${total} cortes (corte_1.mp4...) foram baixados!`);
+  }catch(e){
+    toast('❌ Erro na exportação em lote: ' + e.message, 'error');
+  }finally{
+    if(batchBtn){
+      batchBtn.disabled = false;
+      batchBtn.textContent = '⬇️ [4/4] Baixar Todos (corte_1.mp4...)';
+    }
   }
 }
 

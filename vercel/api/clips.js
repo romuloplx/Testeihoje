@@ -20,7 +20,9 @@ module.exports = async (req, res) => {
       const out = await transcribeClipSegment({
         audioBase64: body.audioBase64,
         audioMime: body.audioMime || 'audio/wav',
-        language: body.language || ''
+        language: body.language || '',
+        offsetSec: body.offsetSec || 0,
+        durationSec: body.durationSec || 20
       });
       return send(res, 200, out);
     }
@@ -32,6 +34,7 @@ module.exports = async (req, res) => {
       targetClipLength: body.targetClipLength || '30-60',
       desiredClipsCount: body.desiredClipsCount || 4,
       energyPeaks: body.energyPeaks || [],
+      transcricaoSegmentos: body.transcricaoSegmentos || [],
       aiModel: body.aiModel || 'auto-router'
     });
 
@@ -59,6 +62,8 @@ module.exports = async (req, res) => {
     return send(res, 200, {
       id,
       clips,
+      cortes_sugeridos: out.cortes_sugeridos || [],
+      transcricao_segmentos: out.transcricao_segmentos || [],
       provider: out.provider || 'multi-ia-opusclip',
       warning: out.warning || undefined,
       project
