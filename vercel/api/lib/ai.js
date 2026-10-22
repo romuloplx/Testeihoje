@@ -3758,27 +3758,41 @@ async function fetchYoutubeClipMp4Segment({ videoId = '', url = '', startSec = 0
   // 1) Tenta API de recorte por trecho (loader.to / oceansaver com start & end) + extratores em paralelo — prioridade para clip real em movimento
   const tasks = [
     async () => {
+      // loader.to clipe real — até 60s de polling para vídeos longos
       try {
-        const initUrl = `https://ab.cococococ.com/ajax/download.php?copyright=0&format=360&url=${encodeURIComponent(watchUrl)}&start=${sFloor}&end=${eCeil}&api=dfcb6d76f2f6a9894gjkege8a4ab232222`;
-        const r = await fetch(initUrl, { headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://loader.to/' }, signal: AbortSignal.timeout(6000) });
-        if (!r.ok) return null;
-        const j = await r.json();
-        const jobId = j?.id || j?.jobId;
-        if (!jobId) return j?.download_url || j?.url || null;
-        for (let poll = 0; poll < 7; poll++) {
-          await new Promise(res => setTimeout(res, 1100 + poll * 400));
+        const domains = ['https://ab.cococococ.com', 'https://cc.cococococ.com', 'https://y2mate.is'];
+        for (const dom of domains) {
           try {
-            const pr = await fetch(`https://ab.cococococ.com/ajax/progress.php?id=${encodeURIComponent(jobId)}`, {
-              headers: { 'User-Agent': 'Mozilla/5.0' },
-              signal: AbortSignal.timeout(4000)
-            });
-            if (pr.ok) {
-              const pj = await pr.json();
-              if (pj?.download_url && /^https?:\/\//i.test(pj.download_url)) return pj.download_url;
-              if (pj?.url && /^https?:\/\//i.test(pj.url)) return pj.url;
-              if (pj?.status === 'error' || pj?.error) break;
+            const initUrl = `${dom}/ajax/download.php?copyright=0&format=360&url=${encodeURIComponent(watchUrl)}&start=${sFloor}&end=${eCeil}&api=dfcb6d76f2f6a9894gjkege8a4ab232222`;
+            const r = await fetch(initUrl, { headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://loader.to/', 'Origin': 'https://loader.to' }, signal: AbortSignal.timeout(8000) });
+            if (!r.ok) continue;
+            const j = await r.json();
+            const jobId = j?.id || j?.jobId || j?.resultId;
+            if (!jobId) {
+              if (j?.download_url && /^https?:\/\//i.test(j.download_url)) return j.download_url;
+              if (j?.url && /^https?:\/\//i.test(j.url)) return j.url;
+              continue;
             }
-          } catch (_) {}
+            for (let poll = 0; poll < 30; poll++) {
+              await new Promise(res => setTimeout(res, 1800));
+              try {
+                const pr = await fetch(`${dom}/ajax/progress.php?id=${encodeURIComponent(jobId)}`, {
+                  headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://loader.to/' },
+                  signal: AbortSignal.timeout(5000)
+                });
+                if (!pr.ok) continue;
+                const pj = await pr.json();
+                if (pj?.download_url && /^https?:\/\//i.test(pj.download_url)) return pj.download_url;
+                if (pj?.url && /^https?:\/\//i.test(pj.url)) return pj.url;
+                if (pj?.downloadUrl && /^https?:\/\//i.test(pj.downloadUrl)) return pj.downloadUrl;
+                if (pj?.status === 2 || pj?.success === 1) {
+                  if (pj.download_url) return pj.download_url;
+                }
+                if (pj?.status === 'error' || pj?.error || pj?.message === 'error') break;
+                if (pj?.status === 'finished' || pj?.finished) break;
+              } catch (_) {}
+            }
+          } catch (_) { continue; }
         }
       } catch (_) {}
       return null;
@@ -3848,6 +3862,23 @@ async function fetchYoutubeClipMp4Segment({ videoId = '', url = '', startSec = 0
   candidateUrls.push(`https://inv.nadeko.net/latest_version?id=${vid}&itag=18&local=true`);
   candidateUrls.push(`https://invidious.nerdvpn.de/latest_version?id=${vid}&itag=18&local=true`);
 
+  // Se for pedido de clipe real [startSec,endSec], prioriza URLs de clipping (loader.to) — retorna URL direta para o navegador baixar completo sem passar por base64 de 25MB no Vercel
+  const isClippedRequest = sFloor > 5 || eCeil - sFloor < 180;
+  const clippingUrl = candidateUrls.find(u => /cococococ|loader\.to|y2mate|ab\./i.test(u));
+  if (isClippedRequest && clippingUrl) {
+    // Retorna URL de clipe já cortado para o frontend baixar direto (evita limite de 5MB do Vercel)
+    return {
+      ok: true,
+      videoBase64: null,
+      mime: 'video/mp4',
+      streamUrl: clippingUrl,
+      hasMore: false,
+      totalSize: null,
+      candidateUrls,
+      isClipped: true,
+      clippedStreamUrl: clippingUrl
+    };
+  }
   for (const cand of candidateUrls) {
     const dl = await downloadVideoStreamChunk(cand, { startByte: 0, endByte: 3670015, timeoutMs: 6500 });
     if (dl && dl.buffer && dl.bytesRead > 25000) {
@@ -3858,12 +3889,13 @@ async function fetchYoutubeClipMp4Segment({ videoId = '', url = '', startSec = 0
         streamUrl: cand,
         hasMore: !!dl.hasMore,
         totalSize: dl.totalSize || null,
-        candidateUrls
+        candidateUrls,
+        isClipped: isClippedRequest
       };
     }
   }
 
-  return { ok: false, candidateUrls };
+  return { ok: false, candidateUrls, isClipped: isClippedRequest };
 }
 
 module.exports = {
