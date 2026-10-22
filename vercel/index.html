@@ -51,7 +51,7 @@ header{
 }
 .badge i{width:8px;height:8px;background:#22c55e;border-radius:999px;display:inline-block;box-shadow:0 0 8px #22c55e}
 
-main{max-width:720px;margin:auto;padding:20px;padding-bottom:100px}
+main{max-width:1040px;margin:auto;padding:20px;padding-bottom:100px}
 .tabs{
   display:flex;gap:8px;margin-bottom:18px;
   background:#121225;padding:6px;border-radius:16px;border:1px solid var(--border);
@@ -203,6 +203,168 @@ video{width:100%;border-radius:12px;margin-top:12px;background:black}
 }
 input[type="range"]{
   padding:0;height:6px;accent-color:#06b6d4;cursor:pointer;margin-top:10px;
+}
+
+/* ==========================================================================
+   ✂️ OPUSCLIP DASHBOARD & RESULT PAGE (clip.opus.pro/dashboard REPLICA)
+   ========================================================================== */
+.opus-dash-card{
+  background:linear-gradient(180deg,#0c0d14 0%,#08090e 100%);
+  border:1.5px solid #222638;
+  border-radius:20px;
+  padding:22px;
+  box-shadow:0 18px 48px rgba(0,0,0,.55);
+}
+.opus-url-pill{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  background:#121420;border:1.5px solid #2a2f45;border-radius:16px;
+  padding:8px 10px 8px 16px;transition:.2s;
+  box-shadow:inset 0 2px 6px rgba(0,0,0,.4);
+}
+.opus-url-pill:focus-within{
+  border-color:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,.18);
+}
+.opus-url-pill input{
+  flex:1;min-width:210px;background:transparent;border:none;color:#fff;
+  font-size:14px;padding:10px 4px;margin:0;outline:none;box-shadow:none !important;
+}
+.opus-cta-1click{
+  background:#ffffff;color:#090a0f;font-weight:900;font-size:13.5px;
+  padding:12px 20px;border-radius:12px;border:none;cursor:pointer;
+  display:inline-flex;align-items:center;gap:7px;white-space:nowrap;
+  box-shadow:0 4px 16px rgba(255,255,255,.18);transition:.18s;
+}
+.opus-cta-1click:hover{background:#22c55e;color:#031c0d;transform:translateY(-1px)}
+.opus-copilot-box{
+  margin-top:14px;padding:14px 16px;border-radius:16px;
+  background:#10121d;border:1px solid #23273a;
+}
+.opus-preset-strip{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(108px,1fr));gap:9px;margin-top:10px;
+}
+.opus-preset-item{
+  background:#131624;border:1.5px solid #262b40;border-radius:12px;padding:10px 8px;
+  text-align:center;cursor:pointer;transition:.18s;position:relative;user-select:none;
+}
+.opus-preset-item:hover{border-color:#4ade80;transform:translateY(-2px)}
+.opus-preset-item.active{
+  border-color:#22c55e;background:linear-gradient(180deg,#11261f 0%,#0d151d 100%);
+  box-shadow:0 0 0 2px rgba(34,197,94,.25);
+}
+.opus-preset-preview{
+  height:56px;border-radius:8px;background:#070910;border:1px solid #1e2436;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:4px;margin-bottom:6px;overflow:hidden;font-weight:900;font-size:10.5px;line-height:1.15;
+}
+.opus-preset-name{font-size:11.5px;font-weight:800;color:#f1f5f9}
+
+/* Result Page Clip Row (Exact clip.opus.pro/dashboard?projectId=... layout) */
+.opus-clip-row{
+  background:#0d0f17;border:1.5px solid #1f2436;border-radius:18px;
+  padding:18px;margin-bottom:16px;transition:.2s;
+  box-shadow:0 10px 30px rgba(0,0,0,.38);
+}
+.opus-clip-row.active-row{
+  border-color:#22c55e;box-shadow:0 0 0 1px rgba(34,197,94,.28),0 12px 34px rgba(0,0,0,.5);
+}
+.opus-clip-row-title{
+  font-size:18px;font-weight:800;color:#ffffff;margin:0 0 14px 0;line-height:1.35;
+  display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;
+}
+.opus-clip-row-title .rk{color:#94a3b8;font-weight:800}
+.opus-clip-grid{
+  display:grid;
+  grid-template-columns:88px 206px minmax(220px,1fr) 168px;
+  gap:16px;align-items:start;
+}
+@media(max-width:880px){
+  .opus-clip-grid{grid-template-columns:1fr 1fr}
+}
+@media(max-width:560px){
+  .opus-clip-grid{grid-template-columns:1fr}
+}
+.opus-vote-col{
+  display:flex;flex-direction:column;align-items:center;gap:10px;
+}
+.opus-vote-btns{display:flex;gap:6px}
+.opus-icon-btn{
+  width:38px;height:38px;border-radius:10px;background:#151826;
+  border:1px solid #282e45;color:#cbd5e1;font-size:15px;
+  display:inline-flex;align-items:center;justify-content:center;
+  cursor:pointer;padding:0;transition:.16s;
+}
+.opus-icon-btn:hover{border-color:#64748b;color:#fff;background:#1e2235}
+.opus-icon-btn.liked{background:#3b0a28;border-color:#f43f5e;color:#fda4af}
+.opus-icon-btn.disliked{background:#27171a;border-color:#ef4444;color:#fca5a5}
+.opus-score-big{
+  text-align:center;padding:10px 8px;border-radius:14px;width:100%;
+  background:linear-gradient(180deg,#091f15 0%,#081118 100%);
+  border:1.5px solid #22c55e66;
+}
+.opus-score-num{font-size:28px;font-weight:900;color:#22c55e;line-height:1}
+.opus-score-num small{font-size:13px;color:#94a3b8;font-weight:700}
+.opus-score-lbl{font-size:9.5px;font-weight:800;letter-spacing:.6px;color:#86efac;margin-top:4px}
+
+.opus-mini-player{
+  position:relative;width:206px;aspect-ratio:9/16;margin:0 auto;
+  background:#04050a;border-radius:14px;overflow:hidden;
+  border:1.5px solid #252b42;cursor:pointer;
+  box-shadow:0 8px 24px rgba(0,0,0,.45);
+}
+.opus-mini-player canvas{
+  width:100%;height:100%;object-fit:contain;display:block;background:#04050a;
+}
+.opus-mini-time{
+  position:absolute;top:8px;right:8px;z-index:3;
+  background:rgba(8,10,18,0.82);backdrop-filter:blur(4px);
+  color:#f1f5f9;font-size:10.5px;font-weight:800;
+  padding:3px 8px;border-radius:999px;border:1px solid rgba(255,255,255,0.14);
+}
+.opus-mini-badge{
+  position:absolute;top:8px;left:8px;z-index:3;
+  background:rgba(6,78,59,0.88);color:#a7f3d0;
+  font-size:9px;font-weight:900;padding:3px 7px;border-radius:999px;
+  border:1px solid #10b98188;letter-spacing:.3px;
+}
+.opus-mini-playbtn{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:3;
+  width:52px;height:52px;border-radius:999px;
+  background:rgba(255,255,255,0.94);color:#090a0f;
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;font-weight:900;box-shadow:0 6px 22px rgba(0,0,0,.55);
+  transition:.18s;pointer-events:none;
+}
+.opus-mini-player:hover .opus-mini-playbtn{transform:translate(-50%,-50%) scale(1.08);background:#22c55e}
+
+.opus-transcript-box{
+  background:#121522;border:1px solid #23283d;border-radius:14px;
+  padding:14px 16px;min-height:285px;display:flex;flex-direction:column;justify-content:space-between;
+}
+.opus-transcript-words{
+  font-size:13.8px;line-height:1.72;color:#d1d5db;margin-top:8px;
+}
+.opus-tw{
+  padding:1px 3px;border-radius:5px;cursor:pointer;transition:.12s;
+}
+.opus-tw:hover{background:#1e293b;color:#fff}
+.opus-tw.tw-active{background:#22c55e;color:#031c0d;font-weight:800}
+.opus-tw.tw-power{color:#fde047;font-weight:700}
+
+.opus-action-stack{
+  display:flex;flex-direction:column;gap:7px;
+}
+.opus-act-btn{
+  width:100%;padding:9px 12px;border-radius:10px;
+  background:#161928;border:1px solid #282e46;color:#e2e8f0;
+  font-size:12px;font-weight:700;text-align:left;
+  display:flex;align-items:center;gap:8px;cursor:pointer;transition:.15s;
+}
+.opus-act-btn:hover{background:#1f243a;border-color:#4ade80;color:#fff;transform:translateX(2px)}
+.opus-act-btn.act-primary{
+  background:linear-gradient(135deg,#16a34a,#059669);border-color:#22c55e;color:#fff;font-weight:800;
+}
+.opus-act-btn.act-active{
+  background:#064e3b;border-color:#10b981;color:#a7f3d0;
 }
 </style>
 </head>
@@ -825,153 +987,242 @@ input[type="range"]{
   </div>
 </section>
 
-<!-- OPUSCLIP IA — FERRAMENTA #1 DE RECORTE E EDIÇÃO DE VÍDEO AI -->
+<!-- OPUSCLIP IA — ENGENHARIA REVERSA DE clip.opus.pro/dashboard (PROJECT #P3102218muth) -->
 <section id="clips" class="hidden">
-  <div class="card">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px">
-      <h2 style="margin:0">✂️ OpusClip IA Pro — Ferramenta #1 de Recorte e Edição de Vídeo AI</h2>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <span style="font-size:11.5px;font-weight:900;padding:4px 10px;border-radius:999px;background:linear-gradient(135deg,#14532d,#052e16);border:1.5px solid #22c55e;color:#bbf7d0;box-shadow:0 0 14px rgba(34,197,94,.35)">🚫 ZERO MARCA D'ÁGUA (100% LIMPO)</span>
-        <span style="font-size:11.5px;font-weight:800;padding:4px 10px;border-radius:999px;background:linear-gradient(135deg,#064e3b,#0f172a);border:1px solid #10b981;color:#a7f3d0">🔥 ClipAnything™ + Auto-Reframe 3.0 + Zoom Cuts + AI B-Roll</span>
+  <div class="opus-dash-card">
+    <!-- TOP BAR ESTILO clip.opus.pro/dashboard -->
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding-bottom:14px;border-bottom:1px solid #1e2336;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <div style="display:inline-flex;align-items:center;gap:7px;font-family:'Space Grotesk',Inter,sans-serif;font-weight:800;font-size:20px;color:#fff">
+          <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:8px;background:#22c55e;color:#031c0d;font-weight:900;font-size:16px">✂️</span>
+          OpusClip <span style="font-size:11px;font-weight:800;padding:2px 8px;border-radius:6px;background:#1e293b;color:#4ade80;border:1px solid #22c55e66">PRO 3.0</span>
+        </div>
+        <span id="opusProjectBadge" style="font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:8px;background:#131624;border:1px solid #282e46;color:#94a3b8">📁 Project <code style="color:#e2e8f0">#P3102218muth</code></span>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:11px;font-weight:900;padding:5px 11px;border-radius:999px;background:#052e16;border:1.5px solid #22c55e;color:#bbf7d0">🚫 ZERO WATERMARK (100% LIMPO)</span>
+        <span style="font-size:11px;font-weight:800;padding:5px 11px;border-radius:999px;background:#141829;border:1px solid #334155;color:#fde047">⚡ ∞ Créditos Pro Ilimitados</span>
       </div>
     </div>
-    <p>Transforme qualquer vídeo longo (do <b>YouTube pelo link</b>, podcast, live, entrevista, aula, gameplay ou vídeo do celular/PC) em <b>múltiplos cortes verticais virais com edição ultra-profissional idêntica ao OpusClip Pro e 100% SEM marca d'água</b>: leitura profunda da fala e cena, <b>Virality Score™ (0–99)</b>, <b>Auto-Reframe 9:16</b> com rastreamento ativo de quem fala, <b>Jump-Cut Zoom Dinâmico</b>, <b>AI B-Roll</b> e <b>legendas animadas sincronizadas palavra por palavra</b>.</p>
 
-    <!-- 🔗 BARRA DE LINK DO YOUTUBE / URL DE VÍDEO (IGUAL AO OPUSCLIP OFICIAL) -->
-    <div style="margin-top:10px;padding:14px 15px;border-radius:14px;background:linear-gradient(180deg,#121c34,#0a1020);border:2px solid #10b981aa;box-shadow:0 8px 26px rgba(16,185,129,.16)">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-        <label style="margin:0;font-size:13.5px;font-weight:900;color:#6ee7b7">🔗 Cole o Link do YouTube, Shorts, Live ou URL de Vídeo (.MP4)</label>
-        <span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;background:#064e3b;color:#a7f3d0">▶️ YouTube • Shorts • Lives • Links Diretos</span>
-      </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <input type="url" id="opusYoutubeUrl"
-               placeholder="🔗 Cole aqui o link do YouTube (ex: https://www.youtube.com/watch?v=... ou https://youtu.be/...)"
-               onkeydown="if(event.key==='Enter'){event.preventDefault();importOpusVideoFromUrl(true);}"
-               style="flex:2;min-width:240px;padding:12px 14px;border-radius:11px;border:1.5px solid #334155;background:#060913;color:#ffffff;font-size:13.5px" />
-        <button class="primary" type="button" id="opusFetchUrlBtn" onclick="importOpusVideoFromUrl(true)" style="padding:12px 18px;font-weight:900;background:linear-gradient(135deg,#ef4444,#dc2626,#ea580c);box-shadow:0 6px 18px rgba(239,68,68,.35);white-space:nowrap">🚀 Puxar do YouTube & Gerar Cortes</button>
-        <button class="ghost" type="button" onclick="importOpusVideoFromUrl(false)" style="padding:12px 14px;border-color:#10b98188;color:#a7f3d0;white-space:nowrap">📥 Só Puxar Vídeo</button>
-      </div>
-      <div id="opusYoutubePreviewCard" class="hidden" style="margin-top:10px;padding:10px 12px;border-radius:11px;background:#080d1a;border:1px solid #1e293b"></div>
+    <!-- 🔗 OPUSCLIP DROP LINK PILL + UPLOAD FILE + GET CLIPS IN 1 CLICK -->
+    <div style="text-align:center;margin-bottom:12px">
+      <h2 style="font-size:22px;font-weight:800;color:#ffffff;margin:0 0 4px 0">#1 AI Video Clipping & Editing Tool</h2>
+      <p style="margin:0;font-size:12.5px;color:#94a3b8">Cole o link do YouTube ou envie seu vídeo para gerar múltiplos cortes verticais com <b>Virality Score™ (0–99)</b>, <b>Auto-Reframe 9:16</b>, <b>AI B-Roll</b> e <b>Legendas Dinâmicas sem marca d'água</b>.</p>
     </div>
 
-    <label style="margin-top:14px">📹 Ou envie um arquivo de vídeo do seu celular / computador</label>
-    <div id="opusDropZone"
-         ondragover="event.preventDefault();this.style.borderColor='#10b981';this.style.background='#0d201c'"
-         ondragleave="this.style.borderColor='#10b98166';this.style.background='linear-gradient(180deg,#0c1824,#090d18)'"
-         ondrop="onDropOpusFile(event)"
-         onclick="document.getElementById('opusVideoFile').click()"
-         style="cursor:pointer;padding:18px 14px;border-radius:14px;border:2px dashed #10b98166;background:linear-gradient(180deg,#0c1824,#090d18);text-align:center;transition:.2s">
-      <div style="font-size:26px;margin-bottom:4px">🎬✂️</div>
-      <div style="font-weight:800;font-size:14px;color:#ecfdf5">Toque para enviar seu vídeo (.MP4, .MOV, .WEBM, .MKV — qualquer tamanho)</div>
-      <div style="font-size:12px;color:#94a3b8;margin-top:3px">Podcasts, entrevistas, lives, aulas, vlogs ou filmes • Sem limite de duração</div>
+    <div class="opus-url-pill">
+      <span style="font-size:17px">🔗</span>
+      <input type="url" id="opusYoutubeUrl"
+             placeholder="Drop a video link (YouTube, Shorts, Live ou URL .MP4) — ex: https://www.youtube.com/watch?v=..."
+             onkeydown="if(event.key==='Enter'){event.preventDefault();importOpusVideoFromUrl(true);}" />
+      <button type="button" class="ghost" onclick="document.getElementById('opusVideoFile').click()" style="padding:10px 13px;border-radius:10px;border-color:#334155;color:#e2e8f0;white-space:nowrap;margin:0">📁 Upload file</button>
+      <button type="button" class="opus-cta-1click" id="opusFetchUrlBtn" onclick="handleOpusOneClickBtn()">⚡ Get clips in 1 click</button>
       <input type="file" id="opusVideoFile" accept="video/*,.mp4,.mov,.webm,.mkv,.avi,.m4v" onchange="loadOpusVideoFile(this.files[0])" style="display:none">
     </div>
 
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-      <button class="ghost" type="button" onclick="useStudioVideoInOpus()" style="border-color:#38bdf888;color:#bae6fd">🎬 Puxar Último Vídeo Criado / Dublado no Estúdio</button>
-      <button class="ghost" type="button" onclick="generateOpusDemoVideo()" style="border-color:#10b98188;color:#a7f3d0">🧪 Gerar Vídeo Demo de Podcast / Entrevista p/ Testar Agora</button>
+    <!-- BARRA DE FONTE RÁPIDA + PREVIEW DO YOUTUBE -->
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px">
+      <div style="display:flex;gap:7px;flex-wrap:wrap">
+        <button class="ghost" type="button" onclick="loadOpusProjectP3102218()" style="padding:7px 12px;font-size:11.5px;border-color:#22c55e88;color:#bbf7d0">🚀 Abrir Projeto #P3102218muth (Demo Oficial OpusClip)</button>
+        <button class="ghost" type="button" onclick="useStudioVideoInOpus()" style="padding:7px 12px;font-size:11.5px;border-color:#38bdf866;color:#bae6fd">🎬 Usar Último Vídeo do Estúdio</button>
+        <button class="ghost" type="button" onclick="importOpusVideoFromUrl(false)" style="padding:7px 12px;font-size:11.5px;border-color:#64748b66;color:#cbd5e1">📥 Só Puxar Link</button>
+      </div>
+      <div id="opusDropZone"
+           ondragover="event.preventDefault();this.style.borderColor='#22c55e'"
+           ondragleave="this.style.borderColor='#262b40'"
+           ondrop="onDropOpusFile(event)"
+           onclick="document.getElementById('opusVideoFile').click()"
+           style="cursor:pointer;padding:6px 12px;border-radius:9px;border:1px dashed #262b40;font-size:11.5px;color:#94a3b8">
+        📥 Ou arraste um arquivo .MP4 / .MOV aqui
+      </div>
     </div>
 
-    <div id="opusFileMeta" class="hidden" style="margin-top:10px;padding:10px 12px;border-radius:10px;background:#0b1324;border:1px solid #1e293b;font-size:12.5px;color:#cbd5e1;line-height:1.5"></div>
+    <div id="opusYoutubePreviewCard" class="hidden" style="margin-top:10px;padding:10px 12px;border-radius:12px;background:#0f1322;border:1px solid #232942"></div>
+    <div id="opusFileMeta" class="hidden" style="margin-top:10px;padding:10px 12px;border-radius:12px;background:#0f1322;border:1px solid #232942;font-size:12.5px;color:#cbd5e1;line-height:1.5"></div>
     <video id="opusSourceVideo" playsinline preload="auto" class="hidden" style="display:none"></video>
 
-    <div style="margin-top:14px;padding:12px 14px;border-radius:12px;background:linear-gradient(180deg,#11182c,#0b0f1d);border:1px solid #10b98155">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px">
-        <label style="margin:0;color:#a7f3d0">🎯 2. ClipAnything™ Prompt — O que a IA deve buscar nos cortes?</label>
-        <span style="font-size:11px;color:#94a3b8">Inspirado no OpusClip ClipAnything™</span>
+    <!-- 🎛️ OPUSCLIP COPILOT & PRESET CONFIGURATION PANEL (IGUAL AO clip.opus.pro/dashboard) -->
+    <div class="opus-copilot-box">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-size:12.5px;font-weight:900;color:#f8fafc">🤖 AI Co-Pilot & Clipping Model</span>
+          <span style="font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px;background:#064e3b;color:#6ee7b7;border:1px solid #10b981">ClipAnything™ NEW</span>
+        </div>
+        <span style="font-size:11px;color:#94a3b8">Analisa fala, cena visual, emoção e retenção</span>
       </div>
-      <input type="text" id="opusPrompt" value="Encontre os momentos mais virais, revelações impactantes, dicas práticas e picos de emoção com alto potencial de retenção" placeholder="Ex: Momentos mais engraçadas, maiores segredos revelados, respostas polêmicas..." style="width:100%;padding:11px 13px;border-radius:10px;border:1px solid var(--border);background:#080b16;color:#f8fafc;font-size:13.5px" />
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
-        <button class="ghost" type="button" onclick="setOpusPromptPreset('viral')" style="font-size:11.5px;padding:5px 10px;border-color:#f59e0b66;color:#fde68a">🔥 Momentos Mais Virais & Polêmicos</button>
-        <button class="ghost" type="button" onclick="setOpusPromptPreset('tips')" style="font-size:11.5px;padding:5px 10px;border-color:#10b98166;color:#a7f3d0">💎 Melhores Dicas & Segredos</button>
-        <button class="ghost" type="button" onclick="setOpusPromptPreset('funny')" style="font-size:11.5px;padding:5px 10px;border-color:#38bdf866;color:#bae6fd">😂 Reações & Momentos Engraçados</button>
-        <button class="ghost" type="button" onclick="setOpusPromptPreset('emotion')" style="font-size:11.5px;padding:5px 10px;border-color:#a855f766;color:#e9d5ff">⚡ Ganchos de Alto Impacto Emocional</button>
-      </div>
-    </div>
 
-    <div class="row">
-      <div>
-        <label>⏱️ Duração ideal de cada corte</label>
-        <select id="opusClipDuration">
-          <option value="15-30">⚡ Curto Explosivo (15s a 30s — TikTok / Reels)</option>
-          <option value="30-60" selected>🔥 Ideal Viral (30s a 60s — Shorts / Reels / TikTok)</option>
-          <option value="60-90">🎬 Corte Completo (60s a 90s — Podcast / História)</option>
-          <option value="auto">🤖 Automático IA (Adapta ao melhor gancho)</option>
-        </select>
+      <div class="row" style="margin-top:0">
+        <div>
+          <label style="margin-top:0;font-size:11px">🧠 Clip model</label>
+          <select id="opusClipModel" style="padding:9px 11px;font-size:12.5px;margin-top:4px;background:#090b13">
+            <option value="clipanything" selected>✨ ClipAnything (Visual + Áudio + Sentimento)</option>
+            <option value="clipbasic">🎙️ ClipBasic (Foco em Diálogo & Podcast)</option>
+          </select>
+        </div>
+        <div>
+          <label style="margin-top:0;font-size:11px">🎭 Genre (Gênero do Vídeo)</label>
+          <select id="opusGenre" style="padding:9px 11px;font-size:12.5px;margin-top:4px;background:#090b13">
+            <option value="auto" selected>🤖 Auto detect</option>
+            <option value="podcast">🎙️ Podcast & Entrevista</option>
+            <option value="talkshow">📺 Talk Show & Comentário</option>
+            <option value="educational">📚 Educacional / Aula / Tutorial</option>
+            <option value="vlog">🤳 Vlog & Lifestyle</option>
+            <option value="gaming">🎮 Gaming & Live Stream</option>
+            <option value="sports">⚽ Esportes & Ação</option>
+            <option value="marketing">💼 Marketing, Vendas & Negócios</option>
+          </select>
+        </div>
+        <div>
+          <label style="margin-top:0;font-size:11px">⏱️ Clip length (Duração)</label>
+          <select id="opusClipDuration" style="padding:9px 11px;font-size:12.5px;margin-top:4px;background:#090b13">
+            <option value="auto">🤖 Auto (0m~3m)</option>
+            <option value="15-30">⚡ &lt;30s (TikTok / Reels Rápido)</option>
+            <option value="30-60" selected>🔥 30s~60s (Ideal Shorts / Reels)</option>
+            <option value="60-90">🎬 60s~90s (História / Podcast)</option>
+          </select>
+        </div>
+        <div>
+          <label style="margin-top:0;font-size:11px">🔢 Quantidade de cortes</label>
+          <select id="opusClipCount" style="padding:9px 11px;font-size:12.5px;margin-top:4px;background:#090b13">
+            <option value="3">3 Cortes (Top 3)</option>
+            <option value="4" selected>4 Cortes Virais</option>
+            <option value="6">6 Cortes Virais</option>
+            <option value="8">8 Cortes Virais</option>
+          </select>
+        </div>
       </div>
-      <div>
-        <label>🔢 Quantidade de cortes virais</label>
-        <select id="opusClipCount">
-          <option value="3">3 Melhores Cortes (Top 3)</option>
-          <option value="4" selected>4 Cortes Virais (Recomendado)</option>
-          <option value="6">6 Cortes Virais</option>
-          <option value="8">8 Cortes Virais (Máximo)</option>
-        </select>
-      </div>
-      <div>
-        <label>📐 Enquadramento IA (Auto-Reframe)</label>
-        <select id="opusReframeMode" onchange="onChangeOpusVisualSettings()">
-          <option value="auto_face" selected>🎯 Auto-Reframe 9:16 (Rastreia Rosto / Sujeito em Ação)</option>
-          <option value="split_podcast">🎙️ Split-Screen Podcast 9:16 (2 Pessoas: Topo & Base)</option>
-          <option value="cinema_blur">✨ Cinema Fit 9:16 (Vídeo Inteiro + Fundo Blur Dinâmico)</option>
-          <option value="1:1">🟦 Quadrado 1:1 (Feed Instagram / LinkedIn)</option>
-          <option value="16:9">🖥️ Horizontal 16:9 (YouTube)</option>
-        </select>
-      </div>
-    </div>
 
-    <div class="row">
-      <div>
-        <label>💬 Template de Legenda Pro (OpusClip 3.0)</label>
-        <select id="opusCaptionStyle" onchange="onChangeOpusVisualSettings()">
-          <option value="hormozi" selected>🔥 Alex Hormozi Pro (Inclinada + Pop Verde/Ouro + Emojis 3D)</option>
-          <option value="mrbeast">⚡ MrBeast Explosive (Zoom 1.22x Ciano/Amarelo + Borda Dupla)</option>
-          <option value="iman">💎 Iman Gadzhi Luxury (Clean Luxo + Sublinhado Neon Dourado)</option>
-          <option value="neon">🌌 Opus Cyber Neon (Ciano + Roxo Glow + Destaque Ativo)</option>
-          <option value="impact">🎯 Podcast Viral Impact (Branco + Caixa Vermelha Forte)</option>
-          <option value="minimal">🎬 Minimal Studio (Legenda Limpa de Cinema)</option>
-          <option value="none">🚫 Sem Legenda Queimada</option>
-        </select>
+      <!-- PROMPT TO CLIP (CLIPANYTHING PROMPT) -->
+      <div style="margin-top:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+          <label style="margin:0;font-size:11.5px;color:#cbd5e1">🎯 Topic / Prompt filter (O que o ClipAnything™ deve buscar?)</label>
+          <div style="display:flex;gap:5px;flex-wrap:wrap">
+            <button class="ghost" type="button" onclick="setOpusPromptPreset('viral')" style="font-size:10.5px;padding:3px 8px;border-color:#f59e0b55;color:#fde68a">🔥 Moments most likely to go viral</button>
+            <button class="ghost" type="button" onclick="setOpusPromptPreset('tips')" style="font-size:10.5px;padding:3px 8px;border-color:#10b98155;color:#a7f3d0">💎 Melhores Dicas & Segredos</button>
+            <button class="ghost" type="button" onclick="setOpusPromptPreset('funny')" style="font-size:10.5px;padding:3px 8px;border-color:#38bdf855;color:#bae6fd">😂 Momentos Engraçados</button>
+            <button class="ghost" type="button" onclick="setOpusPromptPreset('emotion')" style="font-size:10.5px;padding:3px 8px;border-color:#a855f755;color:#e9d5ff">⚡ Picos Emocionais</button>
+          </div>
+        </div>
+        <input type="text" id="opusPrompt" value="Encontre os momentos mais virais, revelações impactantes, dicas práticas e picos de emoção com alto potencial de retenção" placeholder="Ex: Find the moments most likely to go viral on social media..." style="width:100%;padding:9px 12px;margin-top:5px;border-radius:10px;border:1px solid #262b40;background:#080a12;color:#f8fafc;font-size:13px" />
       </div>
-      <div>
-        <label>📍 Posição da Legenda na Tela</label>
-        <select id="opusCaptionPos" onchange="onChangeOpusVisualSettings()">
-          <option value="bottom" selected>⬇️ Base Segura TikTok/Reels/Shorts (78%)</option>
-          <option value="center">🎯 Centro Dinâmico de Retenção (54%)</option>
-          <option value="top">⬆️ Superior Abaixo do Gancho (28%)</option>
-        </select>
-      </div>
-      <div>
-        <label>🏷️ Gancho Viral no Topo (Hook Banner)</label>
-        <select id="opusHookBannerMode" onchange="onChangeOpusVisualSettings()">
-          <option value="first5s" selected>🔥 Mostrar Gancho nos Primeiros 5s (Prende o Scroll)</option>
-          <option value="always">📌 Mostrar Gancho no Topo Durante Todo o Corte</option>
-          <option value="none">🚫 Sem Banner no Topo</option>
-        </select>
-      </div>
-    </div>
 
-    <div class="row">
-      <div>
-        <label>🎥 Cortes de Zoom & Ritmo (Dynamic Zoom Cuts)</label>
-        <select id="opusZoomStyle" onchange="onChangeOpusVisualSettings()">
-          <option value="auto_punch" selected>⚡ Auto Jump-Cut & Punch-In (Zoom nas Palavras de Impacto — OpusClip Pro)</option>
-          <option value="smooth_dolly">🎬 Dolly-In Cinematográfico Contínuo</option>
-          <option value="static">🔒 Câmera Fixa (Sem Zoom Extra)</option>
-        </select>
+      <!-- QUICK PRESETS: CARDS VISUAIS 9:16 IGUAIS AO OPUSCLIP -->
+      <div style="margin-top:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+          <span style="font-size:11.5px;font-weight:800;color:#cbd5e1">🎨 Quick Presets (Templates Visuais do OpusClip)</span>
+          <span style="font-size:10.5px;color:#94a3b8">Clique em um preset para aplicar instantaneamente em todos os cortes</span>
+        </div>
+        <div class="opus-preset-strip" id="opusPresetStrip">
+          <div class="opus-preset-item active" data-preset="hormozi" onclick="selectOpusQuickPreset('hormozi',this)">
+            <div class="opus-preset-preview">
+              <span style="color:#fff">IF YOU</span>
+              <span style="background:#16a34a;color:#fff;padding:1px 5px;border-radius:4px;margin-top:2px">WERE 22</span>
+            </div>
+            <div class="opus-preset-name">🔥 Hormozi</div>
+          </div>
+          <div class="opus-preset-item" data-preset="mrbeast" onclick="selectOpusQuickPreset('mrbeast',this)">
+            <div class="opus-preset-preview">
+              <span style="color:#38bdf8">WAIT FOR</span>
+              <span style="background:#0284c7;color:#fde047;padding:1px 5px;border-radius:4px;margin-top:2px">THE END!</span>
+            </div>
+            <div class="opus-preset-name">⚡ Beasty</div>
+          </div>
+          <div class="opus-preset-item" data-preset="iman" onclick="selectOpusQuickPreset('iman',this)">
+            <div class="opus-preset-preview">
+              <span style="color:#cbd5e1;font-weight:700">THE REAL</span>
+              <span style="color:#fef08a;border-bottom:2px solid #facc15;margin-top:2px">SECRET</span>
+            </div>
+            <div class="opus-preset-name">💎 Iman Lux</div>
+          </div>
+          <div class="opus-preset-item" data-preset="neon" onclick="selectOpusQuickPreset('neon',this)">
+            <div class="opus-preset-preview">
+              <span style="color:#e879f9;text-shadow:0 0 8px #a855f7">KARAOKE</span>
+              <span style="color:#38bdf8;text-shadow:0 0 8px #38bdf8;margin-top:2px">GLOW</span>
+            </div>
+            <div class="opus-preset-name">🌌 Karaoke</div>
+          </div>
+          <div class="opus-preset-item" data-preset="impact" onclick="selectOpusQuickPreset('impact',this)">
+            <div class="opus-preset-preview">
+              <span style="color:#fde047">PODCAST</span>
+              <span style="background:#dc2626;color:#fff;padding:1px 5px;border-radius:4px;margin-top:2px">IMPACT</span>
+            </div>
+            <div class="opus-preset-name">🎯 Pod P</div>
+          </div>
+          <div class="opus-preset-item" data-preset="minimal" onclick="selectOpusQuickPreset('minimal',this)">
+            <div class="opus-preset-preview">
+              <span style="background:#111827;color:#38bdf8;padding:3px 6px;border-radius:5px">Clean Studio</span>
+            </div>
+            <div class="opus-preset-name">🎬 Minimal</div>
+          </div>
+          <div class="opus-preset-item" data-preset="none" onclick="selectOpusQuickPreset('none',this)">
+            <div class="opus-preset-preview">
+              <span style="color:#64748b;font-weight:700">🚫 Clean</span>
+              <span style="color:#475569;font-size:9px">Sem Legenda</span>
+            </div>
+            <div class="opus-preset-name">🚫 No Caption</div>
+          </div>
+        </div>
       </div>
-      <div>
-        <label>🎞️ AI B-Roll & Acabamento Visual (100% Sem Marca d'Água)</label>
-        <select id="opusBrollMode" onchange="onChangeOpusVisualSettings()">
-          <option value="cinema_broll" selected>✨ AI B-Roll Automático + Color Grading Pro + Voz Masterizada</option>
-          <option value="grade_only">🎨 Color Grading de Estúdio + Voz Masterizada (Sem B-Roll)</option>
-          <option value="clean">📹 Vídeo Puro Original (Zero Efeitos Extras)</option>
-        </select>
-      </div>
-    </div>
 
-    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
-      <button class="primary" id="opusAnalyzeBtn" onclick="runOpusClipAnalysis()" style="flex:1;min-width:250px;background:linear-gradient(135deg,#10b981,#059669,#0284c7);box-shadow:0 8px 25px rgba(16,185,129,.35)">✂️ Encontrar Melhores Cortes Virais Agora (OpusClip IA)</button>
+      <!-- CONFIGURAÇÕES AVANÇADAS DE ENQUADRAMENTO, ZOOM E B-ROLL -->
+      <div class="row" style="margin-top:10px">
+        <div>
+          <label style="margin-top:0;font-size:11px">📐 Aspect Ratio & Auto-Reframe</label>
+          <select id="opusReframeMode" onchange="onChangeOpusVisualSettings()" style="padding:8px 10px;font-size:12px;margin-top:4px;background:#090b13">
+            <option value="auto_face" selected>🎯 9:16 Fill (Auto-Reframe Rastreia Rosto)</option>
+            <option value="split_podcast">🎙️ 9:16 Split (2 Pessoas: Topo & Base)</option>
+            <option value="cinema_blur">✨ 9:16 Blur (Cinema Fit + Fundo Blur)</option>
+            <option value="1:1">🟦 1:1 Square (Feed / LinkedIn)</option>
+            <option value="16:9">🖥️ 16:9 Landscape (YouTube)</option>
+          </select>
+        </div>
+        <div>
+          <label style="margin-top:0;font-size:11px">🎥 Dynamic Zoom Cuts</label>
+          <select id="opusZoomStyle" onchange="onChangeOpusVisualSettings()" style="padding:8px 10px;font-size:12px;margin-top:4px;background:#090b13">
+            <option value="auto_punch" selected>⚡ Auto Jump-Cut & Punch-In (OpusClip Pro)</option>
+            <option value="smooth_dolly">🎬 Smooth Dolly-In Contínuo</option>
+            <option value="static">🔒 Static Camera</option>
+          </select>
+        </div>
+        <div>
+          <label style="margin-top:0;font-size:11px">🎞️ AI B-Roll & Audio Polish</label>
+          <select id="opusBrollMode" onchange="onChangeOpusVisualSettings()" style="padding:8px 10px;font-size:12px;margin-top:4px;background:#090b13">
+            <option value="cinema_broll" selected>✨ AI B-Roll ON + Color Grade + Voz Pro</option>
+            <option value="grade_only">🎨 Apenas Color Grade + Voz Pro</option>
+            <option value="clean">📹 Original Puro</option>
+          </select>
+        </div>
+        <div>
+          <label style="margin-top:0;font-size:11px">📍 Posição da Legenda & Hook</label>
+          <div style="display:flex;gap:5px;margin-top:4px">
+            <select id="opusCaptionPos" onchange="onChangeOpusVisualSettings()" style="padding:8px 6px;font-size:11.5px;margin:0;background:#090b13">
+              <option value="bottom" selected>⬇️ Base 78%</option>
+              <option value="center">🎯 Centro 54%</option>
+              <option value="top">⬆️ Topo 28%</option>
+            </select>
+            <select id="opusHookBannerMode" onchange="onChangeOpusVisualSettings()" style="padding:8px 6px;font-size:11.5px;margin:0;background:#090b13">
+              <option value="first5s" selected>🔥 Hook 5s</option>
+              <option value="always">📌 Sempre</option>
+              <option value="none">🚫 Sem Hook</option>
+            </select>
+          </div>
+          <!-- Select oculto sincronizado com os Quick Presets -->
+          <select id="opusCaptionStyle" onchange="onChangeOpusVisualSettings()" class="hidden">
+            <option value="hormozi" selected>hormozi</option>
+            <option value="mrbeast">mrbeast</option>
+            <option value="iman">iman</option>
+            <option value="neon">neon</option>
+            <option value="impact">impact</option>
+            <option value="minimal">minimal</option>
+            <option value="none">none</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <button class="primary" id="opusAnalyzeBtn" onclick="runOpusClipAnalysis()" style="margin:0;background:linear-gradient(135deg,#22c55e,#10b981,#059669);color:#031c0d;font-weight:900;font-size:14.5px;box-shadow:0 8px 25px rgba(34,197,94,.3)">⚡ Get clips in 1 click (Gerar Cortes Virais Agora)</button>
+      </div>
     </div>
 
     <div class="progress-wrap" id="opusProgress">
@@ -986,66 +1237,89 @@ input[type="range"]{
 
     <div class="status" id="opusStatus"></div>
 
-    <!-- WORKSPACE INTERATIVO OPUSCLIP: EDITOR 9:16 AO VIVO + RANKING DE CORTES VIRAIS -->
-    <div id="opusResultWrap" class="hidden" style="margin-top:16px">
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;align-items:start">
+    <!-- ====================================================================
+         🏆 OPUSCLIP RESULT PAGE (IDÊNTICA A clip.opus.pro/dashboard?projectId=P3102218muth)
+         ==================================================================== -->
+    <div id="opusResultWrap" class="hidden" style="margin-top:20px">
 
-        <!-- COLUNA 1: PLAYER & EDITOR 9:16 INTERATIVO AO VIVO -->
-        <div style="background:linear-gradient(180deg,#0d1326,#080b16);border:1.5px solid #10b98188;border-radius:16px;padding:14px">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
-            <div id="opusActiveClipHeader" style="font-weight:800;font-size:13.5px;color:#6ee7b7">🎬 Corte #1 Selecionado</div>
-            <span id="opusActiveScoreBadge" style="font-size:12px;font-weight:900;padding:3px 10px;border-radius:999px;background:#064e3b;border:1px solid #10b981;color:#ecfdf5">🔥 98/100</span>
-          </div>
-
-          <div style="display:flex;justify-content:center;align-items:center;background:#04060d;border-radius:12px;padding:8px;border:1px solid #1e293b">
-            <canvas id="opusPreviewCanvas" width="540" height="960" style="max-width:100%;max-height:430px;width:auto;height:auto;border-radius:10px;display:block;cursor:pointer" onclick="toggleOpusPreviewPlayback()"></canvas>
-          </div>
-
-          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-            <button class="primary" type="button" id="opusPlayBtn" onclick="toggleOpusPreviewPlayback()" style="flex:1;padding:10px 12px">▶️ Assistir Corte Ao Vivo</button>
-            <button class="ghost" type="button" onclick="restartOpusPreviewClip()" style="padding:10px 12px">🔄 Do Início</button>
-          </div>
-
-          <!-- AJUSTE FINO DE RECORTE E TEXTO EM TEMPO REAL -->
-          <div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:#0b1020;border:1px solid #1e293b">
-            <div style="font-size:11.5px;font-weight:800;color:#93c5fd;margin-bottom:6px">✂️ Ajuste Fino de Tempo, Gancho e Legenda (Tempo Real)</div>
-            <div class="row" style="margin-top:0">
-              <div style="min-width:110px">
-                <label style="margin-top:0;font-size:11px">⏱️ Início (seg)</label>
-                <input type="number" step="0.5" id="opusEditStart" onchange="onEditSelectedOpusClip()" style="padding:7px 9px;font-size:12.5px">
-              </div>
-              <div style="min-width:110px">
-                <label style="margin-top:0;font-size:11px">⏱️ Fim (seg)</label>
-                <input type="number" step="0.5" id="opusEditEnd" onchange="onEditSelectedOpusClip()" style="padding:7px 9px;font-size:12.5px">
-              </div>
-            </div>
-            <label style="margin-top:6px;font-size:11px">🏷️ Banner Gancho no Topo</label>
-            <input type="text" id="opusEditHookBanner" oninput="onEditSelectedOpusClip()" style="padding:7px 9px;font-size:12.5px;width:100%;border-radius:8px;border:1px solid var(--border);background:#070a14;color:#fff">
-            <label style="margin-top:6px;font-size:11px">💬 Legenda Animada Hormozi do Corte (edite livremente)</label>
-            <textarea id="opusEditCaption" rows="2" oninput="onEditSelectedOpusClip()" style="padding:7px 9px;font-size:12px;min-height:54px"></textarea>
-          </div>
-
-          <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
-            <button type="button" id="opusExportMp4Btn" onclick="exportSelectedOpusClipMp4()" style="width:100%;padding:14px 16px;border:none;border-radius:12px;font-size:14.5px;font-weight:900;cursor:pointer;color:#022c22;background:linear-gradient(135deg,#34d399,#10b981,#06b6d4);box-shadow:0 8px 24px rgba(16,185,129,.35)">⬇️ GERAR E BAIXAR ESTE CORTE VIRAL (.MP4 GALERIA)</button>
-            <button type="button" onclick="shareOpusClipToGallery()" style="width:100%;padding:11px 14px;border:1.5px solid #38bdf8;border-radius:12px;font-size:13.5px;font-weight:800;cursor:pointer;color:#e0f2fe;background:#0f172a">📲 Salvar Direto na Galeria / Enviar (TikTok, Reels, Shorts)</button>
-            <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <button class="ghost" type="button" id="opusDubClipBtn" onclick="dubSelectedOpusClip()" style="flex:1;font-size:12px;border-color:#a855f788;color:#e9d5ff">🎙️ Dublar Corte em PT-BR com Voz IA</button>
-              <button class="ghost" type="button" onclick="downloadSelectedOpusClipSrt()" style="font-size:12px">📜 Baixar .SRT</button>
-            </div>
-          </div>
-          <video id="opusExportedVideo" controls playsinline class="hidden" style="width:100%;max-height:380px;border-radius:10px;background:#000;margin-top:10px"></video>
+      <!-- BARRA DE FILTROS, ORDENAÇÃO E BUSCA DA PÁGINA DE RESULTADOS -->
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:12px 14px;border-radius:14px;background:#111422;border:1px solid #23283d;margin-bottom:16px">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <button type="button" class="ghost" id="opusFilterAll" onclick="setOpusClipFilter('all')" style="padding:6px 12px;font-size:11.5px;border-color:#22c55e;color:#bbf7d0;background:#064e3b">🎬 All clips</button>
+          <button type="button" class="ghost" id="opusFilterLiked" onclick="setOpusClipFilter('liked')" style="padding:6px 12px;font-size:11.5px">❤️ Liked</button>
+          <button type="button" class="ghost" id="opusFilterTop" onclick="setOpusClipFilter('top90')" style="padding:6px 12px;font-size:11.5px">🔥 Score 90+</button>
+          <span id="opusProviderBadge" style="font-size:11px;padding:4px 10px;border-radius:999px;background:#171b2e;border:1px solid #334155;color:#a5b4fc">🤖 ClipAnything™ 3.0</span>
         </div>
-
-        <!-- COLUNA 2: RANKING DE CORTES VIRAIS COM VIRALITY SCORE™ -->
-        <div>
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-            <div style="font-weight:800;font-size:14px;color:#e2e8f0">🏆 Ranking de Cortes Virais (Virality Score™)</div>
-            <span id="opusProviderBadge" style="font-size:11px;padding:3px 9px;border-radius:999px;background:#1e1b4b;border:1px solid #818cf8;color:#e0e7ff">🤖 OpusClip Multi-IA</span>
-          </div>
-          <div id="opusClipsList" style="display:flex;flex-direction:column;gap:10px"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <input type="text" id="opusSearchTranscript" oninput="renderOpusClipsListUI()" placeholder="🔍 Search in transcript..." style="width:185px;padding:7px 11px;margin:0;font-size:12px;border-radius:9px;background:#090b13;border:1px solid #282e46" />
+          <select id="opusSortOrder" onchange="renderOpusClipsListUI()" style="width:auto;padding:7px 10px;margin:0;font-size:12px;border-radius:9px;background:#090b13;border:1px solid #282e46">
+            <option value="score" selected>🔥 Sort: Virality Score (High → Low)</option>
+            <option value="time">⏱️ Sort: Timeline Order</option>
+          </select>
+          <button type="button" class="ghost" onclick="toggleOpusStudioDrawer()" style="padding:7px 12px;font-size:11.5px;border-color:#38bdf888;color:#bae6fd">✂️ Studio Editor</button>
         </div>
-
       </div>
+
+      <!-- GAVETA DO EDITOR COMPLETO OPUSCLIP STUDIO (ABRE AO CLICAR EM "✂️ Edit clip") -->
+      <div id="opusStudioDrawer" class="hidden" style="background:linear-gradient(180deg,#111628,#0a0d18);border:1.5px solid #22c55e88;border-radius:18px;padding:16px;margin-bottom:18px;box-shadow:0 14px 40px rgba(0,0,0,.6)">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #1e293b">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <span style="font-size:12px;font-weight:900;padding:4px 10px;border-radius:8px;background:#064e3b;color:#a7f3d0;border:1px solid #10b981">✂️ OPUSCLIP AI EDITOR</span>
+            <div id="opusActiveClipHeader" style="font-weight:800;font-size:14px;color:#f8fafc">🎬 Corte #1 Selecionado</div>
+            <span id="opusActiveScoreBadge" style="font-size:12px;font-weight:900;padding:3px 10px;border-radius:999px;background:#052e16;border:1px solid #22c55e;color:#4ade80">🔥 99/100</span>
+          </div>
+          <button type="button" class="ghost" onclick="toggleOpusStudioDrawer(false)" style="padding:6px 12px;font-size:11.5px">✖ Fechar Editor</button>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;align-items:start">
+          <!-- PALCO 9:16 AO VIVO -->
+          <div>
+            <div style="display:flex;justify-content:center;align-items:center;background:#04060d;border-radius:14px;padding:8px;border:1px solid #1e293b">
+              <canvas id="opusPreviewCanvas" width="540" height="960" style="max-width:100%;max-height:410px;width:auto;height:auto;border-radius:10px;display:block;cursor:pointer" onclick="toggleOpusPreviewPlayback()"></canvas>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+              <button class="primary" type="button" id="opusPlayBtn" onclick="toggleOpusPreviewPlayback()" style="flex:1;margin:0;padding:10px 12px">▶️ Assistir Corte Ao Vivo</button>
+              <button class="ghost" type="button" onclick="restartOpusPreviewClip()" style="padding:10px 12px">🔄 Do Início</button>
+            </div>
+          </div>
+
+          <!-- CONTROLES DE EDIÇÃO DE TEXTO, TEMPO E EXPORTAÇÃO -->
+          <div>
+            <div style="padding:12px;border-radius:12px;background:#0b0f1d;border:1px solid #1e293b">
+              <div style="font-size:12px;font-weight:800;color:#86efac;margin-bottom:8px">✂️ Trim & Text-Based Editing (Tempo Real)</div>
+              <div class="row" style="margin-top:0">
+                <div style="min-width:110px">
+                  <label style="margin-top:0;font-size:11px">⏱️ Início (seg)</label>
+                  <input type="number" step="0.5" id="opusEditStart" onchange="onEditSelectedOpusClip()" style="padding:8px 10px;font-size:12.5px;margin-top:4px">
+                </div>
+                <div style="min-width:110px">
+                  <label style="margin-top:0;font-size:11px">⏱️ Fim (seg)</label>
+                  <input type="number" step="0.5" id="opusEditEnd" onchange="onEditSelectedOpusClip()" style="padding:8px 10px;font-size:12.5px;margin-top:4px">
+                </div>
+              </div>
+              <label style="margin-top:8px;font-size:11px">🏷️ Auto Hook Banner (Topo do Vídeo)</label>
+              <input type="text" id="opusEditHookBanner" oninput="onEditSelectedOpusClip()" style="padding:8px 10px;font-size:12.5px;margin-top:4px;width:100%;border-radius:8px;border:1px solid #282e46;background:#070a14;color:#fff">
+              <label style="margin-top:8px;font-size:11px">💬 Captions & Transcript Editor (Edite qualquer palavra)</label>
+              <textarea id="opusEditCaption" rows="3" oninput="onEditSelectedOpusClip()" style="padding:8px 10px;font-size:12.5px;margin-top:4px;min-height:68px"></textarea>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+              <button type="button" id="opusExportMp4Btn" onclick="exportSelectedOpusClipMp4()" style="width:100%;padding:13px 16px;border:none;border-radius:12px;font-size:14px;font-weight:900;cursor:pointer;color:#022c22;background:linear-gradient(135deg,#4ade80,#22c55e,#10b981);box-shadow:0 8px 24px rgba(34,197,94,.3)">⬇️ Download HD (.MP4 Sem Marca d'Água)</button>
+              <button type="button" onclick="shareOpusClipToGallery()" style="width:100%;padding:10px 14px;border:1.5px solid #38bdf8;border-radius:12px;font-size:13px;font-weight:800;cursor:pointer;color:#e0f2fe;background:#0f172a">📲 Post / Schedule (TikTok, Reels, Shorts)</button>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="ghost" type="button" id="opusDubClipBtn" onclick="dubSelectedOpusClip()" style="flex:1;font-size:11.5px;border-color:#a855f788;color:#e9d5ff">🎙️ Add AI voice-over (PT-BR)</button>
+                <button class="ghost" type="button" onclick="exportOpusClipXml(opusState.selectedIdx)" style="font-size:11.5px">🎞️ Export XML</button>
+                <button class="ghost" type="button" onclick="downloadSelectedOpusClipSrt()" style="font-size:11.5px">📜 Baixar .SRT</button>
+              </div>
+            </div>
+            <video id="opusExportedVideo" controls playsinline class="hidden" style="width:100%;max-height:340px;border-radius:10px;background:#000;margin-top:10px"></video>
+          </div>
+        </div>
+      </div>
+
+      <!-- LISTA DE CORTES NO LAYOUT EXATO DO clip.opus.pro/dashboard (4 COLUNAS) -->
+      <div id="opusClipsList"></div>
+
     </div>
   </div>
 </section>
@@ -6880,7 +7154,7 @@ async function importOpusVideoFromUrl(autoRunAnalysis = true){
     toast(e.message, 'error');
     return false;
   }finally{
-    if(fetchBtn){ fetchBtn.disabled = false; fetchBtn.textContent = '🚀 Puxar do YouTube & Gerar Cortes'; }
+    if(fetchBtn){ fetchBtn.disabled = false; fetchBtn.textContent = '⚡ Get clips in 1 click'; }
     if(mainBtn) mainBtn.disabled = false;
   }
 }
@@ -7715,10 +7989,230 @@ function renderSingleOpusPreviewFrame(){
   const cv = document.getElementById('opusPreviewCanvas');
   const v = document.getElementById('opusSourceVideo');
   const clip = opusState.clips[opusState.selectedIdx];
-  if(!cv || !clip) return;
-  const ctx = cv.getContext('2d');
+  if(!clip) return;
   const relSec = v ? Math.max(0, (v.currentTime || clip.startSec) - clip.startSec) : 0.8;
-  drawOpusReframedFrame(ctx, v, clip, relSec);
+  if(cv){
+    const ctx = cv.getContext('2d');
+    drawOpusReframedFrame(ctx, v, clip, relSec);
+  }
+  const cardCv = document.getElementById(`opusCardCanvas-${opusState.selectedIdx}`);
+  if(cardCv){
+    const cctx = cardCv.getContext('2d');
+    drawOpusReframedFrame(cctx, v, clip, relSec);
+  }
+}
+
+// Seleciona um Quick Preset visual (Hormozi, Beasty, Iman, Karaoke, Pod P, Minimal, No Caption) igual ao clip.opus.pro/dashboard
+function selectOpusQuickPreset(presetId, el){
+  const sel = document.getElementById('opusCaptionStyle');
+  if(sel) sel.value = presetId;
+  document.querySelectorAll('#opusPresetStrip .opus-preset-item').forEach(node => {
+    node.classList.toggle('active', node.getAttribute('data-preset') === presetId);
+  });
+  onChangeOpusVisualSettings();
+  renderAllOpusCardStaticPreviews();
+  toast(`🎨 Preset "${presetId.toUpperCase()}" aplicado aos cortes!`);
+}
+
+// Botão principal "⚡ Get clips in 1 click" do topo do dashboard
+async function handleOpusOneClickBtn(){
+  const urlVal = ((document.getElementById('opusYoutubeUrl')||{}).value || '').trim();
+  if(urlVal){
+    await importOpusVideoFromUrl(true);
+  } else {
+    await runOpusClipAnalysis();
+  }
+}
+
+// Carrega instantaneamente o Projeto #P3102218muth (do link oficial https://clip.opus.pro/dashboard?projectId=P3102218muth)
+async function loadOpusProjectP3102218(){
+  const badge = document.getElementById('opusProjectBadge');
+  if(badge) badge.innerHTML = '📁 Project <code style="color:#4ade80">#P3102218muth</code> (Ativo)';
+  await generateOpusDemoVideo();
+  if(opusState.file){
+    await runOpusClipAnalysis(true);
+  }
+}
+
+// Abre ou fecha a gaveta do Studio Editor completo
+function toggleOpusStudioDrawer(forceOpen){
+  const dr = document.getElementById('opusStudioDrawer');
+  if(!dr) return;
+  const willOpen = typeof forceOpen === 'boolean' ? forceOpen : dr.classList.contains('hidden');
+  dr.classList.toggle('hidden', !willOpen);
+  if(willOpen){
+    renderSingleOpusPreviewFrame();
+    setTimeout(() => dr.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
+  }
+}
+
+// Filtro de cortes na página de resultados (All clips / Liked / Score 90+)
+let opusActiveFilter = 'all';
+function setOpusClipFilter(filterMode){
+  opusActiveFilter = filterMode || 'all';
+  ['All','Liked','Top'].forEach(k => {
+    const b = document.getElementById('opusFilter' + k);
+    if(b){
+      b.style.borderColor = '#282e46';
+      b.style.background = 'transparent';
+      b.style.color = '#cbd5e1';
+    }
+  });
+  const activeBtnId = filterMode === 'liked' ? 'opusFilterLiked' : filterMode === 'top90' ? 'opusFilterTop' : 'opusFilterAll';
+  const ab = document.getElementById(activeBtnId);
+  if(ab){
+    ab.style.borderColor = '#22c55e';
+    ab.style.background = '#064e3b';
+    ab.style.color = '#bbf7d0';
+  }
+  renderOpusClipsListUI();
+}
+
+// Like / Dislike nos cortes (igual aos botões [♡] e [👎] do clip.opus.pro/dashboard)
+function toggleOpusClipVote(idx, voteType){
+  const clip = opusState.clips[idx];
+  if(!clip) return;
+  clip.vote = clip.vote === voteType ? null : voteType;
+  renderOpusClipsListUI();
+}
+
+// Converte nota numérica (0-100) em conceito A+, A, A-, B+ estilo OpusClip Virality Score
+function scoreToOpusGrade(val){
+  const n = Number(val) || 92;
+  if(n >= 96) return 'A+';
+  if(n >= 92) return 'A';
+  if(n >= 88) return 'A-';
+  if(n >= 84) return 'B+';
+  return 'B';
+}
+
+// Alterna o formato / enquadramento diretamente pelo botão "📱 9:16" da pilha lateral do corte
+function cycleOpusClipAspect(idx){
+  selectOpusClip(idx, false);
+  const sel = document.getElementById('opusReframeMode');
+  if(!sel) return;
+  const order = ['auto_face', 'split_podcast', 'cinema_blur', '1:1', '16:9'];
+  const curIdx = order.indexOf(sel.value);
+  sel.value = order[(curIdx + 1) % order.length];
+  onChangeOpusVisualSettings();
+  renderOpusClipsListUI();
+  const labels = {
+    auto_face: '9:16 Fill (Auto-Reframe Rosto)',
+    split_podcast: '9:16 Split-Screen Podcast',
+    cinema_blur: '9:16 Cinema Blur',
+    '1:1': '1:1 Quadrado',
+    '16:9': '16:9 Horizontal'
+  };
+  toast(`📐 Enquadramento alterado para: ${labels[sel.value] || sel.value}`);
+}
+
+// Alterna o AI B-Roll diretamente pelo botão "🎬 Add B-Roll" da pilha lateral do corte
+function toggleOpusClipBroll(idx){
+  selectOpusClip(idx, false);
+  const sel = document.getElementById('opusBrollMode');
+  if(!sel) return;
+  sel.value = sel.value === 'cinema_broll' ? 'grade_only' : 'cinema_broll';
+  onChangeOpusVisualSettings();
+  renderOpusClipsListUI();
+  toast(sel.value === 'cinema_broll' ? '🎬 AI B-Roll ativado no corte!' : '📹 AI B-Roll desativado (Apenas Color Grading Pro)');
+}
+
+// Exporta arquivo de Timeline XML compatível com Premiere Pro / Final Cut / DaVinci Resolve (botão "🎞️ Export XML" do OpusClip)
+function exportOpusClipXml(idx){
+  const clip = opusState.clips[idx != null ? idx : opusState.selectedIdx];
+  if(!clip) return toast('Selecione um corte primeiro', 'warn');
+  const fps = 30;
+  const startFrame = Math.round((clip.startSec || 0) * fps);
+  const endFrame = Math.round((clip.endSec || 30) * fps);
+  const durFrames = Math.max(30, endFrame - startFrame);
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE xmeml>
+<xmeml version="5">
+  <sequence id="OpusClip_Pro_${clip.rank}">
+    <name>${escapeHtml(clip.title || `Clip #${clip.rank}`)}</name>
+    <duration>${durFrames}</duration>
+    <rate><timebase>${fps}</timebase><ntsc>FALSE</ntsc></rate>
+    <media>
+      <video>
+        <format>
+          <samplecharacteristics>
+            <width>1080</width>
+            <height>1920</height>
+            <pixelaspectratio>square</pixelaspectratio>
+            <rate><timebase>${fps}</timebase><ntsc>FALSE</ntsc></rate>
+          </samplecharacteristics>
+        </format>
+        <track>
+          <clipitem id="clipitem-${clip.rank}">
+            <name>${escapeHtml(opusState.fileName || 'source-video.mp4')}</name>
+            <start>0</start>
+            <end>${durFrames}</end>
+            <in>${startFrame}</in>
+            <out>${endFrame}</out>
+            <comments>
+              <mastercomment1>Virality Score: ${clip.viralityScore}/100</mastercomment1>
+              <mastercomment2>${escapeHtml(clip.captionText || '')}</mastercomment2>
+            </comments>
+          </clipitem>
+        </track>
+      </video>
+    </media>
+  </sequence>
+</xmeml>`;
+  const blob = new Blob([xml], { type: 'application/xml' });
+  triggerBlobDownload(blob, `opusclip-P3102218muth-clip-${clip.rank}.xml`);
+  toast(`🎞️ Timeline XML (Premiere / DaVinci / Final Cut) do Corte #${clip.rank} exportada!`);
+}
+
+// Pula para a palavra clicada diretamente na transcrição [CC] Transcript!
+function seekOpusClipToWord(clipIdx, wordStartSec){
+  if(opusState.selectedIdx !== clipIdx){
+    selectOpusClip(clipIdx, false);
+  }
+  const clip = opusState.clips[clipIdx];
+  const v = document.getElementById('opusSourceVideo');
+  if(!clip || !v) return;
+  try{
+    v.currentTime = (clip.startSec || 0) + Math.max(0, Number(wordStartSec) || 0);
+  }catch(_){}
+  if(!opusState.playing){
+    toggleOpusPreviewPlayback();
+  } else {
+    renderSingleOpusPreviewFrame();
+  }
+}
+
+// Clica no player vertical 9:16 dentro do card para dar Play/Pause direto no card (igual ao clip.opus.pro/dashboard)
+function playOpusClipCard(idx){
+  if(opusState.selectedIdx === idx && opusState.playing){
+    stopOpusPreviewPlayback();
+    return;
+  }
+  selectOpusClip(idx, true);
+}
+
+// Desenha os frames de capa 9:16 em todos os cards da lista de resultados
+async function renderAllOpusCardStaticPreviews(){
+  const v = document.getElementById('opusSourceVideo');
+  if(!v || !opusState.clips || !opusState.clips.length) return;
+  if(opusState.playing) return;
+  const savedTime = v.currentTime || 0;
+  for(let i = 0; i < opusState.clips.length; i++){
+    const cardCv = document.getElementById(`opusCardCanvas-${i}`);
+    if(!cardCv) continue;
+    const clip = opusState.clips[i];
+    try{
+      v.currentTime = (clip.startSec || 0) + 0.8;
+      await new Promise(r => {
+        const onS = () => { v.removeEventListener('seeked', onS); r(); };
+        v.addEventListener('seeked', onS, { once: true });
+        setTimeout(r, 140);
+      });
+    }catch(_){}
+    const cctx = cardCv.getContext('2d');
+    drawOpusReframedFrame(cctx, v, clip, 0.8);
+  }
+  try{ v.currentTime = savedTime; }catch(_){}
 }
 
 function stopOpusPreviewPlayback(){
@@ -7730,6 +8224,10 @@ function stopOpusPreviewPlayback(){
   if(opusState.dubAudioCtx){ try{ opusState.dubAudioCtx.close(); }catch(_){} opusState.dubAudioCtx = null; }
   const playBtn = document.getElementById('opusPlayBtn');
   if(playBtn) playBtn.textContent = '▶️ Assistir Corte Ao Vivo';
+  document.querySelectorAll('.opus-mini-playbtn').forEach(btn => {
+    btn.textContent = '▶';
+    btn.style.opacity = '1';
+  });
 }
 
 async function toggleOpusPreviewPlayback(){
@@ -7737,16 +8235,27 @@ async function toggleOpusPreviewPlayback(){
     stopOpusPreviewPlayback();
     return;
   }
-  const clip = opusState.clips[opusState.selectedIdx];
+  const idx = opusState.selectedIdx;
+  const clip = opusState.clips[idx];
   const v = document.getElementById('opusSourceVideo');
   const cv = document.getElementById('opusPreviewCanvas');
-  if(!clip || !v || !cv) return;
+  if(!clip || !v) return;
 
   updateOpusCanvasAspect();
-  const ctx = cv.getContext('2d');
+  const ctx = cv ? cv.getContext('2d') : null;
+  const cardCv = document.getElementById(`opusCardCanvas-${idx}`);
+  const cardCtx = cardCv ? cardCv.getContext('2d') : null;
+  const cardPlayBtn = document.getElementById(`opusCardPlayBtn-${idx}`);
+  const cardTimeEl = document.getElementById(`opusCardTime-${idx}`);
+  const clipDur = Math.max(2, (clip.endSec || 30) - (clip.startSec || 0));
+
   opusState.playing = true;
   const playBtn = document.getElementById('opusPlayBtn');
   if(playBtn) playBtn.textContent = '⏸️ Pausar Corte';
+  if(cardPlayBtn){
+    cardPlayBtn.textContent = '⏸';
+    cardPlayBtn.style.opacity = '0.22';
+  }
 
   if(v.currentTime < clip.startSec || v.currentTime >= clip.endSec - 0.15){
     try{ v.currentTime = clip.startSec; }catch(_){}
@@ -7780,7 +8289,21 @@ async function toggleOpusPreviewPlayback(){
       return;
     }
     const relSec = Math.max(0, nowT - clip.startSec);
-    drawOpusReframedFrame(ctx, v, clip, relSec);
+    if(ctx) drawOpusReframedFrame(ctx, v, clip, relSec);
+    if(cardCtx) drawOpusReframedFrame(cardCtx, v, clip, relSec);
+    if(cardTimeEl){
+      cardTimeEl.textContent = `${fmtClockSec(relSec)} / ${fmtClockSec(clipDur)}`;
+    }
+    // Destaca em verde (#22c55e) a palavra exata que está sendo falada na coluna [CC] Transcript!
+    const wordsContainer = document.getElementById(`opusTranscriptWords-${idx}`);
+    if(wordsContainer){
+      const spans = wordsContainer.querySelectorAll('.opus-tw');
+      spans.forEach(sp => {
+        const ws = parseFloat(sp.getAttribute('data-s')) || 0;
+        const we = parseFloat(sp.getAttribute('data-e')) || 0;
+        sp.classList.toggle('tw-active', relSec >= ws && relSec <= we + 0.08);
+      });
+    }
     opusState.rafId = requestAnimationFrame(tick);
   };
   opusState.rafId = requestAnimationFrame(tick);
@@ -7811,7 +8334,16 @@ function selectOpusClip(idx, autoPlay = false){
   document.getElementById('opusEditHookBanner').value = clip.hookBanner || clip.title;
   document.getElementById('opusEditCaption').value = clip.captionText || '';
 
-  renderOpusClipsListUI();
+  // Se os cards ainda não foram montados no DOM, monta-os agora
+  const listEl = document.getElementById('opusClipsList');
+  if(listEl && !listEl.querySelector('.opus-clip-row')){
+    renderOpusClipsListUI();
+  } else {
+    document.querySelectorAll('.opus-clip-row').forEach(row => {
+      const rIdx = Number(row.getAttribute('data-clip-idx'));
+      row.classList.toggle('active-row', rIdx === idx);
+    });
+  }
 
   const v = document.getElementById('opusSourceVideo');
   if(v){
@@ -7821,7 +8353,7 @@ function selectOpusClip(idx, autoPlay = false){
       if(autoPlay) toggleOpusPreviewPlayback();
     };
     v.addEventListener('seeked', onSeeked, { once: true });
-    try{ v.currentTime = clip.startSec + 0.2; }catch(_){ renderSingleOpusPreviewFrame(); }
+    try{ v.currentTime = clip.startSec + 0.4; }catch(_){ renderSingleOpusPreviewFrame(); }
   }
 }
 
@@ -7837,38 +8369,134 @@ function onEditSelectedOpusClip(){
   clip.captionText = document.getElementById('opusEditCaption').value;
   clip._cues = null;
   opusState.lastExportBlob = null;
-  renderSingleOpusPreviewFrame();
   renderOpusClipsListUI();
 }
 
+// Renderiza a página de resultados IDÊNTICA ao https://clip.opus.pro/dashboard?projectId=P3102218muth (4 Colunas por Corte!)
 function renderOpusClipsListUI(){
   const listEl = document.getElementById('opusClipsList');
   if(!listEl) return;
-  listEl.innerHTML = opusState.clips.map((c, idx) => {
+
+  const searchQ = ((document.getElementById('opusSearchTranscript')||{}).value || '').trim().toLowerCase();
+  const sortOrder = ((document.getElementById('opusSortOrder')||{}).value || 'score');
+  const reframeMode = ((document.getElementById('opusReframeMode')||{}).value || 'auto_face');
+  const brollMode = ((document.getElementById('opusBrollMode')||{}).value || 'cinema_broll');
+  const aspectLabel = reframeMode === '1:1' ? '1:1' : reframeMode === '16:9' ? '16:9' : reframeMode === 'split_podcast' ? '9:16 Split' : reframeMode === 'cinema_blur' ? '9:16 Blur' : '9:16';
+
+  const indexed = (opusState.clips || []).map((c, idx) => ({ c, idx }));
+  const filtered = indexed.filter(({ c }) => {
+    if(opusActiveFilter === 'liked' && c.vote !== 'like') return false;
+    if(opusActiveFilter === 'top90' && (c.viralityScore || 0) < 90) return false;
+    if(searchQ){
+      const hay = `${c.title || ''} ${c.captionText || ''} ${c.reason || ''}`.toLowerCase();
+      if(!hay.includes(searchQ)) return false;
+    }
+    return true;
+  });
+
+  if(sortOrder === 'time'){
+    filtered.sort((a, b) => (a.c.startSec || 0) - (b.c.startSec || 0));
+  } else {
+    filtered.sort((a, b) => (b.c.viralityScore || 0) - (a.c.viralityScore || 0));
+  }
+
+  if(!filtered.length){
+    listEl.innerHTML = `<div style="padding:28px;text-align:center;border-radius:16px;background:#0d0f17;border:1px solid #1f2436;color:#94a3b8;font-size:13.5px">Nenhum corte encontrado para este filtro. Clique em <b>🎬 All clips</b> para ver todos os cortes.</div>`;
+    return;
+  }
+
+  listEl.innerHTML = filtered.map(({ c, idx }) => {
     const isSel = idx === opusState.selectedIdx;
-    const scoreColor = c.viralityScore >= 95 ? '#10b981' : c.viralityScore >= 90 ? '#38bdf8' : '#f59e0b';
-    const m = c.metrics || { hook: 96, flow: 94, value: 95, trend: 93 };
-    return `<div onclick="selectOpusClip(${idx}, false)" style="cursor:pointer;padding:12px 14px;border-radius:14px;background:${isSel ? 'linear-gradient(180deg,#112233,#0a1220)' : '#0c1020'};border:${isSel ? '2px solid #10b981' : '1px solid #1e293b'};transition:.18s">`
-      + `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">`
-      +   `<span style="font-weight:900;font-size:13.5px;color:#f8fafc">#${c.rank} • ${escapeHtml(c.title)}</span>`
-      +   `<span style="font-weight:900;font-size:12.5px;padding:3px 10px;border-radius:999px;background:#052e16;border:1.5px solid ${scoreColor};color:#a7f3d0">🔥 Score ${c.viralityScore}/100</span>`
+    const clipDur = Math.max(2, (c.endSec || 30) - (c.startSec || 0));
+    const m = c.metrics || { hook: 97, flow: 95, value: 96, trend: 94 };
+    if(!c._cues || c._cuesText !== c.captionText || c._cuesDur !== clipDur){
+      c._cues = buildOpusWordByWordCues(c.captionText, clipDur, c.startSec || 0);
+      c._cuesText = c.captionText;
+      c._cuesDur = clipDur;
+    }
+    const allWords = [];
+    (c._cues || []).forEach(phrase => {
+      (phrase.words || []).forEach(w => allWords.push(w));
+    });
+
+    const wordsHtml = allWords.map(w => {
+      const cls = w.isPowerWord ? 'opus-tw tw-power' : 'opus-tw';
+      return `<span class="${cls}" data-s="${w.start.toFixed(2)}" data-e="${w.end.toFixed(2)}" onclick="seekOpusClipToWord(${idx}, ${w.start.toFixed(2)})">${escapeHtml(w.word)}</span>`;
+    }).join(' ');
+
+    return `<div class="opus-clip-row ${isSel ? 'active-row' : ''}" data-clip-idx="${idx}">`
+      + `<h3 class="opus-clip-row-title"><span class="rk">#${c.rank}</span> ${escapeHtml(c.title)}</h3>`
+      + `<div class="opus-clip-grid">`
+
+      // COLUNA 1: [♡] [👎] + 99/100 VIRAL SCORE + CONCEITOS (A+, A)
+      + `<div class="opus-vote-col">`
+      +   `<div class="opus-vote-btns">`
+      +     `<button type="button" class="opus-icon-btn ${c.vote === 'like' ? 'liked' : ''}" title="Like clip" onclick="toggleOpusClipVote(${idx},'like')">♡</button>`
+      +     `<button type="button" class="opus-icon-btn ${c.vote === 'dislike' ? 'disliked' : ''}" title="Dislike clip" onclick="toggleOpusClipVote(${idx},'dislike')">👎</button>`
+      +   `</div>`
+      +   `<div class="opus-score-big">`
+      +     `<div class="opus-score-num">${c.viralityScore}<small>/100</small></div>`
+      +     `<div class="opus-score-lbl">VIRAL SCORE</div>`
+      +   `</div>`
+      +   `<div style="width:100%;display:flex;flex-direction:column;gap:4px;font-size:10.5px;color:#94a3b8;background:#121522;padding:8px;border-radius:10px;border:1px solid #22273b">`
+      +     `<div style="display:flex;justify-content:space-between"><span>🎣 Hook</span><b style="color:#4ade80">${scoreToOpusGrade(m.hook)} (${m.hook})</b></div>`
+      +     `<div style="display:flex;justify-content:space-between"><span>⚡ Flow</span><b style="color:#38bdf8">${scoreToOpusGrade(m.flow)} (${m.flow})</b></div>`
+      +     `<div style="display:flex;justify-content:space-between"><span>💎 Value</span><b style="color:#c084fc">${scoreToOpusGrade(m.value)} (${m.value})</b></div>`
+      +     `<div style="display:flex;justify-content:space-between"><span>📈 Trend</span><b style="color:#facc15">${scoreToOpusGrade(m.trend)} (${m.trend})</b></div>`
+      +   `</div>`
       + `</div>`
-      + `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:7px;font-size:11px;font-weight:700">`
-      +   `<span style="padding:2px 7px;border-radius:6px;background:#172554;color:#93c5fd">⏱️ ${fmtClockSec(c.startSec)} – ${fmtClockSec(c.endSec)} (${Math.round(c.durationSec)}s)</span>`
-      +   `<span style="padding:2px 7px;border-radius:6px;background:#1e1b4b;color:#c4b5fd">🎣 Gancho ${m.hook}</span>`
-      +   `<span style="padding:2px 7px;border-radius:6px;background:#064e3b;color:#a7f3d0">⚡ Ritmo ${m.flow}</span>`
-      +   `<span style="padding:2px 7px;border-radius:6px;background:#3b0764;color:#f3e8ff">💎 Valor ${m.value}</span>`
-      +   `<span style="padding:2px 7px;border-radius:6px;background:#451a03;color:#fde68a">📈 Trend ${m.trend}</span>`
+
+      // COLUNA 2: PLAYER VERTICAL 9:16 AO VIVO COM TIMECODE PILL E BOTÃO PLAY CENTRAL
+      + `<div>`
+      +   `<div class="opus-mini-player" onclick="playOpusClipCard(${idx})" title="Clique para assistir este corte vertical ao vivo">`
+      +     `<span class="opus-mini-badge">🚫 SEM WATERMARK</span>`
+      +     `<span class="opus-mini-time" id="opusCardTime-${idx}">00:00 / ${fmtClockSec(clipDur)}</span>`
+      +     `<canvas id="opusCardCanvas-${idx}" width="360" height="640"></canvas>`
+      +     `<div class="opus-mini-playbtn" id="opusCardPlayBtn-${idx}">▶</div>`
+      +   `</div>`
       + `</div>`
-      + `<div style="margin-top:7px;font-size:11.5px;color:#94a3b8;line-height:1.45">💡 <b>Por que viraliza:</b> ${escapeHtml(c.reason)}</div>`
-      + `<div style="margin-top:6px;padding:7px 9px;border-radius:8px;background:#070a14;border:1px solid #1e293b;font-size:11.5px;color:#e2e8f0;font-style:italic">"${escapeHtml(c.captionText)}"</div>`
-      + `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:9px" onclick="event.stopPropagation()">`
-      +   `<button class="primary" type="button" onclick="selectOpusClip(${idx}, true)" style="padding:7px 12px;font-size:12px">▶️ Assistir Corte #${c.rank}</button>`
-      +   `<button class="ghost" type="button" onclick="selectOpusClip(${idx}, false);exportSelectedOpusClipMp4()" style="padding:7px 12px;font-size:12px;border-color:#10b98188;color:#a7f3d0">⬇️ Baixar .MP4</button>`
-      +   `<button class="ghost" type="button" onclick="copyText(${JSON.stringify(c.title + '\n\n' + (c.hashtags || '#shorts #viral'))})" style="padding:7px 10px;font-size:11.5px">📋 Copiar Título & Tags</button>`
+
+      // COLUNA 3: [CC] TRANSCRIPT INTERATIVO PALAVRA POR PALAVRA + ANÁLISE VIRAL
+      + `<div class="opus-transcript-box">`
+      +   `<div>`
+      +     `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding-bottom:8px;border-bottom:1px solid #1e2438">`
+      +       `<div style="display:flex;align-items:center;gap:7px">`
+      +         `<span style="font-size:10.5px;font-weight:900;padding:2px 6px;border-radius:5px;background:#22c55e;color:#031c0d">CC</span>`
+      +         `<span style="font-size:13px;font-weight:800;color:#f8fafc">Transcript</span>`
+      +         `<span style="font-size:11px;color:#94a3b8">(${fmtClockSec(c.startSec)} – ${fmtClockSec(c.endSec)})</span>`
+      +       `</div>`
+      +       `<button type="button" class="ghost" onclick="copyText(${JSON.stringify(c.captionText || '')})" style="padding:4px 9px;font-size:10.5px">📋 Copy text</button>`
+      +     `</div>`
+      +     `<div class="opus-transcript-words" id="opusTranscriptWords-${idx}" title="Clique em qualquer palavra para pular para aquele segundo do vídeo">${wordsHtml}</div>`
+      +   `</div>`
+      +   `<div style="margin-top:12px;padding:10px 12px;border-radius:10px;background:#0b0d16;border:1px solid #1e2438">`
+      +     `<div style="font-size:11.5px;color:#cbd5e1;line-height:1.45">💡 <b style="color:#4ade80">Why it goes viral:</b> ${escapeHtml(c.reason || '')}</div>`
+      +     `<div style="margin-top:6px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">`
+      +       `<span style="font-size:11px;color:#38bdf8;font-weight:700">${escapeHtml(c.hashtags || '#shorts #viral #reels #tiktok')}</span>`
+      +       `${c.dubbedAudioBuffer ? '<span style="font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px;background:#3b0764;color:#e9d5ff;border:1px solid #a855f7">🎙️ AI Voice-Over PT-BR Ativo</span>' : ''}`
+      +     `</div>`
+      +   `</div>`
+      + `</div>`
+
+      // COLUNA 4: PILHA DE 7 BOTÕES IDÊNTICA AO clip.opus.pro/dashboard
+      + `<div class="opus-action-stack">`
+      +   `<button type="button" class="opus-act-btn" onclick="selectOpusClip(${idx}, false);toggleOpusStudioDrawer(true)">✂️ Edit clip</button>`
+      +   `<button type="button" class="opus-act-btn" onclick="cycleOpusClipAspect(${idx})">📱 ${aspectLabel}</button>`
+      +   `<button type="button" class="opus-act-btn ${brollMode === 'cinema_broll' ? 'act-active' : ''}" onclick="toggleOpusClipBroll(${idx})">🎬 ${brollMode === 'cinema_broll' ? 'AI B-Roll: ON' : 'Add B-Roll'}</button>`
+      +   `<button type="button" class="opus-act-btn ${c.dubbedAudioBuffer ? 'act-active' : ''}" onclick="selectOpusClip(${idx}, false);dubSelectedOpusClip()">🎙️ Add AI voice-over</button>`
+      +   `<button type="button" class="opus-act-btn" onclick="selectOpusClip(${idx}, false);shareOpusClipToGallery()">📅 Schedule / Post</button>`
+      +   `<button type="button" class="opus-act-btn act-primary" onclick="selectOpusClip(${idx}, false);exportSelectedOpusClipMp4()">⬇️ Download HD</button>`
+      +   `<button type="button" class="opus-act-btn" onclick="exportOpusClipXml(${idx})">🎞️ Export XML</button>`
+      + `</div>`
+
       + `</div>`
       + `</div>`;
   }).join('');
+
+  setTimeout(() => {
+    renderSingleOpusPreviewFrame();
+    renderAllOpusCardStaticPreviews();
+  }, 50);
 }
 
 // Executa o pipeline completo do OpusClip IA: Link YouTube / Varredura Acústica -> Transcrição IA -> Virality Score™ -> Auto-Reframe 9:16
@@ -7988,7 +8616,7 @@ async function runOpusClipAnalysis(skipUrlCheck = false){
     toast(e.message, 'error');
   }finally{
     btn.disabled = false;
-    btn.textContent = '✂️ Encontrar Melhores Cortes Virais Agora (OpusClip IA)';
+    btn.textContent = '⚡ Get clips in 1 click (Gerar Cortes Virais Agora)';
     setTimeout(() => { document.getElementById('opusProgress').classList.remove('show'); }, 1400);
   }
 }
@@ -8010,12 +8638,13 @@ async function dubSelectedOpusClip(){
     clip.dubbedAudioBuffer = await ac.decodeAudioData(arr);
     await ac.close().catch(()=>{});
     opusState.lastExportBlob = null;
-    toast('🎙️ Corte dublado com Voz Neural IA! Clique em ▶️ Assistir Corte Ao Vivo.');
+    renderOpusClipsListUI();
+    toast('🎙️ Corte dublado com Voz Neural IA! Clique no player para ouvir.');
     toggleOpusPreviewPlayback();
   }catch(e){
     toast('❌ ' + e.message, 'error');
   }finally{
-    if(btn){ btn.disabled = false; btn.textContent = '🎙️ Dublar Corte em PT-BR com Voz IA'; }
+    if(btn){ btn.disabled = false; btn.textContent = '🎙️ Add AI voice-over (PT-BR)'; }
   }
 }
 
@@ -8167,7 +8796,7 @@ async function exportSelectedOpusClipMp4(opts = {}){
     return null;
   }finally{
     if(exportVid){ try{ exportVid.pause(); exportVid.src = ''; }catch(_){} }
-    if(btn){ btn.disabled = false; btn.textContent = '⬇️ GERAR E BAIXAR ESTE CORTE VIRAL (.MP4 GALERIA)'; }
+    if(btn){ btn.disabled = false; btn.textContent = "⬇️ Download HD (.MP4 Sem Marca d'Água)"; }
     setTimeout(() => { document.getElementById('opusProgress').classList.remove('show'); }, 1200);
   }
 }
@@ -8216,6 +8845,20 @@ checkHealth();
 loadProjects();
 if('speechSynthesis' in window) speechSynthesis.getVoices();
 setTimeout(checkHealth, 2000);
+(function checkOpusUrlParams(){
+  try{
+    const params = new URLSearchParams(window.location.search || '');
+    const pid = params.get('projectId');
+    if(pid || window.location.hash === '#clips'){
+      openTab('clips', document.getElementById('tab-clips'));
+      if(pid){
+        const badge = document.getElementById('opusProjectBadge');
+        if(badge) badge.innerHTML = `📁 Project <code style="color:#4ade80">#${escapeHtml(pid)}</code>`;
+        setTimeout(() => loadOpusProjectP3102218(), 250);
+      }
+    }
+  }catch(_){}
+})();
 </script>
 </body>
 </html>
