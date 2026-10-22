@@ -7470,28 +7470,34 @@ async function downloadRealYoutubeVideoInBrowser(videoId, rawUrl, serverCandidat
         if(startSec == null || endSec == null) return null;
         const s = Math.max(0, Math.floor(Number(startSec)||0));
         const e = Math.max(s+5, Math.ceil(Number(endSec)||s+120));
-        try{
-          const initUrl = `https://ab.cococococ.com/ajax/download.php?copyright=0&format=360&url=${encodeURIComponent(watchUrl)}&start=${s}&end=${e}&api=dfcb6d76f2f6a9894gjkege8a4ab232222`;
-          const r = await fetch(initUrl, { headers: { 'Referer': 'https://loader.to/' }, signal: AbortSignal.timeout(7000) });
-          if(!r.ok) return null;
-          const j = await r.json();
-          const jid = j?.id || j?.jobId;
-          if(!jid){
-            if(j?.download_url && /^https?:\/\//i.test(j.download_url)) return j.download_url;
-            return null;
-          }
-          for(let p=0;p<12;p++){
-            await new Promise(res=>setTimeout(res, 1700));
-            try{
-              const pr = await fetch(`https://ab.cococococ.com/ajax/progress.php?id=${encodeURIComponent(jid)}`, { signal: AbortSignal.timeout(5000) });
-              if(pr.ok){
-                const pj = await pr.json();
-                if(pj?.download_url && /^https?:\/\//i.test(pj.download_url)) return pj.download_url;
-                if(pj?.status === 'error') break;
-              }
-            }catch(_){}
-          }
-        }catch(_){}
+        const domains = ['https://ab.cococococ.com','https://cc.cococococ.com','https://y2mate.is','https://ab1.cococococ.com'];
+        for(const dom of domains){
+          try{
+            const initUrl = `${dom}/ajax/download.php?copyright=0&format=360&url=${encodeURIComponent(watchUrl)}&start=${s}&end=${e}&api=dfcb6d76f2f6a9894gjkege8a4ab232222`;
+            const r = await fetch(initUrl, { headers: { 'Referer': 'https://loader.to/', 'Origin': 'https://loader.to' }, signal: AbortSignal.timeout(8000) });
+            if(!r.ok) continue;
+            const j = await r.json();
+            const jid = j?.id || j?.jobId || j?.resultId;
+            if(!jid){
+              if(j?.download_url && /^https?:\/\//i.test(j.download_url)) return j.download_url;
+              if(j?.url && /^https?:\/\//i.test(j.url)) return j.url;
+              continue;
+            }
+            for(let p=0;p<25;p++){
+              await new Promise(res=>setTimeout(res, 2000));
+              try{
+                const pr = await fetch(`${dom}/ajax/progress.php?id=${encodeURIComponent(jid)}`, { headers: { 'Referer': 'https://loader.to/' }, signal: AbortSignal.timeout(6000) });
+                if(pr.ok){
+                  const pj = await pr.json();
+                  if(pj?.download_url && /^https?:\/\//i.test(pj.download_url)) return pj.download_url;
+                  if(pj?.url && /^https?:\/\//i.test(pj.url)) return pj.url;
+                  if(pj?.downloadUrl && /^https?:\/\//i.test(pj.downloadUrl)) return pj.downloadUrl;
+                  if(pj?.status === 'error' || pj?.error) break;
+                }
+              }catch(_){}
+            }
+          }catch(_){ continue; }
+        }
         return null;
       }
     ];
@@ -7516,7 +7522,8 @@ async function downloadRealYoutubeVideoInBrowser(videoId, rawUrl, serverCandidat
         if(!ctype.includes('text/html') && !ctype.includes('application/json')){
           const chunks = [];
           let loaded = 0;
-          const maxBytes = 12 * 1024 * 1024; // Até 12 MB de vídeo MP4 real
+          const isClippedDl = /cococococ|loader\.to|y2mate|ab1\./i.test(candUrl);
+          const maxBytes = isClippedDl ? 70 * 1024 * 1024 : 14 * 1024 * 1024; // clipped 2min precisa até 70MB para 1080p, full até 14MB
           if(r.body && r.body.getReader){
             const reader = r.body.getReader();
             while(true){
@@ -10514,7 +10521,7 @@ async function exportSelectedOpusClipMp4(opts = {}){
         // Tenta também clique real [startSec,endSec] direto do navegador (loader.to clipping)
         const browserDl = await Promise.race([
           downloadRealYoutubeVideoInBrowser(opusState.ytVideoId, opusState.importedUrl || '', candidateUrls, clip.startSec, clip.endSec),
-          new Promise(r => setTimeout(() => r(null), 35000))
+          new Promise(r => setTimeout(() => r(null), 60000))
         ]);
         if(browserDl && browserDl.blob && browserDl.blob.size > 25000){
           ytSegBlob = browserDl.blob;
