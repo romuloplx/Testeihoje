@@ -3061,19 +3061,143 @@ function extractYoutubeVideoId(rawUrl) {
   return null;
 }
 
+// Baixa um chunk binário de um stream MP4 de forma segura (suporta googlevideo &range=, Range header e leitura parcial via getReader sem travar em vídeos grandes!)
+async function downloadVideoStreamChunk(streamUrl, { startByte = 0, endByte = 3145727, ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', timeoutMs = 8000 } = {}) {
+  if (!streamUrl || typeof streamUrl !== 'string') return null;
+  const maxBytes = Math.max(65536, (endByte - startByte) + 1);
+  let targetUrl = streamUrl;
+  const isGoogleVideo = /googlevideo\.com/i.test(streamUrl);
+  if (isGoogleVideo) {
+    // Em URLs googlevideo.com, o parâmetro de query &range=start-end evita o throttling de 40KB/s!
+    if (/[?&]range=/i.test(targetUrl)) {
+      targetUrl = targetUrl.replace(/([?&]range=)\d+-\d+/i, `$1${startByte}-${endByte}`);
+    } else {
+      targetUrl += (targetUrl.includes('?') ? '&' : '?') + `range=${startByte}-${endByte}`;
+    }
+  }
+
+  const headers = { 'User-Agent': ua };
+  if (!isGoogleVideo) {
+    headers['Range'] = `bytes=${startByte}-${endByte}`;
+  }
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const resp = await fetch(targetUrl, {
+      headers,
+      redirect: 'follow',
+      signal: ctrl.signal
+    });
+    if (!resp.ok && resp.status !== 206) return null;
+
+    const ctype = String(resp.headers.get('content-type') || '').toLowerCase();
+    if (ctype.includes('text/html') || ctype.includes('application/json') || ctype.includes('text/plain')) {
+      return null;
+    }
+
+    // Se pediu um chunk posterior (startByte > 0) mas o servidor ignorou Range e respondeu 200 desde o byte 0 (exceto googlevideo que usa ?range= e responde 200), evita duplicar o início
+    if (startByte > 0 && resp.status === 200 && !isGoogleVideo && !resp.headers.get('content-range')) {
+      try { await resp.body?.cancel(); } catch (_) {}
+      return null;
+    }
+
+    const chunks = [];
+    let totalRead = 0;
+    let truncatedByCap = false;
+
+    if (resp.body && typeof resp.body.getReader === 'function') {
+      const reader = resp.body.getReader();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value && value.byteLength) {
+          const remaining = maxBytes - totalRead;
+          if (value.byteLength >= remaining) {
+            chunks.push(Buffer.from(value.buffer, value.byteOffset, remaining));
+            totalRead += remaining;
+            truncatedByCap = true;
+            try { await reader.cancel(); } catch (_) {}
+            break;
+          } else {
+            chunks.push(Buffer.from(value.buffer, value.byteOffset, value.byteLength));
+            totalRead += value.byteLength;
+          }
+        }
+      }
+    } else {
+      const ab = await resp.arrayBuffer();
+      const b = Buffer.from(ab);
+      totalRead = Math.min(b.length, maxBytes);
+      truncatedByCap = b.length > maxBytes;
+      chunks.push(b.subarray(0, totalRead));
+    }
+
+    if (totalRead < 8000) return null;
+    const finalBuf = Buffer.concat(chunks, totalRead);
+
+    // Verifica assinatura: não pode ser HTML ("<!DO", "<htm") nem JSON ("{")
+    const headStr = finalBuf.subarray(0, 16).toString('utf8').trim();
+    if (/^(<!doctype|<html|<head|\{"error)/i.test(headStr)) return null;
+
+    const contentRange = resp.headers.get('content-range') || '';
+    const crMatch = contentRange.match(/bytes\s+\d+-\d+\/(\d+)/i);
+    const totalSize = crMatch ? Number(crMatch[1]) : null;
+    const hasMore = truncatedByCap || resp.status === 206 || (totalSize ? (startByte + totalRead < totalSize) : (totalRead >= maxBytes));
+
+    return {
+      buffer: finalBuf,
+      bytesRead: totalRead,
+      mime: ctype.includes('webm') ? 'video/webm' : 'video/mp4',
+      hasMore,
+      totalSize
+    };
+  } catch (_) {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchVideoStreamChunk({ streamUrl, startByte = 0, endByte = 3145727, ua }) {
+  const res = await downloadVideoStreamChunk(streamUrl, {
+    startByte: Number(startByte) || 0,
+    endByte: Number(endByte) || 3145727,
+    ua: ua || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    timeoutMs: 9000
+  });
+  if (!res || !res.buffer) {
+    return { error: 'Não foi possível ler o chunk de vídeo solicitado.' };
+  }
+  return {
+    ok: true,
+    chunkBase64: res.buffer.toString('base64'),
+    bytesRead: res.bytesRead,
+    mime: res.mime,
+    hasMore: res.hasMore,
+    totalSize: res.totalSize
+  };
+}
+
 async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredClipsCount = 4 }) {
   const cleanUrl = String(url || '').trim();
-  if (!cleanUrl) return { error: 'Informe o link do YouTube ou URL do vídeo.' };
+  if (!cleanUrl) return { error: 'Informe um link do YouTube ou URL de vídeo válido.' };
 
   const videoId = extractYoutubeVideoId(cleanUrl);
   let title = '';
   let author = '';
   let description = '';
-  let keywords = [];
   let chapters = [];
-  let durationSec = 120;
+  let keywords = [];
+  let durationSec = 42;
   let directVideoBase64 = null;
   let directVideoMime = 'video/mp4';
+  let directStreamUrl = null;
+  let directStreamUa = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
+  let hasMoreVideoChunks = false;
+  let totalVideoBytes = null;
+  const candidateStreamUrls = [];
+  let visitorData = '';
   let transcriptSegments = [];
   let timestampedSegments = [];
   let hasVerbatimCaptions = false;
@@ -3098,29 +3222,33 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
     return out;
   };
 
+  const tryDownloadFromCandidate = async (candUrl, ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36') => {
+    if (!candUrl || directVideoBase64) return false;
+    if (!candidateStreamUrls.includes(candUrl)) candidateStreamUrls.push(candUrl);
+    const dl = await downloadVideoStreamChunk(candUrl, { startByte: 0, endByte: 3145727, ua, timeoutMs: 7500 });
+    if (dl && dl.buffer && dl.bytesRead > 15000) {
+      directVideoBase64 = dl.buffer.toString('base64');
+      directVideoMime = dl.mime || 'video/mp4';
+      directStreamUrl = candUrl;
+      directStreamUa = ua;
+      hasMoreVideoChunks = !!dl.hasMore;
+      totalVideoBytes = dl.totalSize || null;
+      return true;
+    }
+    return false;
+  };
+
   // Caso 1: URL direta de arquivo de vídeo (.mp4 / .webm / .mov)
   if (!videoId && /\.(mp4|webm|mov|m4v)(\?|$)/i.test(cleanUrl)) {
-    try {
-      const r = await fetch(cleanUrl, {
-        headers: { 'User-Agent': 'Mozilla/5.0 DubAI-Studio/2.0' },
-        signal: AbortSignal.timeout(12000)
-      });
-      if (r.ok) {
-        const buf = Buffer.from(await r.arrayBuffer());
-        if (buf.length > 1000 && buf.length <= 3_600_000) {
-          directVideoBase64 = buf.toString('base64');
-          directVideoMime = r.headers.get('content-type') || 'video/mp4';
-        }
-      }
-      title = cleanUrl.split('/').pop().split('?')[0] || 'video-link.mp4';
-    } catch (_) {}
+    await tryDownloadFromCandidate(cleanUrl);
+    title = cleanUrl.split('/').pop().split('?')[0] || 'video-link.mp4';
   }
 
-  // Caso 2: Link do YouTube (watch, youtu.be, shorts, live) — Leitura Profunda Multi-Camada
+  // Caso 2: Link do YouTube (watch, youtu.be, shorts, live) — Extração Real Multi-Camada do Vídeo Original MP4
   if (videoId) {
     const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
-    // 2.1) Metadados oficiais via YouTube oEmbed / Noembed + Extração Direta da Página / Innertube em paralelo
+    // 2.1) Metadados oficiais via YouTube oEmbed / Noembed + Extração Direta da Página em paralelo
     await Promise.all([
       (async () => {
         for (const oembedUrl of [
@@ -3142,17 +3270,20 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
         }
       })(),
       (async () => {
-        // Leitura direta do ytInitialPlayerResponse (descrição completa, duração exata, palavras-chave e legendas oficiais!)
+        // Leitura direta do ytInitialPlayerResponse (descrição completa, duração exata, visitorData e legendas oficiais!)
         try {
           const r = await fetch(`${watchUrl}&hl=pt`, {
             headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
               'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7'
             },
             signal: AbortSignal.timeout(5500)
           });
           if (r.ok) {
             const html = await r.text();
+            const vm = html.match(/"VISITOR_DATA"\s*:\s*"([^"]+)"/);
+            if (vm && vm[1]) visitorData = vm[1];
+
             const m = html.match(/ytInitialPlayerResponse\s*=\s*(\{[\s\S]+?\});\s*(?:var\s|let\s|const\s|<\/script>)/);
             if (m && m[1]) {
               const pr = JSON.parse(m[1]);
@@ -3166,19 +3297,7 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
               // Se o próprio ytInitialPlayerResponse trouxer stream MP4 direto (itag 18 faststart), baixa o vídeo real!
               const directFmt = (pr?.streamingData?.formats || []).find(f => f && f.url && /mp4/i.test(f.mimeType || ''));
               if (directFmt && directFmt.url && !directVideoBase64) {
-                try {
-                  const vr = await fetch(directFmt.url, {
-                    headers: { Range: 'bytes=0-3300000', 'User-Agent': 'Mozilla/5.0' },
-                    signal: AbortSignal.timeout(4500)
-                  });
-                  if (vr.status === 200 || vr.status === 206) {
-                    const vbuf = Buffer.from(await vr.arrayBuffer());
-                    if (vbuf.length > 30000 && vbuf.length <= 3_500_000) {
-                      directVideoBase64 = vbuf.toString('base64');
-                      directVideoMime = 'video/mp4';
-                    }
-                  }
-                } catch (_) {}
+                await tryDownloadFromCandidate(directFmt.url);
               }
 
               // Extrai capítulos da descrição se existirem (ex: 00:00 Introdução)
@@ -3225,135 +3344,263 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
         } catch (_) {}
       })(),
       (async () => {
-        // Baixa todos os frames de alta resolução reais do YouTube (maxresdefault HD, sddefault, hqdefault, hq1, hq2, hq3) 100% livres de CORS!
-        const thumbUrls = [
-          `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
-          `https://i.ytimg.com/vi/${videoId}/sddefault.jpg`,
-          `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
-          `https://i.ytimg.com/vi/${videoId}/hq1.jpg`,
-          `https://i.ytimg.com/vi/${videoId}/hq2.jpg`,
-          `https://i.ytimg.com/vi/${videoId}/hq3.jpg`
-        ];
-        const downloadedThumbs = await Promise.all(thumbUrls.map(async (tUrl) => {
-          try {
-            const r = await fetch(tUrl, {
-              headers: { 'User-Agent': 'Mozilla/5.0' },
-              signal: AbortSignal.timeout(4500)
-            });
-            if (r.ok) {
-              const buf = Buffer.from(await r.arrayBuffer());
-              if (buf.length > 2200) {
-                return { len: buf.length, dataUrl: `data:${r.headers.get('content-type') || 'image/jpeg'};base64,${buf.toString('base64')}` };
-              }
+        // Baixa apenas 1 miniatura para o card de identificação do YouTube no topo
+        try {
+          const r = await fetch(`https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`, {
+            headers: { 'User-Agent': 'Mozilla/5.0' },
+            signal: AbortSignal.timeout(3500)
+          });
+          if (r.ok) {
+            const buf = Buffer.from(await r.arrayBuffer());
+            if (buf.length > 2000) {
+              framesBase64.push(`data:image/jpeg;base64,${buf.toString('base64')}`);
             }
-          } catch (_) {}
-          return null;
-        }));
-        const seenSizes = new Set();
-        for (const item of downloadedThumbs) {
-          if (item && !seenSizes.has(item.len)) {
-            seenSizes.add(item.len);
-            framesBase64.push(item.dataUrl);
           }
-        }
+        } catch (_) {}
       })()
     ]);
 
-    // 2.2) Tenta extrair duração real, legendas/transcrição e stream MP4 via Piped / Invidious caso ainda precise
-    const pipedApis = [
-      `https://pipedapi.kavin.rocks/streams/${videoId}`,
-      `https://api.piped.private.coffee/streams/${videoId}`,
-      `https://pipedapi.adminforge.de/streams/${videoId}`
-    ];
-    for (const pUrl of pipedApis) {
-      if (transcriptSegments.length >= 3 && directVideoBase64) break;
-      try {
-        const r = await fetch(pUrl, {
-          headers: { 'User-Agent': 'Mozilla/5.0 DubAI-Studio/2.0' },
-          signal: AbortSignal.timeout(4500)
-        });
-        if (!r.ok) continue;
-        const j = await r.json();
-        if (!title && j.title) title = String(j.title).trim();
-        if (!author && j.uploader) author = String(j.uploader).trim();
-        if (!description && j.description) description = String(j.description).slice(0, 1500);
-        if (j.duration && Number(j.duration) > 5) durationSec = Number(j.duration);
-
-        if (Array.isArray(j.subtitles) && j.subtitles.length && transcriptSegments.length < 2) {
-          const sub = j.subtitles.find(s => /pt/i.test(s.code || '')) || j.subtitles.find(s => /en/i.test(s.code || '')) || j.subtitles[0];
-          if (sub && sub.url) {
-            const sr = await fetch(sub.url, { signal: AbortSignal.timeout(3500) });
-            if (sr.ok) {
-              const stxt = await sr.text();
-              const cleanLines = stxt
-                .replace(/<[^>]+>/g, ' ')
-                .split(/\r?\n/)
-                .map(l => l.trim())
-                .filter(l => l.length > 8 && !/-->|WEBVTT|^\d+$/i.test(l));
-              const built = buildSegmentsFromLines(cleanLines, desiredClipsCount);
-              if (built.length >= 2) {
-                transcriptSegments = built;
-                hasVerbatimCaptions = /pt/i.test(sub.code || '');
-              }
-            }
-          }
-        }
-
-        if (!directVideoBase64 && Array.isArray(j.videoStreams)) {
-          const mp4Stream = j.videoStreams.find(vs => !vs.videoOnly && /mp4/i.test(vs.format || vs.mimeType || '') && vs.url);
-          if (mp4Stream && mp4Stream.url) {
-            const vr = await fetch(mp4Stream.url, {
-              headers: { Range: 'bytes=0-3300000', 'User-Agent': 'Mozilla/5.0' },
-              signal: AbortSignal.timeout(5000)
-            });
-            if (vr.status === 200 || vr.status === 206) {
-              const vbuf = Buffer.from(await vr.arrayBuffer());
-              if (vbuf.length > 20000 && vbuf.length <= 3_500_000) {
-                directVideoBase64 = vbuf.toString('base64');
-                directVideoMime = 'video/mp4';
-              }
-            }
-          }
-        }
-        break;
-      } catch (_) {}
-    }
-
-    // 2.3) Se ainda não obteve o stream MP4 direto, consulta o player Innertube (ANDROID / IOS) para extrair o stream MP4 (itag=18) real do vídeo!
+    // 2.2) Motor 1: YouTube Innertube 2025/2026 (ANDROID_VR, IOS 20.03, ANDROID_TESTSUITE, TVHTML5) com visitorData e &range=0-3145727!
     if (!directVideoBase64) {
-      for (const clientCfg of [
-        { clientName: 'ANDROID', clientVersion: '19.09.37', androidSdkVersion: 30, ua: 'com.google.android.youtube/19.09.37 (Linux; U; Android 11) gzip' },
-        { clientName: 'IOS', clientVersion: '19.09.3', deviceModel: 'iPhone14,3', ua: 'com.google.ios.youtube/19.09.3 (iPhone14,3; U; CPU iOS 15_6 like Mac OS X)' }
-      ]) {
+      const innertubeClients = [
+        {
+          client: {
+            clientName: 'ANDROID_VR',
+            clientVersion: '1.60.19',
+            deviceMake: 'Oculus',
+            deviceModel: 'Quest 3',
+            osName: 'Android',
+            osVersion: '12L',
+            androidSdkVersion: 32,
+            hl: 'pt',
+            gl: 'BR',
+            ...(visitorData ? { visitorData } : {})
+          },
+          ua: 'com.google.android.apps.youtube.vr.oculus/1.60.19 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip'
+        },
+        {
+          client: {
+            clientName: 'IOS',
+            clientVersion: '20.03.02',
+            deviceMake: 'Apple',
+            deviceModel: 'iPhone16,2',
+            osName: 'iPhone',
+            osVersion: '18.2.1.22C161',
+            hl: 'pt',
+            gl: 'BR',
+            ...(visitorData ? { visitorData } : {})
+          },
+          ua: 'com.google.ios.youtube/20.03.02 (iPhone16,2; U; CPU iOS 18_2_1 like Mac OS X;)'
+        },
+        {
+          client: {
+            clientName: 'ANDROID_TESTSUITE',
+            clientVersion: '1.9',
+            androidSdkVersion: 30,
+            osName: 'Android',
+            osVersion: '12',
+            hl: 'pt',
+            gl: 'BR',
+            ...(visitorData ? { visitorData } : {})
+          },
+          ua: 'com.google.android.youtube/1.9 (Linux; U; Android 12; US) gzip'
+        },
+        {
+          client: {
+            clientName: 'TVHTML5_SIMPLY_EMBEDDED_PLAYER',
+            clientVersion: '2.0',
+            hl: 'pt',
+            gl: 'BR',
+            ...(visitorData ? { visitorData } : {})
+          },
+          thirdParty: { embedUrl: 'https://www.youtube.com/' },
+          ua: 'Mozilla/5.0 (PlayStation; PlayStation 5/2.26) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0 Safari/605.1.15'
+        }
+      ];
+
+      for (const cfg of innertubeClients) {
         if (directVideoBase64) break;
         try {
           const ir = await fetch('https://www.youtube.com/youtubei/v1/player?prettyPrint=false', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'User-Agent': clientCfg.ua },
+            headers: {
+              'Content-Type': 'application/json',
+              'User-Agent': cfg.ua,
+              'X-YouTube-Client-Name': cfg.client.clientName === 'IOS' ? '5' : cfg.client.clientName === 'ANDROID_VR' ? '28' : '3'
+            },
             body: JSON.stringify({
               videoId,
-              context: { client: { clientName: clientCfg.clientName, clientVersion: clientCfg.clientVersion, hl: 'pt', gl: 'BR' } }
+              context: {
+                client: cfg.client,
+                ...(cfg.thirdParty ? { thirdParty: cfg.thirdParty } : {})
+              },
+              contentCheckOk: true,
+              racyCheckOk: true
             }),
+            signal: AbortSignal.timeout(5000)
+          });
+          if (!ir.ok) continue;
+          const ij = await ir.json();
+          const vd = ij?.videoDetails || {};
+          if (vd.title && !title) title = String(vd.title).trim();
+          if (vd.author && !author) author = String(vd.author).trim();
+          if (vd.lengthSeconds && Number(vd.lengthSeconds) > 4) durationSec = Number(vd.lengthSeconds);
+
+          // Prioriza itag 18 (360p MP4 faststart com vídeo + áudio integrados)
+          const formats = ij?.streamingData?.formats || [];
+          const bestFmt = formats.find(f => f && f.url && Number(f.itag) === 18)
+            || formats.find(f => f && f.url && /mp4/i.test(f.mimeType || '') && f.audioQuality)
+            || formats.find(f => f && f.url && /mp4/i.test(f.mimeType || ''));
+          if (bestFmt && bestFmt.url) {
+            await tryDownloadFromCandidate(bestFmt.url, cfg.ua);
+          }
+        } catch (_) {}
+      }
+    }
+
+    // 2.3) Motor 2: Cluster Invidious & Piped em paralelo (com suporte a ?local=true para stream MP4 sem bloqueio de IP!)
+    if (!directVideoBase64) {
+      const invidiousInstances = [
+        'https://inv.nadeko.net',
+        'https://invidious.nerdvpn.de',
+        'https://yewtu.be',
+        'https://inv.tux.pizza',
+        'https://invidious.privacyredirect.com',
+        'https://iv.datura.network'
+      ];
+      for (const inst of invidiousInstances) {
+        const localStream = `${inst}/latest_version?id=${videoId}&itag=18&local=true`;
+        if (!candidateStreamUrls.includes(localStream)) candidateStreamUrls.push(localStream);
+      }
+
+      const pipedApis = [
+        `https://pipedapi.kavin.rocks/streams/${videoId}`,
+        `https://api.piped.private.coffee/streams/${videoId}`,
+        `https://pipedapi.adminforge.de/streams/${videoId}`,
+        `https://pipedapi.drgns.space/streams/${videoId}`,
+        `https://pipedapi.smnz.de/streams/${videoId}`
+      ];
+
+      for (const pUrl of pipedApis) {
+        if (directVideoBase64) break;
+        try {
+          const r = await fetch(pUrl, {
+            headers: { 'User-Agent': 'Mozilla/5.0 DubAI-Studio/2.0' },
             signal: AbortSignal.timeout(4500)
           });
-          if (ir.ok) {
-            const ij = await ir.json();
-            const fmt = (ij?.streamingData?.formats || []).find(f => f && f.url && /mp4/i.test(f.mimeType || ''));
-            if (fmt && fmt.url) {
-              const vr = await fetch(fmt.url, {
-                headers: { Range: 'bytes=0-3300000', 'User-Agent': clientCfg.ua },
-                signal: AbortSignal.timeout(5000)
-              });
-              if (vr.status === 200 || vr.status === 206) {
-                const vbuf = Buffer.from(await vr.arrayBuffer());
-                if (vbuf.length > 25000 && vbuf.length <= 3_500_000) {
-                  directVideoBase64 = vbuf.toString('base64');
-                  directVideoMime = 'video/mp4';
+          if (!r.ok) continue;
+          const j = await r.json();
+          if (!title && j.title) title = String(j.title).trim();
+          if (!author && j.uploader) author = String(j.uploader).trim();
+          if (!description && j.description) description = String(j.description).slice(0, 1500);
+          if (j.duration && Number(j.duration) > 5) durationSec = Number(j.duration);
+
+          if (Array.isArray(j.subtitles) && j.subtitles.length && transcriptSegments.length < 2) {
+            const sub = j.subtitles.find(s => /pt/i.test(s.code || '')) || j.subtitles.find(s => /en/i.test(s.code || '')) || j.subtitles[0];
+            if (sub && sub.url) {
+              const sr = await fetch(sub.url, { signal: AbortSignal.timeout(3500) });
+              if (sr.ok) {
+                const stxt = await sr.text();
+                const cleanLines = stxt
+                  .replace(/<[^>]+>/g, ' ')
+                  .split(/\r?\n/)
+                  .map(l => l.trim())
+                  .filter(l => l.length > 8 && !/-->|WEBVTT|^\d+$/i.test(l));
+                const built = buildSegmentsFromLines(cleanLines, desiredClipsCount);
+                if (built.length >= 2) {
+                  transcriptSegments = built;
+                  hasVerbatimCaptions = /pt/i.test(sub.code || '');
                 }
               }
             }
           }
+
+          if (Array.isArray(j.videoStreams)) {
+            const mp4Stream = j.videoStreams.find(vs => !vs.videoOnly && /mp4/i.test(vs.format || vs.mimeType || '') && vs.url);
+            if (mp4Stream && mp4Stream.url) {
+              await tryDownloadFromCandidate(mp4Stream.url);
+            }
+          }
         } catch (_) {}
+      }
+
+      // Testa também as instâncias Invidious (JSON API + stream local=true)
+      for (const inst of invidiousInstances) {
+        if (directVideoBase64) break;
+        try {
+          const r = await fetch(`${inst}/api/v1/videos/${videoId}`, {
+            headers: { 'User-Agent': 'Mozilla/5.0' },
+            signal: AbortSignal.timeout(4200)
+          });
+          if (r.ok) {
+            const j = await r.json();
+            if (!title && j.title) title = String(j.title).trim();
+            if (!author && j.author) author = String(j.author).trim();
+            if (j.lengthSeconds && Number(j.lengthSeconds) > 4) durationSec = Number(j.lengthSeconds);
+            const fmt = (j.formatStreams || []).find(f => f && f.url && /mp4/i.test(f.type || f.container || ''));
+            if (fmt && fmt.url) {
+              await tryDownloadFromCandidate(`${inst}/latest_version?id=${videoId}&itag=${fmt.itag || 18}&local=true`);
+              if (!directVideoBase64) await tryDownloadFromCandidate(fmt.url);
+            }
+          }
+        } catch (_) {}
+      }
+    }
+
+    // 2.4) Motor 3: Extratores Públicos YouTube-para-MP4 (Ryzendesu, Siputzx, Agatz, Vreden, Cobalt) para contornar bloqueio de IP de datacenter!
+    if (!directVideoBase64) {
+      const externalExtractors = [
+        async () => {
+          const r = await fetch(`https://api.ryzendesu.vip/api/downloader/ytmp4?url=${encodeURIComponent(watchUrl)}&quality=360`, { signal: AbortSignal.timeout(5500) });
+          if (!r.ok) return null;
+          const j = await r.json();
+          return j?.url || j?.data?.url || j?.result?.url || null;
+        },
+        async () => {
+          const r = await fetch(`https://api.siputzx.my.id/api/d/ytmp4?url=${encodeURIComponent(watchUrl)}`, { signal: AbortSignal.timeout(5500) });
+          if (!r.ok) return null;
+          const j = await r.json();
+          return j?.data?.dl || j?.data?.url || j?.url || null;
+        },
+        async () => {
+          const r = await fetch(`https://api.agatz.xyz/api/ytmp4?url=${encodeURIComponent(watchUrl)}`, { signal: AbortSignal.timeout(5500) });
+          if (!r.ok) return null;
+          const j = await r.json();
+          return j?.data?.url || j?.data?.dl_url || j?.data?.[0]?.url || j?.url || null;
+        },
+        async () => {
+          const r = await fetch(`https://api.vreden.my.id/api/ytmp4?url=${encodeURIComponent(watchUrl)}`, { signal: AbortSignal.timeout(5500) });
+          if (!r.ok) return null;
+          const j = await r.json();
+          return j?.result?.download?.url || j?.result?.url || j?.url || null;
+        },
+        async () => {
+          for (const cobUrl of ['https://cobalt-api.kwiatekmiki.com/', 'https://cobalt-backend.canine.tools/']) {
+            try {
+              const r = await fetch(cobUrl, {
+                method: 'POST',
+                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: watchUrl, videoQuality: '360', filenameStyle: 'basic' }),
+                signal: AbortSignal.timeout(4500)
+              });
+              if (r.ok) {
+                const j = await r.json();
+                if (j && j.url) return j.url;
+              }
+            } catch (_) {}
+          }
+          return null;
+        }
+      ];
+
+      const extractedUrls = await Promise.all(externalExtractors.map(fn => fn().catch(() => null)));
+      for (const extUrl of extractedUrls) {
+        if (extUrl && typeof extUrl === 'string' && /^https?:\/\//i.test(extUrl)) {
+          if (!candidateStreamUrls.includes(extUrl)) candidateStreamUrls.push(extUrl);
+          if (!directVideoBase64) {
+            await tryDownloadFromCandidate(extUrl);
+          }
+        }
       }
     }
   }
@@ -3430,7 +3677,12 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
     timestampedSegments,
     hasVerbatimCaptions,
     directVideoBase64,
-    directVideoMime
+    directVideoMime,
+    directStreamUrl,
+    directStreamUa,
+    hasMoreVideoChunks,
+    totalVideoBytes,
+    candidateStreamUrls
   };
 }
 
@@ -3438,7 +3690,7 @@ module.exports = {
   TTS_VOICES, mockScript, mockCreateFull, mockDubResult,
   generateWithOpenAI, generateCreateFull, generateSceneImage, dubWithOpenAI, enhanceScript,
   generateAvatarPortrait, generateAvatarScript, generateAvatarVideo, detectAvatarFaceLandmarks,
-  transcribeClipSegment, analyzeViralClips, extractYoutubeVideoId, fetchYoutubeVideoInfoAndStream,
+  transcribeClipSegment, analyzeViralClips, extractYoutubeVideoId, fetchYoutubeVideoInfoAndStream, fetchVideoStreamChunk,
   chatWithFallback, ttsWithFallback, chatViaPollinations, ttsGoogle, ttsStreamElements,
   probeOpenAI, fullPipelineProbe, candidatesProbe, unorouterProbe, unorouterVideoProbe, getBody, send
 };

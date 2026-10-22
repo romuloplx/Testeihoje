@@ -1227,8 +1227,8 @@ input[type="range"]{
         <div>
           <label style="margin-top:0;font-size:11px">🎞️ AI B-Roll & Audio Polish</label>
           <select id="opusBrollMode" onchange="onChangeOpusVisualSettings()" style="padding:8px 10px;font-size:12px;margin-top:4px;background:#090b13">
-            <option value="cinema_broll" selected>✨ AI B-Roll ON + Color Grade + Voz Pro</option>
-            <option value="grade_only">🎨 Apenas Color Grade + Voz Pro</option>
+            <option value="grade_only" selected>🎨 Vídeo Original 100% + Color Grade + Voz Pro</option>
+            <option value="cinema_broll">✨ Cutaway Zoom B-Roll (Do Próprio Vídeo)</option>
             <option value="clean">📹 Original Puro</option>
           </select>
         </div>
@@ -3178,11 +3178,12 @@ function buildStereoPlanarAudio(audioBuffer, targetSr){
 
 // MOTOR PRINCIPAL ANTI-TRAVAMENTO: Hardware WebCodecs (H.264 + AAC 48kHz) + Mp4Muxer (fastStart 'moov' no byte 0, 30.000 FPS cravados!)
 // Zero quadros perdidos mesmo em celulares intermediários — roda liso em qualquer Galeria Android, Fotos iPhone, WhatsApp, Reels e TikTok!
-async function encodeSmoothMp4WithWebCodecs({drawFn, audioBuffer, width=1280, height=720, durationSec=10, alsoPlay=[], onProgress}){
+async function encodeSmoothMp4WithWebCodecs({drawFn, audioBuffer, width=1280, height=720, durationSec=10, startOffsetSec=0, alsoPlay=[], onProgress}){
   if(!window.Mp4Muxer || !window.VideoEncoder || !window.VideoFrame) return null;
   const W = Math.max(2, Math.floor(width / 2) * 2);
   const H = Math.max(2, Math.floor(height / 2) * 2);
   const FPS = 30;
+  const targetStart = Math.max(0, Number(startOffsetSec) || 0);
 
   // 1) Seleciona perfil H.264 acelerado por hardware 100% compatível com Galeria Android + iPhone
   let chosenVideoCfg = null;
@@ -3294,16 +3295,16 @@ async function encodeSmoothMp4WithWebCodecs({drawFn, audioBuffer, width=1280, he
       }
     }
   } else {
-    // MODO B: Captura fluida de vídeo nativo (Dublagem) com requestVideoFrameCallback + timestamps reais por frame (zero engasgo e zero delay!)
+    // MODO B: Captura fluida de vídeo nativo (Dublagem & Cortes OpusClip) com requestVideoFrameCallback + timestamps reais por frame (zero engasgo e zero delay!)
     const primaryVid = alsoPlay[0];
     for(const m of alsoPlay){
       m.muted = true;
       m.playbackRate = 1;
       await new Promise(res => {
-        if(m.readyState >= 3 && Math.abs(m.currentTime) < 0.04) return res();
+        if(m.readyState >= 3 && Math.abs((m.currentTime || 0) - targetStart) < 0.05) return res();
         const done = () => { m.removeEventListener('seeked', done); res(); };
         m.addEventListener('seeked', done);
-        try{ m.currentTime = 0; }catch(e){ res(); }
+        try{ m.currentTime = targetStart; }catch(e){ res(); }
         setTimeout(res, 1000);
       });
     }
@@ -3354,7 +3355,8 @@ async function encodeSmoothMp4WithWebCodecs({drawFn, audioBuffer, width=1280, he
 
       function encodeCurrentFrame(mediaSec){
         if(finished || videoErr){ finishCapture(); return; }
-        const mediaT = Math.max(0, isFinite(mediaSec) ? mediaSec : (primaryVid.currentTime || 0));
+        const rawT = isFinite(mediaSec) ? mediaSec : (primaryVid.currentTime || targetStart);
+        const mediaT = Math.max(0, rawT - targetStart);
         if(mediaT >= durationSec - 0.02 || primaryVid.ended){
           finishCapture();
           return;
@@ -3378,7 +3380,8 @@ async function encodeSmoothMp4WithWebCodecs({drawFn, audioBuffer, width=1280, he
 
       watchdog = setInterval(() => {
         if(finished || videoErr){ finishCapture(); return; }
-        if(primaryVid.ended || (primaryVid.currentTime || 0) >= durationSec - 0.02){
+        const curRel = Math.max(0, (primaryVid.currentTime || targetStart) - targetStart);
+        if(primaryVid.ended || curRel >= durationSec - 0.02){
           finishCapture();
         } else if(primaryVid.paused && !backpressurePaused){
           primaryVid.play().catch(()=>{});
@@ -3399,7 +3402,7 @@ async function encodeSmoothMp4WithWebCodecs({drawFn, audioBuffer, width=1280, he
       } else {
         const pump = async () => {
           if(finished || videoErr){ finishCapture(); return; }
-          encodeCurrentFrame(primaryVid.currentTime || 0);
+          encodeCurrentFrame(primaryVid.currentTime || targetStart);
           await drainBackpressureIfNeeded();
           if(!finished) setTimeout(pump, 16);
         };
@@ -3417,11 +3420,12 @@ async function encodeSmoothMp4WithWebCodecs({drawFn, audioBuffer, width=1280, he
   return new Blob([muxTarget.buffer], { type: 'video/mp4' });
 }
 
-async function recordCanvasVideo({drawFn, audioEl, audioBuffer, width=1280, height=720, durationSec, alsoPlay=[], onProgress}){
+async function recordCanvasVideo({drawFn, audioEl, audioBuffer, width=1280, height=720, durationSec, startOffsetSec=0, alsoPlay=[], onProgress}){
+  const targetStart = Math.max(0, Number(startOffsetSec) || 0);
   // 1ª OPÇÃO PREFERENCIAL: Motor MP4 Nativo Fast-Start 30 FPS cravados via Hardware WebCodecs + Mp4Muxer (zero travamento na Galeria!)
   if(audioBuffer || (!audioEl && !audioBuffer)){
     try{
-      const smoothMp4 = await encodeSmoothMp4WithWebCodecs({ drawFn, audioBuffer, width, height, durationSec, alsoPlay, onProgress });
+      const smoothMp4 = await encodeSmoothMp4WithWebCodecs({ drawFn, audioBuffer, width, height, durationSec, startOffsetSec: targetStart, alsoPlay, onProgress });
       if(smoothMp4 && smoothMp4.size > 1000){
         return smoothMp4;
       }
@@ -3462,10 +3466,10 @@ async function recordCanvasVideo({drawFn, audioEl, audioBuffer, width=1280, heig
     m.muted = true;
     m.playbackRate = 1;
     await new Promise(res => {
-      if(m.readyState >= 3 && Math.abs(m.currentTime) < 0.04) return res();
+      if(m.readyState >= 3 && Math.abs((m.currentTime || 0) - targetStart) < 0.05) return res();
       const done = () => { m.removeEventListener('seeked', done); res(); };
       m.addEventListener('seeked', done);
-      try{ m.currentTime = 0; }catch(e){ res(); }
+      try{ m.currentTime = targetStart; }catch(e){ res(); }
       setTimeout(res, 900);
     });
   }
@@ -3484,7 +3488,7 @@ async function recordCanvasVideo({drawFn, audioEl, audioBuffer, width=1280, heig
     audioStartCtxTime = recAudioCtx.currentTime;
     bufSrc.start(0);
   } else if(audioEl){
-    audioEl.currentTime=0; try{ await audioEl.play(); }catch(e){}
+    audioEl.currentTime = targetStart; try{ await audioEl.play(); }catch(e){}
   }
 
   const primaryVid = alsoPlay[0] || null;
@@ -3497,12 +3501,12 @@ async function recordCanvasVideo({drawFn, audioEl, audioBuffer, width=1280, heig
         ? (recAudioCtx.currentTime - audioStartCtxTime)
         : -1;
       let t;
-      if(primaryVid && !primaryVid.paused && isFinite(primaryVid.currentTime) && (wallElapsed < 0.25 || primaryVid.currentTime > 0.01)){
-        t = primaryVid.currentTime;
+      if(primaryVid && !primaryVid.paused && isFinite(primaryVid.currentTime) && (wallElapsed < 0.25 || primaryVid.currentTime > targetStart + 0.01)){
+        t = Math.max(0, primaryVid.currentTime - targetStart);
       } else if(acElapsed > 0.02 && Math.abs(acElapsed - wallElapsed) < 1.5){
         t = acElapsed;
-      } else if(audioEl && !audioEl.paused && isFinite(audioEl.currentTime) && audioEl.currentTime > 0.01){
-        t = audioEl.currentTime;
+      } else if(audioEl && !audioEl.paused && isFinite(audioEl.currentTime) && audioEl.currentTime > targetStart + 0.01){
+        t = Math.max(0, audioEl.currentTime - targetStart);
       } else {
         t = wallElapsed;
       }
@@ -7049,7 +7053,215 @@ async function importYoutubeIntoDub(){
   }
 }
 
-// Puxa o vídeo pelo link do YouTube (ou URL de vídeo) e prepara o stream + transcrição real para os cortes virais!
+// Converte base64 em Uint8Array de forma rápida
+function b64ToUint8Array(b64){
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for(let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+// Baixa chunks adicionais de um stream MP4 via /api/clips (stream_chunk) para montar o vídeo original completo
+async function downloadVideoChunksViaProxy(streamUrl, ua, initialBytes, maxChunks = 3){
+  const chunks = initialBytes ? [initialBytes] : [];
+  let offset = initialBytes ? initialBytes.byteLength : 0;
+  const CHUNK_SIZE = 3145728; // 3 MB por chunk
+  let totalSize = null;
+
+  for(let c = 0; c < maxChunks; c++){
+    try{
+      const r = await fetch('/api/clips', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'stream_chunk',
+          streamUrl,
+          startByte: offset,
+          endByte: offset + CHUNK_SIZE - 1,
+          ua: ua || undefined
+        })
+      });
+      if(!r.ok) break;
+      const j = await r.json();
+      if(!j || !j.chunkBase64) break;
+      const arr = b64ToUint8Array(j.chunkBase64);
+      if(arr.byteLength < 4096) break;
+      chunks.push(arr);
+      offset += arr.byteLength;
+      if(j.totalSize) totalSize = j.totalSize;
+      if(!j.hasMore || (totalSize && offset >= totalSize)) break;
+    }catch(_){
+      break;
+    }
+  }
+  if(!chunks.length) return null;
+  const blob = new Blob(chunks, { type: 'video/mp4' });
+  return { blob, bytesLoaded: offset, totalSize };
+}
+
+// Quando o IP de datacenter do servidor encontra bloqueio no YouTube, o próprio navegador do usuário (IP residencial) busca o stream MP4 real!
+async function downloadRealYoutubeVideoInBrowser(videoId, rawUrl, serverCandidates = []){
+  const watchUrl = videoId ? `https://www.youtube.com/watch?v=${videoId}` : rawUrl;
+  const candidateUrls = Array.isArray(serverCandidates) ? [...serverCandidates] : [];
+
+  if(videoId){
+    // 1) Consulta extratores CORS direto pelo IP residencial do navegador em paralelo
+    const browserExtractors = [
+      async () => {
+        for(const pApi of [
+          `https://pipedapi.kavin.rocks/streams/${videoId}`,
+          `https://api.piped.private.coffee/streams/${videoId}`,
+          `https://pipedapi.adminforge.de/streams/${videoId}`,
+          `https://pipedapi.drgns.space/streams/${videoId}`
+        ]){
+          try{
+            const r = await fetch(pApi, { signal: AbortSignal.timeout(4500) });
+            if(!r.ok) continue;
+            const j = await r.json();
+            const vs = (j.videoStreams || []).find(s => !s.videoOnly && /mp4/i.test(s.format || s.mimeType || '') && s.url);
+            if(vs && vs.url) return vs.url;
+          }catch(_){}
+        }
+        return null;
+      },
+      async () => {
+        for(const inv of ['https://inv.nadeko.net', 'https://invidious.nerdvpn.de', 'https://yewtu.be', 'https://inv.tux.pizza']){
+          try{
+            const r = await fetch(`${inv}/api/v1/videos/${videoId}`, { signal: AbortSignal.timeout(4500) });
+            if(!r.ok) continue;
+            const j = await r.json();
+            const fmt = (j.formatStreams || []).find(f => f && f.url && /mp4/i.test(f.type || f.container || ''));
+            if(fmt && fmt.url){
+              candidateUrls.unshift(`${inv}/latest_version?id=${videoId}&itag=${fmt.itag || 18}&local=true`);
+              return fmt.url;
+            }
+          }catch(_){}
+        }
+        return null;
+      },
+      async () => {
+        try{
+          const r = await fetch(`https://api.ryzendesu.vip/api/downloader/ytmp4?url=${encodeURIComponent(watchUrl)}&quality=360`, { signal: AbortSignal.timeout(5500) });
+          if(r.ok){
+            const j = await r.json();
+            return j?.url || j?.data?.url || j?.result?.url || null;
+          }
+        }catch(_){}
+        return null;
+      },
+      async () => {
+        try{
+          const r = await fetch(`https://api.siputzx.my.id/api/d/ytmp4?url=${encodeURIComponent(watchUrl)}`, { signal: AbortSignal.timeout(5500) });
+          if(r.ok){
+            const j = await r.json();
+            return j?.data?.dl || j?.data?.url || j?.url || null;
+          }
+        }catch(_){}
+        return null;
+      },
+      async () => {
+        try{
+          const r = await fetch(`https://api.agatz.xyz/api/ytmp4?url=${encodeURIComponent(watchUrl)}`, { signal: AbortSignal.timeout(5500) });
+          if(r.ok){
+            const j = await r.json();
+            return j?.data?.url || j?.data?.dl_url || j?.url || null;
+          }
+        }catch(_){}
+        return null;
+      }
+    ];
+
+    const found = await Promise.all(browserExtractors.map(fn => fn().catch(() => null)));
+    found.forEach(u => {
+      if(u && typeof u === 'string' && !candidateUrls.includes(u)) candidateUrls.unshift(u);
+    });
+  }
+
+  // 2) Tenta baixar o vídeo MP4 real (direto via fetch CORS ou via proxy em chunks de 3MB)
+  for(const candUrl of candidateUrls){
+    if(!candUrl) continue;
+    // Tentativa A: Fetch direto no navegador (funciona em streams com CORS aberto como Invidious ?local=true, Piped, Ryzendesu, CDN)
+    try{
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 7500);
+      const r = await fetch(candUrl, { signal: ctrl.signal });
+      clearTimeout(timer);
+      if(r.ok || r.status === 206){
+        const ctype = String(r.headers.get('content-type') || '').toLowerCase();
+        if(!ctype.includes('text/html') && !ctype.includes('application/json')){
+          const chunks = [];
+          let loaded = 0;
+          const maxBytes = 12 * 1024 * 1024; // Até 12 MB de vídeo MP4 real
+          if(r.body && r.body.getReader){
+            const reader = r.body.getReader();
+            while(true){
+              const { done, value } = await reader.read();
+              if(done) break;
+              if(value && value.byteLength){
+                chunks.push(value);
+                loaded += value.byteLength;
+                if(loaded >= maxBytes){
+                  try{ await reader.cancel(); }catch(_){}
+                  break;
+                }
+              }
+            }
+          } else {
+            const ab = await r.arrayBuffer();
+            loaded = ab.byteLength;
+            chunks.push(new Uint8Array(ab));
+          }
+          if(loaded > 25000){
+            return { blob: new Blob(chunks, { type: 'video/mp4' }), bytesLoaded: loaded, totalSize: null };
+          }
+        }
+      }
+    }catch(_){}
+
+    // Tentativa B: Baixa via /api/clips (stream_chunk) em chunks de 3MB para contornar CORS
+    const proxied = await downloadVideoChunksViaProxy(candUrl, null, null, 3);
+    if(proxied && proxied.blob && proxied.blob.size > 25000){
+      return proxied;
+    }
+  }
+  return null;
+}
+
+// Captura ao vivo o vídeo real em reprodução na aba caso o usuário queira gravar de um vídeo protegido do YouTube (NUNCA usa foto estática!)
+async function captureLiveYoutubeVideoForOpus(ytId, ytTitle){
+  try{
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia){
+      toast('Selecione o arquivo .MP4 original no computador/celular.', 'warn');
+      document.getElementById('opusVideoInput')?.click();
+      return;
+    }
+    toast('🎥 Selecione "Esta Aba" e marque "Compartilhar áudio da aba" para capturar o vídeo original em movimento!');
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: { frameRate: 30 },
+      audio: true,
+      preferCurrentTab: true
+    });
+    showStatus('opusStatus', '🔴 Gravando o vídeo original em movimento por 18 segundos (ou clique em Parar compartilhamento quando quiser)...', 'info');
+    const mime = pickRecorderMime() || 'video/webm';
+    const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 4_000_000 });
+    const chunks = [];
+    rec.ondataavailable = e => { if(e.data && e.data.size) chunks.push(e.data); };
+    const stopped = new Promise(res => { rec.onstop = res; });
+    stream.getVideoTracks()[0].onended = () => { if(rec.state === 'recording') rec.stop(); };
+    rec.start(250);
+    setTimeout(() => { if(rec.state === 'recording') rec.stop(); }, 18000);
+    await stopped;
+    stream.getTracks().forEach(t => t.stop());
+    if(chunks.length){
+      const blob = new Blob(chunks, { type: mime.split(';')[0] });
+      loadOpusVideoFile(blob, `${ytTitle || 'youtube-original'}.mp4`, false);
+    }
+  }catch(e){
+    showStatus('opusStatus', '⚠️ Captura cancelada. Você também pode enviar o arquivo .MP4 diretamente.', 'warn');
+  }
+}
+
+// Puxa o VÍDEO ORIGINAL REAL pelo link do YouTube (ou URL de vídeo) — NUNCA cria vídeo com foto estática!
 async function importOpusVideoFromUrl(autoRunAnalysis = true){
   const urlInp = document.getElementById('opusYoutubeUrl');
   const rawUrl = (urlInp ? urlInp.value : '').trim();
@@ -7061,13 +7273,13 @@ async function importOpusVideoFromUrl(autoRunAnalysis = true){
 
   const fetchBtn = document.getElementById('opusFetchUrlBtn');
   const mainBtn = document.getElementById('opusAnalyzeBtn');
-  if(fetchBtn){ fetchBtn.disabled = true; fetchBtn.textContent = '⏳ Puxando vídeo do YouTube...'; }
+  if(fetchBtn){ fetchBtn.disabled = true; fetchBtn.textContent = '⏳ Baixando vídeo original...'; }
   if(mainBtn) mainBtn.disabled = true;
 
   document.getElementById('opusProgress').classList.add('show');
   setProgress('opusProgressFill', 15);
   setStep(['op1','op2','op3','op4'], 0);
-  showStatus('opusStatus', '🔗 Conectando ao YouTube e puxando vídeo, cenas e transcrição pelo link...', 'info');
+  showStatus('opusStatus', '📥 [1/4] Conectando ao YouTube e baixando o arquivo de VÍDEO ORIGINAL (.MP4 em movimento)...', 'info');
 
   try{
     const clipPrompt = (document.getElementById('opusPrompt')||{}).value || '';
@@ -7104,115 +7316,97 @@ async function importOpusVideoFromUrl(autoRunAnalysis = true){
             `<div style="font-size:11.5px;color:#94a3b8;margin-top:2px">📺 Canal: <b>${escapeHtml(ytAuthor)}</b>${ytId ? ` • ID: <code>${escapeHtml(ytId)}</code>` : ''}${chapInfo}</div>` +
             `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:5px">` +
               `<span style="font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px;background:#064e3b;color:#a7f3d0">✅ ${capBadge}</span>` +
-              `<span style="font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px;background:#14532d;color:#bbf7d0">🚫 100% Sem Marca d'Água</span>` +
+              `<span style="font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px;background:#14532d;color:#bbf7d0">🎬 Vídeo Original MP4 • Sem Marca d'Água</span>` +
             `</div>` +
           `</div>` +
         `</div>`;
     }
 
     setProgress('opusProgressFill', 35);
+    opusState.ytFrameBitmaps = [];
 
-    // Decodifica os frames reais em alta definição do YouTube em ImageBitmaps 100% livres de CORS (também usados pelo AI B-Roll!)
-    const frameBitmaps = [];
-    if(Array.isArray(info.framesBase64)){
-      for(const b64Url of info.framesBase64){
-        try{
-          const b = await (await fetch(b64Url)).blob();
-          const bmp = await createImageBitmap(b);
-          if(bmp) frameBitmaps.push(bmp);
-        }catch(_){}
+    let finalVideoBlob = null;
+    let totalStreamBytes = info.totalVideoBytes || null;
+
+    // 1) Se o servidor já trouxe o primeiro chunk do MP4 real, baixa chunks extras (até ~12MB) para ter o vídeo completo em movimento!
+    if(info.directVideoBase64){
+      const firstChunk = b64ToUint8Array(info.directVideoBase64);
+      if(info.hasMoreVideoChunks && info.directStreamUrl){
+        showStatus('opusStatus', `📥 [1/4] Baixando partes adicionais do vídeo original "${ytTitle}" em alta velocidade...`, 'info');
+        const fullDl = await downloadVideoChunksViaProxy(info.directStreamUrl, info.directStreamUa, firstChunk, 3);
+        if(fullDl && fullDl.blob){
+          finalVideoBlob = fullDl.blob;
+          if(fullDl.totalSize) totalStreamBytes = fullDl.totalSize;
+        }
+      }
+      if(!finalVideoBlob){
+        finalVideoBlob = new Blob([firstChunk], { type: info.directVideoMime || 'video/mp4' });
       }
     }
-    opusState.ytFrameBitmaps = frameBitmaps;
 
-    // 1) Se o backend já trouxe stream MP4 direto, carrega imediatamente!
-    if(info.directVideoBase64){
-      const bin = atob(info.directVideoBase64);
-      const bytes = new Uint8Array(bin.length);
-      for(let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-      const vBlob = new Blob([bytes], { type: info.directVideoMime || 'video/mp4' });
-      loadOpusVideoFile(vBlob, `${ytTitle}.mp4`);
-      opusState.importedUrl = rawUrl;
-      opusState.ytTranscriptSegments = Array.isArray(info.transcriptSegments) ? info.transcriptSegments : null;
-      opusState.whisperSegments = Array.isArray(info.timestampedSegments) && info.timestampedSegments.length ? info.timestampedSegments : null;
-    } else {
-      // 2) Constrói o stream HD reproduzível, 100% LIMPO (SEM MARCA D'ÁGUA) e livre de CORS usando os frames reais do YouTube + voz neural travada!
-      showStatus('opusStatus', `[1/4] Preparando stream HD sem marca d'água e sincronia vocal de "${ytTitle}"...`, 'info');
-      const segs = (Array.isArray(info.transcriptSegments) && info.transcriptSegments.length)
-        ? info.transcriptSegments.slice(0, Math.max(3, desiredClipsCount))
-        : [`Olha esse momento incrível do vídeo ${ytTitle} no canal ${ytAuthor}!`];
-
-      const voice = (document.getElementById('dubVoice')||{}).value || 'onyx';
-      const AC = window.AudioContext || window.webkitAudioContext;
-      const decCtx = new AC();
-      const decodedSegs = await Promise.all(segs.map(async (txt) => {
-        try{
-          const tts = await fetchSceneAudio(txt, voice, 'excited');
-          if(tts && tts.blob){
-            const ab = await decCtx.decodeAudioData(await tts.blob.arrayBuffer());
-            return { text: txt, audioBuffer: ab };
-          }
-        }catch(_){}
-        return { text: txt, audioBuffer: null };
-      }));
-      await decCtx.close().catch(()=>{});
-
-      const master = buildMasterCinemaAudioBuffer(
-        decodedSegs.map((s, idx) => ({ ...s, isLastInScene: idx === decodedSegs.length - 1 })),
-        false,
-        'cinematic'
-      );
-
-      const totalDur = Math.max(12, master.totalDuration || 36);
-      const drawYtStream = (ctx, t) => {
-        const W = ctx.canvas.width, H = ctx.canvas.height;
-        ctx.fillStyle = '#070a14';
-        ctx.fillRect(0, 0, W, H);
-        if(frameBitmaps.length){
-          const segIndex = Math.min(frameBitmaps.length - 1, Math.floor((t / totalDur) * frameBitmaps.length));
-          const bmp = frameBitmaps[segIndex];
-          const nextBmp = frameBitmaps[(segIndex + 1) % frameBitmaps.length];
-          const localP = ((t / totalDur) * frameBitmaps.length) % 1;
-          const moves = ['zoomIn', 'panRight', 'dollyIn', 'panLeft'];
-          drawSceneryWithCamera(ctx, bmp, W, H, localP, moves[segIndex % moves.length], 1, t);
-          // Cross-dissolve cinematográfico suave entre tomadas sem nenhuma marca d'água!
-          if(localP > 0.88 && nextBmp && nextBmp !== bmp){
-            const alpha = (localP - 0.88) / 0.12;
-            drawSceneryWithCamera(ctx, nextBmp, W, H, 0, moves[(segIndex + 1) % moves.length], alpha, t);
-          }
-        }
-      };
-
-      const ytBlob = await recordCanvasVideo({
-        drawFn: drawYtStream,
-        audioBuffer: master.audioBuffer,
-        width: 960,
-        height: 540,
-        durationSec: totalDur
-      });
-
-      loadOpusVideoFile(ytBlob, `${ytTitle}.mp4`, true);
-      opusState.durationSec = totalDur;
-      opusState.importedUrl = rawUrl;
-      opusState.ytFrameBitmaps = frameBitmaps;
-      opusState.ytTranscriptSegments = master.segments.map(seg => ({
-        startSec: Number(seg.start.toFixed(1)),
-        endSec: Number(seg.end.toFixed(1)),
-        energyScore: 0.97,
-        text: seg.text
-      }));
-      opusState.whisperSegments = master.segments.map(seg => ({
-        inicio: Number(seg.start.toFixed(2)),
-        fim: Number(seg.end.toFixed(2)),
-        texto: seg.text
-      }));
+    // 2) Se o servidor não conseguiu o binário direto (ex: bloqueio de IP no YouTube), busca o MP4 real direto pelo navegador do usuário!
+    if(!finalVideoBlob){
+      showStatus('opusStatus', `📥 [1/4] Extraindo stream MP4 original de "${ytTitle}" via rotas diretas...`, 'info');
+      const browserDl = await downloadRealYoutubeVideoInBrowser(ytId, rawUrl, info.candidateStreamUrls || []);
+      if(browserDl && browserDl.blob){
+        finalVideoBlob = browserDl.blob;
+        if(browserDl.totalSize) totalStreamBytes = browserDl.totalSize;
+      }
     }
 
-    toast('✅ Vídeo do YouTube puxado com sucesso!');
+    // 3) Se o vídeo tiver proteção estrita do YouTube contra download direto, NUNCA cria vídeo de foto estática — avisa e oferece captura ao vivo do vídeo real!
+    if(!finalVideoBlob){
+      if(card && ytId){
+        card.innerHTML +=
+          `<div style="margin-top:12px;padding:12px;border-radius:12px;background:#131829;border:1px solid #f59e0b88">` +
+            `<div style="font-size:12.5px;color:#fde68a;font-weight:800;margin-bottom:8px">⚠️ O YouTube protegeu o download automático direto deste vídeo específico. Assista ao vídeo original abaixo e clique em "🎥 Capturar Vídeo Original em Reprodução" ou envie o arquivo .MP4:</div>` +
+            `<div style="position:relative;width:100%;max-width:480px;aspect-ratio:16/9;border-radius:10px;overflow:hidden;border:1px solid #334155;margin-bottom:10px">` +
+              `<iframe src="https://www.youtube.com/embed/${escapeHtml(ytId)}?autoplay=1&playsinline=1" style="width:100%;height:100%;border:0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>` +
+            `</div>` +
+            `<div style="display:flex;gap:8px;flex-wrap:wrap">` +
+              `<button type="button" onclick="captureLiveYoutubeVideoForOpus('${escapeHtml(ytId)}', ${JSON.stringify(ytTitle)})" style="padding:8px 14px;font-size:12px;font-weight:900;border-radius:9px;border:1px solid #22c55e;background:#16a34a;color:#fff;cursor:pointer">🎥 Capturar Vídeo Original em Reprodução</button>` +
+              `<button type="button" class="ghost" onclick="document.getElementById('opusVideoInput').click()" style="padding:8px 14px;font-size:12px">📂 Enviar Arquivo .MP4 Original</button>` +
+            `</div>` +
+          `</div>`;
+      }
+      showStatus('opusStatus', '⚠️ O YouTube bloqueou o download direto do arquivo MP4 deste link. Clique em "🎥 Capturar Vídeo Original em Reprodução" acima ou envie o arquivo .MP4 (nunca usamos foto estática!).', 'warn');
+      return false;
+    }
+
+    // 4) Carrega o VÍDEO ORIGINAL REAL (.MP4) no monitor e aguarda os metadados reais do <video> antes de cortar!
+    loadOpusVideoFile(finalVideoBlob, `${ytTitle}.mp4`, true);
+    opusState.importedUrl = rawUrl;
+    opusState.ytTranscriptSegments = Array.isArray(info.transcriptSegments) ? info.transcriptSegments : null;
+    opusState.whisperSegments = Array.isArray(info.timestampedSegments) && info.timestampedSegments.length ? info.timestampedSegments : null;
+
+    const v = document.getElementById('opusSourceVideo');
+    if(v){
+      await new Promise(res => {
+        if(v.readyState >= 1 && v.duration > 0) return res();
+        const done = () => { v.removeEventListener('loadedmetadata', done); res(); };
+        v.addEventListener('loadedmetadata', done, { once: true });
+        setTimeout(res, 2500);
+      });
+      const rawVidDur = (isFinite(v.duration) && v.duration > 0) ? v.duration : (info.durationSec || 42);
+      // Se o vídeo for muito longo e baixamos os primeiros ~12MB (partial faststart MP4), limita durationSec à parte efetivamente baixada para que nenhum corte congele!
+      if(totalStreamBytes && totalStreamBytes > finalVideoBlob.size * 1.05){
+        const playableRatio = Math.min(1, (finalVideoBlob.size / totalStreamBytes) * 0.92);
+        opusState.durationSec = Math.max(12, Math.floor(rawVidDur * playableRatio));
+      } else {
+        opusState.durationSec = rawVidDur;
+      }
+      // Filtra whisperSegments para caber dentro da duração reproduzível do vídeo baixado
+      if(Array.isArray(opusState.whisperSegments) && opusState.whisperSegments.length){
+        const validSegs = opusState.whisperSegments.filter(s => s.inicio < opusState.durationSec - 1);
+        if(validSegs.length >= 2) opusState.whisperSegments = validSegs;
+      }
+    }
+
+    toast('✅ Vídeo original do YouTube carregado com sucesso!');
     if(autoRunAnalysis){
       await runOpusClipAnalysis(true);
     } else {
-      showStatus('opusStatus', `✅ Vídeo "${ytTitle}" carregado pelo link! Clique em "✂️ Encontrar Melhores Cortes Virais Agora".`, 'success');
+      showStatus('opusStatus', `✅ Vídeo original "${ytTitle}" (${fmtHumanBytes(finalVideoBlob.size)}) carregado! Clique em "⚡ Get clips in 1 click".`, 'success');
     }
     return true;
   }catch(e){
@@ -8052,8 +8246,9 @@ function drawOpusReframedFrame(ctx, videoEl, clip, relSec){
   }
 
   // 2) AI B-ROLL AUTOMÁTICO (Cutaway Visual Dinâmico no meio do corte, estilo OpusClip Pro!)
+  // 2) CUTAWAY DE DETALHE DO PRÓPRIO VÍDEO EM MOVIMENTO (Sem nenhuma foto estática!)
   const clipProg = relSec / clipDur;
-  if(brollMode === 'cinema_broll' && W <= H && clipDur >= 5 && clipProg >= 0.34 && clipProg <= 0.60){
+  if(brollMode === 'cinema_broll' && W <= H && clipDur >= 5 && clipProg >= 0.34 && clipProg <= 0.60 && videoEl && vw > 0 && vh > 0){
     const brollAlpha = Math.min(1, Math.min((clipProg - 0.34) / 0.04, (0.60 - clipProg) / 0.04));
     if(brollAlpha > 0.02){
       ctx.save();
@@ -8067,22 +8262,12 @@ function drawOpusReframedFrame(ctx, videoEl, clip, relSec){
       ctx.shadowBlur = 22;
       ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 16); ctx.clip();
 
-      const brollBitmaps = opusState.ytFrameBitmaps;
-      if(Array.isArray(brollBitmaps) && brollBitmaps.length > 1){
-        const bIdx = (opusState.selectedIdx + 1) % brollBitmaps.length;
-        const bmp = brollBitmaps[bIdx];
-        const bZoom = 1.06 + (clipProg - 0.34) * 0.35;
-        const sw = bmp.width / bZoom, sh = bmp.height / bZoom;
-        const sx = (bmp.width - sw) * 0.5, sy = (bmp.height - sh) * 0.45;
-        try{ ctx.drawImage(bmp, sx, sy, sw, sh, bx, by, bw, bh); }catch(_){}
-      } else if(videoEl && vw > 0 && vh > 0){
-        // Close-up B-Roll de detalhe cinematográfico
-        const bZoom = 1.38 + (clipProg - 0.34) * 0.25;
-        const sw = vw / bZoom, sh = vh / bZoom;
-        const sx = Math.max(0, Math.min(vw - sw, vw * 0.62 - sw * 0.5));
-        const sy = Math.max(0, Math.min(vh - sh, vh * 0.36 - sh * 0.5));
-        try{ ctx.drawImage(videoEl, sx, sy, sw, sh, bx, by, bw, bh); }catch(_){}
-      }
+      // Close-up B-Roll em tempo real do próprio vídeo em reprodução (nunca usa foto!)
+      const bZoom = 1.38 + (clipProg - 0.34) * 0.25;
+      const sw = vw / bZoom, sh = vh / bZoom;
+      const sx = Math.max(0, Math.min(vw - sw, vw * 0.62 - sw * 0.5));
+      const sy = Math.max(0, Math.min(vh - sh, vh * 0.36 - sh * 0.5));
+      try{ ctx.drawImage(videoEl, sx, sy, sw, sh, bx, by, bw, bh); }catch(_){}
       ctx.restore();
 
       ctx.save();
@@ -9114,8 +9299,12 @@ async function extractOpusClipAudioBuffer(clip){
   const dur = Math.max(2, clip.endSec - clip.startSec);
   if(clip.dubbedAudioBuffer) return clip.dubbedAudioBuffer;
 
-  const brollMode = (document.getElementById('opusBrollMode')||{}).value || 'cinema_broll';
   const fullBuf = opusState.fullAudioBuffer;
+  const hasMono = opusState.mono12k && opusState.mono12k.length > 0;
+  // Se o navegador não decodificou fullAudioBuffer nem mono12k antecipadamente, retorna null para capturar o som ao vivo direto do elemento <video>!
+  if((!fullBuf || !fullBuf.length) && !hasMono) return null;
+
+  const brollMode = (document.getElementById('opusBrollMode')||{}).value || 'grade_only';
   const SR = (fullBuf && fullBuf.sampleRate) ? fullBuf.sampleRate : 24000;
   const AC = window.AudioContext || window.webkitAudioContext;
   const tmpCtx = new AC({ sampleRate: SR });
@@ -9141,7 +9330,7 @@ async function extractOpusClipAudioBuffer(clip){
         outCh[i] = Math.tanh(outCh[i] * gain * 1.12) * 0.92;
       }
     }
-  } else if(opusState.mono12k && opusState.mono12k.length > 0){
+  } else if(hasMono){
     const s0 = Math.max(0, Math.floor(clip.startSec * 12000));
     let peak = 0.001;
     for(let i = 0; i < totalSamples; i++){
@@ -9180,7 +9369,7 @@ async function extractOpusClipAudioBuffer(clip){
   return outBuf;
 }
 
-// Exporta o Corte Viral selecionado em vídeo .MP4 real a 30fps (com Auto-Reframe 9:16 + Hook Banner + Legendas Hormozi queimadas na tela!)
+// Exporta o Corte Viral selecionado em vídeo .MP4 real a 30fps (com o VÍDEO ORIGINAL EM MOVIMENTO + Auto-Reframe 9:16 + Legendas queimadas na tela!)
 async function exportSelectedOpusClipMp4(opts = {}){
   const silentExport = !!(opts && opts.silentExport);
   const clip = opusState.clips[opusState.selectedIdx];
@@ -9198,7 +9387,7 @@ async function exportSelectedOpusClipMp4(opts = {}){
   const btn = document.getElementById('opusExportMp4Btn');
   if(btn){ btn.disabled = true; btn.textContent = '⏳ Renderizando Corte Viral .MP4 (30fps)...'; }
   document.getElementById('opusProgress').classList.add('show');
-  showStatus('opusStatus', `🎬 Renderizando Corte #${clip.rank} com Auto-Reframe e Legendas Hormozi em .MP4...`, 'info');
+  showStatus('opusStatus', `🎬 Renderizando Corte #${clip.rank} a partir do vídeo original em movimento (9:16 + Legendas)...`, 'info');
 
   let exportVid = null;
   try{
@@ -9223,7 +9412,8 @@ async function exportSelectedOpusClipMp4(opts = {}){
       setTimeout(ok, 2200);
     });
 
-    exportVid.currentTime = clip.startSec;
+    const startOffset = Math.max(0, Number(clip.startSec) || 0);
+    exportVid.currentTime = startOffset;
     await new Promise(r => {
       const onS = () => { exportVid.removeEventListener('seeked', onS); r(); };
       exportVid.addEventListener('seeked', onS, { once: true });
@@ -9232,10 +9422,8 @@ async function exportSelectedOpusClipMp4(opts = {}){
 
     const mode = (document.getElementById('opusReframeMode')||{}).value || 'auto_face';
     const dim = mode === '1:1' ? { w: 720, h: 720 } : mode === '16:9' ? { w: 960, h: 540 } : { w: 540, h: 960 };
-    const clipDur = Math.max(2, clip.endSec - clip.startSec);
+    const clipDur = Math.max(2, (clip.endSec || 30) - startOffset);
     const clipAudioBuf = await extractOpusClipAudioBuffer(clip);
-
-    await exportVid.play().catch(()=>{});
 
     const drawFn = (ctx, t) => {
       drawOpusReframedFrame(ctx, exportVid, clip, t);
@@ -9244,9 +9432,12 @@ async function exportSelectedOpusClipMp4(opts = {}){
     const blob = await recordCanvasVideo({
       drawFn,
       audioBuffer: clipAudioBuf,
+      audioEl: clipAudioBuf ? null : exportVid,
       width: dim.w,
       height: dim.h,
       durationSec: clipDur,
+      startOffsetSec: startOffset,
+      alsoPlay: [exportVid],
       onProgress: p => {
         setProgress('opusProgressFill', Math.round(p * 100));
       }

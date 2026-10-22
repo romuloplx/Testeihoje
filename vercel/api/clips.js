@@ -1,4 +1,4 @@
-const { transcribeClipSegment, analyzeViralClips, fetchYoutubeVideoInfoAndStream, getBody, send } = require('./lib/ai');
+const { transcribeClipSegment, analyzeViralClips, fetchYoutubeVideoInfoAndStream, fetchVideoStreamChunk, getBody, send } = require('./lib/ai');
 
 module.exports = async (req, res) => {
   try {
@@ -11,6 +11,17 @@ module.exports = async (req, res) => {
         url: body.url,
         clipPrompt: body.clipPrompt || '',
         desiredClipsCount: body.desiredClipsCount || 4
+      });
+      if (out.error) return send(res, 400, { error: out.error });
+      return send(res, 200, out);
+    }
+
+    if (action === 'stream_chunk') {
+      const out = await fetchVideoStreamChunk({
+        streamUrl: body.streamUrl,
+        startByte: body.startByte || 0,
+        endByte: body.endByte || 3145727,
+        ua: body.ua
       });
       if (out.error) return send(res, 400, { error: out.error });
       return send(res, 200, out);
