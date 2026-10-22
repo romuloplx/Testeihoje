@@ -381,7 +381,19 @@ async function generateCreateFull({ prompt, duration, style, voice, cinemaMode =
 
     const cinemaUser = `Pedido da história/vídeo: "${prompt}"${customCharHint}\nEstilo visual: ${style} (${artStylePrompt})\nCrie os personagens da história, os cenários em múltiplos ângulos ("visual" e "actionVisual" com os personagens em ação no cenário) e os diálogos cheios de vida.`;
 
-    const res = await withRetries(() => chatWithFallback({ system: cinemaSystem, user: cinemaUser, json: true, maxTokens: 4500, preferredModel: aiModel }), 2);
+    const isValidCinemaStory = (txt) => {
+      const p = extractJson(txt);
+      return !!(p && Array.isArray(p.scenes) && p.scenes.length >= 2);
+    };
+
+    const res = await withRetries(() => chatWithFallback({
+      system: cinemaSystem,
+      user: cinemaUser,
+      json: true,
+      maxTokens: 4200,
+      preferredModel: aiModel,
+      validator: isValidCinemaStory
+    }), 2);
     if (!res.error) {
       const parsed = extractJson(res.text);
       if (parsed && Array.isArray(parsed.scenes) && parsed.scenes.length) {
@@ -578,12 +590,52 @@ async function generateSceneImage({ prompt, style, width = 1024, height = 576 })
   const targetW = Math.min(1024, Math.max(512, Number(width) || 1024));
   const targetH = Math.min(1024, Math.max(512, Number(height) || 576));
 
-  // 1) Pollinations Flux AI (Grátis, sem chave, alta fidelidade de cenário + personagens, timeout ágil)
+  // 1) Gemini 3.1 Flash Image (Google) — alta fidelidade de personagens e cenários
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      const g = await geminiImage(fullPrompt, 9000);
+      if (g) return g;
+      errors.push('gemini/image: sem imagem retornada');
+    } catch (e) { errors.push('gemini/image: ' + e.message); }
+  }
+
+  // 2) Unorouter Multi-IA Images (SDXL:free / Flux.2 / GPT-Image-2.5) — se houver chave fora de cooldown
+  const uKey = pickReadyUniKey();
+  if (uKey) {
+    for (const model of UNI_IMG_MODELS) {
+      try {
+        const r = await fetch(uniBase() + '/images/generations', {
+          method: 'POST', headers: uniHeaders(uKey),
+          body: JSON.stringify({ model, prompt: fullPrompt, n: 1, size: '1024x1024', response_format: 'b64_json' }),
+          signal: AbortSignal.timeout(9000)
+        });
+        if (r.ok) {
+          const j = await r.json();
+          const b64 = j && j.data && j.data[0] && j.data[0].b64_json;
+          const url = j && j.data && j.data[0] && j.data[0].url;
+          if (b64) return { imageBase64: b64, mime: 'image/png', model: 'unorouter/' + model };
+          if (url) {
+            const fr = await fetch(url, { signal: AbortSignal.timeout(8000) });
+            if (fr.ok) {
+              const buf = Buffer.from(await fr.arrayBuffer());
+              if (buf.length > 100) return { imageBase64: buf.toString('base64'), mime: fr.headers.get('content-type') || 'image/png', model: 'unorouter/' + model };
+            }
+          }
+          errors.push(`unorouter/${model}: resposta sem imagem`);
+        } else {
+          const txt = (await r.text().catch(() => '')).slice(0, 120);
+          errors.push(`unorouter/${model}: HTTP ${r.status}`);
+          if (r.status === 401) { _deadUniKeys.add(uKey); break; }
+          if (r.status === 429 && /allows 1 request|Too many requests/i.test(txt)) { markUniRateWindow(uKey); break; }
+        }
+      } catch (e) { errors.push(`unorouter/${model}: ${e.message}`); }
+    }
+  }
+
+  // 3) Pollinations Flux AI (Grátis, sem chave, alta fidelidade de cenário + personagens, timeout ágil)
   const ladder = [
     { model: fluxModel, w: targetW, h: targetH },
-    { model: 'flux', w: 768, h: 432 },
-    { model: 'turbo', w: 768, h: 432 },
-    { model: '', w: 640, h: 360 }
+    { model: 'turbo', w: 768, h: 432 }
   ];
   for (const opt of ladder) {
     try {
@@ -594,7 +646,7 @@ async function generateSceneImage({ prompt, style, width = 1024, height = 576 })
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
           'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8'
         },
-        signal: AbortSignal.timeout(12500)
+        signal: AbortSignal.timeout(8500)
       });
       if (r.ok) {
         const buf = Buffer.from(await r.arrayBuffer());
@@ -611,48 +663,6 @@ async function generateSceneImage({ prompt, style, width = 1024, height = 576 })
     } catch (e) {
       errors.push(`pollinations(${opt.model || 'std'}): ${e.message}`);
       if (/fetch failed|ENOTFOUND|ECONNREFUSED/i.test(e.message)) break;
-    }
-  }
-
-  // 2) Gemini (Google) — imagem da cena com timeout curto para nunca travar a serverless function
-  if (process.env.GEMINI_API_KEY) {
-    try {
-      const g = await geminiImage(fullPrompt, 10000);
-      if (g) return g;
-      errors.push('gemini/image: sem imagem retornada');
-    } catch (e) { errors.push('gemini/image: ' + e.message); }
-  }
-
-  // 3) Unorouter images — se houver chave pronta fora de cooldown
-  const uKey = pickReadyUniKey();
-  if (uKey) {
-    for (const model of UNI_IMG_MODELS) {
-      try {
-        const r = await fetch(uniBase() + '/images/generations', {
-          method: 'POST', headers: uniHeaders(uKey),
-          body: JSON.stringify({ model, prompt: fullPrompt, n: 1, size: '1024x1024', response_format: 'b64_json' }),
-          signal: AbortSignal.timeout(10000)
-        });
-        if (r.ok) {
-          const j = await r.json();
-          const b64 = j && j.data && j.data[0] && j.data[0].b64_json;
-          const url = j && j.data && j.data[0] && j.data[0].url;
-          if (b64) return { imageBase64: b64, mime: 'image/png', model: 'unorouter/' + model };
-          if (url) {
-            const fr = await fetch(url, { signal: AbortSignal.timeout(9000) });
-            if (fr.ok) {
-              const buf = Buffer.from(await fr.arrayBuffer());
-              if (buf.length > 100) return { imageBase64: buf.toString('base64'), mime: fr.headers.get('content-type') || 'image/png', model: 'unorouter/' + model };
-            }
-          }
-          errors.push(`unorouter/${model}: resposta sem imagem`);
-        } else {
-          const txt = (await r.text().catch(() => '')).slice(0, 120);
-          errors.push(`unorouter/${model}: HTTP ${r.status}`);
-          if (r.status === 401) { _deadUniKeys.add(uKey); break; }
-          if (r.status === 429 && /allows 1 request|Too many requests/i.test(txt)) { markUniRateWindow(uKey); break; }
-        }
-      } catch (e) { errors.push(`unorouter/${model}: ${e.message}`); }
     }
   }
   return { error: errors.join(' | ') || 'nenhum provedor de imagem respondeu' };
@@ -1536,25 +1546,43 @@ async function geminiGenerateTried({ body, timeout = 20000, kind = 'chat' }) {
     ].filter(Boolean).filter(id => /^gemini-/i.test(id) && notSpecial(id) && notRetired(id));
   } else {
     // Chat / Roteiro / Tradução / SEO: combina Gemini 3.1/3 + Gemma 3 27B/12B (14.400 req/dia grátis!)
+    const wantsNativeJson = !!(body && body.generationConfig && body.generationConfig.responseMimeType === 'application/json');
     const discChat = discovered.filter(id => (/^gemini-/i.test(id) || /^gemma-3-(27b|12b)-it$/i.test(id)) && notSpecial(id) && notRetired(id));
-    const pool = [
-      gemModel(),
-      'gemini-3.1-flash-lite-preview',
-      'gemma-3-27b-it',
-      'gemini-3-flash-preview',
-      'gemini-flash-lite-latest',
-      'gemma-3-12b-it',
-      'gemini-3.1-pro-preview',
-      ...discChat,
-      'gemini-pro-latest',
-      'gemini-flash-latest'
-    ].filter(Boolean).filter(id => notSpecial(id) && notRetired(id));
-    const uniquePool = [...new Set(pool)];
-    const shift = uniquePool.length > 1 ? ((_gemCursor++) % Math.min(uniquePool.length, 4)) : 0;
-    const rotated = [...uniquePool.slice(shift), ...uniquePool.slice(0, shift)];
-    candidates = (_gemBest.chat && rotated.includes(_gemBest.chat))
-      ? [_gemBest.chat, ...rotated.filter(x => x !== _gemBest.chat)]
-      : rotated;
+    if (wantsNativeJson) {
+      // Quando pede JSON estruturado (Criar História & Personagens), prioriza modelos Gemini 3.x com suporte nativo a responseMimeType='application/json'
+      const jsonFirst = [
+        gemModel(),
+        'gemini-3.1-flash-lite-preview',
+        'gemini-3-flash-preview',
+        'gemini-3.1-pro-preview',
+        'gemini-flash-lite-latest',
+        'gemini-flash-latest',
+        'gemini-pro-latest',
+        'gemma-3-27b-it',
+        'gemma-3-12b-it',
+        ...discChat
+      ].filter(Boolean).filter(id => notSpecial(id) && notRetired(id));
+      candidates = [...new Set(jsonFirst)];
+    } else {
+      const pool = [
+        gemModel(),
+        'gemini-3.1-flash-lite-preview',
+        'gemma-3-27b-it',
+        'gemini-3-flash-preview',
+        'gemini-flash-lite-latest',
+        'gemma-3-12b-it',
+        'gemini-3.1-pro-preview',
+        ...discChat,
+        'gemini-pro-latest',
+        'gemini-flash-latest'
+      ].filter(Boolean).filter(id => notSpecial(id) && notRetired(id));
+      const uniquePool = [...new Set(pool)];
+      const shift = uniquePool.length > 1 ? ((_gemCursor++) % Math.min(uniquePool.length, 4)) : 0;
+      const rotated = [...uniquePool.slice(shift), ...uniquePool.slice(0, shift)];
+      candidates = (_gemBest.chat && rotated.includes(_gemBest.chat))
+        ? [_gemBest.chat, ...rotated.filter(x => x !== _gemBest.chat)]
+        : rotated;
+    }
   }
 
   const unique = [...new Set(candidates)].filter(id => !_gemDead404.has(id) && !_gemUnsupported.has(`${kind}:${id}`));
@@ -1775,11 +1803,11 @@ function extractJson(text) {
   return null;
 }
 
-// IA Gratuita 1 (Sem Chave): Pollinations OpenAI-Compatible Multi-Model (GPT-4o-mini / DeepSeek / Mistral / Llama)
-async function chatViaPollinations({ system, user, json }) {
+// IA Gratuita 1 (Sem Chave): Pollinations OpenAI-Compatible Multi-Model (GPT-4o-large / GPT-4o-mini / DeepSeek V3 / Mistral / Llama)
+async function chatViaPollinations({ system, user, json, validator = null }) {
   const sysMsg = (system ? system : 'Você é um diretor de cinema e contador de histórias.') + (json ? '\nResponda APENAS um objeto JSON válido, sem blocos markdown e sem comentários.' : '');
   let lastErr = new Error('pollinations indisponível');
-  const polModels = ['openai', 'openai-large', 'deepseek', 'mistral', 'llama'];
+  const polModels = ['openai-large', 'openai', 'deepseek', 'mistral', 'llama'];
   for (const model of polModels) {
     try {
       const seed = Math.floor(Math.random() * 900000) + 1000;
@@ -1792,14 +1820,17 @@ async function chatViaPollinations({ system, user, json }) {
         ],
         temperature: 0.82
       };
-      if (json) payload.jsonMode = true;
+      if (json) {
+        payload.jsonMode = true;
+        payload.response_format = { type: 'json_object' };
+      }
       const r = await fetch('https://text.pollinations.ai/openai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 DubAI-Studio/2.0' },
         body: JSON.stringify(payload),
         signal: AbortSignal.timeout(22000)
       });
-      if (r.status === 429) { lastErr = new Error('HTTP 429 (limite de uso)'); await sleep(1200); continue; }
+      if (r.status === 429) { lastErr = new Error('HTTP 429 (limite de uso)'); await sleep(800); continue; }
       if (!r.ok) { lastErr = new Error('HTTP ' + r.status); continue; }
       const rawTxt = await r.text().catch(() => '');
       let text = '';
@@ -1810,6 +1841,8 @@ async function chatViaPollinations({ system, user, json }) {
         text = rawTxt.trim();
       }
       if (!text) { lastErr = new Error('resposta vazia'); continue; }
+      if (validator && !validator(text)) { lastErr = new Error(`modelo ${model} retornou estrutura incompleta`); continue; }
+      if (json && !extractJson(text)) { lastErr = new Error(`modelo ${model} retornou JSON inválido`); continue; }
       return text;
     } catch (e) {
       lastErr = e;
@@ -1823,10 +1856,11 @@ async function chatViaPollinations({ system, user, json }) {
     'https://text.pollinations.ai/' + encodeURIComponent(short)
   ]) {
     try {
-      const r = await fetch(url, { signal: AbortSignal.timeout(20000) });
+      const r = await fetch(url, { signal: AbortSignal.timeout(18000) });
       if (!r.ok) { lastErr = new Error('HTTP ' + r.status); continue; }
       const text = (await r.text()).trim();
       if (!text) { lastErr = new Error('resposta vazia'); continue; }
+      if (validator && !validator(text)) continue;
       return text;
     } catch (e) { lastErr = e; }
   }
@@ -1834,7 +1868,7 @@ async function chatViaPollinations({ system, user, json }) {
 }
 
 // IA Gratuita 2 (Sem Chave): HackClub Free AI Endpoint (Llama 3.3 70B / Qwen)
-async function chatViaHackClub({ system, user, json }) {
+async function chatViaHackClub({ system, user, json, validator = null }) {
   const sysMsg = (system ? system : 'Você é um diretor de cinema e contador de histórias.') + (json ? '\nResponda APENAS um objeto JSON válido, sem markdown.' : '');
   const r = await fetch('https://ai.hackclub.com/chat/completions', {
     method: 'POST',
@@ -1852,29 +1886,30 @@ async function chatViaHackClub({ system, user, json }) {
   const j = await r.json();
   const text = j && j.choices && j.choices[0] && j.choices[0].message ? String(j.choices[0].message.content || '').trim() : '';
   if (!text) throw new Error('resposta vazia');
+  if (validator && !validator(text)) throw new Error('estrutura JSON incompleta');
   return text;
 }
 
 // Orquestrador Multi-IA do Unorouter: puxa o modelo escolhido ou rotaciona entre as melhores IAs do router
-async function unorouterSmartChat({ system, user, json = false, preferredModel = '', maxTokens = 4500 }) {
+async function unorouterSmartChat({ system, user, json = false, preferredModel = '', maxTokens = 4500, validator = null }) {
   const uKeys = allValidUniKeys();
   if (!uKeys.length) return { error: 'unorouter: sem UNOROUTER_API_KEY' };
 
   const now = Date.now();
-  const baseList = [...UNI_CHAT_MODELS];
+  // Para tarefas JSON (Criar História & Personagens), mantém os modelos diretos (sem bloco <think>) no topo da rotação
+  const fastJsonList = ['cohere-command-a:free', 'gemini-3.1-flash-lite:free', 'agnes-2.5-flash:free'];
+  const rotIdx = (_uniCursor++) % fastJsonList.length;
+  const rotatedFast = [...fastJsonList.slice(rotIdx), ...fastJsonList.slice(0, rotIdx)];
+  const baseList = [...rotatedFast, 'deepseek-r1-distill-qwen-32b:free'];
   if (_uniModels && _uniModels.length) {
     for (const m of uniPickModels(_uniModels)) {
       if (!baseList.includes(m)) baseList.push(m);
     }
   }
 
-  // Rotaciona ponto de partida no modo automático para distribuir carga entre os modelos de elite do router
-  const rotIdx = (_uniCursor++) % baseList.length;
-  const rotated = [...baseList.slice(rotIdx), ...baseList.slice(0, rotIdx)];
-
   let orderedModels = [
-    ...rotated.filter(m => now >= (_uniModelCooldown[m] || 0)),
-    ...rotated.filter(m => now < (_uniModelCooldown[m] || 0))
+    ...baseList.filter(m => now >= (_uniModelCooldown[m] || 0)),
+    ...baseList.filter(m => now < (_uniModelCooldown[m] || 0))
   ];
   const cleanPref = String(preferredModel || '').trim();
   if (cleanPref && cleanPref !== 'auto-router' && cleanPref !== 'gemini-direct') {
@@ -1895,6 +1930,10 @@ async function unorouterSmartChat({ system, user, json = false, preferredModel =
         const text = await unorouterChat({ system, user, json, model, maxTokens, apiKey: uKey });
         if (json && !extractJson(text)) {
           errors.push(`unorouter/${model}: JSON incompleto`);
+          continue;
+        }
+        if (validator && !validator(text)) {
+          errors.push(`unorouter/${model}: cenas incompletas`);
           continue;
         }
         delete _uniModelCooldown[model];
@@ -1922,29 +1961,29 @@ async function unorouterSmartChat({ system, user, json = false, preferredModel =
 }
 
 // Chat com cadeia inteligente Multi-IA: Unorouter Multi-IA (265+ modelos) ↔ Gemini 3.1 / Gemma 3 27B → OpenAI → Pollinations GPT-4o/DeepSeek → HackClub Llama 3.3 70B
-async function chatWithFallback({ system, user, json = false, maxTokens = 8000, preferredModel = '' }) {
+async function chatWithFallback({ system, user, json = false, maxTokens = 8000, preferredModel = '', validator = null }) {
   const errors = [];
   const preferGeminiFirst = preferredModel === 'gemini-direct';
 
   // 1) Se o usuário não pediu Gemini direto, puxa PRIMEIRO o Multi-IA Router (Unorouter: Cohere Command-A + Gemini 3.1 + Agnes 2.5 + DeepSeek R1)
   if (!preferGeminiFirst && allValidUniKeys().length) {
-    const uni = await unorouterSmartChat({ system, user, json, preferredModel, maxTokens });
+    const uni = await unorouterSmartChat({ system, user, json, preferredModel, maxTokens, validator });
     if (uni && uni.text) return uni;
     if (uni && uni.error) errors.push(uni.error);
   }
 
-  // 2) Gemini 3.1 / Gemma 3 27B — alta velocidade e cota generosa (14.400 req/dia no Gemma 3!)
+  // 2) Gemini 3.1 / Gemma 3 27B — alta velocidade e suporte nativo a JSON Schema
   if (process.env.GEMINI_API_KEY) {
     try {
       const g = await geminiChat({ system, user, json, maxTokens });
-      if (g && (!json || extractJson(g.text))) return g;
-      errors.push('gemini: resposta vazia ou chave rejeitada');
+      if (g && (!json || extractJson(g.text)) && (!validator || validator(g.text))) return g;
+      errors.push('gemini: resposta incompleta ou chave em cooldown');
     } catch (e) { errors.push(e.message); }
   } else errors.push('gemini: sem GEMINI_API_KEY');
 
   // 3) Se preferGeminiFirst estava ativo e Gemini falhou, tenta o Multi-IA Router (Unorouter) agora
   if (preferGeminiFirst && allValidUniKeys().length) {
-    const uni = await unorouterSmartChat({ system, user, json, preferredModel: 'auto-router', maxTokens });
+    const uni = await unorouterSmartChat({ system, user, json, preferredModel: 'auto-router', maxTokens, validator });
     if (uni && uni.text) return uni;
     if (uni && uni.error) errors.push(uni.error);
   }
@@ -1964,6 +2003,7 @@ async function chatWithFallback({ system, user, json = false, maxTokens = 8000, 
         const c = await openai.chat.completions.create(body);
         const text = (c.choices[0].message.content || '').trim();
         if (!text) throw new Error('resposta vazia');
+        if (validator && !validator(text)) throw new Error('estrutura incompleta');
         return { text, provider: 'openai/' + model };
       } catch (e) {
         errors.push(`openai/${model}: ${(e.status ? 'HTTP ' + e.status + ' — ' : '')}${e.message}`);
@@ -1974,15 +2014,15 @@ async function chatWithFallback({ system, user, json = false, maxTokens = 8000, 
 
   // 5) Pollinations Multi-Model Free AI (GPT-4o-large / GPT-4o-mini / DeepSeek V3 / Mistral / Llama 3.3)
   try {
-    const text = await chatViaPollinations({ system, user, json });
-    return { text, provider: 'pollinations-ai(multi-llm)' };
+    const text = await chatViaPollinations({ system, user, json, validator });
+    return { text, provider: 'pollinations-ai(gpt-4o/deepseek)' };
   } catch (e) {
     errors.push('pollinations: ' + e.message);
   }
 
   // 6) HackClub Free AI (Llama 3.3 70B)
   try {
-    const text = await chatViaHackClub({ system, user, json });
+    const text = await chatViaHackClub({ system, user, json, validator });
     return { text, provider: 'hackclub-ai(llama-70b)' };
   } catch (e) {
     errors.push('hackclub: ' + e.message);

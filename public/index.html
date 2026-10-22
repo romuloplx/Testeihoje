@@ -228,7 +228,10 @@ input[type="range"]{
 <!-- CREATE -->
 <section id="create">
   <div class="card">
-    <h2>🎥 Criar História & Vídeo com IA (Personagens Vivos + Cenários em Ação)</h2>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+      <h2 style="margin:0">🎥 Criar História & Vídeo com IA (Personagens Vivos + Cenários em Ação)</h2>
+      <span style="font-size:11.5px;font-weight:800;padding:4px 10px;border-radius:999px;background:linear-gradient(135deg,#3b0764,#1e1b4b);border:1px solid #a855f7;color:#f3e8ff;box-shadow:0 0 14px rgba(168,85,247,.35)">⚡ Super-IA Cinema Ativa • 265+ IAs + Gemini 3.1 + GPT-4o + Flux 3D</span>
+    </div>
     <p>Peça qualquer história, aventura, fábula ou vídeo: a IA cria os <b>personagens com aparência consistente</b>, mostra os <b>cenários mudando com os personagens em ação</b> e dá vida aos diálogos com emoção humana real (zero narração robótica!).</p>
 
     <label>📖 Descreva a história ou o vídeo que você quer criar</label>
@@ -249,15 +252,15 @@ input[type="range"]{
       <button class="ghost" type="button" onclick="applyTemplate('ads')">📢 Comercial com Personagens</button>
     </div>
 
-    <div style="margin-top:12px">
-      <label>🤖 Motor de IA Criativa (Multi-IA Router — 265+ IAs Juntas)</label>
-      <select id="aiModel" style="border-color:#7c3aed88;background:linear-gradient(180deg,#13122a,#0d0d1d)">
-        <option value="auto-router" selected>⚡ Multi-IA Turbo (Router 265+ IAs: Cohere Command-A + Gemini 3.1 + DeepSeek R1 + Agnes 2.5 + Flux)</option>
-        <option value="cohere-command-a:free">🧠 Cohere Command-A 111B (Diretor de Histórias & Diálogos Humanos — Router)</option>
+    <div style="margin-top:12px;padding:10px 12px;border-radius:12px;background:linear-gradient(180deg,#151230,#0c0d1e);border:1px solid #8b5cf688">
+      <label style="margin-top:0;color:#e9d5ff">🤖 Super-Motor de IA Criativa (Multi-IA Ensemble: Roteiro + Personagens + Cenários)</label>
+      <select id="aiModel" style="border-color:#8b5cf6;background:#0a0b18">
+        <option value="auto-router" selected>👑 Super-Ensemble Multi-IA (Melhor IA Automática: Cohere Command-A 111B + Gemini 3.1 + GPT-4o + Agnes 2.5 + Flux 3D)</option>
+        <option value="cohere-command-a:free">🧠 Cohere Command-A 111B (Especialista em Histórias, Personagens & Diálogos Humanos — Router)</option>
         <option value="gemini-3.1-flash-lite:free">✨ Gemini 3.1 Flash (Roteiro Cinematográfico & Cenas Multi-Plano — Router)</option>
+        <option value="agnes-2.5-flash:free">🎭 Agnes 2.5 Flash (Narrativa Viva, Fábula & Emoção — Router)</option>
         <option value="deepseek-r1-distill-qwen-32b:free">🔥 DeepSeek R1 32B (Enredo Profundo, Mistério & Reviravoltas — Router)</option>
-        <option value="agnes-2.5-flash:free">🎭 Agnes 2.5 Flash (Narrativa Viva & Emoção — Router)</option>
-        <option value="gemini-direct">🌟 Google Gemini 3.1 Pro / Gemma 3 27B (Direto)</option>
+        <option value="gemini-direct">🌟 Google Gemini 3.1 Pro / Flash Direto (JSON Nativo Ultra-Rápido)</option>
       </select>
     </div>
 
@@ -1175,6 +1178,7 @@ async function createVideo(silentAutoBuild = false){
       mood: data.mood || 'adventure',
       artStylePrompt: data.artStylePrompt || '',
       cinemaMode,
+      provider: data.provider || 'Super-Ensemble Multi-IA',
       seo: data.seo || {},
       duration: duration
     };
@@ -3171,38 +3175,161 @@ async function prepareCinemaActor(char, idx, artStylePrompt, style='cinematic'){
     });
   }
 
-  const sctx = srcCv.getContext('2d');
+  const sctx = srcCv.getContext('2d', { willReadFrequently: true });
+  const wctx = workCv.getContext('2d', { willReadFrequently: true });
   const iw = loadedImg.naturalWidth || loadedImg.width || 512;
   const ih = loadedImg.naturalHeight || loadedImg.height || 512;
   const side = Math.min(iw, ih);
   const sx = (iw - side) * 0.5;
   const sy = (ih - side) * 0.35;
   sctx.drawImage(loadedImg, Math.max(0,sx), Math.max(0,sy), side, side, 0, 0, 512, 512);
+  let srcImageData = null, workImageData = null;
+  try {
+    srcImageData = sctx.getImageData(0, 0, 512, 512);
+    workImageData = wctx.createImageData(512, 512);
+    workImageData.data.set(srcImageData.data);
+  } catch (_) {}
 
   return {
     ...char,
     srcCanvas: srcCv,
     workCanvas: workCv,
+    srcImageData,
+    workImageData,
     blinkOffset: idx * 1.85,
     mouth: await detectActorMouthAndEyes(srcCv, isAi)
   };
 }
 
-// Renderiza o rosto do personagem com lip-sync anatômico em janela de cosseno (zero borda quadrada!)
+// Renderiza o rosto do personagem com Shader 2D Bilinear de Lábios & Mandíbula (mesma tecnologia ultra-natural do Avatar!)
 function renderActorLipSyncCanvas(actor, mouthOpen, mouthWide, blink){
-  if(mouthOpen <= 0.01 && blink <= 0.05) return actor.srcCanvas;
+  if(mouthOpen <= 0.008 && blink <= 0.05) return actor.srcCanvas;
 
   const wctx = actor.workCanvas.getContext('2d');
   const S = 512;
-  wctx.clearRect(0, 0, S, S);
-  wctx.drawImage(actor.srcCanvas, 0, 0, S, S);
-
   const m = actor.mouth || {};
   const mxN = Number.isFinite(m.x) ? m.x : 0.50;
   const myN = Number.isFinite(m.y) ? m.y : 0.553;
   const mwN = Number.isFinite(m.w) ? m.w : 0.132;
   const eyeYN = Number.isFinite(m.eyeY) ? m.eyeY : 0.418;
   const eyeSepN = Number.isFinite(m.eyeSep) ? m.eyeSep : 0.155;
+
+  if(mouthOpen > 0.008 && actor.srcImageData && actor.workImageData){
+    const sData = actor.srcImageData.data;
+    const dData = actor.workImageData.data;
+    dData.set(sData);
+
+    const mx = mxN * S, my = myN * S;
+    const lipRx = Math.max(16, S * mwN * (1 + (mouthWide || 0) * 0.16) * 0.54);
+    const jawRx = Math.max(lipRx * 1.68, S * 0.185);
+    const jawTop = my - S * 0.050;
+    const jawBot = Math.min(S - 2, my + S * 0.205);
+    const openCurve = Math.pow(Math.min(1, mouthOpen), 0.78);
+    const maxGap = openCurve * S * 0.058;
+    const smileLift = (mouthWide || 0) * S * 0.008 * Math.min(1, mouthOpen * 1.8);
+
+    const x0 = Math.max(1, Math.floor(mx - jawRx));
+    const x1 = Math.min(S - 2, Math.ceil(mx + jawRx));
+    const y0 = Math.max(1, Math.floor(jawTop));
+    const y1 = Math.min(S - 2, Math.ceil(jawBot));
+
+    const oralR = Math.max(12, Math.min(48, (m.oralR || 28) * 0.65));
+    const oralG = Math.max(5,  Math.min(24, (m.oralG || 10) * 0.58));
+    const oralB = Math.max(7,  Math.min(28, (m.oralB || 14) * 0.62));
+
+    for(let y = y0; y <= y1; y++){
+      const rowOff = y * S * 4;
+      for(let x = x0; x <= x1; x++){
+        const dx = x - mx;
+        const uJaw = Math.abs(dx) / jawRx;
+        if(uJaw >= 1) continue;
+        const wJawX = 0.5 * (1 + Math.cos(Math.PI * uJaw));
+        const uLip = Math.abs(dx) / lipRx;
+        const wLipX = uLip < 1 ? Math.pow(Math.max(0, 1 - uLip * uLip), 1.35) : 0;
+
+        const cornerSmile = uLip < 1.15 ? (-smileLift * Math.pow(Math.min(1, uLip), 1.4) * wJawX) : 0;
+        const localMy = my + cornerSmile;
+        const upperInnerY = localMy - maxGap * 0.25 * wLipX;
+        const lowerInnerY = localMy + maxGap * 0.75 * wLipX;
+
+        const pIdx = rowOff + x * 4;
+
+        if(wLipX > 0.02 && y > upperInnerY && y < lowerInnerY){
+          const cavH = Math.max(1.0, lowerInnerY - upperInnerY);
+          const v = (y - upperInnerY) / cavH;
+          const edgeDist = Math.min(v, 1 - v) * 2;
+          const feather = Math.min(1, edgeDist * 3.0);
+
+          const srcLipY = v < 0.5 ? localMy - 0.6 : localMy + 0.6;
+          const syClamped = Math.max(1, Math.min(S - 2, Math.round(srcLipY)));
+          const lipIdx = (syClamped * S + x) * 4;
+          const lipR = sData[lipIdx], lipG = sData[lipIdx + 1], lipB = sData[lipIdx + 2];
+
+          let inR = oralR, inG = oralG, inB = oralB;
+          const teethH = Math.min(0.32, (2.8 / Math.max(2.5, cavH)) + 0.14);
+          if(v < teethH && uLip < 0.78 && maxGap > 2.2){
+            const tArch = Math.cos((dx / (lipRx * 0.78)) * (Math.PI * 0.5));
+            const toothShade = (0.86 + 0.14 * tArch) * (1 - (v / teethH) * 0.22);
+            const toothGap = (Math.abs(Math.sin((dx / (lipRx * 0.13)) * Math.PI)) < 0.16) ? 0.88 : 1.0;
+            const tMix = Math.min(0.84, (1 - v / teethH) * tArch * Math.min(1, (maxGap - 2.0) * 0.28));
+            const tr = 236 * toothShade * toothGap;
+            const tg = 231 * toothShade * toothGap;
+            const tb = 224 * toothShade * toothGap;
+            inR = inR * (1 - tMix) + tr * tMix;
+            inG = inG * (1 - tMix) + tg * tMix;
+            inB = inB * (1 - tMix) + tb * tMix;
+          } else if(v > 0.60 && uLip < 0.68 && maxGap > 4.2){
+            const tng = Math.sin(((v - 0.60) / 0.40) * Math.PI) * Math.cos((dx / (lipRx * 0.68)) * (Math.PI * 0.5));
+            inR += 40 * tng;
+            inG += 13 * tng;
+            inB += 17 * tng;
+          }
+          const shadow = 0.58 + 0.42 * Math.sin(v * Math.PI);
+          inR *= shadow; inG *= shadow; inB *= shadow;
+
+          dData[pIdx]     = Math.round(lipR * (1 - feather) + inR * feather);
+          dData[pIdx + 1] = Math.round(lipG * (1 - feather) + inG * feather);
+          dData[pIdx + 2] = Math.round(lipB * (1 - feather) + inB * feather);
+          continue;
+        }
+
+        let srcY = y;
+        let srcX = x;
+        if(y <= upperInnerY){
+          const spanUp = Math.max(1, localMy - jawTop);
+          const tUp = Math.max(0, Math.min(1, (y - jawTop) / spanUp));
+          const wy = tUp * tUp * (3 - 2 * tUp);
+          const lift = maxGap * 0.25 * wLipX * wy;
+          srcY = y + lift;
+        } else {
+          const spanDn = Math.max(1, jawBot - lowerInnerY);
+          const tDn = Math.max(0, Math.min(1, (jawBot - y) / spanDn));
+          const wy = 0.5 * (1 - Math.cos(Math.PI * tDn));
+          const drop = maxGap * (0.75 * wLipX + 0.25 * wJawX * (1 - wLipX)) * wy;
+          srcY = y - drop;
+          srcX = x + dx * 0.025 * openCurve * wy * wJawX;
+        }
+
+        const sxC = Math.max(0, Math.min(S - 2, srcX));
+        const syC = Math.max(0, Math.min(S - 2, srcY));
+        const ix = sxC | 0, iy = syC | 0;
+        const fx = sxC - ix, fy = syC - iy;
+        const w00 = (1 - fx) * (1 - fy), w10 = fx * (1 - fy), w01 = (1 - fx) * fy, w11 = fx * fy;
+        const i00 = (iy * S + ix) * 4;
+        const i10 = i00 + 4;
+        const i01 = i00 + S * 4;
+        const i11 = i01 + 4;
+
+        dData[pIdx]     = (sData[i00] * w00 + sData[i10] * w10 + sData[i01] * w01 + sData[i11] * w11) | 0;
+        dData[pIdx + 1] = (sData[i00+1]*w00 + sData[i10+1]*w10 + sData[i01+1]*w01 + sData[i11+1]*w11) | 0;
+        dData[pIdx + 2] = (sData[i00+2]*w00 + sData[i10+2]*w10 + sData[i01+2]*w01 + sData[i11+2]*w11) | 0;
+      }
+    }
+    wctx.putImageData(actor.workImageData, 0, 0);
+  } else {
+    wctx.clearRect(0, 0, S, S);
+    wctx.drawImage(actor.srcCanvas, 0, 0, S, S);
+  }
 
   if(blink > 0.05){
     const ey = eyeYN * S, sep = eyeSepN * S, ew = S * 0.068, eh = S * 0.028 * blink;
@@ -3217,49 +3344,6 @@ function renderActorLipSyncCanvas(actor, mouthOpen, mouthWide, blink){
       wctx.drawImage(actor.srcCanvas, ex - ew, ey - S*0.038, ew*2, S*0.026, ex - ew, ey - eh, ew*2, eh*2.1);
       wctx.restore();
     }
-  }
-
-  if(mouthOpen > 0.01){
-    const mx = mxN * S, my = myN * S;
-    const lipRx = Math.max(16, S * mwN * (1 + (mouthWide || 0) * 0.22) * 0.54);
-    const jawRx = Math.max(lipRx * 1.50, S * 0.17);
-    const yTop = my - S * 0.048;
-    const yBot = my + S * 0.18;
-    const gap = Math.min(S * 0.068, Math.pow(Math.max(0, mouthOpen), 0.82) * S * 0.058);
-
-    wctx.save();
-    wctx.beginPath(); wctx.ellipse(mx, (yTop+yBot)*0.5, jawRx, (yBot-yTop)*0.5, 0, 0, Math.PI*2); wctx.clip();
-    const COLS = 20;
-    const colW = (jawRx * 2) / COLS;
-    for(let c = 0; c < COLS; c++){
-      const x0 = mx - jawRx + c * colW;
-      const u = Math.min(1, Math.abs(((x0 + colW * 0.5) - mx) / jawRx));
-      const w = 0.5 * (1 + Math.cos(Math.PI * u));
-      if(w < 0.02) continue;
-      const shiftY = gap * 0.72 * w;
-      wctx.drawImage(
-        actor.srcCanvas,
-        x0, my, colW + 0.8, (yBot - my) - shiftY,
-        x0, my + shiftY * 0.88, colW + 0.8, (yBot - my) - shiftY * 0.88
-      );
-    }
-    if(gap > 0.8){
-      const uLip = my - gap * 0.22;
-      const lLip = my + gap * 0.78;
-      const cyM = (uLip + lLip) * 0.5;
-      const ryM = Math.max(1.8, (lLip - uLip) * 0.54);
-      wctx.save();
-      const oralGrad = wctx.createRadialGradient(mx, cyM, 0.5, mx, cyM, lipRx * 0.94);
-      oralGrad.addColorStop(0, `rgba(${Math.max(10,(m.oralR||32)-10)},${Math.max(5,(m.oralG||11)-5)},${Math.max(8,(m.oralB||16)-5)},0.90)`);
-      oralGrad.addColorStop(0.68, `rgba(${m.oralR||32},${m.oralG||11},${m.oralB||16},0.62)`);
-      oralGrad.addColorStop(1, `rgba(${m.oralR||32},${m.oralG||11},${m.oralB||16},0)`);
-      wctx.fillStyle = oralGrad;
-      wctx.beginPath();
-      wctx.ellipse(mx, cyM, lipRx * 0.90, ryM, 0, 0, Math.PI * 2);
-      wctx.fill();
-      wctx.restore();
-    }
-    wctx.restore();
   }
   return actor.workCanvas;
 }
@@ -3688,27 +3772,38 @@ function makeKenBurnsDrawer(scenes, opts={}){
   };
 }
 
-// Busca imagem da cena combinando API Backend + Geração Direta Flux no Navegador (garante cenário real sempre!)
+// Busca imagem da cena combinando API Backend (Gemini 3.1 + Unorouter Flux.2/SDXL) + Geração Direta Flux no Navegador em paralelo!
 async function fetchSceneImage(promptOrScene, style, w=896, h=504){
   const promptText = typeof promptOrScene === 'string'
     ? promptOrScene
     : (promptOrScene.visual || promptOrScene.title || '');
-  try{
-    const r=await fetch('/api/scene-image',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({prompt:promptText, style, width:w, height:h})
+  const backendTask = (async () => {
+    const r = await fetch('/api/scene-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: promptText, style, width: w, height: h })
     });
-    const j=await r.json();
-    if(j&&j.imageBase64){
-      const blob=await (await fetch(`data:${j.mime||'image/png'};base64,${j.imageBase64}`)).blob();
-      return await createImageBitmap(blob);
+    const j = await r.json();
+    if(j && j.imageBase64){
+      const blob = await (await fetch(`data:${j.mime||'image/png'};base64,${j.imageBase64}`)).blob();
+      const bmp = await createImageBitmap(blob);
+      if(bmp) return bmp;
     }
-  }catch(e){ console.warn('imagem da cena backend:',e); }
-  // Fallback imediato direto da CDN de IA gratuita pelo navegador do usuário
-  const direct = await fetchFreeAiImageDirect(promptText, style, w, h);
-  if(direct) return direct;
-  return null;
+    throw new Error('sem imagem backend');
+  })();
+
+  const directTask = (async () => {
+    await new Promise(res => setTimeout(res, 1400));
+    const bmp = await fetchFreeAiImageDirect(promptText, style, w, h);
+    if(bmp) return bmp;
+    throw new Error('sem imagem direta');
+  })();
+
+  try {
+    return await Promise.any([backendTask, directTask]);
+  } catch (_) {
+    return null;
+  }
 }
 
 async function fetchSceneAudio(text,voice,emotion=''){
