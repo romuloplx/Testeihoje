@@ -2931,11 +2931,34 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
   const videoId = extractYoutubeVideoId(cleanUrl);
   let title = '';
   let author = '';
+  let description = '';
+  let keywords = [];
+  let chapters = [];
   let durationSec = 120;
   let directVideoBase64 = null;
   let directVideoMime = 'video/mp4';
   let transcriptSegments = [];
+  let hasVerbatimCaptions = false;
   const framesBase64 = [];
+
+  // Helper para limpar e agrupar linhas de legenda real em janelas naturais de 22 a 34 palavras
+  const buildSegmentsFromLines = (lines, targetCount) => {
+    const cleanText = lines
+      .map(l => String(l || '').replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim())
+      .filter(l => l.length > 2 && !/^(\[.*\]|\(.*\)|WEBVTT|\d+)$/i.test(l))
+      .join(' ');
+    const words = cleanText.split(/\s+/).filter(Boolean);
+    if (words.length < 18) return [];
+    const out = [];
+    const count = Math.max(3, Math.min(8, Number(targetCount) || 4));
+    const step = Math.max(24, Math.floor(words.length / count));
+    for (let i = 0; i < count; i++) {
+      const startWord = Math.min( Math.max(0, words.length - 28), i * step );
+      const slice = words.slice(startWord, startWord + 28).join(' ').trim();
+      if (slice.length > 15) out.push(slice);
+    }
+    return out;
+  };
 
   // Caso 1: URL direta de arquivo de vídeo (.mp4 / .webm / .mov)
   if (!videoId && /\.(mp4|webm|mov|m4v)(\?|$)/i.test(cleanUrl)) {
@@ -2955,100 +2978,172 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
     } catch (_) {}
   }
 
-  // Caso 2: Link do YouTube (watch, youtu.be, shorts, live)
+  // Caso 2: Link do YouTube (watch, youtu.be, shorts, live) — Leitura Profunda Multi-Camada
   if (videoId) {
     const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
-    // 2.1) Metadados oficiais via YouTube oEmbed / Noembed (100% confiável e instantâneo)
-    for (const oembedUrl of [
-      `https://www.youtube.com/oembed?url=${encodeURIComponent(watchUrl)}&format=json`,
-      `https://noembed.com/embed?url=${encodeURIComponent(watchUrl)}`
-    ]) {
-      if (title) break;
-      try {
-        const r = await fetch(oembedUrl, {
-          headers: { 'User-Agent': 'Mozilla/5.0 DubAI-Studio/2.0' },
-          signal: AbortSignal.timeout(5000)
-        });
-        if (r.ok) {
-          const j = await r.json();
-          if (j && j.title) title = String(j.title).trim();
-          if (j && j.author_name) author = String(j.author_name).trim();
+    // 2.1) Metadados oficiais via YouTube oEmbed / Noembed + Extração Direta da Página / Innertube em paralelo
+    await Promise.all([
+      (async () => {
+        for (const oembedUrl of [
+          `https://www.youtube.com/oembed?url=${encodeURIComponent(watchUrl)}&format=json`,
+          `https://noembed.com/embed?url=${encodeURIComponent(watchUrl)}`
+        ]) {
+          if (title && author) break;
+          try {
+            const r = await fetch(oembedUrl, {
+              headers: { 'User-Agent': 'Mozilla/5.0 DubAI-Studio/2.0' },
+              signal: AbortSignal.timeout(4500)
+            });
+            if (r.ok) {
+              const j = await r.json();
+              if (j && j.title && !title) title = String(j.title).trim();
+              if (j && j.author_name && !author) author = String(j.author_name).trim();
+            }
+          } catch (_) {}
         }
-      } catch (_) {}
-    }
+      })(),
+      (async () => {
+        // Leitura direta do ytInitialPlayerResponse (descrição completa, duração exata, palavras-chave e legendas oficiais!)
+        try {
+          const r = await fetch(`${watchUrl}&hl=pt`, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+              'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7'
+            },
+            signal: AbortSignal.timeout(5500)
+          });
+          if (r.ok) {
+            const html = await r.text();
+            const m = html.match(/ytInitialPlayerResponse\s*=\s*(\{[\s\S]+?\});\s*(?:var\s|let\s|const\s|<\/script>)/);
+            if (m && m[1]) {
+              const pr = JSON.parse(m[1]);
+              const vd = pr.videoDetails || {};
+              if (vd.title && !title) title = String(vd.title).trim();
+              if (vd.author && !author) author = String(vd.author).trim();
+              if (vd.lengthSeconds && Number(vd.lengthSeconds) > 4) durationSec = Number(vd.lengthSeconds);
+              if (vd.shortDescription) description = String(vd.shortDescription).slice(0, 1800);
+              if (Array.isArray(vd.keywords)) keywords = vd.keywords.slice(0, 18);
 
-    // 2.2) Baixa os 4 frames reais de cena do YouTube (hqdefault, hq1, hq2, hq3) em Base64 (100% livre de CORS no Canvas!)
-    const thumbUrls = [
-      `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
-      `https://i.ytimg.com/vi/${videoId}/hq1.jpg`,
-      `https://i.ytimg.com/vi/${videoId}/hq2.jpg`,
-      `https://i.ytimg.com/vi/${videoId}/hq3.jpg`
-    ];
-    const downloadedThumbs = await Promise.all(thumbUrls.map(async (tUrl) => {
-      try {
-        const r = await fetch(tUrl, {
-          headers: { 'User-Agent': 'Mozilla/5.0' },
-          signal: AbortSignal.timeout(4500)
-        });
-        if (r.ok) {
-          const buf = Buffer.from(await r.arrayBuffer());
-          if (buf.length > 1200) {
-            return `data:${r.headers.get('content-type') || 'image/jpeg'};base64,${buf.toString('base64')}`;
+              // Extrai capítulos da descrição se existirem (ex: 00:00 Introdução)
+              if (description) {
+                const chapMatches = description.match(/(?:\d{1,2}:)?\d{1,2}:\d{2}\s+[^\r\n]+/g);
+                if (chapMatches && chapMatches.length) chapters = chapMatches.slice(0, 12);
+              }
+
+              // Extrai captionTracks oficiais do YouTube (JSON3 ou XML)
+              const tracks = pr?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+              if (Array.isArray(tracks) && tracks.length) {
+                const bestTrack = tracks.find(t => /^pt/i.test(t.languageCode || ''))
+                  || tracks.find(t => /^es/i.test(t.languageCode || ''))
+                  || tracks.find(t => /^en/i.test(t.languageCode || ''))
+                  || tracks[0];
+                if (bestTrack && bestTrack.baseUrl) {
+                  const cr = await fetch(`${bestTrack.baseUrl}&fmt=json3`, { signal: AbortSignal.timeout(4000) });
+                  if (cr.ok) {
+                    const cj = await cr.json();
+                    if (cj && Array.isArray(cj.events)) {
+                      const rawLines = [];
+                      for (const ev of cj.events) {
+                        if (Array.isArray(ev.segs)) {
+                          const s = ev.segs.map(x => x.utf8 || '').join('').trim();
+                          if (s) rawLines.push(s);
+                        }
+                      }
+                      const built = buildSegmentsFromLines(rawLines, desiredClipsCount);
+                      if (built.length >= 2) {
+                        transcriptSegments = built;
+                        hasVerbatimCaptions = /^pt/i.test(bestTrack.languageCode || '');
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } catch (_) {}
+      })(),
+      (async () => {
+        // Baixa todos os frames de alta resolução reais do YouTube (maxresdefault HD, sddefault, hqdefault, hq1, hq2, hq3) 100% livres de CORS!
+        const thumbUrls = [
+          `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
+          `https://i.ytimg.com/vi/${videoId}/sddefault.jpg`,
+          `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+          `https://i.ytimg.com/vi/${videoId}/hq1.jpg`,
+          `https://i.ytimg.com/vi/${videoId}/hq2.jpg`,
+          `https://i.ytimg.com/vi/${videoId}/hq3.jpg`
+        ];
+        const downloadedThumbs = await Promise.all(thumbUrls.map(async (tUrl) => {
+          try {
+            const r = await fetch(tUrl, {
+              headers: { 'User-Agent': 'Mozilla/5.0' },
+              signal: AbortSignal.timeout(4500)
+            });
+            if (r.ok) {
+              const buf = Buffer.from(await r.arrayBuffer());
+              if (buf.length > 2200) {
+                return { len: buf.length, dataUrl: `data:${r.headers.get('content-type') || 'image/jpeg'};base64,${buf.toString('base64')}` };
+              }
+            }
+          } catch (_) {}
+          return null;
+        }));
+        const seenSizes = new Set();
+        for (const item of downloadedThumbs) {
+          if (item && !seenSizes.has(item.len)) {
+            seenSizes.add(item.len);
+            framesBase64.push(item.dataUrl);
           }
         }
-      } catch (_) {}
-      return null;
-    }));
-    downloadedThumbs.filter(Boolean).forEach(d => framesBase64.push(d));
+      })()
+    ]);
 
-    // 2.3) Tenta extrair duração real, legendas/transcrição e stream MP4 via Piped / Invidious / Innertube
+    // 2.2) Tenta extrair duração real, legendas/transcrição e stream MP4 via Piped / Invidious caso ainda precise
     const pipedApis = [
       `https://pipedapi.kavin.rocks/streams/${videoId}`,
-      `https://api.piped.private.coffee/streams/${videoId}`
+      `https://api.piped.private.coffee/streams/${videoId}`,
+      `https://pipedapi.adminforge.de/streams/${videoId}`
     ];
     for (const pUrl of pipedApis) {
+      if (transcriptSegments.length >= 3 && directVideoBase64) break;
       try {
         const r = await fetch(pUrl, {
           headers: { 'User-Agent': 'Mozilla/5.0 DubAI-Studio/2.0' },
-          signal: AbortSignal.timeout(5500)
+          signal: AbortSignal.timeout(4500)
         });
         if (!r.ok) continue;
         const j = await r.json();
         if (!title && j.title) title = String(j.title).trim();
         if (!author && j.uploader) author = String(j.uploader).trim();
+        if (!description && j.description) description = String(j.description).slice(0, 1500);
         if (j.duration && Number(j.duration) > 5) durationSec = Number(j.duration);
 
-        // Tenta pegar legenda/transcrição se disponível
-        if (Array.isArray(j.subtitles) && j.subtitles.length && !transcriptSegments.length) {
+        if (Array.isArray(j.subtitles) && j.subtitles.length && transcriptSegments.length < 2) {
           const sub = j.subtitles.find(s => /pt/i.test(s.code || '')) || j.subtitles.find(s => /en/i.test(s.code || '')) || j.subtitles[0];
           if (sub && sub.url) {
-            const sr = await fetch(sub.url, { signal: AbortSignal.timeout(4000) });
+            const sr = await fetch(sub.url, { signal: AbortSignal.timeout(3500) });
             if (sr.ok) {
               const stxt = await sr.text();
               const cleanLines = stxt
                 .replace(/<[^>]+>/g, ' ')
                 .split(/\r?\n/)
                 .map(l => l.trim())
-                .filter(l => l.length > 12 && !/-->|WEBVTT|^\d+$/i.test(l));
-              if (cleanLines.length >= 3) {
-                const chunkLen = Math.max(1, Math.ceil(cleanLines.length / 4));
-                for (let k = 0; k < 4; k++) {
-                  const txtPart = cleanLines.slice(k * chunkLen, (k + 1) * chunkLen).join(' ').slice(0, 260);
-                  if (txtPart) transcriptSegments.push(txtPart);
-                }
+                .filter(l => l.length > 8 && !/-->|WEBVTT|^\d+$/i.test(l));
+              const built = buildSegmentsFromLines(cleanLines, desiredClipsCount);
+              if (built.length >= 2) {
+                transcriptSegments = built;
+                hasVerbatimCaptions = /pt/i.test(sub.code || '');
               }
             }
           }
         }
 
-        // Se houver stream MP4 leve e curto, tenta baixar para reprodução nativa direta
         if (!directVideoBase64 && Array.isArray(j.videoStreams)) {
           const mp4Stream = j.videoStreams.find(vs => !vs.videoOnly && /mp4/i.test(vs.format || vs.mimeType || '') && vs.url);
           if (mp4Stream && mp4Stream.url) {
             const vr = await fetch(mp4Stream.url, {
-              headers: { Range: 'bytes=0-3100000', 'User-Agent': 'Mozilla/5.0' },
-              signal: AbortSignal.timeout(6000)
+              headers: { Range: 'bytes=0-3200000', 'User-Agent': 'Mozilla/5.0' },
+              signal: AbortSignal.timeout(5000)
             });
             if (vr.status === 200) {
               const vbuf = Buffer.from(await vr.arrayBuffer());
@@ -3068,22 +3163,37 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
     title = videoId ? `Vídeo YouTube (${videoId})` : 'Vídeo Importado por Link';
   }
 
-  // 3) Se o vídeo não tinha legendas públicas abertas, usa o Super-Ensemble Multi-IA para gerar os trechos falados reais sobre o tema exato do vídeo do YouTube!
-  if (transcriptSegments.length < 3) {
+  // 3) Leitura Semântica Perfeita via Super-Ensemble Multi-IA (traduz/refina legendas em outros idiomas ou extrai os trechos exatos a partir do título + descrição + capítulos reais do vídeo!)
+  if (!hasVerbatimCaptions || transcriptSegments.length < Math.max(3, Number(desiredClipsCount) || 4)) {
     try {
-      const count = Math.max(3, Math.min(6, Number(desiredClipsCount) || 4));
+      const count = Math.max(3, Math.min(8, Number(desiredClipsCount) || 4));
+      const rawRef = transcriptSegments.length ? `\nLegendas originais extraídas do vídeo:\n${transcriptSegments.join('\n')}` : '';
+      const descRef = description ? `\nDescrição real do vídeo no YouTube:\n${description.slice(0, 900)}` : '';
+      const chapRef = chapters.length ? `\nCapítulos do vídeo:\n${chapters.join(' | ')}` : '';
+      const kwRef = keywords.length ? `\nPalavras-chave: ${keywords.join(', ')}` : '';
+
       const sys = [
-        'Você é o motor de transcrição e curadoria do OpusClip IA.',
-        'Dado o título e o canal de um vídeo do YouTube, gere os melhores trechos falados (em português brasileiro natural, dinâmico e envolvente, como o apresentador falando diretamente no vídeo) para os cortes virais.',
+        'Você é o motor de Leitura Profunda e Curadoria Viral do OpusClip Pro 3.0.',
+        'Sua tarefa é ler os metadados reais, descrição, capítulos e legendas do vídeo do YouTube e extrair os melhores trechos falados em português brasileiro (como falas reais, diretas e impactantes do apresentador do vídeo) para cortes verticais 9:16.',
+        'Se houver legendas originais em outro idioma, traduza e adapte fielmente para português falado natural.',
         'Responda APENAS um objeto JSON válido neste formato:',
-        '{ "segments": [ "fala impactante do trecho 1 (20 a 32 palavras)", "fala impactante do trecho 2 (20 a 32 palavras)", "fala impactante do trecho 3 (20 a 32 palavras)", "fala impactante do trecho 4 (20 a 32 palavras)" ] }'
+        '{ "segments": [ "fala exata do corte 1 (20 a 30 palavras)", "fala exata do corte 2 (20 a 30 palavras)", "fala exata do corte 3 (20 a 30 palavras)", "fala exata do corte 4 (20 a 30 palavras)" ] }'
       ].join('\n');
-      const usr = `Título do Vídeo no YouTube: "${title}"${author ? ` | Canal: "${author}"` : ''}\nFoco pedido pelo usuário: "${clipPrompt || 'Momentos mais virais e impactantes'}"\nGere ${count} trechos falados em português brasileiro fiéis ao assunto deste vídeo.`;
+      const usr = [
+        `Título Oficial do Vídeo no YouTube: "${title}"${author ? ` | Canal: "${author}"` : ''}`,
+        `Objetivo pedido pelo usuário: "${clipPrompt || 'Encontrar os momentos mais virais, revelações e dicas práticas'}"`,
+        chapRef,
+        kwRef,
+        descRef,
+        rawRef,
+        `Gere exatamente ${count} trechos falados em português brasileiro 100% fiéis ao conteúdo deste vídeo.`
+      ].filter(Boolean).join('\n');
+
       const aiRes = await chatWithFallback({
         system: sys,
         user: usr,
         json: true,
-        maxTokens: 1200,
+        maxTokens: 1500,
         validator: txt => {
           const p = extractJson(txt);
           return !!(p && Array.isArray(p.segments) && p.segments.length >= 2);
@@ -3113,9 +3223,12 @@ async function fetchYoutubeVideoInfoAndStream({ url, clipPrompt = '', desiredCli
     url: cleanUrl,
     title,
     author: author || 'YouTube Creator',
+    description: description ? description.slice(0, 400) : '',
+    chapters,
     durationSec,
     framesBase64,
     transcriptSegments,
+    hasVerbatimCaptions,
     directVideoBase64,
     directVideoMime
   };

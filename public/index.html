@@ -829,10 +829,13 @@ input[type="range"]{
 <section id="clips" class="hidden">
   <div class="card">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px">
-      <h2 style="margin:0">✂️ OpusClip IA — Ferramenta #1 de Recorte e Edição de Vídeo AI</h2>
-      <span style="font-size:11.5px;font-weight:800;padding:4px 10px;border-radius:999px;background:linear-gradient(135deg,#064e3b,#0f172a);border:1px solid #10b981;color:#a7f3d0;box-shadow:0 0 14px rgba(16,185,129,.35)">🔥 ClipAnything™ + Virality Score™ 99 + Auto-Reframe 9:16 + Hormozi Captions</span>
+      <h2 style="margin:0">✂️ OpusClip IA Pro — Ferramenta #1 de Recorte e Edição de Vídeo AI</h2>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <span style="font-size:11.5px;font-weight:900;padding:4px 10px;border-radius:999px;background:linear-gradient(135deg,#14532d,#052e16);border:1.5px solid #22c55e;color:#bbf7d0;box-shadow:0 0 14px rgba(34,197,94,.35)">🚫 ZERO MARCA D'ÁGUA (100% LIMPO)</span>
+        <span style="font-size:11.5px;font-weight:800;padding:4px 10px;border-radius:999px;background:linear-gradient(135deg,#064e3b,#0f172a);border:1px solid #10b981;color:#a7f3d0">🔥 ClipAnything™ + Auto-Reframe 3.0 + Zoom Cuts + AI B-Roll</span>
+      </div>
     </div>
-    <p>Transforme qualquer vídeo longo (do <b>YouTube pelo link</b>, podcast, live, entrevista, aula, gameplay ou vídeo do celular/PC) em <b>múltiplos cortes verticais virais prontos para TikTok, Reels e YouTube Shorts</b>: a IA detecta os momentos de maior impacto, calcula o <b>Virality Score™ (0–99)</b>, centraliza o rosto de quem fala em <b>9:16</b> e queima <b>legendas animadas palavra por palavra com emojis</b>.</p>
+    <p>Transforme qualquer vídeo longo (do <b>YouTube pelo link</b>, podcast, live, entrevista, aula, gameplay ou vídeo do celular/PC) em <b>múltiplos cortes verticais virais com edição ultra-profissional idêntica ao OpusClip Pro e 100% SEM marca d'água</b>: leitura profunda da fala e cena, <b>Virality Score™ (0–99)</b>, <b>Auto-Reframe 9:16</b> com rastreamento ativo de quem fala, <b>Jump-Cut Zoom Dinâmico</b>, <b>AI B-Roll</b> e <b>legendas animadas sincronizadas palavra por palavra</b>.</p>
 
     <!-- 🔗 BARRA DE LINK DO YOUTUBE / URL DE VÍDEO (IGUAL AO OPUSCLIP OFICIAL) -->
     <div style="margin-top:10px;padding:14px 15px;border-radius:14px;background:linear-gradient(180deg,#121c34,#0a1020);border:2px solid #10b981aa;box-shadow:0 8px 26px rgba(16,185,129,.16)">
@@ -919,13 +922,23 @@ input[type="range"]{
 
     <div class="row">
       <div>
-        <label>💬 Estilo de Legenda Dinâmica (OpusClip Captions)</label>
+        <label>💬 Template de Legenda Pro (OpusClip 3.0)</label>
         <select id="opusCaptionStyle" onchange="onChangeOpusVisualSettings()">
-          <option value="hormozi" selected>🔥 Hormozi Bold (Amarelo + Verde Pop + Caixa Preta + Emojis)</option>
-          <option value="neon">⚡ Opus Neon (Ciano + Roxo Glow + Destaque Ativo)</option>
-          <option value="impact">🎯 Viral Impact (Branco + Destaque Vermelho Forte)</option>
+          <option value="hormozi" selected>🔥 Alex Hormozi Pro (Inclinada + Pop Verde/Ouro + Emojis 3D)</option>
+          <option value="mrbeast">⚡ MrBeast Explosive (Zoom 1.22x Ciano/Amarelo + Borda Dupla)</option>
+          <option value="iman">💎 Iman Gadzhi Luxury (Clean Luxo + Sublinhado Neon Dourado)</option>
+          <option value="neon">🌌 Opus Cyber Neon (Ciano + Roxo Glow + Destaque Ativo)</option>
+          <option value="impact">🎯 Podcast Viral Impact (Branco + Caixa Vermelha Forte)</option>
           <option value="minimal">🎬 Minimal Studio (Legenda Limpa de Cinema)</option>
           <option value="none">🚫 Sem Legenda Queimada</option>
+        </select>
+      </div>
+      <div>
+        <label>📍 Posição da Legenda na Tela</label>
+        <select id="opusCaptionPos" onchange="onChangeOpusVisualSettings()">
+          <option value="bottom" selected>⬇️ Base Segura TikTok/Reels/Shorts (78%)</option>
+          <option value="center">🎯 Centro Dinâmico de Retenção (54%)</option>
+          <option value="top">⬆️ Superior Abaixo do Gancho (28%)</option>
         </select>
       </div>
       <div>
@@ -934,6 +947,25 @@ input[type="range"]{
           <option value="first5s" selected>🔥 Mostrar Gancho nos Primeiros 5s (Prende o Scroll)</option>
           <option value="always">📌 Mostrar Gancho no Topo Durante Todo o Corte</option>
           <option value="none">🚫 Sem Banner no Topo</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>🎥 Cortes de Zoom & Ritmo (Dynamic Zoom Cuts)</label>
+        <select id="opusZoomStyle" onchange="onChangeOpusVisualSettings()">
+          <option value="auto_punch" selected>⚡ Auto Jump-Cut & Punch-In (Zoom nas Palavras de Impacto — OpusClip Pro)</option>
+          <option value="smooth_dolly">🎬 Dolly-In Cinematográfico Contínuo</option>
+          <option value="static">🔒 Câmera Fixa (Sem Zoom Extra)</option>
+        </select>
+      </div>
+      <div>
+        <label>🎞️ AI B-Roll & Acabamento Visual (100% Sem Marca d'Água)</label>
+        <select id="opusBrollMode" onchange="onChangeOpusVisualSettings()">
+          <option value="cinema_broll" selected>✨ AI B-Roll Automático + Color Grading Pro + Voz Masterizada</option>
+          <option value="grade_only">🎨 Color Grading de Estúdio + Voz Masterizada (Sem B-Roll)</option>
+          <option value="clean">📹 Vídeo Puro Original (Zero Efeitos Extras)</option>
         </select>
       </div>
     </div>
@@ -6728,18 +6760,36 @@ async function importOpusVideoFromUrl(autoRunAnalysis = true){
     if(card){
       card.classList.remove('hidden');
       const thumbSrc = (info.framesBase64 && info.framesBase64[0]) || (ytId ? `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg` : '');
+      const chapInfo = Array.isArray(info.chapters) && info.chapters.length ? ` • 📑 ${info.chapters.length} capítulos lidos` : '';
+      const capBadge = info.hasVerbatimCaptions ? '🎙️ Legenda Oficial Extraída' : '🧠 Leitura Semântica Profunda IA';
       card.innerHTML =
         `<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">` +
-          (thumbSrc ? `<img src="${thumbSrc}" style="width:128px;height:72px;object-fit:cover;border-radius:8px;border:1px solid #334155" alt="Thumb">` : '') +
+          (thumbSrc ? `<img src="${thumbSrc}" style="width:136px;height:76px;object-fit:cover;border-radius:8px;border:1.5px solid #10b98188" alt="Thumb">` : '') +
           `<div style="flex:1;min-width:180px">` +
-            `<div style="font-weight:800;font-size:13px;color:#f8fafc">▶️ ${escapeHtml(ytTitle)}</div>` +
-            `<div style="font-size:11.5px;color:#94a3b8;margin-top:2px">📺 Canal: <b>${escapeHtml(ytAuthor)}</b>${ytId ? ` • ID: <code>${escapeHtml(ytId)}</code>` : ''}</div>` +
-            `<div style="font-size:11px;color:#6ee7b7;margin-top:3px">✅ Vídeo e falas importados pelo link — pronto para recortar em 9:16!</div>` +
+            `<div style="font-weight:800;font-size:13.5px;color:#f8fafc">▶️ ${escapeHtml(ytTitle)}</div>` +
+            `<div style="font-size:11.5px;color:#94a3b8;margin-top:2px">📺 Canal: <b>${escapeHtml(ytAuthor)}</b>${ytId ? ` • ID: <code>${escapeHtml(ytId)}</code>` : ''}${chapInfo}</div>` +
+            `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:5px">` +
+              `<span style="font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px;background:#064e3b;color:#a7f3d0">✅ ${capBadge}</span>` +
+              `<span style="font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px;background:#14532d;color:#bbf7d0">🚫 100% Sem Marca d'Água</span>` +
+            `</div>` +
           `</div>` +
         `</div>`;
     }
 
     setProgress('opusProgressFill', 35);
+
+    // Decodifica os frames reais em alta definição do YouTube em ImageBitmaps 100% livres de CORS (também usados pelo AI B-Roll!)
+    const frameBitmaps = [];
+    if(Array.isArray(info.framesBase64)){
+      for(const b64Url of info.framesBase64){
+        try{
+          const b = await (await fetch(b64Url)).blob();
+          const bmp = await createImageBitmap(b);
+          if(bmp) frameBitmaps.push(bmp);
+        }catch(_){}
+      }
+    }
+    opusState.ytFrameBitmaps = frameBitmaps;
 
     // 1) Se o backend já trouxe stream MP4 direto, carrega imediatamente!
     if(info.directVideoBase64){
@@ -6751,8 +6801,8 @@ async function importOpusVideoFromUrl(autoRunAnalysis = true){
       opusState.importedUrl = rawUrl;
       opusState.ytTranscriptSegments = Array.isArray(info.transcriptSegments) ? info.transcriptSegments : null;
     } else {
-      // 2) Constrói o stream HD reproduzível e livre de CORS usando os frames reais do vídeo do YouTube + voz neural sincronizada!
-      showStatus('opusStatus', `🎙️ Preparando áudio e quadros em alta definição de "${ytTitle}" para recorte 9:16...`, 'info');
+      // 2) Constrói o stream HD reproduzível, 100% LIMPO (SEM MARCA D'ÁGUA) e livre de CORS usando os frames reais do vídeo do YouTube + voz neural travada!
+      showStatus('opusStatus', `🎙️ Preparando stream HD sem marca d'água e sincronia vocal de "${ytTitle}"...`, 'info');
       const segs = (Array.isArray(info.transcriptSegments) && info.transcriptSegments.length)
         ? info.transcriptSegments.slice(0, Math.max(3, desiredClipsCount))
         : [`Olha esse momento incrível do vídeo ${ytTitle} no canal ${ytAuthor}!`];
@@ -6774,21 +6824,9 @@ async function importOpusVideoFromUrl(autoRunAnalysis = true){
 
       const master = buildMasterCinemaAudioBuffer(
         decodedSegs.map((s, idx) => ({ ...s, isLastInScene: idx === decodedSegs.length - 1 })),
-        true,
+        false,
         'cinematic'
       );
-
-      // Decodifica os frames reais do YouTube (hqdefault, hq1, hq2, hq3) em ImageBitmaps 100% livres de CORS
-      const frameBitmaps = [];
-      if(Array.isArray(info.framesBase64)){
-        for(const b64Url of info.framesBase64){
-          try{
-            const b = await (await fetch(b64Url)).blob();
-            const bmp = await createImageBitmap(b);
-            if(bmp) frameBitmaps.push(bmp);
-          }catch(_){}
-        }
-      }
 
       const totalDur = Math.max(12, master.totalDuration || 36);
       const drawYtStream = (ctx, t) => {
@@ -6798,18 +6836,16 @@ async function importOpusVideoFromUrl(autoRunAnalysis = true){
         if(frameBitmaps.length){
           const segIndex = Math.min(frameBitmaps.length - 1, Math.floor((t / totalDur) * frameBitmaps.length));
           const bmp = frameBitmaps[segIndex];
+          const nextBmp = frameBitmaps[(segIndex + 1) % frameBitmaps.length];
           const localP = ((t / totalDur) * frameBitmaps.length) % 1;
           const moves = ['zoomIn', 'panRight', 'dollyIn', 'panLeft'];
           drawSceneryWithCamera(ctx, bmp, W, H, localP, moves[segIndex % moves.length], 1, t);
+          // Cross-dissolve cinematográfico suave entre tomadas sem nenhuma marca d'água!
+          if(localP > 0.88 && nextBmp && nextBmp !== bmp){
+            const alpha = (localP - 0.88) / 0.12;
+            drawSceneryWithCamera(ctx, nextBmp, W, H, 0, moves[(segIndex + 1) % moves.length], alpha, t);
+          }
         }
-        // Badge discreto do vídeo fonte no canto superior
-        ctx.save();
-        ctx.fillStyle = 'rgba(8, 11, 22, 0.76)';
-        ctx.beginPath(); ctx.roundRect(22, 18, Math.min(W - 44, 520), 36, 999); ctx.fill();
-        ctx.fillStyle = '#f8fafc';
-        ctx.font = '800 15px Inter, sans-serif';
-        ctx.fillText(`▶️ ${ytTitle.slice(0, 48)} • ${ytAuthor.slice(0, 22)}`, 38, 41);
-        ctx.restore();
       };
 
       const ytBlob = await recordCanvasVideo({
@@ -6823,10 +6859,11 @@ async function importOpusVideoFromUrl(autoRunAnalysis = true){
       loadOpusVideoFile(ytBlob, `${ytTitle}.mp4`);
       opusState.durationSec = totalDur;
       opusState.importedUrl = rawUrl;
+      opusState.ytFrameBitmaps = frameBitmaps;
       opusState.ytTranscriptSegments = master.segments.map(seg => ({
         startSec: Number(seg.start.toFixed(1)),
         endSec: Number(seg.end.toFixed(1)),
-        energyScore: 0.96,
+        energyScore: 0.97,
         text: seg.text
       }));
     }
@@ -6996,12 +7033,6 @@ async function generateOpusDemoVideo(){
         ctx.beginPath(); ctx.roundRect(idx === 0 ? 35 : -65, 5, 30, 52, 12); ctx.fill();
         ctx.restore();
       });
-
-      ctx.fillStyle = 'rgba(10,14,28,0.82)';
-      ctx.beginPath(); ctx.roundRect(28, 22, 390, 40, 999); ctx.fill();
-      ctx.fillStyle = '#6ee7b7';
-      ctx.font = '800 17px Inter, sans-serif';
-      ctx.fillText('🎙️ PODCAST STUDIO • EPISÓDIO #42 (DEMO)', 48, 48);
     };
 
     const demoBlob = await recordCanvasVideo({
@@ -7012,7 +7043,7 @@ async function generateOpusDemoVideo(){
       durationSec: durSec
     });
     loadOpusVideoFile(demoBlob, 'podcast-studio-episodio-42.mp4');
-    showStatus('opusStatus', '✅ Vídeo Demo de Podcast (36s) carregado! Agora clique em "✂️ Encontrar Melhores Cortes Virais Agora".', 'success');
+    showStatus('opusStatus', '✅ Vídeo Demo de Podcast (36s, sem marca d\'água) carregado! Agora clique em "✂️ Encontrar Melhores Cortes Virais Agora".', 'success');
   }catch(e){
     showStatus('opusStatus', '❌ Falha ao gerar vídeo demo: ' + e.message, 'error');
   }finally{
@@ -7020,7 +7051,7 @@ async function generateOpusDemoVideo(){
   }
 }
 
-// Varre a energia acústica real do vídeo para encontrar os momentos mais intensos e extrair o áudio de cada janela
+// Varre a energia acústica real do vídeo para encontrar os momentos mais intensos e extrair o áudio de TODAS as janelas candidatas
 async function scanVideoAcousticEnergyPeaks(file, durationSec, desiredCount, targetLenCode, onMsg){
   const msg = typeof onMsg === 'function' ? onMsg : ()=>{};
   const totalDur = Math.max(6, durationSec || 60);
@@ -7032,9 +7063,9 @@ async function scanVideoAcousticEnergyPeaks(file, durationSec, desiredCount, tar
   let mono12k = opusState.mono12k;
   const SR = 12000;
 
-  if(!mono12k && file && file.size < 110 * 1024 * 1024){
+  if(!mono12k && file && file.size < 130 * 1024 * 1024){
     try{
-      msg('🔊 Analisando ondas de voz, picos de emoção e ritmo do vídeo...');
+      msg('🔊 Analisando ondas de voz, picos de emoção, sílabas e ritmo do vídeo...');
       const AC = window.AudioContext || window.webkitAudioContext;
       const ac = new AC();
       const arr = await file.arrayBuffer();
@@ -7055,34 +7086,34 @@ async function scanVideoAcousticEnergyPeaks(file, durationSec, desiredCount, tar
 
   const candidates = [];
   if(mono12k && mono12k.length > SR * 3){
-    // Calcula energia RMS em janelas de 1 segundo
     const totalSecFloor = Math.floor(mono12k.length / SR);
     const secRms = new Float32Array(totalSecFloor);
     let maxRms = 0.001;
     for(let s = 0; s < totalSecFloor; s++){
       let sum = 0;
       const base = s * SR;
-      for(let i = 0; i < SR; i += 4){
+      for(let i = 0; i < SR; i += 3){
         const v = mono12k[base + i];
         sum += v * v;
       }
-      const r = Math.sqrt(sum / (SR / 4));
+      const r = Math.sqrt(sum / (SR / 3));
       secRms[s] = r;
       if(r > maxRms) maxRms = r;
     }
 
     const winSec = Math.max(5, Math.min(Math.floor(totalSecFloor * 0.8), Math.round(clipSpan)));
-    const stepSec = Math.max(2, Math.floor(winSec / 4));
+    const stepSec = Math.max(1, Math.floor(winSec / 5));
     const scoredWindows = [];
     for(let s0 = 0; s0 <= Math.max(0, totalSecFloor - winSec); s0 += stepSec){
-      let sum = 0, hookBoost = 0;
+      let sum = 0, hookBoost = 0, dynamicVar = 0;
       for(let k = 0; k < winSec && (s0 + k) < totalSecFloor; k++){
         const val = secRms[s0 + k] / maxRms;
         sum += val;
-        if(k < 4) hookBoost += val * 1.35; // Valoriza ganchos fortes nos primeiros 4s!
+        if(k < 4) hookBoost += val * 1.42;
+        if(k > 0) dynamicVar += Math.abs(val - (secRms[s0 + k - 1] / maxRms));
       }
-      const score = (sum / winSec) * 0.7 + (hookBoost / 4) * 0.3;
-      scoredWindows.push({ startSec: s0, endSec: Math.min(totalDur, s0 + winSec), energyScore: Math.min(0.99, Math.max(0.75, score)) });
+      const score = (sum / winSec) * 0.62 + (hookBoost / 4) * 0.28 + Math.min(0.99, dynamicVar / winSec) * 0.10;
+      scoredWindows.push({ startSec: s0, endSec: Math.min(totalDur, s0 + winSec), energyScore: Math.min(0.99, Math.max(0.78, score)) });
     }
     scoredWindows.sort((a, b) => b.energyScore - a.energyScore);
 
@@ -7093,7 +7124,6 @@ async function scanVideoAcousticEnergyPeaks(file, durationSec, desiredCount, tar
     }
   }
 
-  // Completa janelas se o vídeo for curto ou sem trilha decodificada
   while(candidates.length < count){
     const idx = candidates.length;
     const span = Math.min(clipSpan, Math.max(5, totalDur / Math.max(1, count)));
@@ -7105,12 +7135,12 @@ async function scanVideoAcousticEnergyPeaks(file, durationSec, desiredCount, tar
     });
   }
 
-  // Extrai snippet WAV 12kHz (até 18s) das top 3 janelas para transcrição IA rápida
+  // Extrai snippet WAV 12kHz (até 22s) de TODAS as janelas para transcrição real completa ("Leitura Perfeita")
   for(let i = 0; i < candidates.length; i++){
     const c = candidates[i];
-    if(mono12k && i < 3){
+    if(mono12k){
       const s0 = Math.max(0, Math.floor(c.startSec * SR));
-      const s1 = Math.min(mono12k.length, Math.floor(Math.min(c.endSec, c.startSec + 18) * SR));
+      const s1 = Math.min(mono12k.length, Math.floor(Math.min(c.endSec, c.startSec + 22) * SR));
       if(s1 - s0 > SR){
         const slice = mono12k.subarray(s0, s1);
         const wavBytes = encodeWavMono(slice, SR);
@@ -7121,15 +7151,15 @@ async function scanVideoAcousticEnergyPeaks(file, durationSec, desiredCount, tar
   return candidates;
 }
 
-// Detecta a posição horizontal do rosto/apresentador ativo no frame do vídeo para o Auto-Reframe 9:16
-async function detectVideoSpeakerFocusX(videoEl, timeSec){
-  if(!videoEl || !videoEl.videoWidth) return 0.5;
+// Detecta a posição horizontal e vertical (X, Y) do rosto/apresentador ativo em um instante do vídeo
+async function detectVideoSpeakerFocusPoint(videoEl, timeSec){
+  if(!videoEl || !videoEl.videoWidth) return { x: 0.5, y: 0.38 };
   try{
     await new Promise(res => {
       const onSeek = () => { videoEl.removeEventListener('seeked', onSeek); res(); };
       videoEl.addEventListener('seeked', onSeek, { once: true });
       try{ videoEl.currentTime = Math.max(0, timeSec); }catch(_){ res(); }
-      setTimeout(res, 350);
+      setTimeout(res, 260);
     });
     const cv = document.createElement('canvas');
     const W = 160, H = 90;
@@ -7138,82 +7168,197 @@ async function detectVideoSpeakerFocusX(videoEl, timeSec){
     ctx.drawImage(videoEl, 0, 0, W, H);
     const data = ctx.getImageData(0, 0, W, H).data;
 
-    let weightedX = 0, totalWeight = 0;
-    for(let y = Math.floor(H * 0.12); y < Math.floor(H * 0.72); y++){
-      for(let x = Math.floor(W * 0.10); x < Math.floor(W * 0.90); x++){
+    let weightedX = 0, weightedY = 0, totalWeight = 0;
+    for(let y = Math.floor(H * 0.10); y < Math.floor(H * 0.74); y++){
+      for(let x = Math.floor(W * 0.08); x < Math.floor(W * 0.92); x++){
         const idx = (y * W + x) * 4;
         const r = data[idx], g = data[idx + 1], b = data[idx + 2];
-        const isSkin = (r > 85 && g > 45 && b > 25 && r > g && g > b * 0.85 && (r - Math.min(g, b)) > 18);
+        const isSkin = (r > 85 && g > 45 && b > 25 && r > g && g > b * 0.85 && (r - Math.min(g, b)) > 16);
         const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-        const w = isSkin ? 4.5 : (lum > 45 && lum < 235 ? 0.35 : 0.05);
+        // Borda / detalhe facial (contraste horizontal de olhos/boca)
+        const idxNext = (y * W + Math.min(W - 1, x + 1)) * 4;
+        const edge = Math.abs(r - data[idxNext]) + Math.abs(g - data[idxNext + 1]);
+        const w = (isSkin ? 5.2 : (lum > 45 && lum < 235 ? 0.35 : 0.05)) * (1 + Math.min(1.5, edge / 45));
         weightedX += (x / W) * w;
+        weightedY += (y / H) * w;
         totalWeight += w;
       }
     }
     if(totalWeight > 0){
-      const fx = weightedX / totalWeight;
-      return Math.max(0.24, Math.min(0.76, fx));
+      return {
+        x: Math.max(0.22, Math.min(0.78, weightedX / totalWeight)),
+        y: Math.max(0.26, Math.min(0.56, weightedY / totalWeight))
+      };
     }
   }catch(_){}
-  return 0.5;
+  return { x: 0.5, y: 0.38 };
+}
+
+// Varre múltiplos keyframes ao longo do corte para rastrear quem está falando segundo a segundo (Auto-Reframe 3.0)
+async function scanClipDynamicCameraKeyframes(videoEl, clip){
+  const dur = Math.max(3, (clip.endSec || 30) - (clip.startSec || 0));
+  const fractions = [0.08, 0.30, 0.52, 0.74, 0.92];
+  const keyframes = [];
+  for(const f of fractions){
+    const pt = await detectVideoSpeakerFocusPoint(videoEl, (clip.startSec || 0) + dur * f);
+    keyframes.push({ relSec: dur * f, x: pt.x, y: pt.y });
+  }
+  clip.focusKeyframes = keyframes;
+  clip.focusX = keyframes[1] ? keyframes[1].x : 0.5;
+  clip.focusY = keyframes[1] ? keyframes[1].y : 0.38;
+  return keyframes;
+}
+
+// Interpola suavemente o foco da câmera (X, Y) no segundo atual do corte
+function getInterpolatedSpeakerFocus(clip, relSec){
+  const kfs = clip.focusKeyframes;
+  if(!Array.isArray(kfs) || !kfs.length){
+    return { x: Number.isFinite(clip.focusX) ? clip.focusX : 0.5, y: Number.isFinite(clip.focusY) ? clip.focusY : 0.38 };
+  }
+  if(relSec <= kfs[0].relSec) return { x: kfs[0].x, y: kfs[0].y };
+  if(relSec >= kfs[kfs.length - 1].relSec) return { x: kfs[kfs.length - 1].x, y: kfs[kfs.length - 1].y };
+  for(let i = 0; i < kfs.length - 1; i++){
+    const a = kfs[i], b = kfs[i + 1];
+    if(relSec >= a.relSec && relSec <= b.relSec){
+      const rawP = (relSec - a.relSec) / Math.max(0.01, b.relSec - a.relSec);
+      const p = rawP * rawP * (3 - 2 * rawP); // Smoothstep
+      return {
+        x: a.x + (b.x - a.x) * p,
+        y: a.y + (b.y - a.y) * p
+      };
+    }
+  }
+  return { x: kfs[0].x, y: kfs[0].y };
 }
 
 // Mapa de Auto-Emojis contextuais estilo OpusClip Hormozi Captions
 function pickOpusEmojiForPhrase(phraseText){
   const t = String(phraseText || '').toLowerCase();
-  if(/segredo|ninguém|verdade|revela|olha|atenção|presta/i.test(t)) return '🔥';
-  if(/dinheiro|ouro|valor|lucro|rico|milh|resultado/i.test(t)) return '💎';
-  if(/rápido|agora|hoje|segundo|velocidade|explod/i.test(t)) return '⚡';
-  if(/ideia|dica|aprende|entend|mente|cérebro/i.test(t)) return '💡';
-  if(/futuro|foguete|crescer|topo|sucesso|viral/i.test(t)) return '🚀';
-  if(/incrível|impossível|absurdo|nunca|choque/i.test(t)) return '🤯';
+  if(/segredo|ninguém|verdade|revela|olha|atenção|presta|fogo/i.test(t)) return '🔥';
+  if(/dinheiro|ouro|valor|lucro|rico|milh|resultado|fortuna/i.test(t)) return '💎';
+  if(/rápido|agora|hoje|segundo|velocidade|explod|energia/i.test(t)) return '⚡';
+  if(/ideia|dica|aprende|entend|mente|cérebro|sabedoria/i.test(t)) return '💡';
+  if(/futuro|foguete|crescer|topo|sucesso|viral|avanç/i.test(t)) return '🚀';
+  if(/incrível|impossível|absurdo|nunca|choque|surpre/i.test(t)) return '🤯';
+  if(/atenção|cuidado|erro|perigo|pare|nunca faça/i.test(t)) return '⚠️';
+  if(/coração|vida|emoção|amor|paixão|sentir/i.test(t)) return '❤️';
   return '🎯';
 }
 
-// Constrói blocos curtos de 3–4 palavras estilo OpusClip Hormozi (com destaque palavra por palavra!)
-function buildOpusWordByWordCues(text, clipDurationSec){
+// Constrói blocos curtos de 3 palavras estilo OpusClip Pro 3.0 com Sincronia Acústica Real (Syllable Energy Lock!)
+function buildOpusWordByWordCues(text, clipDurationSec, clipStartSec = 0){
   const clean = String(text || '').replace(/\s+/g, ' ').trim();
   if(!clean) return [];
   const rawWords = clean.split(' ').filter(Boolean);
   if(!rawWords.length) return [];
 
   const totalDur = Math.max(1.5, clipDurationSec || 10);
-  const weights = rawWords.map(w => Math.max(2, w.length) + (/[,.!?;:]$/.test(w) ? 2.5 : 0));
+
+  // Detecta onde a voz começa e termina dentro do corte usando a onda acústica real (mono12k)
+  let speechStartOffset = 0.06;
+  let speechEndOffset = totalDur - 0.10;
+  if(opusState.mono12k && opusState.mono12k.length > 12000){
+    const SR = 12000;
+    const s0 = Math.max(0, Math.floor((clipStartSec || 0) * SR));
+    const s1 = Math.min(opusState.mono12k.length, Math.floor(((clipStartSec || 0) + totalDur) * SR));
+    if(s1 - s0 > SR){
+      let peakAmp = 0.001;
+      for(let i = s0; i < s1; i += 20){
+        const a = Math.abs(opusState.mono12k[i]);
+        if(a > peakAmp) peakAmp = a;
+      }
+      const thresh = peakAmp * 0.14;
+      for(let i = s0; i < s1; i += 60){
+        if(Math.abs(opusState.mono12k[i]) > thresh){
+          speechStartOffset = Math.max(0.04, Math.min(1.1, (i - s0) / SR));
+          break;
+        }
+      }
+      for(let i = s1 - 1; i > s0; i -= 60){
+        if(Math.abs(opusState.mono12k[i]) > thresh){
+          speechEndOffset = Math.max(speechStartOffset + 1.0, Math.min(totalDur - 0.05, (i - s0) / SR));
+          break;
+        }
+      }
+    }
+  }
+
+  const weights = rawWords.map(w => {
+    const cleanW = w.replace(/[^a-zA-ZÀ-ÿ0-9]/g, '');
+    const syllEst = Math.max(1, Math.round(cleanW.length / 2.6));
+    const punctPause = /[.!?]$/.test(w) ? 1.85 : /[,;:]$/.test(w) ? 1.15 : 0;
+    return syllEst + punctPause;
+  });
   const totalW = weights.reduce((a, b) => a + b, 0) || 1;
 
-  let cursor = 0.08;
-  const usableDur = Math.max(1.0, totalDur - 0.16);
+  let cursor = speechStartOffset;
+  const usableDur = Math.max(1.0, speechEndOffset - speechStartOffset);
   const timedWords = rawWords.map((w, i) => {
     const d = (weights[i] / totalW) * usableDur;
     const start = cursor;
     const end = cursor + d;
     cursor = end;
-    const isHighlight = w.replace(/[^a-zA-ZÀ-ÿ0-9]/g, '').length >= 6 || /[!?🔥⚡💎]/.test(w) || (i % 4 === 1);
-    return { word: w, start, end, isHighlight };
+    const cleanW = w.replace(/[^a-zA-ZÀ-ÿ0-9]/g, '');
+    const isPowerWord = /^(segredo|verdade|nunca|sempre|agora|dinheiro|milhões|incrível|impossível|absurdo|atenção|olha|resultado|sucesso|viral|erro|cuidado|ouro|muda|tudo)$/i.test(cleanW);
+    const isHighlight = isPowerWord || cleanW.length >= 6 || /[!?🔥⚡💎]/.test(w) || (i % 3 === 1);
+    return { word: w, start, end, isHighlight, isPowerWord };
   });
 
-  // Agrupa de 3 em 3 palavras (padrão ouro OpusClip / Hormozi Shorts)
+  // Agrupa de 3 em 3 palavras (padrão ouro OpusClip Pro / Alex Hormozi Shorts)
   const phrases = [];
   const WORDS_PER_PHRASE = 3;
   for(let i = 0; i < timedWords.length; i += WORDS_PER_PHRASE){
     const slice = timedWords.slice(i, i + WORDS_PER_PHRASE);
     const phraseStr = slice.map(x => x.word).join(' ');
     phrases.push({
+      phraseIdx: phrases.length,
       start: slice[0].start,
       end: slice[slice.length - 1].end,
       words: slice,
+      hasPowerWord: slice.some(x => x.isPowerWord || x.isHighlight),
       emoji: pickOpusEmojiForPhrase(phraseStr)
     });
   }
   return phrases;
 }
 
-// Renderiza 1 frame completo do OpusClip (Auto-Reframe 9:16 / Split-Screen Podcast / Cinema Blur + Hook Banner + Legendas Hormozi)
+// Renderiza 1 frame ultra-profissional do OpusClip Pro 3.0 (100% SEM MARCA D'ÁGUA + Auto-Reframe 3.0 + Dynamic Zoom Cuts + AI B-Roll + Multi-Line Hormozi/MrBeast/Iman Captions)
 function drawOpusReframedFrame(ctx, videoEl, clip, relSec){
   const W = ctx.canvas.width, H = ctx.canvas.height;
   const reframeMode = (document.getElementById('opusReframeMode')||{}).value || clip.reframeMode || 'auto_face';
   const captionStyle = (document.getElementById('opusCaptionStyle')||{}).value || 'hormozi';
+  const captionPos = (document.getElementById('opusCaptionPos')||{}).value || 'bottom';
   const hookMode = (document.getElementById('opusHookBannerMode')||{}).value || 'first5s';
+  const zoomStyle = (document.getElementById('opusZoomStyle')||{}).value || 'auto_punch';
+  const brollMode = (document.getElementById('opusBrollMode')||{}).value || 'cinema_broll';
+
+  const clipDur = Math.max(2, (clip.endSec || 30) - (clip.startSec || 0));
+  if(!clip._cues || clip._cuesText !== clip.captionText || clip._cuesDur !== clipDur){
+    clip._cues = buildOpusWordByWordCues(clip.captionText, clipDur, clip.startSec || 0);
+    clip._cuesText = clip.captionText;
+    clip._cuesDur = clipDur;
+  }
+  const cues = clip._cues || [];
+  const activeCue = cues.find(c => relSec >= c.start && relSec <= c.end + 0.08) || cues[Math.min(cues.length - 1, Math.floor((relSec / clipDur) * cues.length))];
+  const activeWordObj = activeCue && activeCue.words ? activeCue.words.find(w => relSec >= w.start && relSec <= w.end + 0.05) : null;
+
+  // Calcula o fator de Zoom Dinâmico (Jump-Cut Punch-In estilo OpusClip Pro)
+  let cameraZoom = 1.0;
+  if(zoomStyle === 'auto_punch'){
+    // Punch-in no gancho inicial (0 a 1.6s) + Punch-in nas palavras de impacto ou frases pares
+    const isOpeningHook = relSec < 1.65;
+    const isPunchPhrase = activeCue && (activeCue.phraseIdx % 2 === 1);
+    const isPowerMoment = !!(activeWordObj && activeWordObj.isPowerWord);
+    if(isOpeningHook || isPowerMoment){
+      cameraZoom = 1.15;
+    } else if(isPunchPhrase){
+      cameraZoom = 1.09 + 0.03 * Math.sin(relSec * 1.8);
+    } else {
+      cameraZoom = 1.0 + 0.03 * (relSec / clipDur);
+    }
+  } else if(zoomStyle === 'smooth_dolly'){
+    cameraZoom = 1.0 + 0.12 * (relSec / clipDur);
+  }
 
   ctx.fillStyle = '#05070f';
   ctx.fillRect(0, 0, W, H);
@@ -7221,15 +7366,15 @@ function drawOpusReframedFrame(ctx, videoEl, clip, relSec){
   const vw = (videoEl && videoEl.videoWidth) || 1280;
   const vh = (videoEl && videoEl.videoHeight) || 720;
 
+  // 1) RENDERIZAÇÃO DO VÍDEO COM AUTO-REFRAME 3.0 + RASTREAMENTO ATIVO + DYNAMIC ZOOM CUTS
   if(videoEl && vw > 0 && vh > 0){
     if(reframeMode === 'split_podcast' && W < H){
-      // 🎙️ MODO PODCAST SPLIT-SCREEN 9:16: Pessoa 1 no topo (x=0.28), Pessoa 2 na base (x=0.72)
       const halfH = Math.floor(H * 0.5);
       const targetAspect = W / halfH;
-      let sw = vh * targetAspect;
-      let sh = vh;
-      if(sw > vw){ sw = vw; sh = vw / targetAspect; }
-      const sy = Math.max(0, (vh - sh) * 0.35);
+      let sw = (vh * targetAspect) / cameraZoom;
+      let sh = vh / cameraZoom;
+      if(sw > vw){ sw = vw / cameraZoom; sh = sw / targetAspect; }
+      const sy = Math.max(0, (vh - sh) * 0.34);
 
       const sxLeft = Math.max(0, Math.min(vw - sw, vw * 0.27 - sw * 0.5));
       const sxRight = Math.max(0, Math.min(vw - sw, vw * 0.73 - sw * 0.5));
@@ -7239,11 +7384,9 @@ function drawOpusReframedFrame(ctx, videoEl, clip, relSec){
         ctx.drawImage(videoEl, sxRight, sy, sw, sh, 0, halfH, W, H - halfH);
       }catch(_){}
 
-      // Linha divisória neon entre as duas câmeras do podcast
       ctx.fillStyle = '#10b981';
       ctx.fillRect(0, halfH - 2, W, 4);
     } else if(reframeMode === 'cinema_blur' && W < H){
-      // ✨ MODO CINEMA FIT 9:16: Fundo preenchido suave + Vídeo 16:9 inteiro centralizado com moldura neon
       const bgScale = Math.max(W / vw, H / vh) * 1.18;
       const bgW = vw * bgScale, bgH = vh * bgScale;
       try{
@@ -7261,47 +7404,102 @@ function drawOpusReframedFrame(ctx, videoEl, clip, relSec){
       const fy = (H - fitH) * 0.44;
       ctx.save();
       ctx.beginPath(); ctx.roundRect(fx, fy, fitW, fitH, 16); ctx.clip();
-      try{ ctx.drawImage(videoEl, fx, fy, fitW, fitH); }catch(_){}
+      const subSw = vw / cameraZoom, subSh = vh / cameraZoom;
+      const subSx = (vw - subSw) * 0.5, subSy = (vh - subSh) * 0.4;
+      try{ ctx.drawImage(videoEl, subSx, subSy, subSw, subSh, fx, fy, fitW, fitH); }catch(_){}
       ctx.restore();
       ctx.strokeStyle = 'rgba(16, 185, 129, 0.65)';
       ctx.lineWidth = 2.5;
       ctx.beginPath(); ctx.roundRect(fx, fy, fitW, fitH, 16); ctx.stroke();
     } else {
-      // 🎯 AUTO-REFRAME 9:16 COM RASTREAMENTO FACIAL / SUJEITO FALANDO
+      // 🎯 AUTO-REFRAME 3.0 COM INTERPOLAÇÃO MULTI-KEYFRAME DO APRESENTADOR ATIVO + JUMP-CUT PUNCH-IN
       const targetAspect = W / H;
       const srcAspect = vw / vh;
-      let sx = 0, sy = 0, sw = vw, sh = vh;
-      const baseFocusX = Number.isFinite(clip.focusX) ? clip.focusX : 0.5;
-      const dynamicPan = Math.sin(relSec * 0.85) * 0.03;
-      const focusX = Math.max(0.18, Math.min(0.82, baseFocusX + dynamicPan));
+      const focusPt = getInterpolatedSpeakerFocus(clip, relSec);
+      const dynamicPanX = Math.sin(relSec * 0.75) * 0.018;
+      const focusX = Math.max(0.16, Math.min(0.84, focusPt.x + dynamicPanX));
+      const focusY = Math.max(0.24, Math.min(0.62, focusPt.y));
 
+      let baseSw = vw, baseSh = vh;
       if(srcAspect > targetAspect){
-        sw = vh * targetAspect;
-        sx = Math.max(0, Math.min(vw - sw, vw * focusX - sw * 0.5));
+        baseSw = vh * targetAspect;
       } else {
-        sh = vw / targetAspect;
-        sy = Math.max(0, Math.min(vh - sh, vh * 0.38 - sh * 0.5));
+        baseSh = vw / targetAspect;
       }
+      const sw = baseSw / cameraZoom;
+      const sh = baseSh / cameraZoom;
+      const sx = Math.max(0, Math.min(vw - sw, vw * focusX - sw * 0.5));
+      const sy = Math.max(0, Math.min(vh - sh, vh * focusY - sh * 0.45));
       try{ ctx.drawImage(videoEl, sx, sy, sw, sh, 0, 0, W, H); }catch(_){}
     }
   }
 
-  // Vinheta superior e inferior para leitura perfeita do Hook Banner e das Legendas Hormozi
-  const botGrad = ctx.createLinearGradient(0, H * 0.58, 0, H);
-  botGrad.addColorStop(0, 'rgba(0,0,0,0)');
-  botGrad.addColorStop(0.65, 'rgba(4,6,14,0.48)');
-  botGrad.addColorStop(1, 'rgba(4,6,14,0.86)');
-  ctx.fillStyle = botGrad;
-  ctx.fillRect(0, H * 0.58, W, H * 0.42);
+  // 2) AI B-ROLL AUTOMÁTICO (Cutaway Visual Dinâmico no meio do corte, estilo OpusClip Pro!)
+  const clipProg = relSec / clipDur;
+  if(brollMode === 'cinema_broll' && W <= H && clipDur >= 5 && clipProg >= 0.34 && clipProg <= 0.60){
+    const brollAlpha = Math.min(1, Math.min((clipProg - 0.34) / 0.04, (0.60 - clipProg) / 0.04));
+    if(brollAlpha > 0.02){
+      ctx.save();
+      ctx.globalAlpha = brollAlpha;
+      const bw = Math.round(W * 0.86);
+      const bh = Math.round(bw * 0.56);
+      const bx = Math.round((W - bw) * 0.5);
+      const by = Math.round(H * 0.16);
 
-  // 2) TOP VIRAL HOOK BANNER (Prende a atenção nos primeiros segundos!)
+      ctx.shadowColor = 'rgba(0,0,0,0.65)';
+      ctx.shadowBlur = 22;
+      ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 16); ctx.clip();
+
+      const brollBitmaps = opusState.ytFrameBitmaps;
+      if(Array.isArray(brollBitmaps) && brollBitmaps.length > 1){
+        const bIdx = (opusState.selectedIdx + 1) % brollBitmaps.length;
+        const bmp = brollBitmaps[bIdx];
+        const bZoom = 1.06 + (clipProg - 0.34) * 0.35;
+        const sw = bmp.width / bZoom, sh = bmp.height / bZoom;
+        const sx = (bmp.width - sw) * 0.5, sy = (bmp.height - sh) * 0.45;
+        try{ ctx.drawImage(bmp, sx, sy, sw, sh, bx, by, bw, bh); }catch(_){}
+      } else if(videoEl && vw > 0 && vh > 0){
+        // Close-up B-Roll de detalhe cinematográfico
+        const bZoom = 1.38 + (clipProg - 0.34) * 0.25;
+        const sw = vw / bZoom, sh = vh / bZoom;
+        const sx = Math.max(0, Math.min(vw - sw, vw * 0.62 - sw * 0.5));
+        const sy = Math.max(0, Math.min(vh - sh, vh * 0.36 - sh * 0.5));
+        try{ ctx.drawImage(videoEl, sx, sy, sw, sh, bx, by, bw, bh); }catch(_){}
+      }
+      ctx.restore();
+
+      ctx.save();
+      ctx.globalAlpha = brollAlpha;
+      ctx.strokeStyle = 'rgba(250, 204, 21, 0.85)';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 16); ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // 3) COLOR GRADING & VINHETA DE ESTÚDIO (Para contraste de cinema e leitura cristalina)
+  if(brollMode !== 'clean'){
+    const topGrad = ctx.createLinearGradient(0, 0, 0, H * 0.22);
+    topGrad.addColorStop(0, 'rgba(3,5,12,0.55)');
+    topGrad.addColorStop(1, 'rgba(3,5,12,0)');
+    ctx.fillStyle = topGrad;
+    ctx.fillRect(0, 0, W, H * 0.22);
+  }
+  const botGrad = ctx.createLinearGradient(0, H * 0.54, 0, H);
+  botGrad.addColorStop(0, 'rgba(0,0,0,0)');
+  botGrad.addColorStop(0.62, 'rgba(4,6,14,0.46)');
+  botGrad.addColorStop(1, 'rgba(4,6,14,0.88)');
+  ctx.fillStyle = botGrad;
+  ctx.fillRect(0, H * 0.54, W, H * 0.46);
+
+  // 4) TOP VIRAL HOOK BANNER (Com animação pop de entrada nos primeiros 0.25s!)
   const showHook = hookMode === 'always' || (hookMode === 'first5s' && relSec <= 5.2);
   const hookText = String(clip.hookBanner || clip.title || '').trim();
   if(showHook && hookText){
     ctx.save();
-    const hFont = Math.max(15, Math.round(W * 0.040));
+    const hFont = Math.max(14, Math.round(W * 0.038));
     ctx.font = `900 ${hFont}px Inter, system-ui, sans-serif`;
-    const maxW = W * 0.86;
+    const maxW = W * 0.84;
     const words = hookText.toUpperCase().split(/\s+/);
     const lines = [];
     let cur = '';
@@ -7313,119 +7511,189 @@ function drawOpusReframedFrame(ctx, videoEl, clip, relSec){
     if(cur) lines.push(cur);
 
     const lineH = Math.round(hFont * 1.28);
-    const boxW = Math.min(W * 0.92, Math.max(...lines.map(l => ctx.measureText(l).width)) + 34);
-    const boxH = lines.length * lineH + 22;
+    const boxW = Math.min(W * 0.90, Math.max(...lines.map(l => ctx.measureText(l).width)) + 32);
+    const boxH = lines.length * lineH + 20;
     const bx = (W - boxW) * 0.5;
-    const by = Math.round(H * 0.055);
+    const by = Math.round(H * 0.052);
 
-    ctx.fillStyle = 'rgba(10, 12, 24, 0.92)';
+    const popScale = relSec < 0.22 ? (0.85 + (relSec / 0.22) * 0.15) : 1.0;
+    ctx.translate(W * 0.5, by + boxH * 0.5);
+    ctx.scale(popScale, popScale);
+    ctx.translate(-W * 0.5, -(by + boxH * 0.5));
+
+    ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    ctx.shadowBlur = 14;
+    ctx.fillStyle = 'rgba(10, 12, 24, 0.94)';
     ctx.strokeStyle = '#facc15';
     ctx.lineWidth = 2.5;
     ctx.beginPath(); ctx.roundRect(bx, by, boxW, boxH, 14); ctx.fill(); ctx.stroke();
+    ctx.shadowBlur = 0;
 
     ctx.fillStyle = '#fef08a';
     ctx.textAlign = 'center';
     lines.forEach((l, idx) => {
-      ctx.fillText(l, W * 0.5, by + 16 + (idx + 0.78) * lineH);
+      ctx.fillText(l, W * 0.5, by + 15 + (idx + 0.78) * lineH);
     });
     ctx.restore();
   }
 
-  // 3) LEGENDAS DINÂMICAS OPUSCLIP (HORMOZI WORD-BY-WORD + AUTO-EMOJI + POP ANIMATION)
-  if(captionStyle !== 'none'){
-    const clipDur = Math.max(2, (clip.endSec || 30) - (clip.startSec || 0));
-    if(!clip._cues || clip._cuesText !== clip.captionText || clip._cuesDur !== clipDur){
-      clip._cues = buildOpusWordByWordCues(clip.captionText, clipDur);
-      clip._cuesText = clip.captionText;
-      clip._cuesDur = clipDur;
+  // 5) LEGENDAS ULTRA-PROFISSIONAIS OPUSCLIP PRO 3.0 (MULTI-LINHA INTELIGENTE, ZERO CORTE NAS BORDAS, 6 ESTILOS DE ELITE)
+  if(captionStyle !== 'none' && activeCue && activeCue.words && activeCue.words.length){
+    ctx.save();
+    const maxSafeWidth = W * 0.85;
+    let baseFont = Math.max(20, Math.round(W * (captionStyle === 'mrbeast' ? 0.068 : captionStyle === 'iman' ? 0.056 : 0.064)));
+    ctx.font = `900 ${baseFont}px Inter, system-ui, sans-serif`;
+
+    // Se alguma palavra individual for mais larga que a zona segura, reduz a fonte automaticamente para nunca cortar!
+    for(const wObj of activeCue.words){
+      const wWidth = ctx.measureText(wObj.word.toUpperCase()).width;
+      if(wWidth > maxSafeWidth * 0.92){
+        baseFont = Math.max(16, Math.floor(baseFont * (maxSafeWidth * 0.92) / wWidth));
+        ctx.font = `900 ${baseFont}px Inter, system-ui, sans-serif`;
+      }
     }
-    const cues = clip._cues || [];
-    const activeCue = cues.find(c => relSec >= c.start && relSec <= c.end + 0.08) || cues[Math.min(cues.length - 1, Math.floor((relSec / clipDur) * cues.length))];
 
-    if(activeCue && activeCue.words && activeCue.words.length){
+    // Quebra inteligente das palavras do bloco em 1 ou 2 linhas centralizadas que sempre cabem em 85% da largura
+    const spaceW = ctx.measureText(' ').width;
+    const wrappedLines = [];
+    let currentLine = [];
+    let currentLineW = 0;
+    for(const wObj of activeCue.words){
+      const wStr = wObj.word.toUpperCase();
+      const wW = ctx.measureText(wStr).width;
+      if(currentLine.length > 0 && (currentLineW + spaceW + wW) > maxSafeWidth){
+        wrappedLines.push({ words: currentLine, totalW: currentLineW });
+        currentLine = [{ ...wObj, wStr, wW }];
+        currentLineW = wW;
+      } else {
+        if(currentLine.length > 0) currentLineW += spaceW;
+        currentLine.push({ ...wObj, wStr, wW });
+        currentLineW += wW;
+      }
+    }
+    if(currentLine.length > 0) wrappedLines.push({ words: currentLine, totalW: currentLineW });
+
+    const yAnchorRatio = captionPos === 'center' ? 0.54 : captionPos === 'top' ? 0.28 : 0.78;
+    const blockCenterY = Math.round(H * yAnchorRatio);
+    const lineH = Math.round(baseFont * 1.32);
+
+    // Inclinação dinâmica de -2 graus exclusiva dos estilos Hormozi Pro e MrBeast Explosive
+    if(captionStyle === 'hormozi' || captionStyle === 'mrbeast'){
+      ctx.translate(W * 0.5, blockCenterY);
+      ctx.rotate(-0.032);
+      ctx.translate(-W * 0.5, -blockCenterY);
+    }
+
+    // Emoji 3D contextual flutuante com spring bounce acima da legenda
+    if(activeCue.emoji && captionStyle !== 'minimal' && captionStyle !== 'iman'){
       ctx.save();
-      const baseFont = Math.max(22, Math.round(W * 0.064));
+      const emoSize = Math.round(baseFont * 1.18);
+      ctx.font = `${emoSize}px sans-serif`;
+      ctx.textAlign = 'center';
+      const bounce = Math.sin(relSec * 9.5) * 4;
+      const emoY = blockCenterY - ((wrappedLines.length - 1) * lineH * 0.5) - baseFont * 1.25 + bounce;
+      ctx.fillText(activeCue.emoji, W * 0.5, emoY);
+      ctx.restore();
       ctx.font = `900 ${baseFont}px Inter, system-ui, sans-serif`;
-      const yPos = Math.round(H * 0.79);
+    }
 
-      // Emoji contextual flutuante acima da frase (estilo OpusClip)
-      if(activeCue.emoji && captionStyle !== 'minimal'){
-        const emoSize = Math.round(baseFont * 1.15);
-        ctx.font = `${emoSize}px sans-serif`;
-        ctx.textAlign = 'center';
-        const bounce = Math.sin(relSec * 8) * 3;
-        ctx.fillText(activeCue.emoji, W * 0.5, yPos - baseFont * 1.25 + bounce);
+    // Fundo translúcido de luxo para Iman Gadzhi ou Minimal Studio
+    if(captionStyle === 'minimal' || captionStyle === 'iman'){
+      const widestLine = Math.max(...wrappedLines.map(l => l.totalW));
+      const totalBoxH = wrappedLines.length * lineH + 18;
+      const boxTopY = blockCenterY - ((wrappedLines.length - 1) * lineH * 0.5) - baseFont * 0.96;
+      ctx.fillStyle = captionStyle === 'iman' ? 'rgba(6, 9, 18, 0.84)' : 'rgba(8, 10, 20, 0.76)';
+      ctx.beginPath();
+      ctx.roundRect((W - widestLine) * 0.5 - 20, boxTopY, widestLine + 40, totalBoxH, 12);
+      ctx.fill();
+      if(captionStyle === 'iman'){
+        ctx.strokeStyle = 'rgba(250, 204, 21, 0.45)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
       }
+    }
 
-      ctx.font = `900 ${baseFont}px Inter, system-ui, sans-serif`;
-      const fullLine = activeCue.words.map(w => w.word.toUpperCase()).join(' ');
-      const totalLineW = ctx.measureText(fullLine).width;
+    // Desenha cada linha e cada palavra com animação pop individual na sílaba exata!
+    wrappedLines.forEach((lineObj, lineIdx) => {
+      const yPos = blockCenterY + (lineIdx - (wrappedLines.length - 1) * 0.5) * lineH;
+      let cursorX = (W - lineObj.totalW) * 0.5;
 
-      if(captionStyle === 'minimal'){
-        ctx.fillStyle = 'rgba(8, 10, 20, 0.78)';
-        ctx.beginPath();
-        ctx.roundRect((W - totalLineW) * 0.5 - 18, yPos - baseFont, totalLineW + 36, baseFont * 1.38, 10);
-        ctx.fill();
-      }
-
-      let cursorX = (W - totalLineW) * 0.5;
-      activeCue.words.forEach((wObj, wIdx) => {
-        const wordStr = wObj.word.toUpperCase();
-        const wordW = ctx.measureText(wordStr).width;
-        const spaceW = ctx.measureText(' ').width;
+      lineObj.words.forEach((wObj) => {
         const isCurrent = relSec >= wObj.start && relSec <= wObj.end + 0.05;
+        const wordCenterX = cursorX + wObj.wW * 0.5;
+        const wordCenterY = yPos - baseFont * 0.34;
 
         ctx.save();
-        const wordCenterX = cursorX + wordW * 0.5;
-        const wordCenterY = yPos - baseFont * 0.32;
         if(isCurrent){
+          const pop = captionStyle === 'mrbeast' ? 1.20 : captionStyle === 'iman' ? 1.07 : 1.15;
           ctx.translate(wordCenterX, wordCenterY);
-          ctx.scale(1.12, 1.12);
+          ctx.scale(pop, pop);
           ctx.translate(-wordCenterX, -wordCenterY);
         }
 
-        // Pill de destaque atrás da palavra ativa no estilo Hormozi / Impact
-        if(isCurrent && (captionStyle === 'hormozi' || captionStyle === 'impact')){
-          ctx.fillStyle = captionStyle === 'hormozi' ? '#16a34a' : '#dc2626';
+        // Caixa Pop atrás da palavra falada no momento (Hormozi / Impact / MrBeast)
+        if(isCurrent && (captionStyle === 'hormozi' || captionStyle === 'impact' || captionStyle === 'mrbeast')){
+          ctx.fillStyle = captionStyle === 'hormozi'
+            ? (wObj.isPowerWord ? '#ca8a04' : '#16a34a')
+            : captionStyle === 'mrbeast'
+              ? '#0284c7'
+              : '#dc2626';
+          ctx.shadowColor = 'rgba(0,0,0,0.65)';
+          ctx.shadowBlur = 10;
           ctx.beginPath();
-          ctx.roundRect(cursorX - 7, yPos - baseFont * 0.96, wordW + 14, baseFont * 1.18, 8);
+          ctx.roundRect(cursorX - 7, yPos - baseFont * 0.94, wObj.wW + 14, baseFont * 1.16, 8);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        }
+
+        // Sublinhado neon dourado na palavra ativa no modo Iman Gadzhi Luxury
+        if(isCurrent && captionStyle === 'iman'){
+          ctx.fillStyle = '#facc15';
+          ctx.beginPath();
+          ctx.roundRect(cursorX, yPos + 5, wObj.wW, 4, 2);
           ctx.fill();
         }
 
-        // Contorno preto pesado estilo Shorts/TikTok
-        ctx.lineWidth = Math.max(5, Math.round(baseFont * 0.20));
+        // Sombra 3D e contorno preto profundo estilo OpusClip Pro
+        ctx.shadowColor = 'rgba(0,0,0,0.85)';
+        ctx.shadowOffsetY = 3;
+        ctx.shadowBlur = 6;
+        ctx.lineWidth = Math.max(5, Math.round(baseFont * (captionStyle === 'mrbeast' ? 0.24 : 0.20)));
         ctx.strokeStyle = '#000000';
         ctx.lineJoin = 'round';
-        ctx.strokeText(wordStr, cursorX, yPos);
+        ctx.strokeText(wObj.wStr, cursorX, yPos);
 
-        // Cor da palavra segundo o tema OpusClip escolhido
+        // Preenchimento cromático segundo o template OpusClip Pro escolhido
         if(captionStyle === 'hormozi'){
-          ctx.fillStyle = isCurrent ? '#ffffff' : (wObj.isHighlight ? '#facc15' : '#ffffff');
+          ctx.fillStyle = isCurrent ? '#ffffff' : (wObj.isPowerWord ? '#4ade80' : wObj.isHighlight ? '#facc15' : '#ffffff');
+        } else if(captionStyle === 'mrbeast'){
+          ctx.fillStyle = isCurrent ? '#fde047' : (wObj.isHighlight ? '#38bdf8' : '#ffffff');
+        } else if(captionStyle === 'iman'){
+          ctx.fillStyle = isCurrent ? '#fef08a' : (wObj.isHighlight ? '#e2e8f0' : '#cbd5e1');
         } else if(captionStyle === 'neon'){
           ctx.shadowColor = isCurrent ? '#38bdf8' : '#a855f7';
-          ctx.shadowBlur = isCurrent ? 16 : 8;
+          ctx.shadowBlur = isCurrent ? 18 : 9;
           ctx.fillStyle = isCurrent ? '#38bdf8' : (wObj.isHighlight ? '#e879f9' : '#ffffff');
         } else if(captionStyle === 'impact'){
           ctx.fillStyle = isCurrent ? '#ffffff' : (wObj.isHighlight ? '#fde047' : '#ffffff');
         } else {
           ctx.fillStyle = isCurrent ? '#38bdf8' : '#ffffff';
         }
-        ctx.fillText(wordStr, cursorX, yPos);
+        ctx.fillText(wObj.wStr, cursorX, yPos);
         ctx.restore();
 
-        cursorX += wordW + spaceW;
+        cursorX += wObj.wW + spaceW;
       });
-      ctx.restore();
-    }
+    });
+    ctx.restore();
   }
 
-  // 4) BARRA DE PROGRESSO VIRAL NO RODAPÉ
-  const clipDur = Math.max(1, (clip.endSec || 30) - (clip.startSec || 0));
+  // 6) BARRA DE PROGRESSO FINA NO RODAPÉ (SEM QUALQUER MARCA D'ÁGUA!)
   const progP = Math.max(0, Math.min(1, relSec / clipDur));
-  ctx.fillStyle = 'rgba(255,255,255,0.18)';
-  ctx.fillRect(0, H - 6, W, 6);
+  ctx.fillStyle = 'rgba(255,255,255,0.16)';
+  ctx.fillRect(0, H - 5, W, 5);
   ctx.fillStyle = '#10b981';
-  ctx.fillRect(0, H - 6, W * progP, 6);
+  ctx.fillRect(0, H - 5, W * progP, 5);
 }
 
 function updateOpusCanvasAspect(){
@@ -7653,8 +7921,8 @@ async function runOpusClipAnalysis(skipUrlCheck = false){
     setProgress('opusProgressFill', 38);
     showStatus('opusStatus', '🎙️ Etapa 2/4: Transcrevendo falas reais dos momentos de maior impacto com IA...', 'info');
 
-    // Transcreve até 2 janelas principais em paralelo para alimentar o motor OpusClip com a fala real do vídeo
-    const toTranscribe = peaks.filter(p => p.audioBase64).slice(0, 2);
+    // Transcreve TODAS as janelas candidatas em paralelo para leitura 100% real e completa da fala do vídeo!
+    const toTranscribe = peaks.filter(p => p.audioBase64);
     await Promise.all(toTranscribe.map(async (pk) => {
       try{
         const r = await fetch('/api/clips', {
@@ -7694,12 +7962,12 @@ async function runOpusClipAnalysis(skipUrlCheck = false){
 
     setStep(['op1','op2','op3','op4'], 3);
     setProgress('opusProgressFill', 88);
-    showStatus('opusStatus', '🎯 Etapa 4/4: Calibrando Auto-Reframe 9:16 (rastreamento facial do apresentador em cada corte)...', 'info');
+    showStatus('opusStatus', '🎯 Etapa 4/4: Rastreando rosto e movimento do apresentador segundo a segundo (Auto-Reframe 3.0 Sem Marca d\'Água)...', 'info');
 
     const v = document.getElementById('opusSourceVideo');
     for(let i = 0; i < data.clips.length; i++){
       const c = data.clips[i];
-      c.focusX = await detectVideoSpeakerFocusX(v, c.startSec + Math.min(2.5, c.durationSec * 0.3));
+      await scanClipDynamicCameraKeyframes(v, c);
     }
 
     opusState.clips = data.clips;
@@ -7709,8 +7977,8 @@ async function runOpusClipAnalysis(skipUrlCheck = false){
     selectOpusClip(0, false);
 
     setProgress('opusProgressFill', 100);
-    showStatus('opusStatus', `✅ ${data.clips.length} Cortes Virais prontos (Score até ${data.clips[0].viralityScore}/100)! Clique em ▶️ Assistir ou ⬇️ Baixar .MP4.`, 'success');
-    toast(`🔥 ${data.clips.length} Cortes Virais encontrados pelo OpusClip IA!`);
+    showStatus('opusStatus', `✅ ${data.clips.length} Cortes Virais prontos (Score até ${data.clips[0].viralityScore}/100 • 100% Sem Marca d'Água)! Clique em ▶️ Assistir ou ⬇️ Baixar .MP4.`, 'success');
+    toast(`🔥 ${data.clips.length} Cortes Virais prontos sem marca d'água!`);
     if(data.project) saveProject(data.project);
     setTimeout(() => {
       document.getElementById('opusResultWrap').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -7751,11 +8019,12 @@ async function dubSelectedOpusClip(){
   }
 }
 
-// Extrai o AudioBuffer exato do trecho [startSec, endSec] para gravar no .MP4 exportado
+// Extrai o AudioBuffer exato do trecho [startSec, endSec] com Masterização Broadcast de Voz + SFX Sutil de Gancho
 async function extractOpusClipAudioBuffer(clip){
   const dur = Math.max(2, clip.endSec - clip.startSec);
   if(clip.dubbedAudioBuffer) return clip.dubbedAudioBuffer;
 
+  const brollMode = (document.getElementById('opusBrollMode')||{}).value || 'cinema_broll';
   const SR = 24000;
   const AC = window.AudioContext || window.webkitAudioContext;
   const tmpCtx = new AC({ sampleRate: SR });
@@ -7765,15 +8034,39 @@ async function extractOpusClipAudioBuffer(clip){
 
   if(opusState.mono12k && opusState.mono12k.length > 0){
     const s0 = Math.max(0, Math.floor(clip.startSec * 12000));
+    let peak = 0.001;
     for(let i = 0; i < totalSamples; i++){
       const srcPos = s0 + i * 0.5;
       const idx = Math.floor(srcPos);
       if(idx < opusState.mono12k.length){
         const frac = srcPos - idx;
-        outCh[i] = opusState.mono12k[idx] * (1 - frac) + (opusState.mono12k[idx + 1] || 0) * frac;
+        const val = opusState.mono12k[idx] * (1 - frac) + (opusState.mono12k[idx + 1] || 0) * frac;
+        outCh[i] = val;
+        if(Math.abs(val) > peak) peak = Math.abs(val);
+      }
+    }
+    // Masterização de Voz de Estúdio (Normalização + Soft Limiter estilo Podcast Pro)
+    if(brollMode !== 'clean' && peak > 0.01){
+      const gain = Math.min(2.4, 0.88 / peak);
+      for(let i = 0; i < totalSamples; i++){
+        const boosted = outCh[i] * gain;
+        outCh[i] = Math.tanh(boosted * 1.15) * 0.92;
       }
     }
   }
+
+  // SFX sutil de Hook Whoosh nos primeiros 0.20s quando AI B-Roll & Acabamento Pro está ativo
+  if(brollMode === 'cinema_broll'){
+    const sfxSamples = Math.min(totalSamples, Math.floor(0.20 * SR));
+    for(let i = 0; i < sfxSamples; i++){
+      const p = i / sfxSamples;
+      const env = Math.sin(p * Math.PI) * 0.08;
+      const freq = 140 + p * 320;
+      const swoop = Math.sin(2 * Math.PI * freq * (i / SR)) * env;
+      outCh[i] = Math.max(-0.95, Math.min(0.95, outCh[i] + swoop));
+    }
+  }
+
   await tmpCtx.close().catch(()=>{});
   return outBuf;
 }
