@@ -1537,15 +1537,20 @@ input[type="range"]{
       <h2 style="margin:0">⬇️ Baixar vídeo do YouTube</h2>
       <span class="kbd" style="background:#052e16;border-color:#22c55e;color:#bbf7d0">MP4</span>
     </div>
-    <p style="margin-top:10px">Cole o link do vídeo para consultar os formatos MP4 disponíveis e baixar a qualidade escolhida.</p>
+    <p style="margin-top:10px">Cole o link, consulte os formatos MP4 e baixe pelo navegador. O site prioriza yt-dlp no servidor e mantém um resolvedor alternativo quando necessário.</p>
+    <div role="list" aria-label="Etapas do download" style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">
+      <span role="listitem" class="kbd">1 · Cole o link</span>
+      <span role="listitem" class="kbd">2 · Escolha MP4 e qualidade</span>
+      <span role="listitem" class="kbd">3 · Baixe em Downloads</span>
+    </div>
 
-    <label for="youtubeDownloadUrl">🔗 Link do vídeo</label>
+    <label for="youtubeDownloadUrl">🔗 1. Link do vídeo</label>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <input type="url" id="youtubeDownloadUrl" autocomplete="url"
              placeholder="https://www.youtube.com/watch?v=..."
              onkeydown="if(event.key==='Enter'){event.preventDefault();inspectYoutubeDownload();}"
              style="flex:1;min-width:220px;padding:12px 14px;border-radius:10px;border:1px solid #334155;background:#080b16;color:#fff;font-size:14px" />
-      <button class="primary" type="button" id="youtubeInspectBtn" onclick="inspectYoutubeDownload()" style="padding:11px 16px;white-space:nowrap">🔎 Buscar formatos</button>
+      <button class="primary" type="button" id="youtubeInspectBtn" onclick="inspectYoutubeDownload()" style="padding:11px 16px;white-space:nowrap">🔎 Buscar formatos MP4</button>
     </div>
 
     <div id="youtubeDownloadVideoCard" class="hidden" style="display:flex;align-items:center;gap:12px;margin-top:14px;padding:11px;border:1px solid #334155;border-radius:12px;background:#0b1020">
@@ -1558,12 +1563,12 @@ input[type="range"]{
 
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:end">
       <div style="flex:1;min-width:220px">
-        <label for="youtubeDownloadFormat" style="margin-top:0">Qualidade / formato</label>
+        <label for="youtubeDownloadFormat" style="margin-top:0">2. Qualidade MP4</label>
         <select id="youtubeDownloadFormat" disabled style="width:100%">
           <option value="">Primeiro busque um vídeo</option>
         </select>
       </div>
-      <button class="primary" type="button" id="youtubeDownloadBtn" onclick="startYoutubeDownload()" disabled style="padding:12px 18px;min-width:190px;background:linear-gradient(135deg,#16a34a,#059669)">⬇️ Baixar vídeo MP4</button>
+      <button class="primary" type="button" id="youtubeDownloadBtn" onclick="startYoutubeDownload()" disabled style="padding:12px 18px;min-width:190px;background:linear-gradient(135deg,#16a34a,#059669)">⬇️ 3. Baixar MP4</button>
     </div>
 
     <div class="progress-wrap" id="youtubeDownloadProgress" aria-live="polite">
@@ -1840,6 +1845,7 @@ async function extractYoutubeDownloadDataFromResolverApi(watchUrl,videoId){
     title:String(data.title||''),
     author:String(data.author||''),
     durationSec:Number(data.durationSec)||0,
+    source:String(data.source||''),
     formats
   };
 }
@@ -1931,7 +1937,7 @@ async function inspectYoutubeDownload(){
   try{
     const parsed=parseYoutubeDownloadInput(input&&input.value);
     if(inspectBtn){ inspectBtn.disabled=true; inspectBtn.textContent='⏳ Buscando...'; }
-    showStatus('youtubeDownloadStatus','🛠️ Consultando o resolvedor de vídeo...','info');
+    showStatus('youtubeDownloadStatus','🔎 Consultando yt-dlp no servidor (com fallback automático)...','info');
     let result=null;
     let resolverError=null;
     try{ result=await extractYoutubeDownloadDataFromResolverApi(parsed.watchUrl,parsed.videoId); }
@@ -1958,7 +1964,8 @@ async function inspectYoutubeDownload(){
       watchUrl:parsed.watchUrl,
       title:result.title||`Vídeo ${parsed.videoId}`,
       author:result.author||'',
-      durationSec:Number(result.durationSec)||0
+      durationSec:Number(result.durationSec)||0,
+      source:String(result.source||'')
     };
     youtubeDownloadOptions=result.formats;
     if(select){
@@ -1980,17 +1987,18 @@ async function inspectYoutubeDownload(){
       const details=[];
       if(youtubeDownloadInfo.author) details.push(`Canal: ${youtubeDownloadInfo.author}`);
       if(youtubeDownloadInfo.durationSec) details.push(`Duração: ${fmtClockSec(youtubeDownloadInfo.durationSec)}`);
+      if(youtubeDownloadInfo.source) details.push(`Servidor: ${youtubeDownloadInfo.source==='yt-dlp'?'yt-dlp':'ytdl-core (fallback)'}`);
       details.push(`${youtubeDownloadOptions.length} formato(s) MP4`);
       meta.textContent=details.join(' • ');
     }
     if(thumb){ thumb.style.display=''; thumb.src=`https://i.ytimg.com/vi/${parsed.videoId}/hqdefault.jpg`; thumb.onerror=()=>{thumb.style.display='none';}; }
     if(videoCard) videoCard.classList.remove('hidden');
     if(downloadBtn) downloadBtn.disabled=false;
-    showStatus('youtubeDownloadStatus','✅ Vídeo encontrado. Escolha a qualidade e toque em Baixar vídeo MP4.','success');
+    showStatus('youtubeDownloadStatus','✅ Formatos encontrados. Escolha a qualidade e toque em “3. Baixar MP4”.','success');
   }catch(error){
     showStatus('youtubeDownloadStatus','❌ '+(error.message||'Não foi possível consultar este vídeo.'),'error');
   }finally{
-    if(inspectBtn){ inspectBtn.disabled=false; inspectBtn.textContent='🔎 Buscar formatos'; }
+      if(inspectBtn){ inspectBtn.disabled=false; inspectBtn.textContent='🔎 Buscar formatos MP4'; }
   }
 }
 
@@ -2152,7 +2160,7 @@ async function startYoutubeDownload(){
     }catch(error){
       showStatus('youtubeDownloadStatus','❌ Não consegui iniciar o download: '+(error.message||'erro do navegador'),'error');
     }finally{
-      if(downloadBtn){downloadBtn.disabled=false;downloadBtn.textContent='⬇️ Baixar vídeo MP4';}
+      if(downloadBtn){downloadBtn.disabled=false;downloadBtn.textContent='⬇️ 3. Baixar MP4';}
     }
     return;
   }
@@ -2166,7 +2174,7 @@ async function startYoutubeDownload(){
     }catch(error){
       if(error&&error.name==='AbortError'){
         showStatus('youtubeDownloadStatus','Download cancelado.','warn');
-        if(downloadBtn){downloadBtn.disabled=false;downloadBtn.textContent='⬇️ Baixar vídeo MP4';}
+        if(downloadBtn){downloadBtn.disabled=false;downloadBtn.textContent='⬇️ 3. Baixar MP4';}
         return;
       }
     }
@@ -2208,7 +2216,7 @@ async function startYoutubeDownload(){
     }
     showStatus('youtubeDownloadStatus',`❌ ${message}${directError?' (o acesso direto e o proxy também falharam)':''} Se o vídeo for seu ou você tiver permissão, tente outra qualidade ou use o link direto abaixo.`,'error');
   }finally{
-    if(downloadBtn){downloadBtn.disabled=false;downloadBtn.textContent='⬇️ Baixar vídeo MP4';}
+    if(downloadBtn){downloadBtn.disabled=false;downloadBtn.textContent='⬇️ 3. Baixar MP4';}
   }
 }
 
