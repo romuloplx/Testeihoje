@@ -7637,12 +7637,16 @@ async function importOpusVideoFromUrl(autoRunAnalysis = true){
   try{
     const clipPrompt = (document.getElementById('opusPrompt')||{}).value || '';
     const desiredClipsCount = Number((document.getElementById('opusClipCount')||{}).value || 4);
+    // limpa ?is= e outros params do youtu.be para o servidor entender
+    let fetchUrlForApi = rawUrl;
+    const mId = rawUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([A-Za-z0-9_\-]{11})/);
+    if(mId && mId[1]) fetchUrlForApi = `https://www.youtube.com/watch?v=${mId[1]}`;
     const resp = await fetch('/api/clips', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'fetch_url',
-        url: rawUrl,
+        url: fetchUrlForApi,
         clipPrompt,
         desiredClipsCount
       })
@@ -10501,7 +10505,7 @@ async function exportSelectedOpusClipMp4(opts = {}){
           body: JSON.stringify({
             action: 'download_clip_mp4',
             videoId: opusState.ytVideoId,
-            url: opusState.importedUrl || `https://www.youtube.com/watch?v=${opusState.ytVideoId}`,
+            url: `https://www.youtube.com/watch?v=${opusState.ytVideoId}`,
             startSec: clip.startSec,
             endSec: clip.endSec
           }),
@@ -10681,9 +10685,41 @@ async function exportSelectedOpusClipMp4(opts = {}){
           // Recursão 1x com novo arquivo
           return await exportSelectedOpusClipMp4(opts);
         }
-        // Se captura cancelada, NÃO gera foto+TTS — instrui usuário a baixar original
+        // Se captura cancelada, tenta baixar vídeo completo automaticamente (sem arrastar)
         if(!opusState.file || !opusState.fileUrl){
-          throw new Error('Falha ao baixar vídeo original do YouTube para este corte (' + fmtClockSec(clip.startSec) + '–' + fmtClockSec(clip.endSec) + '). Solução rápida: clique em "📥 Baixar vídeo original MP4 1080p" acima para baixar o vídeo completo, depois arraste o .MP4 para "📂 Usar Meu .MP4" e gere os cortes novamente — download do corte será 100% vídeo original em movimento. Ou use yt-dlp: ' + (document.getElementById('ytdlpCmd')?document.getElementById('ytdlpCmd').textContent:''));
+          showStatus('opusStatus', `⚠️ Captura cancelada — tentando baixar vídeo completo automaticamente (sem arrastar)...`, 'info');
+          try{
+            const cleanUrl = `https://www.youtube.com/watch?v=${opusState.ytVideoId}`;
+            const r2 = await fetch('/api/clips', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'fetch_url', url: cleanUrl, clipPrompt:'', desiredClipsCount:1 }) });
+            const j2 = await r2.json();
+            let autoBlob=null; let autoName='';
+            if(j2 && !j2.error){
+              if(j2.directVideoBase64){
+                const bytes=b64ToUint8Array(j2.directVideoBase64);
+                if(j2.hasMoreVideoChunks && j2.directStreamUrl){
+                  const full=await downloadVideoChunksViaProxy(j2.directStreamUrl, j2.directStreamUa, bytes, 8);
+                  if(full && full.blob) autoBlob=full.blob;
+                }
+                if(!autoBlob) autoBlob=new Blob([bytes],{type:j2.directVideoMime||'video/mp4'});
+                autoName=(j2.title||opusState.ytVideoId).replace(/[^\w\-]+/g,'_').slice(0,80)+'.mp4';
+              }
+              if(!autoBlob && j2.candidateStreamUrls && j2.candidateStreamUrls.length){
+                const dl=await downloadRealYoutubeVideoInBrowser(j2.videoId||opusState.ytVideoId, cleanUrl, j2.candidateStreamUrls);
+                if(dl && dl.blob){ autoBlob=dl.blob; autoName=(j2.title||opusState.ytVideoId).replace(/[^\w\-]+/g,'_').slice(0,80)+'.mp4'; }
+              }
+            }
+            if(!autoBlob){
+              const dl2=await downloadRealYoutubeVideoInBrowser(opusState.ytVideoId, cleanUrl, opusState.ytCandidateUrls||[]);
+              if(dl2 && dl2.blob){ autoBlob=dl2.blob; autoName=opusState.ytVideoId+'.mp4'; }
+            }
+            if(autoBlob && autoBlob.size>25000){
+              toast('✅ Baixei o vídeo completo automaticamente! Cortando seu trecho agora...');
+              loadOpusVideoFile(autoBlob, autoName||'video-completo.mp4', true);
+              await new Promise(res=>{ const v=document.getElementById('opusSourceVideo'); if(!v) return setTimeout(res,800); if(v.readyState>=1 && isFinite(v.duration) && v.duration>0) return res(); v.addEventListener('loadedmetadata',()=>res(),{once:true}); setTimeout(res,3000); });
+              return await exportSelectedOpusClipMp4(opts);
+            }
+          }catch(e){}
+          throw new Error('Não consegui baixar este corte ' + fmtClockSec(clip.startSec) + '–' + fmtClockSec(clip.endSec) + ' automaticamente. Toque 1 vez em 📥 Baixar vídeo original MP4 1080p lá em cima (ele já carrega sozinho, sem precisar arrastar) e gere os cortes de novo. Se seu link tem ?is=, use só https://youtu.be/' + opusState.ytVideoId);
         }
         showStatus('opusStatus', `🎙️ Captura concluída — reprocessando`, 'info');
       }
