@@ -10537,6 +10537,13 @@ async function gravarCorteGaleria(clipIdx = null){
   const clip = opusState.clips[idx];
   if(!clip) return toast('Selecione um corte primeiro!', 'warn');
 
+  // Precisa de um arquivo local carregado para gravar o corte com legenda
+  const sourceVideoUrl = opusState.fileUrl || '';
+  if(!sourceVideoUrl){
+    toast('Envie um arquivo .MP4 primeiro (📁 Upload file) para gerar e salvar o corte.', 'warn');
+    return;
+  }
+
   const btn = document.getElementById('opusExportMp4Btn');
   if(btn){ btn.disabled = true; btn.textContent = '⏳ Gravando corte pra Galeria...'; }
   document.getElementById('opusProgress').classList.add('show');
@@ -10549,148 +10556,46 @@ async function gravarCorteGaleria(clipIdx = null){
     const clipDur = Math.max(2, (clip.endSec || 30) - (clip.startSec || 0));
     const startOffset = Math.max(0, Number(clip.startSec) || 0);
 
-    let sourceVideoUrl = opusState.fileUrl || '';
+    // Extrai áudio do vídeo local para gravar junto com a legenda
     let audioBuffer = null;
-    let ytSegBlob = null;
+    try{
+      audioBuffer = await decodeAudioBufferFromVideoUrl(sourceVideoUrl, startOffset, clipDur);
+      if(audioBuffer) clip.dubbedAudioBuffer = audioBuffer;
+    }catch(_){}
 
-    // 1) Se já temos arquivo local carregado, usa ele direto
-    if(sourceVideoUrl){
-      try{
-        audioBuffer = await decodeAudioBufferFromVideoUrl(sourceVideoUrl, startOffset, clipDur);
-        if(audioBuffer) clip.dubbedAudioBuffer = audioBuffer;
-      }catch(_){}
-    }
+    // Cria o <video> fonte para drawFn
+    const videoEl = document.createElement('video');
+    videoEl.src = sourceVideoUrl;
+    videoEl.muted = true;
+    videoEl.playsInline = true;
+    videoEl.preload = 'auto';
+    await new Promise((res, rej)=>{
+      const ok=()=>{cleanup();res();};
+      const err=()=>{cleanup();rej(new Error('Falha ao carregar vídeo fonte.'));};
+      const cleanup=()=>{videoEl.removeEventListener('canplay',ok);videoEl.removeEventListener('loadeddata',ok);videoEl.removeEventListener('error',err);};
+      videoEl.addEventListener('canplay',ok,{once:true});
+      videoEl.addEventListener('loadeddata',ok,{once:true});
+      videoEl.addEventListener('error',err,{once:true});
+      videoEl.load();
+      setTimeout(()=>{cleanup();res();},3000);
+    });
+    videoEl.currentTime = startOffset;
 
-    // 2) Se é link do YouTube, tenta baixar o segmento real via browser (IP residencial)
-    if(!sourceVideoUrl && opusState.ytVideoId){
-      showStatus('opusStatus', `📥 Baixando segmento do YouTube via navegador (IP residencial)...`, 'info');
-      setProgress('opusProgressFill', 20);
-
-      const candidateUrls = Array.isArray(opusState.ytCandidateUrls) ? [...opusState.ytCandidateUrls] : [];
-      const watchUrl = `https://www.youtube.com/watch?v=${opusState.ytVideoId}`;
-
-      // Tenta download direto via browser (downloadRealYoutubeVideoInBrowser já tenta Piped, Invidious, ytInitialPlayerResponse)
-      const browserDl = await Promise.race([
-        downloadRealYoutubeVideoInBrowser(opusState.ytVideoId, opusState.importedUrl || watchUrl, candidateUrls, clip.startSec, clip.endSec),
-        new Promise(r => setTimeout(() => r(null), 60000))
-      ]);
-
-      if(browserDl && browserDl.blob && browserDl.blob.size > 25000){
-        ytSegBlob = browserDl.blob;
-        const testUrl = URL.createObjectURL(ytSegBlob);
-        const testVid = document.createElement('video');
-        testVid.src = testUrl;
-        testVid.muted = true;
-        testVid.playsInline = true;
-        testVid.preload = 'auto';
-        const canDecode = await new Promise(res => {
-          const ok = () => { cleanup(); res(true); };
-          const fail = () => { cleanup(); res(false); };
-          const cleanup = () => {
-            testVid.removeEventListener('loadeddata', ok);
-            testVid.removeEventListener('canplay', ok);
-            testVid.removeEventListener('error', fail);
-          };
-          testVid.addEventListener('loadeddata', ok, { once: true });
-          testVid.addEventListener('canplay', ok, { once: true });
-          testVid.addEventListener('error', fail, { once: true });
-          testVid.load();
-          setTimeout(() => { cleanup(); res(testVid.videoWidth > 0); }, 2200);
-        });
-        if(canDecode){
-          sourceVideoUrl = testUrl;
-          try{
-            audioBuffer = await decodeAudioBufferFromVideoUrl(sourceVideoUrl, 0, Math.min(clipDur, testVid.duration || clipDur));
-            if(audioBuffer) clip.dubbedAudioBuffer = audioBuffer;
-          }catch(_){}
-          URL.revokeObjectURL(testUrl);
-        } else {
-          URL.revokeObjectURL(testUrl);
-          ytSegBlob = null;
-        }
-      }
-    }
-
-    // 3) Se não conseguiu vídeo real, tenta captura de tela (último recurso)
-    if(!sourceVideoUrl && opusState.ytVideoId){
-      showStatus('opusStatus', `⚠️ YouTube bloqueou download direto. Abrindo captura de tela — selecione esta aba + compartilhe áudio...`, 'warn');
-      toast('🎥 Selecione "Esta Aba" e marque "Compartilhar áudio da aba" para gravar o vídeo real!');
-      await captureLiveYoutubeVideoForOpus(opusState.ytVideoId, clip.title || `corte-${clip.rank}`);
-      if(opusState.fileUrl){
-        sourceVideoUrl = opusState.fileUrl;
-        try{
-          audioBuffer = await decodeAudioBufferFromVideoUrl(sourceVideoUrl, 0, clipDur);
-          if(audioBuffer) clip.dubbedAudioBuffer = audioBuffer;
-        }catch(_){}
-      }
-    }
-
-    // 4) Se ainda não tem vídeo, tenta estúdio com miniatura + TTS real da legenda
-    if(!sourceVideoUrl){
-      showStatus('opusStatus', `🎬 Montando estúdio com miniatura + narração da legenda...`, 'info');
-      clip._forceStudioRender = true;
-      const thumbUrl = opusState.ytThumbUrl || `https://i.ytimg.com/vi/${opusState.ytVideoId}/hqdefault.jpg`;
-      if(!clip._thumbBitmap){
-        try{
-          const tr = await fetch(thumbUrl);
-          if(tr.ok){ const tb = await tr.blob(); clip._thumbBitmap = await createImageBitmap(tb); }
-        }catch(_){}
-      }
-      // Tenta TTS real do navegador para gerar áudio da fala da legenda
-      if(clip.captionText){
-        try{
-          const voice = (document.getElementById('dubVoice')||{}).value || 'nova';
-          const speechText = String(clip.captionText || clip.title || '').slice(0, 1200);
-          audioBuffer = await ttsNavegadorParaAudioBuffer(speechText, voice);
-          if(audioBuffer) clip.dubbedAudioBuffer = audioBuffer;
-        }catch(_){}
-      }
-    }
-
-    if(!sourceVideoUrl && !clip._forceStudioRender){
-      throw new Error('Não foi possível obter o vídeo para gravação. Tente baixar o vídeo original primeiro ou enviar um arquivo .MP4.');
-    }
-
-    // 5) Grava o canvas com legenda queimada + áudio
     const drawFn = (ctx, t) => {
-      drawOpusReframedFrame(ctx, sourceVideoUrl ? document.createElement('video') : null, clip, t);
+      drawOpusReframedFrame(ctx, videoEl, clip, t);
     };
-
-    // Se tem vídeo real, configura o <video> para drawFn
-    let videoEl = null;
-    if(sourceVideoUrl){
-      videoEl = document.createElement('video');
-      videoEl.src = sourceVideoUrl;
-      videoEl.muted = true;
-      videoEl.playsInline = true;
-      videoEl.preload = 'auto';
-      await new Promise((res, rej)=>{
-        const ok=()=>{cleanup();res();};
-        const err=()=>{cleanup();rej(new Error('Falha ao carregar vídeo fonte.'));};
-        const cleanup=()=>{videoEl.removeEventListener('canplay',ok);videoEl.removeEventListener('loadeddata',ok);videoEl.removeEventListener('error',err);};
-        videoEl.addEventListener('canplay',ok,{once:true});
-        videoEl.addEventListener('loadeddata',ok,{once:true});
-        videoEl.addEventListener('error',err,{once:true});
-        videoEl.load();
-        setTimeout(()=>{cleanup();res();},3000);
-      });
-      // Recria drawFn com o videoEl real
-      const drawFnReal = (ctx, t) => {
-        drawOpusReframedFrame(ctx, videoEl, clip, t);
-      };
-    }
 
     showStatus('opusStatus', `🎬 Gravando Corte #${clip.rank} com legenda queimada (30fps)...`, 'info');
     setProgress('opusProgressFill', 40);
 
     const blob = await recordCanvasVideo({
-      drawFn: sourceVideoUrl ? (ctx, t) => drawOpusReframedFrame(ctx, videoEl, clip, t) : drawFn,
+      drawFn,
       audioBuffer,
       audioEl: null,
       width: dim.w, height: dim.h,
       durationSec: clipDur,
       startOffsetSec: startOffset,
-      alsoPlay: sourceVideoUrl ? [videoEl] : [],
+      alsoPlay: [videoEl],
       onProgress: p => { setProgress('opusProgressFill', Math.round(40 + p * 55)); }
     });
 
@@ -10698,7 +10603,7 @@ async function gravarCorteGaleria(clipIdx = null){
 
     finalizarBlobGaleria(blob, clip);
 
-    if(videoEl){ try{ videoEl.pause(); videoEl.src = ''; }catch(_){} }
+    try{ videoEl.pause(); videoEl.src = ''; }catch(_){}
     if(sourceVideoUrl && sourceVideoUrl.startsWith('blob:')) URL.revokeObjectURL(sourceVideoUrl);
 
   }catch(e){
@@ -10745,29 +10650,28 @@ function finalizarBlobGaleria(blob, clip){
     expVidEl.classList.remove('hidden');
   }
 
-  // --- Salvar na Galeria (Mobile-first: iOS/Android) ---
-  // No iOS Safari, <a download> NÃO salva na galeria/Photos.
-  // Usamos navigator.share() (Web Share API) que permite salvar direto na galeria.
-  // Fallback: triggerBlobDownload (desktop/Android Chrome) e nova aba.
+  // --- Salvar na Galeria (Mobile-first: Android/iOS) ---
+  // Padrão supoclip: downloadBlob (URL.createObjectURL + <a download>) +
+  // navigator.share() (Web Share API) para salvar direto na galeria do Android/iOS.
   (async () => {
     try{
       const file = new File([blob], filename, { type: blob.type || 'video/mp4' });
+      // Web Share API: funciona no Android Chrome e iOS Safari para salvar na galeria
       if(navigator.share && navigator.canShare && navigator.canShare({ files: [file] })){
         await navigator.share({
           title: filename,
           text: 'Corte viral criado no DubAI PRO (OpusClip IA)',
           files: [file],
         });
-        toast(`✅ ${filename} compartilhado/salvo na Galeria!`);
+        toast(`✅ ${filename} salvo na Galeria!`);
         showStatus('opusStatus', `✅ Corte #${clip.rank} salvo na Galeria!`, 'success');
         return;
       }
     }catch(e){
-      // Se share falhar (usuário cancelou, não suportado, etc.), cai no fallback abaixo
       console.warn('navigator.share falhou:', e.message);
     }
 
-    // Fallback: download padrão via <a download>
+    // Fallback: download padrão via <a download> (funciona no Android Chrome → Downloads)
     triggerBlobDownload(blob, filename);
     toast(`⬇️ ${filename} baixado (verifique Downloads/Galeria)`);
     showStatus('opusStatus', `✅ Corte #${clip.rank} gravado!`, 'success');
