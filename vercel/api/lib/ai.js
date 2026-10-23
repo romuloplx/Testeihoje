@@ -2611,7 +2611,7 @@ Ensure eyeLX < eyeRX and eyeLY < my < chinY. Output JSON only.`;
 // ============================================================================
 
 async function transcribeClipSegment({ audioBase64, audioMime = 'audio/wav', language = '', offsetSec = 0, durationSec = 20 }) {
-  if (!audioBase64) return { text: '', segments: [], silent: true, provider: 'none' };
+  if (!audioBase64) return { text: '', segments: [], silent: true, provider: 'none', timingGranularity: 'none' };
   const cleanB64 = String(audioBase64).replace(/^data:[^;]+;base64,/, '');
   const audioBuf = Buffer.from(cleanB64, 'base64');
   const normMime = /webm/i.test(audioMime) ? 'audio/webm'
@@ -2623,46 +2623,78 @@ async function transcribeClipSegment({ audioBase64, audioMime = 'audio/wav', lan
   const fileLabel = `clip.${ext}`;
   const baseOffset = Math.max(0, Number(offsetSec) || 0);
   const segSpan = Math.max(2, Number(durationSec) || 20);
+  const transcriptionTimeoutMs = Math.min(45000, Math.max(14000, 10000 + segSpan * 220));
 
   let text = '';
   let rawWhisperSegments = [];
+  let rawWhisperWords = [];
   let provider = '';
   let heardSilence = false;
+  let textOnlyFallback = '';
+  let textOnlyProvider = '';
 
-  // 1) Gemini 3.x Audio Multimodal (rápido e preciso)
-  if (!text && process.env.GEMINI_API_KEY) {
-    try {
-      const t = await geminiTranscribe(audioBuf, language, 16000, normMime);
-      if (t === '__SILENCE__') heardSilence = true;
-      else if (t) {
-        text = t.trim();
-        provider = 'gemini/' + (_gemBest && _gemBest.audio ? _gemBest.audio : gemModel());
-      }
-    } catch (_) {}
-  }
+  const wordsFromSegments = (segments) => (Array.isArray(segments) ? segments : [])
+    .flatMap(seg => Array.isArray(seg?.words) ? seg.words : []);
+  const hasTimedEntries = (items) => Array.isArray(items) && items.some(item => {
+    const start = Number(item?.start ?? item?.start_time);
+    const end = Number(item?.end ?? item?.end_time);
+    return Number.isFinite(start) && Number.isFinite(end) && end > start;
+  });
+  const textFromTimedItems = (words, segments) => {
+    const wordText = (Array.isArray(words) ? words : [])
+      .map(word => String(word?.word ?? word?.text ?? '').trim())
+      .filter(Boolean)
+      .join(' ');
+    if (wordText) return wordText;
+    return (Array.isArray(segments) ? segments : [])
+      .map(segment => String(segment?.text || '').trim())
+      .filter(Boolean)
+      .join(' ');
+  };
 
-  // 2) Unorouter Whisper com Timestamps (verbose_json)
+  // Tenta primeiro provedores Whisper: Gemini retorna texto, mas não fornece timestamps de palavra.
+  // Sem essa ordem, o resultado do Gemini impedia a chamada ao Whisper e forçava estimativa por tamanho do texto.
   const uKey = pickReadyUniKey();
-  if (!text && !heardSilence && uKey) {
+  if (!heardSilence && uKey) {
     for (const model of UNI_WHISPER_MODELS) {
       try {
-        const fd = new FormData();
-        fd.append('file', new Blob([audioBuf], { type: normMime }), fileLabel);
-        fd.append('model', model);
-        fd.append('response_format', 'verbose_json');
-        if (language) fd.append('language', language);
-        const r = await fetch(uniBase() + '/audio/transcriptions', {
-          method: 'POST',
-          headers: { Authorization: uniHeaders(uKey).Authorization },
-          body: fd,
-          signal: AbortSignal.timeout(14000)
-        });
-        if (r.ok) {
+        let r = null;
+        for (const requestWordGranularity of [true, false]) {
+          const fd = new FormData();
+          fd.append('file', new Blob([audioBuf], { type: normMime }), fileLabel);
+          fd.append('model', model);
+          fd.append('response_format', 'verbose_json');
+          if (requestWordGranularity) {
+            fd.append('timestamp_granularities[]', 'word');
+            fd.append('timestamp_granularities[]', 'segment');
+          }
+          if (language) fd.append('language', language);
+          r = await fetch(uniBase() + '/audio/transcriptions', {
+            method: 'POST',
+            headers: { Authorization: uniHeaders(uKey).Authorization },
+            body: fd,
+            signal: AbortSignal.timeout(transcriptionTimeoutMs)
+          });
+          // Alguns endpoints OpenAI-compatíveis aceitam verbose_json, mas não o parâmetro de granularidade.
+          if (r.ok || r.status === 429 || ![400, 422].includes(r.status)) break;
+        }
+        if (r && r.ok) {
           const j = await r.json();
-          text = String(j.text || '').trim();
-          if (Array.isArray(j.segments)) rawWhisperSegments = j.segments;
-          if (text) { provider = 'unorouter/' + model; break; }
-        } else if (r.status === 429) {
+          const candidateWords = Array.isArray(j.words) && j.words.length ? j.words : wordsFromSegments(j.segments);
+          const candidateSegments = Array.isArray(j.segments) ? j.segments : [];
+          const candidateText = String(j.text || '').trim() || textFromTimedItems(candidateWords, candidateSegments);
+          if (candidateText && !textOnlyFallback) {
+            textOnlyFallback = candidateText;
+            textOnlyProvider = 'unorouter/' + model;
+          }
+          if (hasTimedEntries(candidateWords) || hasTimedEntries(candidateSegments)) {
+            rawWhisperWords = candidateWords;
+            rawWhisperSegments = candidateSegments;
+            text = candidateText;
+            provider = 'unorouter/' + model;
+            break;
+          }
+        } else if (r && r.status === 429) {
           markUniRateWindow(uKey);
           break;
         }
@@ -2670,7 +2702,7 @@ async function transcribeClipSegment({ audioBase64, audioMime = 'audio/wav', lan
     }
   }
 
-  // 3) OpenAI Whisper oficial com Timestamps (verbose_json)
+  // Whisper oficial também pode retornar timestamps por palavra no formato verbose_json.
   if (!text && !heardSilence && canUseOfficialOpenAI()) {
     try {
       const OpenAI = require('openai');
@@ -2681,14 +2713,41 @@ async function transcribeClipSegment({ audioBase64, audioMime = 'audio/wav', lan
         file,
         model: 'whisper-1',
         response_format: 'verbose_json',
+        timestamp_granularities: ['word', 'segment'],
         language: language || undefined
-      });
-      text = String(tr.text || '').trim();
-      if (Array.isArray(tr.segments)) rawWhisperSegments = tr.segments;
-      if (text) provider = 'openai/whisper-1';
+      }, { timeout: transcriptionTimeoutMs });
+      const candidateWords = Array.isArray(tr.words) && tr.words.length ? tr.words : wordsFromSegments(tr.segments);
+      const candidateSegments = Array.isArray(tr.segments) ? tr.segments : [];
+      const candidateText = String(tr.text || '').trim() || textFromTimedItems(candidateWords, candidateSegments);
+      if (candidateText && !textOnlyFallback) {
+        textOnlyFallback = candidateText;
+        textOnlyProvider = 'openai/whisper-1';
+      }
+      if (hasTimedEntries(candidateWords) || hasTimedEntries(candidateSegments)) {
+        rawWhisperWords = candidateWords;
+        rawWhisperSegments = candidateSegments;
+        text = candidateText;
+        provider = 'openai/whisper-1';
+      }
     } catch (e) {
       if (e.status === 401) markOpenAi401();
     }
+  }
+
+  // Se o Whisper só devolveu texto, mantém essa transcrição; Gemini é o último recurso sem timestamps.
+  if (!text && textOnlyFallback) {
+    text = textOnlyFallback;
+    provider = textOnlyProvider;
+  }
+  if (!text && !heardSilence && process.env.GEMINI_API_KEY) {
+    try {
+      const t = await geminiTranscribe(audioBuf, language, transcriptionTimeoutMs, normMime);
+      if (t === '__SILENCE__') heardSilence = true;
+      else if (t) {
+        text = t.trim();
+        provider = 'gemini/' + (_gemBest && _gemBest.audio ? _gemBest.audio : gemModel());
+      }
+    } catch (_) {}
   }
 
   const cleaned = String(text || '')
@@ -2696,37 +2755,61 @@ async function transcribeClipSegment({ audioBase64, audioMime = 'audio/wav', lan
     .replace(/\s+/g, ' ')
     .trim();
 
-  // Extrai trechos formatados com tempo exatamente como em transcriver_audio (Whisper): [{ inicio, fim, texto }]
+  // Retorna timestamps de palavra quando disponíveis; caso contrário, preserva os segmentos Whisper.
   const segments = [];
-  if (rawWhisperSegments.length) {
-    for (const seg of rawWhisperSegments) {
-      const t = String(seg.text || '').replace(/\s+/g, ' ').trim();
-      if (!t) continue;
-      segments.push({
-        inicio: Number((baseOffset + Number(seg.start || 0)).toFixed(2)),
-        fim: Number((baseOffset + Number(seg.end || 0)).toFixed(2)),
-        texto: t
-      });
+  const timedWords = rawWhisperWords.length ? rawWhisperWords : wordsFromSegments(rawWhisperSegments);
+  const normalizeTimedItem = (item, itemText) => {
+    const token = String(itemText || '').replace(/\[[^\]]*\]|\([^)]*\)|[♪♫♬♩]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const rawStart = Number(item?.start ?? item?.start_time);
+    const rawEnd = Number(item?.end ?? item?.end_time);
+    if (!token || !Number.isFinite(rawStart) || !Number.isFinite(rawEnd) || rawEnd <= rawStart) return null;
+    const localStart = Math.max(0, Math.min(segSpan, rawStart));
+    const localEnd = Math.max(localStart, Math.min(segSpan, rawEnd));
+    if (localEnd <= localStart) return null;
+    return {
+      inicio: Number((baseOffset + localStart).toFixed(2)),
+      fim: Number((baseOffset + localEnd).toFixed(2)),
+      texto: token
+    };
+  };
+
+  let usedWordTimestamps = false;
+  if (hasTimedEntries(timedWords)) {
+    for (const word of timedWords) {
+      const item = normalizeTimedItem(word, word?.word ?? word?.text);
+      if (item) segments.push(item);
     }
-  } else if (cleaned) {
+    usedWordTimestamps = segments.length > 0;
+  }
+  if (!segments.length && rawWhisperSegments.length) {
+    for (const seg of rawWhisperSegments) {
+      const item = normalizeTimedItem(seg, seg?.text);
+      if (item) segments.push(item);
+    }
+  }
+
+  let timingGranularity = segments.length ? (usedWordTimestamps ? 'word' : 'segment') : 'none';
+  if (!segments.length && cleaned) {
     const clauses = cleaned.match(/[^.!?]+[.!?]*/g) || [cleaned];
     const cleanClauses = clauses.map(c => c.trim()).filter(Boolean);
     const totalChars = cleanClauses.reduce((acc, c) => acc + c.length, 0) || 1;
-    let cursor = baseOffset;
+    let charCursor = 0;
     for (const cl of cleanClauses) {
-      const d = Math.max(1.2, (cl.length / totalChars) * segSpan);
-      const inicio = Number(cursor.toFixed(2));
-      const fim = Number((cursor + d).toFixed(2));
-      cursor += d;
-      segments.push({ inicio, fim, texto: cl });
+      const inicio = Number((baseOffset + (charCursor / totalChars) * segSpan).toFixed(2));
+      charCursor += cl.length;
+      const fim = Number((baseOffset + (charCursor / totalChars) * segSpan).toFixed(2));
+      if (fim > inicio) segments.push({ inicio, fim, texto: cl });
     }
+    timingGranularity = segments.length ? 'estimated' : 'none';
   }
+  segments.sort((a, b) => a.inicio - b.inicio || a.fim - b.fim);
 
   return {
     text: cleaned,
     segments,
     silent: !cleaned,
-    provider: provider || 'acoustic-detector'
+    provider: provider || (cleaned ? 'acoustic-detector' : 'none'),
+    timingGranularity
   };
 }
 
@@ -2749,38 +2832,32 @@ function buildSmartViralClipsFallback({ fileName, durationSec, clipPrompt, targe
     {
       title: `🔥 O Melhor Momento do Podcast (${cleanFileTopic.slice(0, 28)})!`,
       hookBanner: '🔥 OLHA ESSE MOMENTO INCRÍVEL!',
-      reason: 'Pico máximo de energia vocal logo nos primeiros 3 segundos (Hook forte) combinado com história completa de 2 minutos que prende a retenção até o final.',
-      defaultText: 'Presta muita atenção nessa história aqui! Quase ninguém percebe esse detalhe nos bastidores, mas é exatamente nesse momento que tudo muda de verdade. Olha só a reação na mesa quando ele conta o que realmente aconteceu naquele dia, porque ninguém estava esperando essa revelação ao vivo! Todo mundo ficou impressionado com a sinceridade e o jeito direto de explicar cada passo!'
+      reason: 'Pico máximo de energia vocal logo nos primeiros 3 segundos (Hook forte) combinado com história completa de 2 minutos que prende a retenção até o final.'
     },
     {
       title: `⚡ A Revelação Mais Comentada (${cleanFileTopic.slice(0, 26)})!`,
       hookBanner: '⚡ NINGUÉM ESPERAVA ESSA RESPOSTA!',
-      reason: 'Mudança rápida de cadência e entonação emocional intensa — gera identificação imediata e alto índice de compartilhamento nos Shorts, Reels e TikTok.',
-      defaultText: 'Quando você entende como funciona o jogo nos bastidores, nunca mais olha da mesma forma! Olha o que ele respondeu logo em seguida quando perguntaram sobre o assunto mais polêmico da carreira dele. Essa parte vale cada segundo porque mostra os dois lados da história com uma clareza absurda e um fechamento que deixa qualquer um de queixo caído!'
+      reason: 'Mudança rápida de cadência e entonação emocional intensa — gera identificação imediata e alto índice de compartilhamento nos Shorts, Reels e TikTok.'
     },
     {
       title: `💎 História Completa: Vale Ouro do Início ao Fim!`,
       hookBanner: '💎 ESSE CORTE VALE OURO PURO!',
-      reason: 'Alta densidade de valor e resenha autêntica em 2 minutos, ideal para salvamentos (saves) e replays automáticos.',
-      defaultText: 'Essa aqui é uma das melhores partes de todo o episódio! Repara em como a conversa começa tranquila e de repente vira o assunto mais engraçado e verdadeiro da noite. Quem assiste esse trecho até o final entende exatamente por que esse corte bateu recorde de visualizações e comentários!'
+      reason: 'Alta densidade de valor e resenha autêntica em 2 minutos, ideal para salvamentos (saves) e replays automáticos.'
     },
     {
       title: `🚀 Reviravolta Surpreendente no Episódio: Veja Até o Final!`,
       hookBanner: '🚀 ESPERA ATÉ VER O FINAL DISSO!',
-      reason: 'Arco narrativo completo de 2 minutos com tensão crescente e fechamento forte para máximo watch-time.',
-      defaultText: 'No começo parecia só mais uma pergunta normal, mas olha como a situação vira completamente em questão de segundos! Ele puxou a lembrança exata, deu nome aos bois e contou o que ninguém tinha coragem de falar abertamente no microfone. Esse final é simplesmente inacreditável!'
+      reason: 'Arco narrativo completo de 2 minutos com tensão crescente e fechamento forte para máximo watch-time.'
     },
     {
       title: `🎯 O Ponto Exato Onde Tudo Faz Sentido!`,
       hookBanner: '🎯 ISSO MUDA TUDO NA PRÁTICA!',
-      reason: 'Fala incisiva com ritmo dinâmico e clareza visual, excelente para engajamento nos comentários.',
-      defaultText: 'Muita gente tenta adivinhar o que acontece por trás das câmeras, mas aqui ele abriu o jogo completo sem filtro nenhum! Presta atenção em cada frase desse trecho de dois minutos porque a lição que fica no final muda completamente a visão de todo mundo!'
+      reason: 'Fala incisiva com ritmo dinâmico e clareza visual, excelente para engajamento nos comentários.'
     },
     {
       title: `💥 O Momento Mais Viral do Episódio Inteiro!`,
       hookBanner: '💥 ESSE TRECHO VAI VIRALIZAR!',
-      reason: 'Pico acústico de entusiasmo e reação genuína que dispara gatilho de curiosidade instantânea.',
-      defaultText: 'Olha a reação exata da bancada nesse instante! Não tem como assistir esses dois minutos sem dar risada e querer mandar para alguém agora mesmo. É o puro suco do entretenimento e da resenha de verdade do começo ao fim!'
+      reason: 'Pico acústico de entusiasmo e reação genuína que dispara gatilho de curiosidade instantânea.'
     }
   ];
 
@@ -2816,9 +2893,9 @@ function buildSmartViralClipsFallback({ fileName, durationSec, clipPrompt, targe
 
     const tpl = viralTemplates[i % viralTemplates.length];
     const baseScore = Math.max(85, Math.min(99, 98 - i * 3));
-    const spokenText = (pk && pk.text && String(pk.text).trim().length > 8)
+    const spokenText = (pk && pk.text && String(pk.text).trim().length > 0)
       ? String(pk.text).trim()
-      : tpl.defaultText;
+      : '';
 
     clips.push({
       id: `clip-${i + 1}`,
@@ -2844,6 +2921,43 @@ function buildSmartViralClipsFallback({ fileName, durationSec, clipPrompt, targe
   return clips;
 }
 
+function dedupeTimedCaptionSegments(segments) {
+  const sorted = (Array.isArray(segments) ? segments : [])
+    .filter(s => s && Number.isFinite(Number(s.inicio)) && Number.isFinite(Number(s.fim)) && Number(s.fim) > Number(s.inicio) && String(s.texto || '').trim())
+    .map(s => ({ inicio: Number(s.inicio), fim: Number(s.fim), texto: String(s.texto).trim() }))
+    .sort((a, b) => a.inicio - b.inicio || a.fim - b.fim);
+  const unique = [];
+  const normalize = value => String(value || '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+
+  for (const current of sorted) {
+    const key = normalize(current.texto);
+    if (!key) continue;
+    let duplicateIndex = -1;
+    for (let i = unique.length - 1; i >= 0; i--) {
+      const previous = unique[i];
+      if (previous.fim < current.inicio - 1) break;
+      if (normalize(previous.texto) !== key) continue;
+      const overlap = Math.min(previous.fim, current.fim) - Math.max(previous.inicio, current.inicio);
+      const minDuration = Math.min(previous.fim - previous.inicio, current.fim - current.inicio);
+      const nearlySameRange = Math.abs(previous.inicio - current.inicio) <= Math.max(0.12, minDuration * 0.35)
+        && Math.abs(previous.fim - current.fim) <= Math.max(0.18, minDuration * 0.5);
+      if (overlap >= Math.max(0.04, minDuration * 0.45) || nearlySameRange) {
+        duplicateIndex = i;
+        break;
+      }
+    }
+    if (duplicateIndex < 0) {
+      unique.push(current);
+    } else {
+      const previous = unique[duplicateIndex];
+      const previousDuration = previous.fim - previous.inicio;
+      const currentDuration = current.fim - current.inicio;
+      if (currentDuration < previousDuration) unique[duplicateIndex] = current;
+    }
+  }
+  return unique.sort((a, b) => a.inicio - b.inicio || a.fim - b.fim);
+}
+
 async function analyzeViralClips({
   fileName = 'video.mp4',
   durationSec = 60,
@@ -2866,7 +2980,7 @@ async function analyzeViralClips({
   });
 
   // Constrói a lista unificada de segmentos com timestamps [{ inicio, fim, texto }] (ETAPA 2 -> ETAPA 3)
-  const allTimedSegments = Array.isArray(transcricaoSegmentos) && transcricaoSegmentos.length
+  let allTimedSegments = Array.isArray(transcricaoSegmentos) && transcricaoSegmentos.length
     ? transcricaoSegmentos.map(s => ({
         inicio: Number(Number(s.inicio ?? s.startSec ?? s.start ?? 0).toFixed(2)),
         fim: Number(Number(s.fim ?? s.endSec ?? s.end ?? 5).toFixed(2)),
@@ -2886,15 +3000,11 @@ async function analyzeViralClips({
             });
           }
         }
-      } else if (pk && pk.text) {
-        allTimedSegments.push({
-          inicio: Number(Number(pk.startSec || 0).toFixed(2)),
-          fim: Number(Number(pk.endSec || 15).toFixed(2)),
-          texto: String(pk.text).trim()
-        });
       }
     }
   }
+
+  allTimedSegments = dedupeTimedCaptionSegments(allTimedSegments);
 
   const peaksSummary = (Array.isArray(energyPeaks) ? energyPeaks : []).slice(0, 8).map((p, idx) => {
     const s = Number(p.startSec || 0).toFixed(1);
@@ -2963,28 +3073,23 @@ async function analyzeViralClips({
     validator: isValidClipsJson
   }), 2);
 
+  const getClipTranscriptSegments = (startSec, endSec) => allTimedSegments.filter(sg => {
+    if (sg.fim <= startSec || sg.inicio >= endSec) return false;
+    const wordCount = String(sg.texto || '').trim().split(/\s+/).filter(Boolean).length;
+    // Segmentos de frase sem timestamps por palavra só entram se couberem inteiros no corte.
+    return wordCount <= 1 || (sg.inicio >= startSec && sg.fim <= endSec);
+  });
+
   const attachSubSegmentsAndSchema = (clipList) => {
     return clipList.map((c, idx) => {
       const s = Number(c.startSec ?? c.inicio ?? 0);
       const e = Number(c.endSec ?? c.fim ?? 30);
-      const clipDur = Math.max(4, e - s);
-      const matchingSegs = allTimedSegments.filter(sg => sg.fim > s + 0.2 && sg.inicio < e - 0.2);
+      const matchingSegs = getClipTranscriptSegments(s, e);
 
-      let subSegments = matchingSegs;
-      let fullCaptionText = String(c.captionText || '').trim();
-
-      // Mantém legenda 100% fiel ao que foi falado — não inventa frases genéricas. Se poucos segmentos, apenas realinha aos reais.
-      if (!matchingSegs.length && allTimedSegments.length) {
-        const closest = allTimedSegments
-          .map(sg => ({ sg, dist: Math.min(Math.abs(sg.inicio - s), Math.abs(sg.fim - e)) }))
-          .sort((a,b)=>a.dist-b.dist)
-          .slice(0, 4)
-          .map(x=>x.sg);
-        if (closest.length) {
-          subSegments = closest;
-          fullCaptionText = closest.map(c=>c.texto).join(' ').trim() || fullCaptionText;
-        }
-      }
+      const subSegments = matchingSegs;
+      // Não empresta timestamps de outro trecho; quando há tempo real, o texto exibido vem desses mesmos segmentos.
+      const timedCaptionText = matchingSegs.map(sg => sg.texto).join(' ').trim();
+      const fullCaptionText = timedCaptionText || String(c.captionText || '').trim();
 
       return {
         ...c,
@@ -3022,17 +3127,26 @@ async function analyzeViralClips({
           e = Math.max(s + 3, Math.min(totalDur, e));
         }
         // Se a janela original tinha transcrição real da fala do vídeo, preserva 100% da fala real!
-        const origPeak = Array.isArray(energyPeaks) ? energyPeaks[idx] : null;
-        const matchingSegsText = allTimedSegments
-          .filter(sg => sg.fim > s + 0.3 && sg.inicio < e - 0.3)
+        const matchingSegsText = getClipTranscriptSegments(s, e)
           .map(sg => sg.texto)
           .join(' ')
           .trim();
-        const realTranscript = matchingSegsText.length > 8
+        const clipSpan = Math.max(0.01, e - s);
+        const matchingPeak = (Array.isArray(energyPeaks) ? energyPeaks : [])
+          .map(pk => {
+            const peakStart = Number(pk?.startSec ?? pk?.inicio ?? 0);
+            const peakEnd = Number(pk?.endSec ?? pk?.fim ?? 0);
+            const overlapDur = Math.max(0, Math.min(e, peakEnd) - Math.max(s, peakStart));
+            const peakSpan = Math.max(0.01, peakEnd - peakStart);
+            return { pk, overlapDur, peakSpan };
+          })
+          .filter(item => item.overlapDur / item.peakSpan >= 0.85 && item.overlapDur / clipSpan >= 0.85)
+          .sort((a, b) => b.overlapDur - a.overlapDur)[0]?.pk;
+        const realTranscript = matchingSegsText.length > 0
           ? matchingSegsText
-          : (origPeak && origPeak.text && String(origPeak.text).trim().length > 8)
-            ? String(origPeak.text).trim()
-            : String(c.captionText || fb.captionText).trim();
+          : (matchingPeak?.text && String(matchingPeak.text).trim().length > 0)
+            ? String(matchingPeak.text).trim()
+            : '';
         const rawScore = c.viralityScore ?? c.score_viralidade;
         const vScore = Math.max(82, Math.min(99, Math.round(Number(rawScore) || fb.viralityScore)));
         const titleStr = String(c.title || c.titulo || fb.title).trim();

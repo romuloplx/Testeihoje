@@ -1465,8 +1465,8 @@ input[type="range"]{
                   <span style="font-size:10.5px;color:#94a3b8">📝 Palavras por bloco na tela:</span>
                   <select id="opusEditWordsPerPhrase" onchange="onAdjustOpusCaptionSettings()" style="width:auto;padding:5px 9px;margin:0;font-size:11.5px;border-radius:7px;background:#0b0f1d;border:1px solid #282e46">
                     <option value="1">⚡ 1 Palavra (Dinâmico Rápido)</option>
-                    <option value="2">🔥 2 Palavras (Impacto)</option>
-                    <option value="3" selected>💎 3 Palavras (Padrão Hormozi / OpusClip)</option>
+                    <option value="2" selected>🔥 2 Palavras (Mais legível)</option>
+                    <option value="3">💎 3 Palavras (Mais dinâmico)</option>
                     <option value="4">🎬 4 Palavras (Frase Completa)</option>
                   </select>
                 </div>
@@ -8803,6 +8803,8 @@ function loadOpusVideoFile(file, customLabel = '', skipAutoClip = false){
   opusState.mono12k = null;
   opusState.fullAudioBuffer = null;
   opusState.ytTranscriptSegments = null;
+  opusState.whisperSegments = null;
+  opusState.importedUrl = '';
   opusState.clips = [];
   opusState.lastExportBlob = null; opusState.lastExportClipId = null;
 
@@ -9084,15 +9086,19 @@ async function scanVideoAcousticEnergyPeaks(file, durationSec, desiredCount, tar
     });
   }
 
-  // Extrai snippet WAV 12kHz (até 22s) de TODAS as janelas para transcrição real completa ("Leitura Perfeita")
+  // Extrai o áudio da janela candidata inteira (máx. 120s) para não espalhar 22s de fala pelo tempo de um corte maior.
   for(let i = 0; i < candidates.length; i++){
     const c = candidates[i];
     if(mono12k){
-      const s0 = Math.max(0, Math.floor(c.startSec * SR));
-      const s1 = Math.min(mono12k.length, Math.floor(Math.min(c.endSec, c.startSec + 22) * SR));
+      const audioStartSec = Math.max(0, Number(c.startSec) || 0);
+      const audioEndSec = Math.min(totalDur, Number(c.endSec) || totalDur, audioStartSec + 120);
+      const s0 = Math.max(0, Math.floor(audioStartSec * SR));
+      const s1 = Math.min(mono12k.length, Math.ceil(audioEndSec * SR));
       if(s1 - s0 > SR){
         const slice = mono12k.subarray(s0, s1);
         const wavBytes = encodeWavMono(slice, SR);
+        c.audioStartSec = Number((s0 / SR).toFixed(3));
+        c.audioDurationSec = Number(((s1 - s0) / SR).toFixed(3));
         c.audioBase64 = bytesToBase64(wavBytes);
       }
     }
@@ -9195,55 +9201,67 @@ function pickOpusEmojiForPhrase(phraseText){
 }
 
 // Constrói blocos curtos de palavras estilo OpusClip Pro 3.0 com Timestamps Whisper ([inicio, fim, texto]) + Sincronia Acústica Real!
-function buildOpusWordByWordCues(text, clipDurationSec, clipStartSec = 0, subSegments = null, wordsPerPhrase = 3){
+function buildOpusWordByWordCues(text, clipDurationSec, clipStartSec = 0, subSegments = null, wordsPerPhrase = 2){
   const clean = String(text || '').replace(/\s+/g, ' ').trim();
   if(!clean) return [];
   const rawWords = clean.split(' ').filter(Boolean);
   if(!rawWords.length) return [];
 
-  const totalDur = Math.max(1.5, clipDurationSec || 10);
+  const totalDur = Math.max(1.5, Number(clipDurationSec) || 10);
+  const absoluteClipStart = Math.max(0, Number(clipStartSec) || 0);
+  const absoluteClipEnd = absoluteClipStart + totalDur;
   let timedWords = [];
 
-  // Se temos segmentos reais com timestamps do Whisper ([{inicio, fim, texto}]), trava cada palavra ao seu segmento exato!
-  const validSubs = Array.isArray(subSegments) ? subSegments.filter(s => s && s.texto && isFinite(s.inicio) && isFinite(s.fim) && s.fim > s.inicio) : [];
-  if(validSubs.length >= 1){
+  // Usa timestamps Whisper em nível de palavra quando disponíveis; segmentos maiores são interpolados apenas dentro do seu intervalo real.
+  const validSubs = Array.isArray(subSegments) ? subSegments.filter(s => {
+    const start = Number(s && s.inicio);
+    const end = Number(s && s.fim);
+    return s && s.texto && Number.isFinite(start) && Number.isFinite(end) && end > start
+      && end > absoluteClipStart && start < absoluteClipEnd;
+  }).map(s => ({ inicio: Number(s.inicio), fim: Number(s.fim), texto: String(s.texto).trim() }))
+    .sort((a, b) => a.inicio - b.inicio || a.fim - b.fim) : [];
+
+  if(validSubs.length){
     let globalWordIdx = 0;
-    validSubs.forEach((seg) => {
+    validSubs.forEach(seg => {
       const segWords = String(seg.texto || '').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
       if(!segWords.length) return;
-      const relStart = Math.max(0.02, Math.min(totalDur - 0.2, (Number(seg.inicio) || 0) - (clipStartSec || 0)));
-      const relEnd = Math.max(relStart + 0.25, Math.min(totalDur - 0.02, (Number(seg.fim) || totalDur) - (clipStartSec || 0)));
-      const segDur = Math.max(0.25, relEnd - relStart);
+      const absStart = Math.max(absoluteClipStart, seg.inicio);
+      const absEnd = Math.min(absoluteClipEnd, seg.fim);
+      const relStart = Math.max(0, absStart - absoluteClipStart);
+      const relEnd = Math.min(totalDur, absEnd - absoluteClipStart);
+      const segDur = relEnd - relStart;
+      if(segDur <= 0) return;
       const weights = segWords.map(w => {
         const cleanW = w.replace(/[^a-zA-ZÀ-ÿ0-9]/g, '');
         const syllEst = Math.max(1, Math.round(cleanW.length / 2.6));
-        const punctPause = /[.!?]$/.test(w) ? 1.85 : /[,;:]$/.test(w) ? 1.15 : 0;
-        return syllEst + punctPause;
+        const punctuationWeight = /[.!?]$/.test(w) ? 0.35 : /[,;:]$/.test(w) ? 0.15 : 0;
+        return syllEst + punctuationWeight;
       });
       const totalW = weights.reduce((a, b) => a + b, 0) || 1;
       let cursor = relStart;
       segWords.forEach((w, idx) => {
-        const d = (weights[idx] / totalW) * segDur;
-        const start = cursor;
-        const end = cursor + d;
-        cursor = end;
+        const wordStart = cursor;
+        const d = idx === segWords.length - 1 ? Math.max(0, relEnd - cursor) : (weights[idx] / totalW) * segDur;
+        const wordEnd = Math.min(relEnd, wordStart + d);
+        cursor = wordEnd;
         const cleanW = w.replace(/[^a-zA-ZÀ-ÿ0-9]/g, '');
         const isPowerWord = /^(segredo|verdade|nunca|sempre|agora|dinheiro|milhões|incrível|impossível|absurdo|atenção|olha|resultado|sucesso|viral|erro|cuidado|ouro|muda|tudo)$/i.test(cleanW);
         const isHighlight = isPowerWord || cleanW.length >= 6 || /[!?🔥⚡💎]/.test(w) || (globalWordIdx % 3 === 1);
         globalWordIdx++;
-        timedWords.push({ word: w, start, end, isHighlight, isPowerWord });
+        timedWords.push({ word: w, start: wordStart, end: wordEnd, isHighlight, isPowerWord });
       });
     });
   }
 
-  // Fallback para Sincronia Acústica Real (Syllable Energy Lock via mono12k)
+  // Sem timestamps, distribui pelo intervalo de fala detectável; mantém a estimativa dentro da duração real do corte.
   if(!timedWords.length){
     let speechStartOffset = 0.06;
     let speechEndOffset = totalDur - 0.10;
     if(opusState.mono12k && opusState.mono12k.length > 12000){
       const SR = 12000;
-      const s0 = Math.max(0, Math.floor((clipStartSec || 0) * SR));
-      const s1 = Math.min(opusState.mono12k.length, Math.floor(((clipStartSec || 0) + totalDur) * SR));
+      const s0 = Math.max(0, Math.floor(absoluteClipStart * SR));
+      const s1 = Math.min(opusState.mono12k.length, Math.floor(absoluteClipEnd * SR));
       if(s1 - s0 > SR){
         let peakAmp = 0.001;
         for(let i = s0; i < s1; i += 20){
@@ -9253,13 +9271,13 @@ function buildOpusWordByWordCues(text, clipDurationSec, clipStartSec = 0, subSeg
         const thresh = peakAmp * 0.14;
         for(let i = s0; i < s1; i += 60){
           if(Math.abs(opusState.mono12k[i]) > thresh){
-            speechStartOffset = Math.max(0.04, Math.min(1.1, (i - s0) / SR));
+            speechStartOffset = Math.max(0.04, Math.min(totalDur - 0.12, (i - s0) / SR));
             break;
           }
         }
         for(let i = s1 - 1; i > s0; i -= 60){
           if(Math.abs(opusState.mono12k[i]) > thresh){
-            speechEndOffset = Math.max(speechStartOffset + 1.0, Math.min(totalDur - 0.05, (i - s0) / SR));
+            speechEndOffset = Math.max(speechStartOffset + 0.05, Math.min(totalDur - 0.04, (i - s0) / SR));
             break;
           }
         }
@@ -9268,18 +9286,15 @@ function buildOpusWordByWordCues(text, clipDurationSec, clipStartSec = 0, subSeg
 
     const weights = rawWords.map(w => {
       const cleanW = w.replace(/[^a-zA-ZÀ-ÿ0-9]/g, '');
-      const syllEst = Math.max(1, Math.round(cleanW.length / 2.6));
-      const punctPause = /[.!?]$/.test(w) ? 1.85 : /[,;:]$/.test(w) ? 1.15 : 0;
-      return syllEst + punctPause;
+      return Math.max(1, Math.round(cleanW.length / 2.6));
     });
     const totalW = weights.reduce((a, b) => a + b, 0) || 1;
-
     let cursor = speechStartOffset;
-    const usableDur = Math.max(1.0, speechEndOffset - speechStartOffset);
+    const usableDur = Math.max(0.1, speechEndOffset - speechStartOffset);
     timedWords = rawWords.map((w, i) => {
-      const d = (weights[i] / totalW) * usableDur;
       const start = cursor;
-      const end = cursor + d;
+      const d = i === rawWords.length - 1 ? Math.max(0, speechEndOffset - cursor) : (weights[i] / totalW) * usableDur;
+      const end = Math.min(speechEndOffset, start + d);
       cursor = end;
       const cleanW = w.replace(/[^a-zA-ZÀ-ÿ0-9]/g, '');
       const isPowerWord = /^(segredo|verdade|nunca|sempre|agora|dinheiro|milhões|incrível|impossível|absurdo|atenção|olha|resultado|sucesso|viral|erro|cuidado|ouro|muda|tudo)$/i.test(cleanW);
@@ -9288,11 +9303,17 @@ function buildOpusWordByWordCues(text, clipDurationSec, clipStartSec = 0, subSeg
     });
   }
 
-  // Agrupa de N em N palavras (ajustável pelo usuário: 1, 2, 3 ou 4 palavras por vez)
+  // Blocos menores deixam a legenda mais arejada; a pontuação final também fecha o bloco para não misturar frases.
   const phrases = [];
-  const WORDS_PER_PHRASE = Math.max(1, Math.min(6, Number(wordsPerPhrase) || 3));
-  for(let i = 0; i < timedWords.length; i += WORDS_PER_PHRASE){
-    const slice = timedWords.slice(i, i + WORDS_PER_PHRASE);
+  const WORDS_PER_PHRASE = Math.max(1, Math.min(6, Number(wordsPerPhrase) || 2));
+  for(let i = 0; i < timedWords.length;){
+    let phraseEnd = i;
+    while(phraseEnd < timedWords.length && phraseEnd - i < WORDS_PER_PHRASE){
+      const word = timedWords[phraseEnd].word;
+      phraseEnd++;
+      if(/[.!?…]["'”’»)]*$/u.test(word)) break;
+    }
+    const slice = timedWords.slice(i, phraseEnd);
     const phraseStr = slice.map(x => x.word).join(' ');
     phrases.push({
       phraseIdx: phrases.length,
@@ -9302,8 +9323,15 @@ function buildOpusWordByWordCues(text, clipDurationSec, clipStartSec = 0, subSeg
       hasPowerWord: slice.some(x => x.isPowerWord || x.isHighlight),
       emoji: pickOpusEmojiForPhrase(phraseStr)
     });
+    i = phraseEnd;
   }
   return phrases;
+}
+
+function findActiveOpusCaptionCue(cues, timeSec){
+  const t = Number(timeSec);
+  if(!Array.isArray(cues) || !Number.isFinite(t)) return null;
+  return cues.find(c => c && t >= Number(c.start) && t < Number(c.end) + 0.08) || null;
 }
 
 // Renderiza 1 frame ultra-profissional do OpusClip Pro 3.0 (100% SEM MARCA D'ÁGUA + Auto-Reframe 3.0 + Dynamic Zoom Cuts + AI B-Roll + Legendas Ajustáveis Sincronizadas com a Fala)
@@ -9317,7 +9345,7 @@ function drawOpusReframedFrame(ctx, videoEl, clip, relSec){
   const brollMode = (document.getElementById('opusBrollMode')||{}).value || 'cinema_broll';
 
   const clipDur = Math.max(2, (clip.endSec || 30) - (clip.startSec || 0));
-  const wPerPhrase = Number(clip.wordsPerPhrase) || Number((document.getElementById('opusEditWordsPerPhrase')||{}).value) || 3;
+  const wPerPhrase = Number(clip.wordsPerPhrase) || Number((document.getElementById('opusEditWordsPerPhrase')||{}).value) || 2;
   if(!clip._cues || clip._cuesText !== clip.captionText || clip._cuesDur !== clipDur || clip._cuesWpp !== wPerPhrase){
     clip._cues = buildOpusWordByWordCues(clip.captionText, clipDur, clip.startSec || 0, clip.subSegments, wPerPhrase);
     clip._cuesText = clip.captionText;
@@ -9331,7 +9359,7 @@ function drawOpusReframedFrame(ctx, videoEl, clip, relSec){
   const capSpeed = Math.max(0.4, Math.min(2.2, Number(clip.captionSpeedRate) || 1.0));
   const captionRelSec = Math.max(0, (relSec - capOffset) * capSpeed);
 
-  const activeCue = cues.find(c => captionRelSec >= c.start && captionRelSec <= c.end + 0.08) || cues[Math.min(cues.length - 1, Math.max(0, Math.floor((captionRelSec / clipDur) * cues.length)))];
+  const activeCue = findActiveOpusCaptionCue(cues, captionRelSec);
   const activeWordObj = activeCue && activeCue.words ? activeCue.words.find(w => captionRelSec >= w.start && captionRelSec <= w.end + 0.05) : null;
 
   // Calcula o fator de Zoom Dinâmico (Jump-Cut Punch-In estilo OpusClip Pro)
@@ -10227,7 +10255,7 @@ function syncOpusCaptionUiFromClip(clip){
   const spdVal = Number(clip.captionSpeedRate) || 1.0;
   const yVal = Number.isFinite(Number(clip.captionYRatio)) && Number(clip.captionYRatio) > 0 ? Number(clip.captionYRatio) : 78;
   const sclVal = Number(clip.captionFontScale) || 100;
-  const wppVal = Number(clip.wordsPerPhrase) || 3;
+  const wppVal = Number(clip.wordsPerPhrase) || 2;
 
   const offEl = document.getElementById('opusEditCaptionOffset');
   const spdEl = document.getElementById('opusEditCaptionSpeed');
@@ -10293,7 +10321,7 @@ function onAdjustOpusCaptionSettings(cardIdx = null){
     if(yEl) clip.captionYRatio = Math.max(15, Math.min(88, Math.round(parseFloat(yEl.value || 78))));
     if(sclEl) clip.captionFontScale = Math.max(65, Math.min(145, Math.round(parseFloat(sclEl.value || 100))));
     if(wppEl){
-      const newWpp = Math.max(1, Math.min(6, parseInt(wppEl.value || '3', 10)));
+      const newWpp = Math.max(1, Math.min(6, parseInt(wppEl.value || '2', 10)));
       if(clip.wordsPerPhrase !== newWpp){
         clip.wordsPerPhrase = newWpp;
         clip._cues = null;
@@ -10399,7 +10427,7 @@ function resetOpusCaptionSync(cardIdx = null){
   clip.captionYRatio = 78;
   clip.captionXRatio = 50;
   clip.captionFontScale = 100;
-  clip.wordsPerPhrase = 3;
+  clip.wordsPerPhrase = 2;
   clip._cues = null;
   opusState.lastExportBlob = null; opusState.lastExportClipId = null;
   if(idx === opusState.selectedIdx) syncOpusCaptionUiFromClip(clip);
@@ -10580,7 +10608,7 @@ function renderOpusClipsListUI(){
     const isSel = idx === opusState.selectedIdx;
     const clipDur = Math.max(2, (c.endSec || 30) - (c.startSec || 0));
     const m = c.metrics || { hook: 97, flow: 95, value: 96, trend: 94 };
-    const wPerPhrase = Number(c.wordsPerPhrase) || 3;
+    const wPerPhrase = Number(c.wordsPerPhrase) || 2;
     if(!c._cues || c._cuesText !== c.captionText || c._cuesDur !== clipDur || c._cuesWpp !== wPerPhrase){
       c._cues = buildOpusWordByWordCues(c.captionText, clipDur, c.startSec || 0, c.subSegments, wPerPhrase);
       c._cuesText = c.captionText;
@@ -10779,10 +10807,13 @@ async function runOpusClipAnalysis(skipUrlCheck = false){
     setStep(['op1','op2','op3','op4','op5','op6'], 1);
     setProgress('opusProgressFill', 32);
     if(typeof setOpusPipelineStage==='function') setOpusPipelineStage(2);
-    showStatus('opusStatus', '🎙️ [2/6] [Whisper STT] Transcrevendo com word-level timestamps [{inicio, fim, texto}]...', 'info');
+    showStatus('opusStatus', '🎙️ [2/6] [Whisper STT] Transcrevendo cada janela completa com timestamps de palavras/frases...', 'info');
 
-    // Transcreve TODAS as janelas candidatas em paralelo e coleta os segmentos exatos [{inicio, fim, texto}] do Whisper!
-    const collectedWhisperSegments = Array.isArray(opusState.whisperSegments) ? [...opusState.whisperSegments] : [];
+    // Transcreve as janelas candidatas completas; os tempos enviados refletem exatamente o áudio codificado.
+    const hasPreloadedTranscript = opusState.ytEmbedMode || Boolean(opusState.importedUrl)
+      || (Array.isArray(opusState.ytTranscriptSegments) && opusState.ytTranscriptSegments.length > 0);
+    const collectedWhisperSegments = hasPreloadedTranscript && Array.isArray(opusState.whisperSegments)
+      ? [...opusState.whisperSegments] : [];
     const toTranscribe = peaks.filter(p => p.audioBase64);
     await Promise.all(toTranscribe.map(async (pk) => {
       try{
@@ -10793,8 +10824,8 @@ async function runOpusClipAnalysis(skipUrlCheck = false){
             action: 'transcribe_segment',
             audioBase64: pk.audioBase64,
             audioMime: 'audio/wav',
-            offsetSec: pk.startSec,
-            durationSec: Math.max(2, (pk.endSec || 20) - (pk.startSec || 0))
+            offsetSec: Number.isFinite(Number(pk.audioStartSec)) ? pk.audioStartSec : pk.startSec,
+            durationSec: Number(pk.audioDurationSec) || Math.max(2, (pk.endSec || 20) - (pk.startSec || 0))
           })
         });
         const j = await r.json();
@@ -10808,18 +10839,7 @@ async function runOpusClipAnalysis(skipUrlCheck = false){
     }));
     peaks.forEach(p => { delete p.audioBase64; });
 
-    // Garante lista ordenada de segmentos [{inicio, fim, texto}] para a Etapa 3 (Curadoria Semântica LLM)
-    if(!collectedWhisperSegments.length){
-      peaks.forEach(pk => {
-        if(pk.text){
-          collectedWhisperSegments.push({
-            inicio: Number((pk.startSec || 0).toFixed(2)),
-            fim: Number((pk.endSec || 15).toFixed(2)),
-            texto: String(pk.text).trim()
-          });
-        }
-      });
-    }
+    // Ordena apenas timestamps reais/estimados vindos do transcritor; texto de janela inteira não vira um falso timestamp.
     collectedWhisperSegments.sort((a, b) => (a.inicio || 0) - (b.inicio || 0));
     opusState.whisperSegments = collectedWhisperSegments;
 
@@ -10887,8 +10907,13 @@ async function runOpusClipAnalysis(skipUrlCheck = false){
     setProgress('opusProgressFill', 100);
     if(typeof setOpusPipelineStage==='function') setOpusPipelineStage(6);
     setStep(['op1','op2','op3','op4','op5','op6'],5);
-    showStatus('opusStatus', `✅ Pipeline [6/6] Concluído! ${data.clips.length} Melhores Partes cortadas em 9:16 e legendadas (Score até ${data.clips[0].viralityScore}/100 • MP4 normal YouTube • 100% Sem Marca d'Água)!`, 'success');
-    toast(`🔥 ${data.clips.length} Melhores Partes cortadas em MP4 normal YouTube (9:16) com legendas!`);
+    const clipsWithoutCaptions = data.clips.filter(c => !String(c.captionText || '').trim()).length;
+    const completionMessage = `✅ Pipeline [6/6] Concluído! ${data.clips.length} Melhores Partes cortadas em 9:16 (Score até ${data.clips[0].viralityScore}/100 • MP4 normal YouTube • 100% Sem Marca d'Água)!`;
+    const missingCaptionNote = clipsWithoutCaptions ? ` ⚠️ ${clipsWithoutCaptions} corte(s) sem transcrição confiável; a legenda foi omitida para não inventar fala.` : '';
+    showStatus('opusStatus', completionMessage + missingCaptionNote, clipsWithoutCaptions ? 'warn' : 'success');
+    toast(clipsWithoutCaptions
+      ? `⚠️ ${clipsWithoutCaptions} corte(s) sem transcrição confiável; confira o áudio ou tente novamente.`
+      : `🔥 ${data.clips.length} Melhores Partes cortadas em MP4 normal YouTube (9:16) com legendas!`);
     if(data.project) saveProject(data.project);
     setTimeout(() => {
       document.getElementById('opusResultWrap').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -11711,16 +11736,18 @@ async function shareOpusClipToGallery(){
 function downloadSelectedOpusClipSrt(){
   const clip = opusState.clips[opusState.selectedIdx];
   if(!clip) return toast('Selecione um corte primeiro', 'warn');
+  if(!String(clip.captionText || '').trim()) return toast('Sem transcrição confiável para exportar como SRT.', 'warn');
   const dur = Math.max(2, clip.endSec - clip.startSec);
-  const wpp = Number(clip.wordsPerPhrase) || 3;
+  const wpp = Number(clip.wordsPerPhrase) || 2;
   const off = Number(clip.captionOffsetSec) || 0;
   const spd = Math.max(0.4, Math.min(2.2, Number(clip.captionSpeedRate) || 1.0));
   const cues = buildOpusWordByWordCues(clip.captionText, dur, clip.startSec || 0, clip.subSegments, wpp);
   let srt = '';
   cues.forEach((c, idx) => {
     const line = c.words.map(w => w.word).join(' ');
-    const s = Math.max(0, (c.start / spd) + off);
-    const e = Math.max(s + 0.2, (c.end / spd) + off);
+    const s = Math.max(0, Math.min(dur, (c.start / spd) + off));
+    const e = Math.min(dur, Math.max(s + 0.08, (c.end / spd) + off));
+    if(e <= s) return;
     srt += `${idx + 1}\n${fmtSRT(s)} --> ${fmtSRT(e)}\n${line}\n\n`;
   });
   const a = document.createElement('a');
