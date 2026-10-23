@@ -22,6 +22,17 @@ const readOpusCaptionHelpers = () => {
   return context;
 };
 
+const readMissingCaptionTranscriber = context => {
+  const html = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
+  const start = html.indexOf('async function transcribeMissingOpusClipCaptions(');
+  const end = html.indexOf('\n// Executa o pipeline completo do OpusClip IA', start);
+  assert.notEqual(start, -1, 'missing-caption transcriber should exist');
+  assert.notEqual(end, -1, 'missing-caption transcriber should have an end marker');
+  vm.createContext(context);
+  vm.runInContext(`${html.slice(start, end)}\nglobalThis.recoverMissingCaptions = transcribeMissingOpusClipCaptions;`, context);
+  return context;
+};
+
 test('word timestamps stay absolute-to-relative exact and default to readable two-word blocks', () => {
   const { buildCues } = readOpusCaptionHelpers();
   const cues = buildCues('Olá mundo! Tudo certo.', 2, 10, [
@@ -55,6 +66,43 @@ test('burned-in captions keep a readable gap between highlighted words', () => {
   assert.equal(wordGap(34, 9), 18);
   assert.equal(wordGap(20, 10), 11);
   assert.equal(wordGap(20, 20), 20);
+});
+
+test('missing clip captions are recovered from that clip audio, without replacing existing transcripts', async () => {
+  const requests = [];
+  const context = readMissingCaptionTranscriber({
+    opusState: { mono12k: new Float32Array(12000 * 6).fill(0.2), fullAudioBuffer: null },
+    encodeWavMono: samples => new Uint8Array(samples.length * 2 + 44),
+    bytesToBase64: bytes => `wav-${bytes.length}`,
+    fetch: async (url, options) => {
+      assert.equal(url, '/api/clips');
+      const body = JSON.parse(options.body);
+      requests.push(body);
+      return {
+        ok: true,
+        json: async () => ({
+          text: 'fala real do trecho',
+          segments: [{ inicio: body.offsetSec + 0.2, fim: body.offsetSec + 0.5, texto: 'fala' }],
+          timingGranularity: 'word'
+        })
+      };
+    }
+  });
+  const clips = [
+    { startSec: 2, endSec: 4, captionText: '' },
+    { startSec: 0, endSec: 2, captionText: 'transcrição já existente' }
+  ];
+
+  const recovered = await context.recoverMissingCaptions(clips);
+
+  assert.equal(recovered, 1);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].action, 'transcribe_segment');
+  assert.equal(requests[0].offsetSec, 2);
+  assert.equal(requests[0].durationSec, 2);
+  assert.equal(clips[0].captionText, 'fala real do trecho');
+  assert.equal(clips[0].subSegments[0].texto, 'fala');
+  assert.equal(clips[1].captionText, 'transcrição já existente');
 });
 
 test('duplicate overlapping transcripts are collapsed without removing repeated words spoken later', () => {

@@ -10764,6 +10764,85 @@ function renderOpusClipsListUI(){
   }, 50);
 }
 
+// Recupera legendas ausentes transcrevendo o áudio exato do corte, sem inventar texto nem reaproveitar fala de outro intervalo.
+async function transcribeMissingOpusClipCaptions(clips){
+  const pending = (Array.isArray(clips) ? clips : []).filter(clip => clip && !String(clip.captionText || '').trim());
+  if(!pending.length) return 0;
+
+  const SR = 12000;
+  const mono = opusState.mono12k && opusState.mono12k.length ? opusState.mono12k : null;
+  const audioBuffer = !mono && opusState.fullAudioBuffer && opusState.fullAudioBuffer.length
+    ? opusState.fullAudioBuffer : null;
+  if(!mono && !audioBuffer) return 0;
+
+  const monoSource = mono || audioBuffer.getChannelData(0);
+  const sourceRate = mono ? SR : Number(audioBuffer.sampleRate) || SR;
+  let nextIndex = 0;
+  let recovered = 0;
+
+  const transcribeOne = async clip => {
+    const startSec = Math.max(0, Number(clip.startSec) || 0);
+    const endSecRaw = Number(clip.endSec);
+    if(!Number.isFinite(endSecRaw) || endSecRaw <= startSec) return false;
+    const maxEndSec = Math.min(endSecRaw, startSec + 120, monoSource.length / sourceRate);
+    const durationSec = maxEndSec - startSec;
+    if(durationSec < 2) return false;
+
+    let samples;
+    if(mono){
+      const s0 = Math.max(0, Math.floor(startSec * SR));
+      const s1 = Math.min(mono.length, Math.ceil(maxEndSec * SR));
+      samples = mono.subarray(s0, s1);
+    } else {
+      const count = Math.floor(durationSec * SR);
+      const sourceStart = Math.floor(startSec * sourceRate);
+      const sourceStep = sourceRate / SR;
+      samples = new Float32Array(count);
+      for(let i = 0; i < count; i++){
+        const pos = sourceStart + i * sourceStep;
+        const idx = Math.floor(pos);
+        const frac = pos - idx;
+        samples[i] = (monoSource[idx] || 0) * (1 - frac) + (monoSource[idx + 1] || 0) * frac;
+      }
+    }
+    if(samples.length < SR * 2) return false;
+
+    try{
+      const wavBytes = encodeWavMono(samples, SR);
+      const response = await fetch('/api/clips', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'transcribe_segment',
+          audioBase64: bytesToBase64(wavBytes),
+          audioMime: 'audio/wav',
+          offsetSec: startSec,
+          durationSec: Number((samples.length / SR).toFixed(2))
+        })
+      });
+      if(!response.ok) return false;
+      const result = await response.json();
+      const text = String(result && result.text || '').trim();
+      if(!text || result.silent) return false;
+      clip.captionText = text;
+      clip.subSegments = Array.isArray(result.segments) ? result.segments : [];
+      clip.captionTimingGranularity = result.timingGranularity || 'estimated';
+      return true;
+    }catch(_){
+      return false;
+    }
+  };
+
+  const worker = async () => {
+    while(nextIndex < pending.length){
+      const clip = pending[nextIndex++];
+      if(await transcribeOne(clip)) recovered++;
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(2, pending.length) }, worker));
+  return recovered;
+}
+
 // Executa o pipeline completo do OpusClip IA: Link YouTube / Varredura Acústica -> Transcrição IA -> Virality Score™ -> Auto-Reframe 9:16
 async function runOpusClipAnalysis(skipUrlCheck = false){
   const urlVal = ((document.getElementById('opusYoutubeUrl')||{}).value || '').trim();
@@ -10873,6 +10952,13 @@ async function runOpusClipAnalysis(skipUrlCheck = false){
     const data = await resp.json();
     if(!resp.ok || !data.clips || !data.clips.length){
       throw new Error((data && data.error) || 'Não foi possível gerar os cortes virais.');
+    }
+
+    const missingCaptionCount = data.clips.filter(clip => !String(clip.captionText || '').trim()).length;
+    if(missingCaptionCount && ((opusState.mono12k && opusState.mono12k.length) || (opusState.fullAudioBuffer && opusState.fullAudioBuffer.length))){
+      setProgress('opusProgressFill', 62);
+      showStatus('opusStatus', `📝 Recuperando a transcrição real de ${missingCaptionCount} corte(s) diretamente do áudio de cada trecho...`, 'info');
+      await transcribeMissingOpusClipCaptions(data.clips);
     }
 
     setStep(['op1','op2','op3','op4','op5','op6'], 3);
