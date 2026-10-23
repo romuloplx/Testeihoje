@@ -3,9 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "description": "DubAI PRO — deploy Vercel (serverless)",
+  "scripts": {
+    "postinstall": "node scripts/prepare-ytdlp.js"
+  },
   "dependencies": {
     "@breezystack/lamejs": "^1.2.7",
     "@distube/ytdl-core": "5.0.1",
+    "@involvex/yt-dlp": "2026.8.22",
     "msedge-tts": "^2.1.0",
     "openai": "^4.104.0"
   },

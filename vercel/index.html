@@ -1574,9 +1574,9 @@ input[type="range"]{
     <a id="youtubeDownloadFallbackLink" class="ghost hidden" target="_blank" rel="noopener noreferrer" style="display:inline-block;margin-top:8px;text-decoration:none"></a>
 
     <div class="hint" style="margin-top:12px">
+      Este site usa <a href="https://github.com/yt-dlp/yt-dlp" target="_blank" rel="noopener noreferrer" style="color:#93c5fd">yt-dlp</a> no servidor. O comando <b>winget</b> do exemplo é exclusivo do Windows; no Android, não precisa instalar esse executável para usar o site.
       Baixe somente vídeos que você criou ou tem autorização para salvar. A disponibilidade e a qualidade dependem do vídeo e das restrições do YouTube.
-      No Android, este site entrega o MP4 ao navegador, que normalmente o salva em <b>Downloads</b>; ele não pode gravar diretamente em DCIM/Galeria. Se a Galeria não listar o arquivo, mova-o para Movies usando o app Arquivos.
-      Código-fonte incorporado: <a href="https://github.com/Tyrrrz/YoutubeDownloader" target="_blank" rel="noopener noreferrer" style="color:#93c5fd">Tyrrrz/YoutubeDownloader (MIT)</a>.
+      No Android, o Chrome normalmente salva o MP4 em <b>Downloads</b>; o site não pode gravar diretamente em DCIM/Galeria. Se a Galeria não listar o arquivo, mova-o para Movies usando o app Arquivos.
     </div>
   </div>
 </section>
@@ -1810,7 +1810,7 @@ async function extractYoutubeDownloadDataFromMirrors(videoId){
   return null;
 }
 
-async function extractYoutubeDownloadDataFromYtdlServer(watchUrl,videoId){
+async function extractYoutubeDownloadDataFromResolverApi(watchUrl,videoId){
   const response=await fetch('/api/clips',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
@@ -1831,7 +1831,7 @@ async function extractYoutubeDownloadDataFromYtdlServer(watchUrl,videoId){
       height:Number(format.height)||0,
       bitrate:Number(format.bitrate)||0,
       contentLength:Number(format.contentLength)||0,
-      source:'ytdl-core',
+      source:String(format.source||data.source||'ytdl-core'),
       videoId,
       url:''
     }));
@@ -1934,7 +1934,7 @@ async function inspectYoutubeDownload(){
     showStatus('youtubeDownloadStatus','🛠️ Consultando o resolvedor de vídeo...','info');
     let result=null;
     let resolverError=null;
-    try{ result=await extractYoutubeDownloadDataFromYtdlServer(parsed.watchUrl,parsed.videoId); }
+    try{ result=await extractYoutubeDownloadDataFromResolverApi(parsed.watchUrl,parsed.videoId); }
     catch(error){ resolverError=error; }
     if((!result||!result.formats||!result.formats.length)&&requestId===youtubeDownloadRequestId){
       showStatus('youtubeDownloadStatus','🔎 Tentando ler os formatos disponíveis no navegador...','info');
@@ -2133,9 +2133,10 @@ async function startYoutubeDownload(){
   const title=sanitizeYoutubeDownloadFilename(youtubeDownloadInfo.title||`video-${youtubeDownloadInfo.videoId}`);
   const quality=sanitizeYoutubeDownloadFilename(format.qualityLabel||'MP4').replace(/\s+/g,'-');
   const filename=`${title}-${quality}.mp4`;
-  if(format.source==='ytdl-core'){
+  if(format.source==='ytdl-core'||format.source==='yt-dlp'){
     try{
-      const downloadUrl=`/api/clips?action=youtube_download&videoId=${encodeURIComponent(youtubeDownloadInfo.videoId)}&itag=${encodeURIComponent(format.itag)}`;
+      const engine=format.source==='yt-dlp'?'yt-dlp':'ytdl-core';
+      const downloadUrl=`/api/clips?action=youtube_download&engine=${encodeURIComponent(engine)}&videoId=${encodeURIComponent(youtubeDownloadInfo.videoId)}&itag=${encodeURIComponent(format.itag)}`;
       const anchor=document.createElement('a');
       anchor.href=downloadUrl;
       anchor.download=filename;

@@ -1,4 +1,5 @@
 {
+  "installCommand": "npm ci && npm run postinstall",
   "rewrites": [
     { "source": "/terms", "destination": "/api/tiktok?page=terms" },
     { "source": "/privacy", "destination": "/api/tiktok?page=privacy" },
@@ -6,5 +7,13 @@
     { "source": "/api/tiktok/:rest*", "destination": "/api/tiktok?verify_file=:rest*" },
     { "source": "/api/video/download", "destination": "/api/video" },
     { "source": "/api/video/download/:id*", "destination": "/api/video?id=:id*" }
-  ]
+  ],
+  "functions": {
+    "api/clips.js": {
+      "includeFiles": [
+        "node_modules/@involvex/yt-dlp-binary-linux-x64/**",
+        "node_modules/@involvex/yt-dlp/binaries/any/**"
+      ]
+    }
+  }
 }

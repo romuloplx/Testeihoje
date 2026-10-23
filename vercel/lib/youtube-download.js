@@ -65,7 +65,40 @@ function normalizeDownloadableFormats(formats) {
       contentLength: Number(format.contentLength) || 0,
       container: 'mp4',
       hasAudio: true,
-      hasVideo: true
+      hasVideo: true,
+      source: 'ytdl-core'
+    });
+  }
+  return [...unique.values()].sort((a, b) => b.height - a.height || b.bitrate - a.bitrate);
+}
+
+function normalizeYtDlpFormats(formats) {
+  const unique = new Map();
+  for (const format of Array.isArray(formats) ? formats : []) {
+    if (!format || String(format.ext || '').toLowerCase() !== 'mp4') continue;
+    if (String(format.vcodec || '').toLowerCase() === 'none' || !format.vcodec) continue;
+    if (String(format.acodec || '').toLowerCase() === 'none' || !format.acodec) continue;
+    if (format.has_drm || format.is_drm || format.is_live) continue;
+
+    const formatId = String(format.format_id || '');
+    if (!/^\d{1,6}$/.test(formatId)) continue;
+    const itag = Number(formatId);
+    if (!Number.isSafeInteger(itag) || itag <= 0 || unique.has(itag)) continue;
+
+    const height = Number(format.height)
+      || Number((String(format.format_note || format.resolution || '').match(/\d+/) || [])[0])
+      || 0;
+    const qualityLabel = String(format.format_note || (height ? `${height}p` : 'MP4'));
+    unique.set(itag, {
+      itag,
+      qualityLabel,
+      height,
+      bitrate: Number(format.tbr || format.abr) || 0,
+      contentLength: Number(format.filesize) || 0,
+      container: 'mp4',
+      hasAudio: true,
+      hasVideo: true,
+      source: 'yt-dlp'
     });
   }
   return [...unique.values()].sort((a, b) => b.height - a.height || b.bitrate - a.bitrate);
@@ -116,6 +149,7 @@ module.exports = {
   extractYoutubeVideoId,
   isDownloadableMp4Format,
   normalizeDownloadableFormats,
+  normalizeYtDlpFormats,
   sanitizeVideoFilename,
   getResolver,
   resolveYoutubeVideo
