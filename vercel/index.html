@@ -7406,10 +7406,13 @@ async function extractYoutubeStreamsFromWatchPage(videoId){
   const proxies = [
     u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
     u => `https://api.cors.lol/?url=${encodeURIComponent(u)}`,
+    u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+    u => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+    u => `https://thingproxy.freeboard.io/fetch/${encodeURIComponent(u)}`,
   ];
   for(const makeProxyUrl of proxies){
     try{
-      const r = await fetch(makeProxyUrl(watchUrl), { signal: AbortSignal.timeout(10000) });
+      const r = await fetch(makeProxyUrl(watchUrl), { signal: AbortSignal.timeout(12000) });
       if(!r.ok) continue;
       const html = await r.text();
       // ytInitialPlayerResponse contém streamingData.formats com URLs googlevideo diretas
@@ -7425,7 +7428,7 @@ async function extractYoutubeStreamsFromWatchPage(videoId){
         // Prioriza formatos com áudio (não videoOnly) e itag 18 (360p MP4 faststart)
         if(f.videoOnly === true || f.videoOnly === 'true') continue;
         streams.push(f.url);
-        if(streams.length >= 4) break;
+        if(streams.length >= 6) break;
       }
       if(streams.length) return streams;
     }catch(_){}
@@ -7519,7 +7522,40 @@ async function downloadRealYoutubeVideoInBrowser(videoId, rawUrl, serverCandidat
         }catch(_){}
         return null;
       },
-      // CLIP REAL 2min via seu-worker (substitui loader.to externo) — POST /api/video com start/end
+      async () => {
+        // Extrator direto via servidor /api/clips (yt-dlp quando disponível) — tenta baixar o corte real
+        try{
+          const r = await fetch('/api/clips', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'fetch_url',
+              url: watchUrl,
+              clipPrompt: '',
+              desiredClipsCount: 1
+            }),
+            signal: AbortSignal.timeout(30000)
+          });
+          if(r.ok){
+            const j = await r.json();
+            if(j && j.directVideoBase64){
+              const bytes = b64ToUint8Array(j.directVideoBase64);
+              if(bytes.byteLength > 25000){
+                const blob = new Blob([bytes], { type: j.directVideoMime || 'video/mp4' });
+                return { blob, direct: true };
+              }
+            }
+            if(j && j.candidateStreamUrls && j.candidateStreamUrls.length){
+              j.candidateStreamUrls.forEach(u=>{ if(u && !candidateUrls.includes(u)) candidateUrls.push(u); });
+            }
+            if(j && j.directStreamUrl){
+              if(!candidateUrls.includes(j.directStreamUrl)) candidateUrls.push(j.directStreamUrl);
+            }
+          }
+        }catch(_){}
+        return null;
+      },
+      // CLIP REAL 2min via POST /api/video com start/end
       async () => {
         if(startSec == null || endSec == null) return null;
         try{
@@ -7550,6 +7586,11 @@ async function downloadRealYoutubeVideoInBrowser(videoId, rawUrl, serverCandidat
     ];
 
     const found = await Promise.all(browserExtractors.map(fn => fn().catch(() => null)));
+    // Se algum extrator retornou blob direto (via servidor yt-dlp), usa ele imediatamente
+    const directBlob = found.find(f => f && f.blob && f.direct);
+    if(directBlob && directBlob.blob){
+      return { blob: directBlob.blob, bytesLoaded: directBlob.blob.size, totalSize: null };
+    }
     found.forEach(u => {
       if(u && typeof u === 'string' && !candidateUrls.includes(u)) candidateUrls.unshift(u);
     });
