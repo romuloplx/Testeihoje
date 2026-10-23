@@ -18,7 +18,7 @@ const readOpusCaptionHelpers = () => {
     pickOpusEmojiForPhrase: () => '🎯'
   };
   vm.createContext(context);
-  vm.runInContext(`${html.slice(start, end)}\nglobalThis.buildCues = buildOpusWordByWordCues;\nglobalThis.findCue = findActiveOpusCaptionCue;`, context);
+  vm.runInContext(`${html.slice(start, end)}\nglobalThis.buildCues = buildOpusWordByWordCues;\nglobalThis.findCue = findActiveOpusCaptionCue;\nglobalThis.wordGap = getOpusCaptionWordGap;`, context);
   return context;
 };
 
@@ -47,6 +47,14 @@ test('word timestamps stay absolute-to-relative exact and default to readable tw
     Array.from(sentenceCues, cue => Array.from(cue.words, word => word.word)),
     [['do', 'episódio!'], ['Presta', 'atenção']]
   );
+});
+
+test('burned-in captions keep a readable gap between highlighted words', () => {
+  const { wordGap } = readOpusCaptionHelpers();
+
+  assert.equal(wordGap(34, 9), 18);
+  assert.equal(wordGap(20, 10), 11);
+  assert.equal(wordGap(20, 20), 20);
 });
 
 test('duplicate overlapping transcripts are collapsed without removing repeated words spoken later', () => {
