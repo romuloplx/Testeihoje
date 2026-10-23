@@ -9334,6 +9334,13 @@ function findActiveOpusCaptionCue(cues, timeSec){
   return cues.find(c => c && t >= Number(c.start) && t < Number(c.end) + 0.08) || null;
 }
 
+// A folga extra impede que contorno, brilho e pop da palavra ativa apaguem o espaço entre as palavras.
+function getOpusCaptionWordGap(fontSize, measuredSpaceWidth){
+  const size = Math.max(0, Number(fontSize) || 0);
+  const normalSpace = Math.max(0, Number(measuredSpaceWidth) || 0);
+  return Math.max(normalSpace, Math.ceil(size * 0.52));
+}
+
 // Renderiza 1 frame ultra-profissional do OpusClip Pro 3.0 (100% SEM MARCA D'ÁGUA + Auto-Reframe 3.0 + Dynamic Zoom Cuts + AI B-Roll + Legendas Ajustáveis Sincronizadas com a Fala)
 function drawOpusReframedFrame(ctx, videoEl, clip, relSec){
   const W = ctx.canvas.width, H = ctx.canvas.height;
@@ -9601,7 +9608,7 @@ function drawOpusReframedFrame(ctx, videoEl, clip, relSec){
     }
 
     // Quebra inteligente das palavras do bloco em 1 ou 2 linhas centralizadas que sempre cabem em 86% da largura
-    const spaceW = ctx.measureText(' ').width;
+    const spaceW = getOpusCaptionWordGap(baseFont, ctx.measureText(' ').width);
     const wrappedLines = [];
     let currentLine = [];
     let currentLineW = 0;
