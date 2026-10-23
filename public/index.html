@@ -10744,9 +10744,34 @@ function finalizarBlobGaleria(blob, clip){
     expVidEl.src = URL.createObjectURL(blob);
     expVidEl.classList.remove('hidden');
   }
-  triggerBlobDownload(blob, filename);
-  toast(`✅ Vídeo ${filename} salvo na Galeria!`);
-  showStatus('opusStatus', `✅ Corte #${clip.rank} gravado direto na Galeria!`, 'success');
+
+  // --- Salvar na Galeria (Mobile-first: iOS/Android) ---
+  // No iOS Safari, <a download> NÃO salva na galeria/Photos.
+  // Usamos navigator.share() (Web Share API) que permite salvar direto na galeria.
+  // Fallback: triggerBlobDownload (desktop/Android Chrome) e nova aba.
+  (async () => {
+    try{
+      const file = new File([blob], filename, { type: blob.type || 'video/mp4' });
+      if(navigator.share && navigator.canShare && navigator.canShare({ files: [file] })){
+        await navigator.share({
+          title: filename,
+          text: 'Corte viral criado no DubAI PRO (OpusClip IA)',
+          files: [file],
+        });
+        toast(`✅ ${filename} compartilhado/salvo na Galeria!`);
+        showStatus('opusStatus', `✅ Corte #${clip.rank} salvo na Galeria!`, 'success');
+        return;
+      }
+    }catch(e){
+      // Se share falhar (usuário cancelou, não suportado, etc.), cai no fallback abaixo
+      console.warn('navigator.share falhou:', e.message);
+    }
+
+    // Fallback: download padrão via <a download>
+    triggerBlobDownload(blob, filename);
+    toast(`⬇️ ${filename} baixado (verifique Downloads/Galeria)`);
+    showStatus('opusStatus', `✅ Corte #${clip.rank} gravado!`, 'success');
+  })();
 }
 
 async function exportSelectedOpusClipMp4(opts = {}){
