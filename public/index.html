@@ -366,6 +366,26 @@ input[type="range"]{
 }
 .opus-mini-player:hover .opus-hover-dl{opacity:1;transform:translateY(0) scale(1)}
 .opus-hover-dl:hover{filter:brightness(1.1);transform:scale(1.06)}
+/* 📥 BOTÃO GIGANTE 1-TOQUE NO CELULAR: tocar no vídeo = baixar direto pra Galeria */
+.opus-tap-dl{
+  position:absolute;bottom:10px;left:50%;transform:translateX(-50%);z-index:5;
+  width:92%;padding:12px 10px;border-radius:13px;
+  background:linear-gradient(135deg,#22c55e,#16a34a,#0e9f6e);border:2px solid #fff;
+  color:#fff;font-size:13px;font-weight:900;text-align:center;
+  display:flex;align-items:center;justify-content:center;gap:7px;
+  cursor:pointer;box-shadow:0 8px 22px rgba(0,0,0,.48),0 0 0 3px rgba(34,197,94,.28);
+  -webkit-tap-highlight-color:transparent;user-select:none;
+}
+.opus-tap-dl:active{transform:translateX(-50%) scale(.97)}
+.opus-tap-dl-sub{font-size:10px;font-weight:800;opacity:.92;display:block;margin-top:1px}
+/* Desktop: mostra hover pequeno, esconde gigante — Mobile: inverte */
+@media(min-width:769px){ .opus-tap-dl{display:none !important} }
+@media(max-width:768px){
+  .opus-hover-dl{display:none !important}
+  .opus-mini-player{width:100%;max-width:340px}
+  .opus-mini-playbtn{width:46px;height:46px;font-size:18px}
+  .opus-clip-row{padding:14px}
+}
 .opus-select-chk{
   position:absolute;top:8px;left:8px;z-index:4;
   width:22px;height:22px;accent-color:#22c55e;cursor:pointer;
@@ -1386,7 +1406,7 @@ input[type="range"]{
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
           <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:#cbd5e1;cursor:pointer;margin:0"><input type="checkbox" id="opusBulkSelectAll" onchange="toggleBulkSelectAll(this.checked)" style="width:16px;height:16px;accent-color:#22c55e"> Selecionar todos</label>
           <span id="opusBulkCount" style="font-size:11.5px;font-weight:800;padding:4px 10px;border-radius:999px;background:#064e3b;color:#a7f3d0;border:1px solid #10b981">0 selecionado(s)</span>
-          <span style="font-size:11px;color:#94a3b8">Passe o cursor no clipe → clique em <b>⬇️ Download</b> para baixar um clipe individual (.mp4). Para vários, selecione e use Bulk Download.</span>
+          <span style="font-size:11px;color:#94a3b8">📱 <b>No celular: toque em cima do vídeo para BAIXAR direto pra Galeria (.MP4)</b> — toque no <b>▶</b> para prévia. <span style="display:none" class="hide-mobile">No PC: passe o cursor → <b>⬇️ Download</b></span> Para vários, selecione e use <b>Bulk Download</b>.</span>
         </div>
         <button type="button" id="opusBatchExportBtn" onclick="gerarCortesFinaisEmLote()" style="padding:9px 16px;font-size:12.5px;font-weight:900;border-radius:10px;border:1px solid #22c55e;background:linear-gradient(135deg,#16a34a,#059669);color:#fff;cursor:pointer;box-shadow:0 6px 16px rgba(34,197,94,.3)">⬇️ Bulk Download (Baixar em Lote) — .MP4</button>
       </div>
@@ -1424,7 +1444,8 @@ input[type="range"]{
               <div id="opusPreviewStage" style="position:relative;display:inline-flex;justify-content:center;align-items:center;border-radius:10px;overflow:hidden;background:#000">
                 <div id="opusPreviewYtWrap" class="hidden" style="position:absolute;inset:0;overflow:hidden;z-index:1;background:#000"></div>
                 <canvas id="opusPreviewCanvas" width="540" height="960" style="position:relative;z-index:2;max-width:100%;max-height:410px;width:auto;height:auto;border-radius:10px;display:block;pointer-events:none;background:transparent"></canvas>
-                <div id="opusPreviewClickShield" onclick="toggleOpusPreviewPlayback()" style="position:absolute;inset:0;z-index:3;cursor:pointer"></div>
+                <div id="opusPreviewClickShield" onclick="toggleOpusPreviewPlayback()" style="position:absolute;inset:0;z-index:3;cursor:pointer" title="Toque para prévia — use o botão verde para baixar"></div>
+                <button type="button" class="opus-tap-dl" onclick="event.stopPropagation();exportSelectedOpusClipMp4()" style="z-index:5" title="Baixar corte para Galeria">📥 BAIXAR ESTE CORTE <span class="opus-tap-dl-sub">Toque aqui → Galeria</span></button>
               </div>
             </div>
             <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
@@ -7196,7 +7217,7 @@ function getOpusVisibleIds(){ return getOpusFilteredClips().map(c=>c.id); }
 function toggleBulkSelectAll(checked){ const vis=getOpusVisibleIds(); if(checked) vis.forEach(id=>opusBulkSelected.add(id)); else vis.forEach(id=>opusBulkSelected.delete(id)); updateOpusBulkCount(); renderOpusClipsListUI(); }
 function toggleOpusBulkItem(id, checked){ if(checked) opusBulkSelected.add(id); else opusBulkSelected.delete(id); updateOpusBulkCount(); renderOpusClipsListUI(); }
 function toastOpusClip(m,t){ try{ toast(m,t||'ok'); }catch(e){ console.log(m); } }
-function quickDownloadOpusClip(clipId, ev){ if(ev){ ev.preventDefault(); ev.stopPropagation(); } const idx=opusState.clips.findIndex(c=>c.id===clipId); if(idx>=0){ selectOpusClip(idx, false); exportSelectedOpusClipMp4(); } }
+function quickDownloadOpusClip(clipId, ev){ if(ev){ ev.preventDefault(); ev.stopPropagation(); } try{ if(navigator.vibrate) navigator.vibrate(50); }catch(e){} const idx=opusState.clips.findIndex(c=>c.id===clipId); if(idx>=0){ const clip=opusState.clips[idx]; const rank=clip?clip.rank||idx+1:idx+1; toast('📥 Baixando Corte #'+rank+' para sua Galeria — toque só 1 vez e aguarde o .MP4...'); selectOpusClip(idx, false); exportSelectedOpusClipMp4(); } }
 
 // Escuta mensagens oficiais do YouTube IFrame Player API (enablejsapi=1) para sincronizar cada palavra da legenda ao milissegundo exato da fala no vídeo do YouTube!
 window.addEventListener('message', (ev) => {
@@ -9944,14 +9965,15 @@ function renderOpusClipsListUI(){
 
       // COLUNA 2: PLAYER VERTICAL 9:16 AO VIVO COM TIMECODE PILL, STREAM YOUTUBE 9:16 + CANVAS DE LEGENDAS E BOTÃO PLAY
       + `<div>`
-      +   `<div class="opus-mini-player" id="opusMiniPlayer-${idx}" title="Clique para assistir este corte vertical ao vivo com legendas">`
+      +   `<div class="opus-mini-player" id="opusMiniPlayer-${idx}" title="Toque no vídeo para BAIXAR o corte direto pra Galeria — toque no ▶ para prévia">`
       +     `<span class="opus-mini-badge">🚫 SEM WATERMARK • ${fmtClockSec(clipDur)}</span>`
       +     `<span class="opus-mini-time" id="opusCardTime-${idx}">00:00 / ${fmtClockSec(clipDur)}</span>`
       +     `<div id="opusCardYtWrap-${idx}" class="${opusState.ytEmbedMode ? '' : 'hidden'}" style="position:absolute;inset:0;overflow:hidden;z-index:1;background:#000"></div>`
       +     `<canvas id="opusCardCanvas-${idx}" width="360" height="640" style="position:relative;z-index:2;pointer-events:none;background:transparent"></canvas>`
-      +     `<div class="opus-card-click-shield" id="opusCardClickShield-${idx}" onclick="playOpusClipCard(${idx})" style="position:absolute;inset:0;z-index:3;cursor:pointer"></div>`
+      +     `<div class="opus-card-click-shield" id="opusCardClickShield-${idx}" onclick="quickDownloadOpusClip('${c.id}', event)" style="position:absolute;inset:0;z-index:3;cursor:pointer" title="Toque para BAIXAR este corte (.MP4) direto pra Galeria"></div>`
+      +     `<button type="button" class="opus-tap-dl" onclick="quickDownloadOpusClip('${c.id}', event)" title="Baixar tocando no vídeo — salva na Galeria"><span style="display:flex;align-items:center;gap:6px">📥 BAIXAR PARA GALERIA</span><span class="opus-tap-dl-sub">Toque no vídeo ☝️</span></button>`
       +     `<button type="button" class="opus-hover-dl" onclick="quickDownloadOpusClip('${c.id}', event)" title="Baixar este clipe — Baixa direto .MP4 (igual OpusClip)">⬇️ Download</button>`
-      +     `<div class="opus-mini-playbtn" id="opusCardPlayBtn-${idx}" onclick="event.stopPropagation();playOpusClipCard(${idx})" style="z-index:4;pointer-events:auto">▶</div>`
+      +     `<div class="opus-mini-playbtn" id="opusCardPlayBtn-${idx}" onclick="event.stopPropagation();playOpusClipCard(${idx})" style="z-index:4;pointer-events:auto" title="▶ Prévia do corte">▶</div>`
       +   `</div>`
       + `</div>`
 
