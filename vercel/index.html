@@ -7416,6 +7416,41 @@ async function downloadVideoChunksViaProxy(streamUrl, ua, initialBytes, maxChunk
   return { blob, bytesLoaded: offset, totalSize };
 }
 
+// Extrai URLs de stream do YouTube direto da página de watch usando o IP residencial do navegador.
+// Não depende de instâncias públicas de Piped/Invidious que podem estar offline ou rate-limited.
+// Tenta CORS proxy públicos; se todos falharem, retorna null e o fluxo cai nos extratores existentes.
+async function extractYoutubeStreamsFromWatchPage(videoId){
+  const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
+  const proxies = [
+    u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    u => `https://api.cors.lol/?url=${encodeURIComponent(u)}`,
+  ];
+  for(const makeProxyUrl of proxies){
+    try{
+      const r = await fetch(makeProxyUrl(watchUrl), { signal: AbortSignal.timeout(10000) });
+      if(!r.ok) continue;
+      const html = await r.text();
+      // ytInitialPlayerResponse contém streamingData.formats com URLs googlevideo diretas
+      const m = html.match(/ytInitialPlayerResponse\s*=\s*(\{[\s\S]+?\});\s*(?:var\s|let\s|const\s|<\/script>)/);
+      if(!m || !m[1]) continue;
+      const pr = JSON.parse(m[1]);
+      const formats = pr?.streamingData?.formats || [];
+      const adaptive = pr?.streamingData?.adaptiveFormats || [];
+      const streams = [];
+      for(const f of [...formats, ...adaptive]){
+        if(!f || !f.url || !f.mimeType) continue;
+        if(!/mp4/i.test(f.mimeType)) continue;
+        // Prioriza formatos com áudio (não videoOnly) e itag 18 (360p MP4 faststart)
+        if(f.videoOnly === true || f.videoOnly === 'true') continue;
+        streams.push(f.url);
+        if(streams.length >= 4) break;
+      }
+      if(streams.length) return streams;
+    }catch(_){}
+  }
+  return null;
+}
+
 // Quando o IP de datacenter do servidor encontra bloqueio no YouTube, o próprio navegador do usuário (IP residencial) busca o stream MP4 real — com suporte a clipe real [startSec,endSec]!
 async function downloadRealYoutubeVideoInBrowser(videoId, rawUrl, serverCandidates = [], startSec = null, endSec = null){
   const watchUrl = videoId ? `https://www.youtube.com/watch?v=${videoId}` : rawUrl;
@@ -7423,7 +7458,38 @@ async function downloadRealYoutubeVideoInBrowser(videoId, rawUrl, serverCandidat
 
   if(videoId){
     // 1) Consulta extratores CORS direto pelo IP residencial do navegador em paralelo
+    // Ordem: (a) ytInitialPlayerResponse da página de watch direto no browser (IP residencial),
+    //        (b) Invidious ?local=true (URL CORS-friendly, tocável no <video> do celular),
+    //        (c) Piped, (d) externos
     const browserExtractors = [
+      async () => {
+        // (a) Extrai ytInitialPlayerResponse da página de watch do YouTube — IP residencial, sem depender de servidor
+        const streams = await extractYoutubeStreamsFromWatchPage(videoId);
+        if(streams && streams.length){
+          // URLs googlevideo.com precisam de proxy; vamos adicionar ao candidato e retornar a primeira
+          // O tentativa de fetch direto falhará por CORS, mas o proxy /api/clips pode tentar
+          streams.forEach(s => { if(s && !candidateUrls.includes(s)) candidateUrls.push(s); });
+          return streams[0];
+        }
+        return null;
+      },
+      async () => {
+        // (b) Invidious ?local=true — URL já CORS-friendly, pronta para <video> no celular
+        for(const inv of ['https://inv.nadeko.net', 'https://invidious.nerdvpn.de', 'https://yewtu.be', 'https://inv.tux.pizza', 'https://inv.us.projectsegfau.lt', 'https://iv.melmac.space']) {
+          try{
+            const r = await fetch(`${inv}/api/v1/videos/${videoId}`, { signal: AbortSignal.timeout(4500) });
+            if(!r.ok) continue;
+            const j = await r.json();
+            const fmt = (j.formatStreams || []).find(f => f && f.url && /mp4/i.test(f.type || f.container || ''));
+            if(fmt && fmt.url){
+              const localUrl = `${inv}/latest_version?id=${videoId}&itag=${fmt.itag || 18}&local=true`;
+              if(!candidateUrls.includes(localUrl)) candidateUrls.unshift(localUrl);
+              return localUrl; // retorna a URL CORS-friendly, não a googlevideo.com bloqueada
+            }
+          }catch(_){}
+        }
+        return null;
+      },
       async () => {
         for(const pApi of [
           `https://pipedapi.kavin.rocks/streams/${videoId}`,
@@ -7437,21 +7503,6 @@ async function downloadRealYoutubeVideoInBrowser(videoId, rawUrl, serverCandidat
             const j = await r.json();
             const vs = (j.videoStreams || []).find(s => !s.videoOnly && /mp4/i.test(s.format || s.mimeType || '') && s.url);
             if(vs && vs.url) return vs.url;
-          }catch(_){}
-        }
-        return null;
-      },
-      async () => {
-        for(const inv of ['https://inv.nadeko.net', 'https://invidious.nerdvpn.de', 'https://yewtu.be', 'https://inv.tux.pizza']){
-          try{
-            const r = await fetch(`${inv}/api/v1/videos/${videoId}`, { signal: AbortSignal.timeout(4500) });
-            if(!r.ok) continue;
-            const j = await r.json();
-            const fmt = (j.formatStreams || []).find(f => f && f.url && /mp4/i.test(f.type || f.container || ''));
-            if(fmt && fmt.url){
-              candidateUrls.unshift(`${inv}/latest_version?id=${videoId}&itag=${fmt.itag || 18}&local=true`);
-              return fmt.url;
-            }
           }catch(_){}
         }
         return null;
