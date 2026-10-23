@@ -5,7 +5,11 @@
   "description": "DubAI PRO — deploy Vercel (serverless)",
   "dependencies": {
     "@breezystack/lamejs": "^1.2.7",
+    "@distube/ytdl-core": "5.0.1",
     "msedge-tts": "^2.1.0",
     "openai": "^4.104.0"
+  },
+  "engines": {
+    "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
   }
 }
