@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const {
   extractYoutubeVideoId,
   normalizeDownloadableFormats,
+  normalizeYtDlpFormats,
   sanitizeVideoFilename
 } = require('../vercel/lib/youtube-download');
 const clipsHandler = require('../vercel/api/clips');
@@ -39,6 +40,23 @@ test('keeps only downloadable, muxed MP4 formats and sorts by quality', () => {
   assert.equal(formats[0].container, 'mp4');
 });
 
+test('accepts yt-dlp muxed MP4 formats and rejects split or non-MP4 streams', () => {
+  const formats = normalizeYtDlpFormats([
+    { format_id: '18', ext: 'mp4', vcodec: 'avc1.42001E', acodec: 'mp4a.40.2', height: 360, filesize: 1000, tbr: 900, format_note: '360p' },
+    { format_id: '22', ext: 'mp4', vcodec: 'avc1.64001F', acodec: 'mp4a.40.2', height: 720, filesize_approx: 2000, tbr: 2500, format_note: '720p' },
+    { format_id: '137', ext: 'mp4', vcodec: 'avc1', acodec: 'none', height: 1080 },
+    { format_id: '140', ext: 'mp4', vcodec: 'none', acodec: 'mp4a.40.2' },
+    { format_id: '251', ext: 'webm', vcodec: 'vp9', acodec: 'opus' },
+    { format_id: '22+140', ext: 'mp4', vcodec: 'avc1', acodec: 'mp4a.40.2' },
+    { format_id: '500', ext: 'mp4', vcodec: 'avc1', acodec: 'mp4a.40.2', has_drm: true }
+  ]);
+
+  assert.deepEqual(formats.map(format => format.itag), [22, 18]);
+  assert.equal(formats[0].source, 'yt-dlp');
+  assert.equal(formats[1].contentLength, 1000);
+  assert.equal(formats[0].container, 'mp4');
+});
+
 test('sanitizes filenames for Content-Disposition and Android downloads', () => {
   assert.equal(sanitizeVideoFilename('  Vídeo: /teste?  '), 'Video- -teste-');
   assert.equal(sanitizeVideoFilename(''), 'video-youtube');
@@ -64,5 +82,23 @@ test('download actions are routed through the existing clips API without extra V
   assert.equal(getResponse.statusCode, 400);
   assert.match(JSON.parse(getResponse.body).error, /parâmetros de vídeo inválidos/i);
 
-  assert.equal(require('node:fs').existsSync(require('node:path').join(__dirname, '../vercel/api/youtube-download.js')), false);
+  const invalidEngineResponse = makeResponse();
+  await clipsHandler({
+    method: 'GET',
+    url: '/api/clips?action=youtube_download&engine=unknown&videoId=abcdefghijk&itag=18',
+    headers: {}
+  }, invalidEngineResponse);
+  assert.equal(invalidEngineResponse.statusCode, 400);
+  assert.match(JSON.parse(invalidEngineResponse.body).error, /parâmetros de vídeo inválidos/i);
+
+  const fs = require('node:fs');
+  const path = require('node:path');
+  for (const functionPath of [
+    '../vercel/api/youtube-download.js',
+    '../vercel/api/lib/youtube-download.js',
+    '../vercel/api/lib/youtube-download-handler.js',
+    '../vercel/api/lib/ytdlp-runtime.js'
+  ]) {
+    assert.equal(fs.existsSync(path.join(__dirname, functionPath)), false, `${functionPath} must not add a Vercel function`);
+  }
 });

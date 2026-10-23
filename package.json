@@ -5,6 +5,7 @@
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
+    "postinstall": "node vercel/scripts/prepare-ytdlp.js",
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "node --test tests/*.test.js"
@@ -19,6 +20,7 @@
   "dependencies": {
     "@breezystack/lamejs": "^1.2.7",
     "@distube/ytdl-core": "5.0.1",
+    "@involvex/yt-dlp": "2026.8.22",
     "cors": "^2.8.5",
     "dotenv": "^16.6.0",
     "express": "^4.21.2",

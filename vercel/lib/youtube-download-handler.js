@@ -4,9 +4,14 @@ const {
   extractYoutubeVideoId,
   isDownloadableMp4Format,
   normalizeDownloadableFormats,
+  normalizeYtDlpFormats,
   sanitizeVideoFilename,
   resolveYoutubeVideo
 } = require('./youtube-download');
+const {
+  getYoutubeVideoInfoWithYtDlp,
+  spawnYoutubeMp4DownloadWithYtDlp
+} = require('./ytdlp-runtime');
 
 const VIDEO_ERROR_MESSAGES = {
   INVALID_YOUTUBE_URL: 'Use um link válido do YouTube.',
@@ -15,6 +20,7 @@ const VIDEO_ERROR_MESSAGES = {
 };
 
 function sendJson(res, status, payload) {
+  if (res.destroyed) return;
   if (res.headersSent) {
     if (typeof res.destroy === 'function') res.destroy();
     return;
@@ -83,6 +89,16 @@ function parseRange(value, totalSize) {
   return { start, end: Math.min(end, totalSize - 1) };
 }
 
+function formatDetails(info, ytdlp) {
+  const details = info && info.videoDetails;
+  return {
+    title: String(details && details.title || info && info.title || ''),
+    author: String(details && details.author || info && (info.uploader || info.channel || info.creator) || ''),
+    durationSec: Number(details && details.lengthSeconds || info && info.duration) || 0,
+    formats: ytdlp ? normalizeYtDlpFormats(info && info.formats) : normalizeDownloadableFormats(info && info.formats)
+  };
+}
+
 async function handleFormats(req, res, bodyOverride) {
   const body = bodyOverride && typeof bodyOverride === 'object' ? bodyOverride : await getRequestBody(req);
   const input = body.videoId || body.url;
@@ -91,29 +107,171 @@ async function handleFormats(req, res, bodyOverride) {
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30000);
+  let ytdlpInfo;
+  let ytdlpError;
+  let ytdlError;
   try {
-    const { info, formats } = await resolveYoutubeVideo(videoId, controller.signal);
-    if (!formats.length) {
-      return sendJson(res, 422, {
-        error: VIDEO_ERROR_MESSAGES.NO_PROGRESSIVE_MP4,
-        code: 'NO_PROGRESSIVE_MP4'
-      });
+    try {
+      ytdlpInfo = await getYoutubeVideoInfoWithYtDlp(videoId, controller.signal);
+      const ytdlpResult = formatDetails(ytdlpInfo, true);
+      if (ytdlpResult.formats.length) {
+        return sendJson(res, 200, { videoId, ...ytdlpResult, source: 'yt-dlp' });
+      }
+    } catch (error) {
+      ytdlpError = error;
     }
-    return sendJson(res, 200, {
-      videoId,
-      title: String(info.videoDetails && info.videoDetails.title || ''),
-      author: String(info.videoDetails && info.videoDetails.author || ''),
-      durationSec: Number(info.videoDetails && info.videoDetails.lengthSeconds) || 0,
-      formats
-    });
+
+    try {
+      const { info } = await resolveYoutubeVideo(videoId, controller.signal);
+      const ytdlResult = formatDetails(info, false);
+      if (ytdlResult.formats.length) {
+        return sendJson(res, 200, { videoId, ...ytdlResult, source: 'ytdl-core' });
+      }
+    } catch (error) {
+      ytdlError = error;
+    }
+
+    if (controller.signal.aborted) {
+      const error = new Error('A consulta ao YouTube excedeu o tempo limite.');
+      error.code = 'YOUTUBE_TIMEOUT';
+      throw error;
+    }
+    if (ytdlpInfo || ytdlpError && ytdlpError.code === 'NO_PROGRESSIVE_MP4' || ytdlError && ytdlError.code === 'NO_PROGRESSIVE_MP4') {
+      const error = new Error(VIDEO_ERROR_MESSAGES.NO_PROGRESSIVE_MP4);
+      error.code = 'NO_PROGRESSIVE_MP4';
+      throw error;
+    }
+    throw ytdlError || ytdlpError || new Error('YouTube resolution failed.');
   } catch (error) {
     console.error('[youtube-download] formats error:', error && error.message || error);
     const code = error && error.code || 'YOUTUBE_RESOLUTION_FAILED';
     const message = VIDEO_ERROR_MESSAGES[code]
       || 'Não foi possível consultar o YouTube agora. O vídeo pode estar indisponível ou restrito; tente novamente mais tarde.';
-    return sendJson(res, code === 'INVALID_YOUTUBE_URL' ? 400 : 502, { error: message, code });
+    return sendJson(res, code === 'NO_PROGRESSIVE_MP4' ? 422 : 502, { error: message, code });
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+function streamYtDlpProcess(child, res, controller, timeout, filename) {
+  return new Promise(resolve => {
+    let started = false;
+    let settled = false;
+    let outputBytes = 0;
+    let stderr = '';
+    let killTimer;
+
+    const cleanup = () => {
+      clearTimeout(timeout);
+      if (killTimer) clearTimeout(killTimer);
+      controller.signal.removeEventListener('abort', onAbort);
+      res.removeListener('drain', onDrain);
+      res.removeListener('close', onResponseClose);
+    };
+    const killChild = () => {
+      if (child.exitCode === null && child.signalCode === null) {
+        try { child.kill('SIGTERM'); } catch (_) {}
+        killTimer = setTimeout(() => {
+          if (child.exitCode === null && child.signalCode === null) {
+            try { child.kill('SIGKILL'); } catch (_) {}
+          }
+        }, 1500);
+        if (typeof killTimer.unref === 'function') killTimer.unref();
+      }
+    };
+    const onAbort = () => killChild();
+    const onDrain = () => child.stdout.resume();
+    const onResponseClose = () => {
+      if (!res.writableEnded) controller.abort();
+    };
+    const finish = (code, error) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (res.destroyed) {
+        resolve();
+        return;
+      }
+      if (!started) {
+        if (code === 0 && outputBytes === 0) {
+          sendJson(res, 502, { error: 'O yt-dlp não retornou dados de vídeo.', code: 'EMPTY_VIDEO_STREAM' });
+        } else {
+          console.error('[youtube-download] yt-dlp stream error:', error && error.message || stderr || `exit ${code}`);
+          sendJson(res, 502, { error: 'Não foi possível iniciar o stream deste vídeo. Tente outra qualidade.', code: 'YTDLP_STREAM_FAILED' });
+        }
+      } else if (code === 0) {
+        res.end();
+      } else if (typeof res.destroy === 'function') {
+        res.destroy(error || new Error('yt-dlp video stream interrupted'));
+      }
+      resolve();
+    };
+
+    controller.signal.addEventListener('abort', onAbort, { once: true });
+    res.on('drain', onDrain);
+    res.once('close', onResponseClose);
+    child.stdout.on('data', chunk => {
+      if (settled) return;
+      if (!started) {
+        started = true;
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'video/mp4');
+        res.setHeader('Content-Disposition', encodeDisposition(filename));
+        res.setHeader('Cache-Control', 'private, no-store, no-cache, must-revalidate');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Accept-Ranges', 'none');
+      }
+      outputBytes += chunk.length;
+      if (!res.write(chunk)) child.stdout.pause();
+    });
+    child.stderr.on('data', chunk => {
+      if (settled) return;
+      stderr = (stderr + Buffer.from(chunk).toString('utf8')).slice(-8000);
+    });
+    child.once('error', error => finish(null, error));
+    child.once('close', (code, signal) => {
+      const closeCode = Number.isInteger(code) ? code : signal ? 128 : 1;
+      finish(closeCode, signal ? new Error(`yt-dlp stopped (${signal})`) : null);
+    });
+  });
+}
+
+async function handleYtDlpDownload(req, res, videoId, itag) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 280000);
+  try {
+    const info = await getYoutubeVideoInfoWithYtDlp(videoId, controller.signal);
+    const format = normalizeYtDlpFormats(info && info.formats).find(item => item.itag === itag);
+    if (!format) {
+      clearTimeout(timeout);
+      return sendJson(res, 410, { error: VIDEO_ERROR_MESSAGES.FORMAT_NOT_FOUND, code: 'FORMAT_NOT_FOUND' });
+    }
+    if (controller.signal.aborted) {
+      clearTimeout(timeout);
+      return sendJson(res, 504, { error: 'A solicitação excedeu o tempo limite.', code: 'YOUTUBE_TIMEOUT' });
+    }
+
+    const title = sanitizeVideoFilename(info.title || `video-${videoId}`);
+    const quality = sanitizeVideoFilename(format.qualityLabel || (format.height ? `${format.height}p` : 'MP4'));
+    const filename = `${title}-${quality}.mp4`;
+    const child = await spawnYoutubeMp4DownloadWithYtDlp(videoId, String(format.itag));
+    if (controller.signal.aborted) {
+      try { child.kill('SIGTERM'); } catch (_) {}
+      clearTimeout(timeout);
+      return sendJson(res, 504, { error: 'A solicitação excedeu o tempo limite.', code: 'YOUTUBE_TIMEOUT' });
+    }
+    return await streamYtDlpProcess(child, res, controller, timeout, filename);
+  } catch (error) {
+    clearTimeout(timeout);
+    console.error('[youtube-download] yt-dlp request error:', error && error.message || error);
+    if (controller.signal.aborted) {
+      return sendJson(res, 504, { error: 'A solicitação excedeu o tempo limite.', code: 'YOUTUBE_TIMEOUT' });
+    }
+    const code = error && error.code || 'YTDLP_DOWNLOAD_FAILED';
+    const message = code === 'INVALID_YOUTUBE_URL'
+      ? VIDEO_ERROR_MESSAGES.INVALID_YOUTUBE_URL
+      : 'Não foi possível baixar este vídeo com yt-dlp. Ele pode estar indisponível ou restrito; tente outra qualidade mais tarde.';
+    return sendJson(res, code === 'INVALID_YOUTUBE_URL' ? 400 : 502, { error: message, code });
   }
 }
 
@@ -121,9 +279,11 @@ async function handleDownload(req, res) {
   const url = getUrl(req);
   const videoId = extractYoutubeVideoId(url.searchParams.get('videoId') || '');
   const itag = Number(url.searchParams.get('itag'));
-  if (!videoId || !Number.isSafeInteger(itag) || itag <= 0) {
+  const engine = url.searchParams.get('engine') || 'ytdl-core';
+  if (!videoId || !Number.isSafeInteger(itag) || itag <= 0 || !['ytdl-core', 'yt-dlp'].includes(engine)) {
     return sendJson(res, 400, { error: 'Parâmetros de vídeo inválidos.', code: 'INVALID_DOWNLOAD_REQUEST' });
   }
+  if (engine === 'yt-dlp') return handleYtDlpDownload(req, res, videoId, itag);
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 280000);
