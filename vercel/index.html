@@ -7819,12 +7819,21 @@ async function importOpusVideoFromUrl(autoRunAnalysis = true){
   }
 }
 
+function normalizeYoutubeUrlForDownload(raw){
+  const s = String(raw||'').trim();
+  if(!s) return s;
+  const m = s.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([A-Za-z0-9_\-]{11})/);
+  if(m && m[1]) return `https://www.youtube.com/watch?v=${m[1]}`;
+  return s.split('?')[0].trim() || s;
+}
 function updateYtdlpCommandDisplay(){
   const inp = document.getElementById('opusYoutubeUrl');
   const code = document.getElementById('ytdlpCmd');
   if(!code) return;
-  const url = (inp && inp.value.trim()) || 'https://link-do-seu-video-aqui';
-  code.textContent = `yt-dlp -f "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]" ${url}`;
+  const raw = (inp && inp.value.trim()) || 'https://link-do-seu-video-aqui';
+  const url = normalizeYoutubeUrlForDownload(raw);
+  const quoted = url.includes(' ') || url.includes('&') ? `"${url}"` : url;
+  code.textContent = `yt-dlp -f "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]" ${quoted}`;
 }
 document.addEventListener('input', (e)=>{
   if(e.target && e.target.id === 'opusYoutubeUrl') updateYtdlpCommandDisplay();
@@ -7841,16 +7850,19 @@ function copyYtdlpCommand(){
 }
 async function downloadOriginalYoutube1080p(){
   const inp = document.getElementById('opusYoutubeUrl');
-  const rawUrl = (inp ? inp.value.trim() : '');
-  if(!rawUrl){
+  const rawInput = (inp ? inp.value.trim() : '');
+  if(!rawInput){
     toast('🔗 Cole o link do YouTube primeiro no campo acima!', 'warn');
     if(inp) inp.focus();
     return;
   }
+  const rawUrl = normalizeYoutubeUrlForDownload(rawInput);
+  if(inp && rawUrl !== rawInput) inp.value = rawUrl;
   updateYtdlpCommandDisplay();
   const btn = document.querySelector('button[onclick="downloadOriginalYoutube1080p()"]');
   if(btn){ btn.disabled=true; btn.textContent='⏳ Baixando 1080p...'; }
-  showStatus('opusStatus','📥 Baixando vídeo original em MP4 1080p (bv*[ext=mp4]+ba[ext=m4a])...','info');
+  if(rawInput !== rawUrl) toast('🔗 Link limpo (?is= removido) → usando ' + rawUrl);
+  showStatus('opusStatus','📥 Baixando vídeo original em MP4 1080p direto no navegador — sem Termux (1 toque)...','info');
   try{
     let blob=null;
     let filename='';
@@ -7888,7 +7900,7 @@ async function downloadOriginalYoutube1080p(){
         if(dl && dl.blob){ blob=dl.blob; filename=vid+'.mp4'; }
       }
     }
-    if(!blob) throw new Error('Não foi possível baixar o MP4 1080p por este link. Copie o comando yt-dlp acima e rode no seu terminal/Termux.');
+    if(!blob) throw new Error('Não consegui baixar direto — o YouTube bloqueou o download temporariamente. Tente colar só https://www.youtube.com/watch?v=ID (sem ?is= / ?si=) ou cole o link .MP4 direto. Sem Termux: é 1 toque em “Baixar MP4 1080p agora” no navegador.');
     if(!filename) filename='video-original-1080p.mp4';
     if(!filename.toLowerCase().endsWith('.mp4')) filename+='.mp4';
     triggerBlobDownload(blob, filename);
