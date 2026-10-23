@@ -2973,40 +2973,16 @@ async function analyzeViralClips({
       let subSegments = matchingSegs;
       let fullCaptionText = String(c.captionText || '').trim();
 
-      // Se o corte é de 2 minutos (ex: 120s) e temos poucos segmentos, divide/distribui as falas em janelas naturais de ~4.5s para a legenda fluir no ritmo humano durante os 2 minutos inteiros!
-      const coveredSpan = matchingSegs.length
-        ? (matchingSegs[matchingSegs.length - 1].fim - matchingSegs[0].inicio)
-        : 0;
-      if (matchingSegs.length < 4 || coveredSpan < clipDur * 0.55) {
-        const baseWords = fullCaptionText.split(/\s+/).filter(Boolean);
-        const minTargetWords = Math.max(24, Math.round(clipDur * 2.1));
-        const expandedWords = [...baseWords];
-        const continuationPhrases = [
-          'Olha só como essa parte da conversa explica exatamente o que aconteceu nos bastidores daquele episódio.',
-          'Ninguém na mesa esperava essa resposta ao vivo e a reação mostra por que esse corte viralizou tanto!',
-          'Presta atenção em cada detalhe que ele conta agora porque essa história muda completamente o jogo.',
-          'Essa resenha inteira vale ouro do começo ao fim, repara no nível de sinceridade e energia desse momento!'
-        ];
-        let pIdx = 0;
-        while (expandedWords.length < minTargetWords) {
-          const extra = continuationPhrases[(idx + pIdx) % continuationPhrases.length].split(/\s+/);
-          expandedWords.push(...extra);
-          pIdx++;
-        }
-        fullCaptionText = expandedWords.join(' ');
-        const BUILT_SEG_WORDS = 10;
-        const numBuilt = Math.max(1, Math.ceil(expandedWords.length / BUILT_SEG_WORDS));
-        const segDur = clipDur / numBuilt;
-        subSegments = [];
-        for (let k = 0; k < numBuilt; k++) {
-          const wSlice = expandedWords.slice(k * BUILT_SEG_WORDS, (k + 1) * BUILT_SEG_WORDS).join(' ');
-          if (wSlice) {
-            subSegments.push({
-              inicio: Number((s + k * segDur).toFixed(2)),
-              fim: Number((s + (k + 1) * segDur).toFixed(2)),
-              texto: wSlice
-            });
-          }
+      // Mantém legenda 100% fiel ao que foi falado — não inventa frases genéricas. Se poucos segmentos, apenas realinha aos reais.
+      if (!matchingSegs.length && allTimedSegments.length) {
+        const closest = allTimedSegments
+          .map(sg => ({ sg, dist: Math.min(Math.abs(sg.inicio - s), Math.abs(sg.fim - e)) }))
+          .sort((a,b)=>a.dist-b.dist)
+          .slice(0, 4)
+          .map(x=>x.sg);
+        if (closest.length) {
+          subSegments = closest;
+          fullCaptionText = closest.map(c=>c.texto).join(' ').trim() || fullCaptionText;
         }
       }
 
