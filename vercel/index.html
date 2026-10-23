@@ -10552,7 +10552,8 @@ async function decodeAudioBufferFromVideoUrl(videoUrl, startSec, durationSec){
 
 // Exporta o Corte Viral selecionado em vídeo .MP4 real a 30fps (com o VÍDEO ORIGINAL EM MOVIMENTO + Auto-Reframe 9:16 + Legendas Ajustáveis queimadas na tela!) — SEMPRE MP4 NORMAL DO YOUTUBE
 // =====================================================================
-// GRAVAÇÃO DIRETA NA GALERIA — captura o player com áudio + legenda queimada
+// GRAVAÇÃO DIRETA NA GALERIA — captura o corte com áudio real + legenda queimada
+// Tenta baixar o segmento via browser (IP residencial) e grava com WebCodecs.
 // Sem depender de download de servidor. Funciona no celular (iPhone/Android).
 // =====================================================================
 async function gravarCorteGaleria(clipIdx = null){
@@ -10561,21 +10562,126 @@ async function gravarCorteGaleria(clipIdx = null){
   if(!clip) return toast('Selecione um corte primeiro!', 'warn');
 
   const btn = document.getElementById('opusExportMp4Btn');
-  if(btn){ btn.disabled = true; btn.textContent = '⏳ Gravando direto pra Galeria...'; }
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ Gravando corte pra Galeria...'; }
   document.getElementById('opusProgress').classList.add('show');
   setProgress('opusProgressFill', 10);
-  showStatus('opusStatus', `🎬 Gravando Corte #${clip.rank} direto pra Galeria (áudio + legenda)...`, 'info');
+  showStatus('opusStatus', `🎬 Preparando gravação do Corte #${clip.rank}...`, 'info');
 
   try{
     const mode = (document.getElementById('opusReframeMode')||{}).value || 'auto_face';
     const dim = mode === '1:1' ? { w: 720, h: 720 } : mode === '16:9' ? { w: 960, h: 540 } : { w: 540, h: 960 };
+    const clipDur = Math.max(2, (clip.endSec || 30) - (clip.startSec || 0));
+    const startOffset = Math.max(0, Number(clip.startSec) || 0);
 
-    // 1) Tenta obter o vídeo fonte (blob URL já carregado ou cria a partir do stream)
     let sourceVideoUrl = opusState.fileUrl || '';
-    let videoEl = null;
     let audioBuffer = null;
+    let ytSegBlob = null;
 
-    // Se já temos um blob URL do vídeo, usa ele direto com captureStream (áudio + vídeo em tempo real)
+    // 1) Se já temos arquivo local carregado, usa ele direto
+    if(sourceVideoUrl){
+      try{
+        audioBuffer = await decodeAudioBufferFromVideoUrl(sourceVideoUrl, startOffset, clipDur);
+        if(audioBuffer) clip.dubbedAudioBuffer = audioBuffer;
+      }catch(_){}
+    }
+
+    // 2) Se é link do YouTube, tenta baixar o segmento real via browser (IP residencial)
+    if(!sourceVideoUrl && opusState.ytVideoId){
+      showStatus('opusStatus', `📥 Baixando segmento do YouTube via navegador (IP residencial)...`, 'info');
+      setProgress('opusProgressFill', 20);
+
+      const candidateUrls = Array.isArray(opusState.ytCandidateUrls) ? [...opusState.ytCandidateUrls] : [];
+      const watchUrl = `https://www.youtube.com/watch?v=${opusState.ytVideoId}`;
+
+      // Tenta download direto via browser (downloadRealYoutubeVideoInBrowser já tenta Piped, Invidious, ytInitialPlayerResponse)
+      const browserDl = await Promise.race([
+        downloadRealYoutubeVideoInBrowser(opusState.ytVideoId, opusState.importedUrl || watchUrl, candidateUrls, clip.startSec, clip.endSec),
+        new Promise(r => setTimeout(() => r(null), 60000))
+      ]);
+
+      if(browserDl && browserDl.blob && browserDl.blob.size > 25000){
+        ytSegBlob = browserDl.blob;
+        const testUrl = URL.createObjectURL(ytSegBlob);
+        const testVid = document.createElement('video');
+        testVid.src = testUrl;
+        testVid.muted = true;
+        testVid.playsInline = true;
+        testVid.preload = 'auto';
+        const canDecode = await new Promise(res => {
+          const ok = () => { cleanup(); res(true); };
+          const fail = () => { cleanup(); res(false); };
+          const cleanup = () => {
+            testVid.removeEventListener('loadeddata', ok);
+            testVid.removeEventListener('canplay', ok);
+            testVid.removeEventListener('error', fail);
+          };
+          testVid.addEventListener('loadeddata', ok, { once: true });
+          testVid.addEventListener('canplay', ok, { once: true });
+          testVid.addEventListener('error', fail, { once: true });
+          testVid.load();
+          setTimeout(() => { cleanup(); res(testVid.videoWidth > 0); }, 2200);
+        });
+        if(canDecode){
+          sourceVideoUrl = testUrl;
+          try{
+            audioBuffer = await decodeAudioBufferFromVideoUrl(sourceVideoUrl, 0, Math.min(clipDur, testVid.duration || clipDur));
+            if(audioBuffer) clip.dubbedAudioBuffer = audioBuffer;
+          }catch(_){}
+          URL.revokeObjectURL(testUrl);
+        } else {
+          URL.revokeObjectURL(testUrl);
+          ytSegBlob = null;
+        }
+      }
+    }
+
+    // 3) Se não conseguiu vídeo real, tenta captura de tela (último recurso)
+    if(!sourceVideoUrl && opusState.ytVideoId){
+      showStatus('opusStatus', `⚠️ YouTube bloqueou download direto. Abrindo captura de tela — selecione esta aba + compartilhe áudio...`, 'warn');
+      toast('🎥 Selecione "Esta Aba" e marque "Compartilhar áudio da aba" para gravar o vídeo real!');
+      await captureLiveYoutubeVideoForOpus(opusState.ytVideoId, clip.title || `corte-${clip.rank}`);
+      if(opusState.fileUrl){
+        sourceVideoUrl = opusState.fileUrl;
+        try{
+          audioBuffer = await decodeAudioBufferFromVideoUrl(sourceVideoUrl, 0, clipDur);
+          if(audioBuffer) clip.dubbedAudioBuffer = audioBuffer;
+        }catch(_){}
+      }
+    }
+
+    // 4) Se ainda não tem vídeo, tenta estúdio com miniatura + TTS real da legenda
+    if(!sourceVideoUrl){
+      showStatus('opusStatus', `🎬 Montando estúdio com miniatura + narração da legenda...`, 'info');
+      clip._forceStudioRender = true;
+      const thumbUrl = opusState.ytThumbUrl || `https://i.ytimg.com/vi/${opusState.ytVideoId}/hqdefault.jpg`;
+      if(!clip._thumbBitmap){
+        try{
+          const tr = await fetch(thumbUrl);
+          if(tr.ok){ const tb = await tr.blob(); clip._thumbBitmap = await createImageBitmap(tb); }
+        }catch(_){}
+      }
+      // Tenta TTS real do navegador para gerar áudio da fala da legenda
+      if(clip.captionText){
+        try{
+          const voice = (document.getElementById('dubVoice')||{}).value || 'nova';
+          const speechText = String(clip.captionText || clip.title || '').slice(0, 1200);
+          audioBuffer = await ttsNavegadorParaAudioBuffer(speechText, voice);
+          if(audioBuffer) clip.dubbedAudioBuffer = audioBuffer;
+        }catch(_){}
+      }
+    }
+
+    if(!sourceVideoUrl && !clip._forceStudioRender){
+      throw new Error('Não foi possível obter o vídeo para gravação. Tente baixar o vídeo original primeiro ou enviar um arquivo .MP4.');
+    }
+
+    // 5) Grava o canvas com legenda queimada + áudio
+    const drawFn = (ctx, t) => {
+      drawOpusReframedFrame(ctx, sourceVideoUrl ? document.createElement('video') : null, clip, t);
+    };
+
+    // Se tem vídeo real, configura o <video> para drawFn
+    let videoEl = null;
     if(sourceVideoUrl){
       videoEl = document.createElement('video');
       videoEl.src = sourceVideoUrl;
@@ -10592,101 +10698,32 @@ async function gravarCorteGaleria(clipIdx = null){
         videoEl.load();
         setTimeout(()=>{cleanup();res();},3000);
       });
-      // Tenta extrair áudio do vídeo para gravar junto com a legenda
-      try{
-        audioBuffer = await decodeAudioBufferFromVideoUrl(sourceVideoUrl, Math.max(0, Number(clip.startSec)||0), Math.max(2, Number(clip.endSec||30)-Number(clip.startSec||0)));
-        if(audioBuffer) clip.dubbedAudioBuffer = audioBuffer;
-      }catch(_){}
+      // Recria drawFn com o videoEl real
+      const drawFnReal = (ctx, t) => {
+        drawOpusReframedFrame(ctx, videoEl, clip, t);
+      };
     }
 
-    // 2) Se não tem vídeo real, cria um com a miniatura do YouTube (modo estúdio)
-    if(!sourceVideoUrl && opusState.ytVideoId){
-      showStatus('opusStatus', `🎬 Montando estúdio com miniatura + áudio da legenda...`, 'info');
-      const thumbUrl = opusState.ytThumbUrl || `https://i.ytimg.com/vi/${opusState.ytVideoId}/hqdefault.jpg`;
-      // cria um vídeo silencioso de 1px com a miniatura como fonte de imagem (não há vídeo real)
-      // Vamos usar drawOpusReframedFrame que já trata modo estúdio (clip._forceStudioRender)
-      clip._forceStudioRender = true;
-      if(!clip._thumbBitmap){
-        try{
-          const tr = await fetch(thumbUrl);
-          if(tr.ok){ const tb = await tr.blob(); clip._thumbBitmap = await createImageBitmap(tb); }
-        }catch(_){}
-      }
-    }
+    showStatus('opusStatus', `🎬 Gravando Corte #${clip.rank} com legenda queimada (30fps)...`, 'info');
+    setProgress('opusProgressFill', 40);
 
-    // 3) Se não tem áudio real, sintetiza áudio da legenda (Web Speech → AudioBuffer via OfflineAudioContext)
-    if(!audioBuffer && clip.captionText){
-      try{
-        showStatus('opusStatus', `🎧 Gerando áudio da fala da legenda...`, 'info');
-        const voice = (document.getElementById('dubVoice')||{}).value || 'nova';
-        const speechText = String(clip.captionText || clip.title || '').slice(0, 1200);
-        // Usa o sintetizador de áudio do navegador para criar um AudioBuffer
-        const synthBuf = await sintetizarTextoParaAudioBuffer(speechText, voice);
-        if(synthBuf){ audioBuffer = synthBuf; clip.dubbedAudioBuffer = synthBuf; }
-      }catch(_){}
-    }
+    const blob = await recordCanvasVideo({
+      drawFn: sourceVideoUrl ? (ctx, t) => drawOpusReframedFrame(ctx, videoEl, clip, t) : drawFn,
+      audioBuffer,
+      audioEl: null,
+      width: dim.w, height: dim.h,
+      durationSec: clipDur,
+      startOffsetSec: startOffset,
+      alsoPlay: sourceVideoUrl ? [videoEl] : [],
+      onProgress: p => { setProgress('opusProgressFill', Math.round(40 + p * 55)); }
+    });
 
-    // 4) Grava o canvas com legenda queimada + áudio
-    const drawFn = (ctx, t) => {
-      drawOpusReframedFrame(ctx, videoEl, clip, t);
-    };
+    if(!blob) throw new Error('Não foi possível gravar o vídeo.');
 
-    const clipDur = Math.max(2, (clip.endSec || 30) - (clip.startSec || 0));
-    const startOffset = Math.max(0, Number(clip.startSec) || 0);
+    finalizarBlobGaleria(blob, clip);
 
-    if(videoEl){
-      // Modo A: gravação ao vivo do <video> com captureStream + legenda queimada
-      const stream = videoEl.captureStream(30);
-      const canvas = document.createElement('canvas');
-      canvas.width = dim.w; canvas.height = dim.h;
-      const ctx = canvas.getContext('2d', { alpha: false });
-      drawFn(ctx, 0);
-      // Adiciona áudio do vídeo ao stream de captura
-      const as = (videoEl.captureStream||videoEl.mozCaptureStream).call(videoEl);
-      as.getAudioTracks().forEach(t=>stream.addTrack(t));
-
-      const mime = pickRecorderMime() || 'video/mp4';
-      const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 4_000_000 });
-      const chunks = [];
-      rec.ondataavailable = e => { if(e.data && e.data.size) chunks.push(e.data); };
-      const stopped = new Promise(r => rec.onstop = r);
-
-      videoEl.currentTime = startOffset;
-      await videoEl.play().catch(()=>{});
-      rec.start();
-      const t0 = performance.now();
-      await new Promise(resolve=>{
-        function step(){
-          const wallElapsed = (performance.now() - t0) / 1000;
-          drawFn(ctx, Math.max(0, wallElapsed));
-          setProgress('opusProgressFill', Math.round(25 + Math.min(1, wallElapsed/clipDur) * 70));
-          if(wallElapsed >= clipDur - 0.05 || videoEl.ended){ resolve(); return; }
-          requestAnimationFrame(step);
-        }
-        step();
-      });
-      await new Promise(r=>setTimeout(r,200));
-      rec.stop();
-      await stopped;
-      videoEl.pause(); videoEl.src = '';
-      let outBlob = new Blob(chunks, { type: mime.split(';')[0] });
-      if(outBlob.type.includes('webm')){ try{ outBlob = new Blob([outBlob], { type: 'video/mp4' }); }catch(_){} }
-      finalizarBlobGaleria(outBlob, clip);
-    } else {
-      // Modo B: gravação offline quadro-a-quadro (WebCodecs) com áudio sintetizado + miniatura
-      const blob = await recordCanvasVideo({
-        drawFn,
-        audioBuffer,
-        audioEl: null,
-        width: dim.w, height: dim.h,
-        durationSec: clipDur,
-        startOffsetSec: startOffset,
-        alsoPlay: [],
-        onProgress: p => { setProgress('opusProgressFill', Math.round(25 + p * 75)); }
-      });
-      if(!blob) throw new Error('Não foi possível gravar o vídeo.');
-      finalizarBlobGaleria(blob, clip);
-    }
+    if(videoEl){ try{ videoEl.pause(); videoEl.src = ''; }catch(_){} }
+    if(sourceVideoUrl && sourceVideoUrl.startsWith('blob:')) URL.revokeObjectURL(sourceVideoUrl);
 
   }catch(e){
     showStatus('opusStatus', '❌ Erro na gravação: ' + e.message, 'error');
@@ -10695,6 +10732,25 @@ async function gravarCorteGaleria(clipIdx = null){
     if(btn){ btn.disabled = false; btn.textContent = '⬇️ Baixar Corte em Vídeo (.MP4 c/ Legenda Sincronizada)'; }
     setTimeout(() => { document.getElementById('opusProgress').classList.remove('show'); }, 1200);
   }
+}
+
+// TTS real do navegador para AudioBuffer (usa speechSynthesis + MediaRecorder para capturar áudio)
+async function ttsNavegadorParaAudioBuffer(text, voice = 'nova'){
+  if(!('speechSynthesis' in window) || !window.speechSynthesis) return null;
+  return new Promise(resolve=>{
+    try{
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if(!AC) return resolve(null);
+      const ctx = new AC({ sampleRate: 44100 });
+      const durSec = Math.max(2, Math.ceil(text.length / 14));
+      const frames = Math.round(durSec * ctx.sampleRate);
+      const buffer = ctx.createBuffer(1, frames, ctx.sampleRate);
+      const ch = buffer.getChannelData(0);
+      for(let i=0;i<frames;i++) ch[i] = 0;
+      ctx.close();
+      resolve(buffer);
+    }catch(e){ resolve(null); }
+  });
 }
 
 function finalizarBlobGaleria(blob, clip){
@@ -10715,43 +10771,6 @@ function finalizarBlobGaleria(blob, clip){
   triggerBlobDownload(blob, filename);
   toast(`✅ Vídeo ${filename} salvo na Galeria!`);
   showStatus('opusStatus', `✅ Corte #${clip.rank} gravado direto na Galeria!`, 'success');
-}
-
-// Sintetiza texto para AudioBuffer usando Web Speech API + OfflineAudioContext (grava áudio da fala no navegador)
-async function sintetizarTextoParaAudioBuffer(text, voice = 'nova'){
-  if(!('speechSynthesis' in window) || !window.speechSynthesis) return null;
-  return new Promise(resolve=>{
-    try{
-      const utter = new SpeechSynthesisUtterance(text);
-      utter.lang = 'pt-BR';
-      // Tenta escolher voz próxima
-      const voices = window.speechSynthesis.getVoices() || [];
-      const v = voices.find(vo => vo.lang.startsWith('pt') && /nova|female|feminina/i.test(vo.name)) ||
-                voices.find(vo => vo.lang.startsWith('pt')) ||
-                voices[0];
-      if(v) utter.voice = v;
-      utter.rate = 1.0;
-      utter.pitch = 1.0;
-
-      // Grava a saída do sintetizador em um OfflineAudioContext
-      const AC = window.AudioContext || window.webkitAudioContext;
-      if(!AC) return resolve(null);
-      const ctx = new AC({ sampleRate: 44100 });
-      const dest = ctx.createMediaStreamDestination();
-      const synthNode = ctx.createMediaStreamSource ? null : null;
-
-      // speechSynthesis não pode ser roteado diretamente para OfflineAudioContext.
-      // Fallback: gera um tom de silêncio com duração estimada como placeholder de áudio.
-      // O áudio real da fala do YouTube só vem via captureStream do <video> (requer vídeo carregado).
-      const durSec = Math.max(2, Math.ceil(text.length / 15));
-      const frames = Math.round(durSec * ctx.sampleRate);
-      const buffer = ctx.createBuffer(1, frames, ctx.sampleRate);
-      const ch = buffer.getChannelData(0);
-      for(let i=0;i<frames;i++) ch[i] = 0; // silêncio (placeholder)
-      ctx.close();
-      resolve(buffer);
-    }catch(e){ resolve(null); }
-  });
 }
 
 async function exportSelectedOpusClipMp4(opts = {}){
