@@ -1,5 +1,5 @@
 const { transcribeClipSegment, analyzeViralClips, fetchYoutubeVideoInfoAndStream, fetchVideoStreamChunk, fetchYoutubeClipMp4Segment, getBody, send } = require('./lib/ai');
-const { handleFormats: handleYoutubeDownloadFormats, handleDownload: handleYoutubeDownload } = require('./lib/youtube-download-handler');
+const { handleFormats: handleYoutubeDownloadFormats, handleDownload: handleYoutubeDownload } = require('../lib/youtube-download-handler');
 
 module.exports = async (req, res) => {
   try {

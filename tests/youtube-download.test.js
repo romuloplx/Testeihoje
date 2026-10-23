@@ -6,7 +6,7 @@ const {
   extractYoutubeVideoId,
   normalizeDownloadableFormats,
   sanitizeVideoFilename
-} = require('../vercel/api/lib/youtube-download');
+} = require('../vercel/lib/youtube-download');
 const clipsHandler = require('../vercel/api/clips');
 
 test('accepts supported YouTube link forms and rejects foreign hosts', () => {
