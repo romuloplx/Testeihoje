@@ -7886,6 +7886,38 @@ async function downloadOriginalYoutube1080p(){
         }
         filename=(j.title ? j.title.replace(/[^\w\-]+/g,'_').slice(0,80) : 'video')+'.mp4';
       }
+      // ytdown.to-style: se backend já trouxe directStreamUrl (googlevideo decifrado), baixa direto igual ytdown
+      if(!blob && j && j.directStreamUrl){
+        showStatus('opusStatus','📥 Link direto encontrado (ytdown-style)! Baixando via stream seguro...','info');
+        try{
+          const prox = await downloadVideoChunksViaProxy(j.directStreamUrl, j.directStreamUa || 'Mozilla/5.0', null, 30);
+          if(prox && prox.blob && prox.blob.size > 25000){ blob=prox.blob; filename=(j.title ? j.title.replace(/[^\w\-]+/g,'_').slice(0,80) : 'video')+'.mp4'; }
+        }catch(_){}
+        // fallback: tentativa direta via fetch CORS aberto (Invidious ?local=true / CDN)
+        if(!blob){
+          try{
+            const r2 = await fetch(j.directStreamUrl, { signal: AbortSignal.timeout(9000) });
+            if(r2.ok){
+              const ct = String(r2.headers.get('content-type')||'').toLowerCase();
+              if(!ct.includes('text/html') && !ct.includes('application/json')){
+                const ab = await r2.arrayBuffer();
+                if(ab.byteLength > 25000) { blob=new Blob([ab],{type:'video/mp4'}); filename=(j.title ? j.title.replace(/[^\w\-]+/g,'_').slice(0,80) : 'video')+'.mp4'; }
+              }
+            }
+          }catch(_){}
+        }
+        // último recurso: abre URL direta em nova aba pra salvar na Galeria (igual app.ytdown.to faz)
+        if(!blob && /^https?:\/\//i.test(j.directStreamUrl)){
+          try{
+            const a=document.createElement('a');
+            a.href=j.directStreamUrl; a.target='_blank'; a.rel='noopener'; a.download=(j.title||j.videoId||'video')+'.mp4';
+            document.body.appendChild(a); a.click(); setTimeout(()=>{ try{a.remove()}catch(_){} },2000);
+            toast('⬇️ Download direto aberto em nova aba — salve na Galeria!'); showStatus('opusStatus','✅ Link direto aberto! Confirme “Salvar” na Galeria.','success');
+            if(btn){ btn.disabled=false; btn.textContent='⬇️ Baixar MP4 1080p agora'; }
+            return;
+          }catch(_){}
+        }
+      }
       if(!blob && j && Array.isArray(j.candidateStreamUrls) && j.candidateStreamUrls.length){
         const dl = await downloadRealYoutubeVideoInBrowser(j.videoId||'', rawUrl, j.candidateStreamUrls);
         if(dl && dl.blob){ blob=dl.blob; filename=(j.title ? j.title.replace(/[^\w\-]+/g,'_').slice(0,80) : 'video')+'.mp4'; }
