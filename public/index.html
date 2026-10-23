@@ -1072,25 +1072,20 @@ input[type="range"]{
     <!-- 🔗 OPUSCLIP DROP LINK PILL + UPLOAD FILE + GET CLIPS IN 1 CLICK -->
     <div style="text-align:center;margin-bottom:12px">
       <h2 style="font-size:22px;font-weight:800;color:#ffffff;margin:0 0 4px 0">#1 AI Video Clipping & Editing Tool</h2>
-      <p style="margin:0;font-size:12.5px;color:#94a3b8">Cole o link do YouTube ou envie seu vídeo para gerar múltiplos cortes verticais com <b>Virality Score™ (0–99)</b>, <b>Auto-Reframe 9:16</b>, <b>AI B-Roll</b> e <b>Legendas Dinâmicas sem marca d'água</b>.</p>
+      <p style="margin:0;font-size:12.5px;color:#94a3b8">Envie seu vídeo para gerar múltiplos cortes verticais com <b>Virality Score™ (0–99)</b>, <b>Auto-Reframe 9:16</b>, <b>AI B-Roll</b> e <b>Legendas Dinâmicas sem marca d'água</b>.</p>
     </div>
 
     <div class="opus-url-pill">
-      <span style="font-size:17px">🔗</span>
-      <input type="url" id="opusYoutubeUrl"
-             placeholder="Drop a video link (YouTube, Shorts, Live ou URL .MP4) — ex: https://www.youtube.com/watch?v=..."
-             onkeydown="if(event.key==='Enter'){event.preventDefault();importOpusVideoFromUrl(true);}" />
       <button type="button" class="ghost" onclick="document.getElementById('opusVideoFile').click()" style="padding:10px 13px;border-radius:10px;border-color:#334155;color:#e2e8f0;white-space:nowrap;margin:0">📁 Upload file</button>
-      <button type="button" class="opus-cta-1click" id="opusFetchUrlBtn" onclick="handleOpusOneClickBtn()">⚡ Get clips in 1 click</button>
+      <button type="button" class="opus-cta-1click" id="opusFetchUrlBtn" onclick="handleOpusOneClickBtn()">⚡ Gerar cortes em 1 clique</button>
       <input type="file" id="opusVideoFile" accept="video/*,.mp4,.mov,.webm,.mkv,.avi,.m4v" onchange="loadOpusVideoFile(this.files[0])" style="display:none">
     </div>
 
-    <!-- BARRA DE FONTE RÁPIDA + PREVIEW DO YOUTUBE -->
+    <!-- BARRA DE FONTE RÁPIDA -->
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px">
       <div style="display:flex;gap:7px;flex-wrap:wrap">
         <button class="ghost" type="button" onclick="loadOpusProjectP3102218()" style="padding:7px 12px;font-size:11.5px;border-color:#22c55e88;color:#bbf7d0">🚀 Abrir Projeto #P3102218muth (Demo Oficial OpusClip)</button>
         <button class="ghost" type="button" onclick="useStudioVideoInOpus()" style="padding:7px 12px;font-size:11.5px;border-color:#38bdf866;color:#bae6fd">🎬 Usar Último Vídeo do Estúdio</button>
-        <button class="ghost" type="button" onclick="importOpusVideoFromUrl(false)" style="padding:7px 12px;font-size:11.5px;border-color:#64748b66;color:#cbd5e1">📥 Só Puxar Link</button>
       </div>
       <div id="opusDropZone"
            ondragover="event.preventDefault();this.style.borderColor='#22c55e'"
@@ -1102,20 +1097,6 @@ input[type="range"]{
       </div>
     </div>
 
-    <!-- 📥 BAIXAR VÍDEO ORIGINAL YOUTUBE MP4 1080p (comando yt-dlp) -->
-    <div style="margin-top:12px;padding:12px 14px;border-radius:12px;background:#0e111e;border:1px solid #1e2538;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between">
-      <div style="flex:1;min-width:260px">
-        <div style="font-size:12px;font-weight:900;color:#f8fafc">📥 Baixar vídeo original do YouTube em MP4 1080p</div>
-        <div style="font-size:11px;color:#94a3b8;margin-top:3px">Baixa o arquivo original sem cortes — depois gere os cortes virais. Comando usado:</div>
-        <code id="ytdlpCmd" style="display:block;margin-top:6px;padding:8px 10px;border-radius:8px;background:#080a14;border:1px solid #242b40;color:#a5f3fc;font-size:11px;word-break:break-all;user-select:all">yt-dlp -f "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]" https://link-do-seu-video-aqui</code>
-      </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button type="button" class="ghost" onclick="copyYtdlpCommand()" style="padding:10px 14px;font-size:12px;border-color:#334155;color:#e2e8f0">📋 Copiar comando</button>
-        <button type="button" class="primary" onclick="downloadOriginalYoutube1080p()" style="padding:10px 16px;font-size:12px;font-weight:900;background:linear-gradient(135deg,#7c3aed,#06b6d4);color:#fff;border:none;margin:0">⬇️ Baixar MP4 1080p agora</button>
-      </div>
-    </div>
-
-    <div id="opusYoutubePreviewCard" class="hidden" style="margin-top:10px;padding:10px 12px;border-radius:12px;background:#0f1322;border:1px solid #232942"></div>
     <div id="opusFileMeta" class="hidden" style="margin-top:10px;padding:10px 12px;border-radius:12px;background:#0f1322;border:1px solid #232942;font-size:12.5px;color:#cbd5e1;line-height:1.5"></div>
 
     <!-- 🎬 MONITOR DO VÍDEO EM REPRODUÇÃO + DETECTOR DE MELHORES PARTES & LEGENDAS AUTOMÁTICAS -->
@@ -9206,12 +9187,7 @@ function selectOpusQuickPreset(presetId, el){
 
 // Botão principal "⚡ Get clips in 1 click" do topo do dashboard
 async function handleOpusOneClickBtn(){
-  const urlVal = ((document.getElementById('opusYoutubeUrl')||{}).value || '').trim();
-  if(urlVal){
-    await importOpusVideoFromUrl(true);
-  } else {
-    await runOpusClipAnalysis();
-  }
+  await runOpusClipAnalysis();
 }
 
 // Carrega instantaneamente o Projeto #P3102218muth (do link oficial https://clip.opus.pro/dashboard?projectId=P3102218muth)
