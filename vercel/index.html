@@ -814,6 +814,219 @@ input[type="range"]{
 </section>
 
 
+<!-- DUB -->
+<section id="dub" class="hidden">
+  <div class="card">
+    <h2>🌍 Dublar Vídeo ou Áudio (Pequenos & Grandes • Sem Limite de Tamanho)</h2>
+    <p>Envie desde <b>clipes curtos (TikTok, Reels, Shorts, WhatsApp)</b> até <b>vídeos longos e pesados (aulas, podcasts, documentários e filmes de centenas de MBs ou GBs)</b> usando o seletor de arquivo ou arrastando o vídeo/áudio para a área abaixo.</p>
+
+    <div id="dubDropZone"
+         ondragover="event.preventDefault();this.style.borderColor='#34d399';this.style.background='#0f1f26'"
+         ondragleave="this.style.borderColor='#4c1d95';this.style.background='linear-gradient(180deg,#111428,#0b0d1b)'"
+         ondrop="onDropDubFile(event)"
+         onclick="document.getElementById('videoFile').click()"
+         style="margin-top:12px;padding:22px 16px;border:2px dashed #4c1d95;border-radius:14px;background:linear-gradient(180deg,#111428,#0b0d1b);text-align:center;cursor:pointer;transition:.2s">
+      <div style="font-size:28px;margin-bottom:6px">🎬 ⬆️ 🎧</div>
+      <div style="font-weight:800;font-size:14.5px;color:#e0e7ff">Toque aqui ou arraste qualquer vídeo / áudio (pequeno ou grande)</div>
+      <div class="hint" style="margin-top:6px">Suporta <b>MP4, MOV, MKV, WEBM, AVI, M4V, MP3, WAV, M4A, OGG</b> • Clipes de 2s até vídeos longos de 500MB / 1GB+ com fatiamento automático!</div>
+    </div>
+    <input type="file" id="videoFile" accept="video/*,audio/*,.mkv,.mov,.avi,.flv,.wmv,.m4v,.mp4,.webm,.mp3,.wav,.m4a,.ogg" onchange="previewVideo()" style="display:none">
+
+    <div id="dubFileMeta" class="hidden" style="margin-top:12px;padding:11px 13px;border-radius:11px;background:#0e1726;border:1px solid #1e3a8a;font-size:12.5px;line-height:1.6;color:#dbeafe"></div>
+
+    <video id="preview" controls playsinline hidden style="width:100%;max-height:440px;margin-top:12px;border-radius:10px;background:#000"></video>
+    <div id="dubQuickOpusBar" class="hidden" style="margin-top:8px">
+      <button type="button" onclick="sendPlayingVideoToOpusClip('dub')" style="width:100%;padding:11px 14px;border:1.5px solid #22c55e;border-radius:11px;font-size:13px;font-weight:900;cursor:pointer;color:#bbf7d0;background:linear-gradient(135deg,#052e16,#064e3b)">✂️ Pegar Melhores Partes Deste Vídeo Reproduzindo, Cortar &amp; Botar Legendas (OpusClip IA)</button>
+    </div>
+    <audio id="audioPreview" controls hidden style="width:100%;margin-top:12px"></audio>
+
+    <div class="row" style="margin-top:12px">
+      <div>
+        <label>Idioma original</label>
+        <select id="language">
+          <option value="">✨ Detectar automaticamente</option>
+          <option value="en">🇺🇸 Inglês</option>
+          <option value="es">🇪🇸 Espanhol</option>
+          <option value="fr">🇫🇷 Francês</option>
+          <option value="ja">🇯🇵 Japonês</option>
+          <option value="ko">🇰🇷 Coreano</option>
+          <option value="zh">🇨🇳 Chinês</option>
+          <option value="de">🇩🇪 Alemão</option>
+          <option value="it">🇮🇹 Italiano</option>
+          <option value="ru">🇷🇺 Russo</option>
+          <option value="pt">🇧🇷 Português</option>
+        </select>
+      </div>
+      <div>
+        <label>Voz da dublagem</label>
+        <div style="display:flex;gap:8px">
+          <select id="dubVoice" style="flex:1">
+            <option value="onyx">🎙️ Antônio — Masculina Grave Cinema (Humana HD)</option>
+            <option value="nova">🎙️ Francisca — Feminina Calorosa Natural (Humana HD)</option>
+            <option value="shimmer">🎙️ Thalita HD — Feminina Jovem Realista (Dragon Neural)</option>
+            <option value="echo">🎙️ Andrew HD — Masculina Podcast Conversacional</option>
+            <option value="coral">🎙️ Ava HD — Feminina Expressiva Comercial</option>
+            <option value="fable">🎙️ Brian HD — Masculina Contador de Histórias</option>
+            <option value="sage">🎙️ Emma HD — Feminina Documentário & Aula</option>
+            <option value="ash">🎙️ Remy HD — Masculina Dramática Firme</option>
+            <option value="alloy">🎙️ Vivienne HD — Feminina Executiva / TV</option>
+          </select>
+          <button class="ghost" type="button" onclick="previewVoice(document.getElementById('dubVoice').value)">🔊</button>
+        </div>
+      </div>
+      <div>
+        <label>Traduzir e dublar em</label>
+        <select id="targetLanguage">
+          <option value="pt-BR" selected>🇧🇷 Português (Brasil)</option>
+          <option value="en">🇺🇸 Inglês</option>
+          <option value="es">🇪🇸 Espanhol</option>
+          <option value="fr">🇫🇷 Francês</option>
+          <option value="de">🇩🇪 Alemão</option>
+          <option value="it">🇮🇹 Italiano</option>
+          <option value="ja">🇯🇵 Japonês</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Mixagem com áudio original</label>
+        <select id="dubBgMix">
+          <option value="duck" selected>🔉 Voz dublada + som ambiente original suave (12%)</option>
+          <option value="mute">🔇 100% só a voz nova (silenciar áudio original)</option>
+        </select>
+      </div>
+      <div>
+        <label>Legendas traduzidas no vídeo</label>
+        <select id="dubBurnSubs">
+          <option value="yes" selected>💬 Incluir legendas traduzidas sincronizadas</option>
+          <option value="no">🚫 Vídeo limpo (sem legenda queimada na tela)</option>
+        </select>
+      </div>
+      <div>
+        <label>Extensão do processamento</label>
+        <select id="dubRangeMode" onchange="document.getElementById('dubTrimRow').classList.toggle('hidden', this.value!=='trim')">
+          <option value="full" selected>🎬 Vídeo INTEIRO (do início ao fim, sem cortes)</option>
+          <option value="trim">✂️ Escolher trecho específico (início e fim)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- 🎵 SOM / MÚSICA DE FUNDO LEVE NA DUBLAGEM -->
+    <div style="margin-top:12px;padding:13px 14px;border-radius:12px;background:linear-gradient(180deg,#12172e,#0c1022);border:1px solid #4c1d95aa">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+        <div style="font-weight:800;font-size:13px;color:#e9d5ff">🎵 Som / Música de Fundo Leve (Auto-Ducking Inteligente)</div>
+        <span id="dubBgVolBadge" style="font-size:11.5px;font-weight:800;padding:3px 9px;border-radius:999px;background:#1e1b4b;border:1px solid #6366f188;color:#c7d2fe">🔉 12% — Leve (Ideal p/ Voz)</span>
+      </div>
+      <div class="row" style="margin-top:0;align-items:end">
+        <div style="flex:1.6">
+          <label style="margin-top:0">Estilo do som de fundo</label>
+          <div style="display:flex;gap:8px">
+            <select id="dubBgMusicStyle" onchange="onChangeDubBgMusicStyle(this.value,'setup')" style="flex:1">
+              <option value="soft_piano" selected>🎹 Piano & Pad Suave (Leve — Recomendado)</option>
+              <option value="cinema_warm">🎬 Cinema Emocionante / Documentário</option>
+              <option value="inspiring_acoustic">✨ Violão & Ambiente Inspirador (Reels / YouTube)</option>
+              <option value="lofi_velvet">☕ Lo-Fi Aconchegante (Vlog / Podcast)</option>
+              <option value="mystery_deep">🕵️ Mistério & História Curiosa</option>
+              <option value="zen_nature">🌿 Brisa & Chuva Suave Relaxante</option>
+              <option value="custom">📂 Enviar minha própria música (.MP3 / .WAV / .M4A)</option>
+              <option value="none">🔇 Sem música de fundo (apenas voz)</option>
+            </select>
+            <button class="ghost" type="button" id="dubBgPreviewBtn" onclick="togglePreviewDubBgMusic()" style="white-space:nowrap;border-color:#8b5cf6;color:#ddd6fe">🔊 Ouvir fundo</button>
+          </div>
+        </div>
+        <div style="flex:1">
+          <label style="margin-top:0">Volume de fundo (<span id="dubBgVolPct">12%</span> — abaixa sozinho na fala)</label>
+          <input type="range" id="dubBgMusicVol" min="0" max="40" value="12" oninput="onChangeDubBgVol(this.value,'setup')" style="width:100%;accent-color:#8b5cf6;cursor:pointer;padding:6px 0">
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px">
+        <button class="ghost" type="button" onclick="document.getElementById('dubCustomMusicFile').click()" style="font-size:12px;padding:6px 11px;border-color:#38bdf866;color:#bae6fd">📂 Escolher música do celular / PC</button>
+        <input type="file" id="dubCustomMusicFile" accept="audio/*,.mp3,.wav,.m4a,.ogg,.aac,.flac,.webm" onchange="onPickCustomDubMusic(this)" style="display:none">
+        <span id="dubCustomMusicInfo" class="hint" style="margin:0">💡 Na fala da dublagem o fundo desce suavemente para não atrapalhar nenhuma palavra, e preenche as pausas naturalmente.</span>
+      </div>
+    </div>
+
+    <div id="dubTrimRow" class="row hidden" style="background:#101528;padding:10px 12px;border-radius:10px;border:1px solid #334155">
+      <div>
+        <label style="margin-top:0">⏱️ Começar em (segundos ou min:seg)</label>
+        <input id="dubTrimStart" value="0:00" placeholder="Ex: 0:00 ou 90">
+      </div>
+      <div>
+        <label style="margin-top:0">⏱️ Terminar em (segundos ou min:seg)</label>
+        <input id="dubTrimEnd" value="2:00" placeholder="Ex: 2:30 ou 150">
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <button class="primary" id="dubBtn" onclick="dubVideo()" style="flex:1;min-width:240px">🎙️ Dublar Vídeo Completo Agora (Pequeno ou Grande)</button>
+      <button class="ghost hidden" type="button" id="dubStopBtn" onclick="requestStopDubbing()" style="border-color:#f59e0b;color:#fde68a">⏹️ Finalizar no ponto atual</button>
+    </div>
+
+    <div class="progress-wrap" id="dubProgress">
+      <div class="progress-bar"><div class="progress-fill" id="dubProgressFill"></div></div>
+      <div class="progress-steps">
+        <span id="d1" class="active">Áudio Inteligente</span>
+        <span id="d2">Transcrição IA</span>
+        <span id="d3">Tradução + Voz</span>
+        <span id="d4">Sincronia Master</span>
+      </div>
+    </div>
+
+    <div class="status" id="dubStatus"></div>
+    <div id="dubResult" class="hidden" style="margin-top:14px">
+      <div style="background:linear-gradient(180deg,#0f172a,#090d16);border:1.5px solid #10b98188;border-radius:14px;padding:14px">
+        <div id="dubTitle" style="font-weight:800;font-size:14px;color:#6ee7b7;margin-bottom:10px">✅ Dublagem concluída!</div>
+        <div id="dubPlayerWrap" class="hidden" style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px">
+          <video id="dubSyncVideo" controls playsinline class="hidden" style="width:100%;max-height:460px;border-radius:10px;background:#000"></video>
+          <audio id="dubAudio" controls style="width:100%"></audio>
+          <video id="dubExportedVideo" controls playsinline class="hidden" style="width:100%;max-height:460px;border-radius:10px;background:#000"></video>
+
+          <!-- 🎚️ MIXAGEM INSTANTÂNEA PÓS-DUBLAGEM (SEM PRECISAR REDUBLAR!) -->
+          <div style="padding:11px 13px;border-radius:11px;background:#11162c;border:1px solid #6366f155">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+              <span style="font-size:12px;font-weight:800;color:#c7d2fe">🎚️ Ajustar Som de Fundo Agora (instantâneo, sem redublar!)</span>
+              <span id="dubPostBgBadge" style="font-size:11px;font-weight:700;color:#a5b4fc">🔉 12% — Leve</span>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <select id="dubPostBgStyle" onchange="onChangeDubBgMusicStyle(this.value,'post');remixDubBackgroundInstant()" style="flex:1.4;min-width:190px;padding:8px 10px;font-size:12.5px">
+                <option value="soft_piano" selected>🎹 Piano & Pad Suave (Leve)</option>
+                <option value="cinema_warm">🎬 Cinema Emocionante</option>
+                <option value="inspiring_acoustic">✨ Violão & Ambiente Inspirador</option>
+                <option value="lofi_velvet">☕ Lo-Fi Aconchegante</option>
+                <option value="mystery_deep">🕵️ Mistério & História Curiosa</option>
+                <option value="zen_nature">🌿 Brisa & Chuva Suave</option>
+                <option value="custom">📂 Minha música enviada</option>
+                <option value="none">🔇 Sem música de fundo</option>
+              </select>
+              <div style="flex:1;min-width:140px;display:flex;align-items:center;gap:8px">
+                <span style="font-size:11.5px;color:#94a3b8;white-space:nowrap">Vol:</span>
+                <input type="range" id="dubPostBgVol" min="0" max="40" value="12" oninput="onChangeDubBgVol(this.value,'post')" onchange="remixDubBackgroundInstant()" style="flex:1;accent-color:#8b5cf6;cursor:pointer">
+              </div>
+              <button class="ghost" type="button" onclick="document.getElementById('dubCustomMusicFile').click()" style="font-size:11.5px;padding:7px 10px">📂 Minha Música</button>
+            </div>
+          </div>
+
+          <button type="button" id="dubMainDownloadBtn" onclick="downloadDubVideo()" style="width:100%;padding:15px 18px;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;color:#042f2e;background:linear-gradient(135deg,#34d399,#10b981,#06b6d4);box-shadow:0 8px 26px rgba(16,185,129,.35)">⬇️ GERAR E BAIXAR VÍDEO DUBLADO LISO (.MP4 GALERIA)</button>
+          <button type="button" onclick="sendPlayingVideoToOpusClip('dub')" style="width:100%;padding:12px 16px;border:1.5px solid #22c55e;border-radius:12px;font-size:13.5px;font-weight:900;cursor:pointer;color:#bbf7d0;background:linear-gradient(135deg,#052e16,#064e3b)">✂️ Pegar Melhores Partes Deste Vídeo, Cortar &amp; Botar Legendas (OpusClip IA)</button>
+          <button type="button" onclick="shareToGallery('dub')" style="width:100%;padding:12px 16px;border:1.5px solid #38bdf8;border-radius:12px;font-size:14px;font-weight:800;cursor:pointer;color:#e0f2fe;background:#0f172a">📲 Salvar direto na Galeria / Enviar (Celular, WhatsApp, Reels)</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="primary" type="button" onclick="playDubbed()" style="padding:9px 14px">▶️ Assistir vídeo sincronizado agora (instantâneo)</button>
+            <a id="dubDownload" class="ghost" download="dublagem-completa.wav" style="padding:9px 14px;text-decoration:none">🎙️ Baixar áudio dublado (.WAV)</a>
+            <button class="ghost" type="button" onclick="downloadDubSRT()">📜 Baixar legendas traduzidas (.SRT)</button>
+          </div>
+        </div>
+        <div style="font-weight:800;font-size:12px;margin-bottom:6px">📝 Roteiro Transcrito & Traduzido por Blocos de Tempo</div>
+        <div id="dubScript" style="white-space:pre-wrap;font-size:12.5px;line-height:1.7;color:#d1d5ff;max-height:320px;overflow:auto"></div>
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+          <button class="ghost" onclick="copyText(document.getElementById('dubScript').innerText)">📋 Copiar tradução</button>
+          <button class="ghost" onclick="speakText(document.getElementById('dubScript').innerText)">🔊 Ouvir com Voz Humana Neural</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- OPUSCLIP IA — ENGENHARIA REVERSA DE clip.opus.pro/dashboard (PROJECT #P3102218muth) -->
 <section id="clips" class="hidden">
   <div class="opus-dash-card">
@@ -7070,48 +7283,6 @@ function mountOpusYt916Player(containerEl, videoId, startSec, endSec, isPlaying)
         }
       }catch(_){}
     }, 450);
-  }
-}
-
-// Atalho da tela inicial que abre a aba OpusClip IA e puxa o link do YouTube automaticamente
-function launchOpusFromQuickLink(){
-  const qInp = document.getElementById('quickYoutubeUrl');
-  const val = (qInp ? qInp.value : '').trim();
-  openTab('clips', document.getElementById('tab-clips'));
-  const opusInp = document.getElementById('opusYoutubeUrl');
-  if(opusInp && val){
-    opusInp.value = val;
-    importOpusVideoFromUrl(true);
-  } else if(opusInp){
-    opusInp.focus();
-    toast('🔗 Cole o link do YouTube aqui para puxar e recortar!');
-  }
-}
-
-// Puxa um vídeo do YouTube pelo link diretamente para a aba Dublar (#dub)
-async function importYoutubeIntoDub(){
-  const inp = document.getElementById('dubYoutubeUrl');
-  const rawUrl = (inp ? inp.value : '').trim();
-  if(!rawUrl){
-    toast('🔗 Cole o link do YouTube primeiro!', 'warn');
-    if(inp) inp.focus();
-    return;
-  }
-  const btn = document.getElementById('dubFetchYtBtn');
-  if(btn){ btn.disabled = true; btn.textContent = '⏳ Puxando...'; }
-  showStatus('dubStatus', '🔗 Puxando vídeo e áudio do YouTube pelo link...', 'info');
-  try{
-    const opusInp = document.getElementById('opusYoutubeUrl');
-    if(opusInp) opusInp.value = rawUrl;
-    const ok = await importOpusVideoFromUrl(false);
-    if(ok && opusState.file){
-      previewVideo(opusState.file);
-      showStatus('dubStatus', `✅ Vídeo do YouTube ("${opusState.fileName}") carregado! Clique em "🎙️ Dublar Vídeo Completo Agora".`, 'success');
-    }
-  }catch(e){
-    showStatus('dubStatus', '❌ Erro ao puxar vídeo do YouTube: ' + e.message, 'error');
-  }finally{
-    if(btn){ btn.disabled = false; btn.textContent = '📥 Puxar do YouTube'; }
   }
 }
 
