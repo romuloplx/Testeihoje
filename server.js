@@ -549,6 +549,8 @@ app.post('/api/tts', async (req, res) => {
 
 // TikTok Auto-Post API (OAuth v2 PKCE + Direct Post + Inbox Draft + Webhook + Viral AI Caption + Legal/Domain Verification)
 app.all('/api/clips', (req, res) => require('./vercel/api/clips')(req, res));
+app.all('/api/video', (req, res) => require('./vercel/api/video')(req, res));
+app.all('/api/video/download', (req, res) => require('./vercel/api/video')(req, res));
 app.all('/api/tiktok', (req, res) => require('./vercel/api/tiktok')(req, res));
 app.get('/terms', (req, res) => { req.url = '/api/tiktok?page=terms'; return require('./vercel/api/tiktok')(req, res); });
 app.get('/privacy', (req, res) => { req.url = '/api/tiktok?page=privacy'; return require('./vercel/api/tiktok')(req, res); });

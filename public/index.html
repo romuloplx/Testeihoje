@@ -7486,39 +7486,32 @@ async function downloadRealYoutubeVideoInBrowser(videoId, rawUrl, serverCandidat
         }catch(_){}
         return null;
       },
-      // CLIP REAL 2min via loader.to direto do navegador (IP residencial desbloqueado — retorna MP4 cortado já!)
+      // CLIP REAL 2min via seu-worker (substitui loader.to externo) — POST /api/video com start/end
       async () => {
         if(startSec == null || endSec == null) return null;
-        const s = Math.max(0, Math.floor(Number(startSec)||0));
-        const e = Math.max(s+5, Math.ceil(Number(endSec)||s+120));
-        const domains = ['https://ab.cococococ.com','https://cc.cococococ.com','https://y2mate.is','https://ab1.cococococ.com'];
-        for(const dom of domains){
-          try{
-            const initUrl = `${dom}/ajax/download.php?copyright=0&format=360&url=${encodeURIComponent(watchUrl)}&start=${s}&end=${e}&api=dfcb6d76f2f6a9894gjkege8a4ab232222`;
-            const r = await fetch(initUrl, { headers: { 'Referer': 'https://loader.to/', 'Origin': 'https://loader.to' }, signal: AbortSignal.timeout(8000) });
-            if(!r.ok) continue;
-            const j = await r.json();
-            const jid = j?.id || j?.jobId || j?.resultId;
-            if(!jid){
-              if(j?.download_url && /^https?:\/\//i.test(j.download_url)) return j.download_url;
-              if(j?.url && /^https?:\/\//i.test(j.url)) return j.url;
-              continue;
-            }
-            for(let p=0;p<25;p++){
-              await new Promise(res=>setTimeout(res, 2000));
-              try{
-                const pr = await fetch(`${dom}/ajax/progress.php?id=${encodeURIComponent(jid)}`, { headers: { 'Referer': 'https://loader.to/' }, signal: AbortSignal.timeout(6000) });
-                if(pr.ok){
-                  const pj = await pr.json();
-                  if(pj?.download_url && /^https?:\/\//i.test(pj.download_url)) return pj.download_url;
-                  if(pj?.url && /^https?:\/\//i.test(pj.url)) return pj.url;
-                  if(pj?.downloadUrl && /^https?:\/\//i.test(pj.downloadUrl)) return pj.downloadUrl;
-                  if(pj?.status === 'error' || pj?.error) break;
-                }
-              }catch(_){}
-            }
-          }catch(_){ continue; }
-        }
+        try{
+          const r = await fetch('/api/video', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ url: watchUrl, start: startSec, end: endSec, resolution: 1080 }), signal: AbortSignal.timeout(8500) });
+          if(!r.ok) return null;
+          const j = await r.json();
+          const id = j?.id;
+          if(!id){
+            if(j?.downloadUrl && /^https?:\/\//i.test(j.downloadUrl)) return j.downloadUrl;
+            if(j?.url && /^https?:\/\//i.test(j.url)) return j.url;
+            return null;
+          }
+          for(let p=0;p<15;p++){
+            await new Promise(res=>setTimeout(res, 2000));
+            try{
+              const pr = await fetch(`/api/video?id=${encodeURIComponent(id)}`, { signal: AbortSignal.timeout(6000) });
+              if(!pr.ok) continue;
+              const pj = await pr.json();
+              if(pj?.downloadUrl && /^https?:\/\//i.test(pj.downloadUrl)) return pj.downloadUrl;
+              if(pj?.url && /^https?:\/\//i.test(pj.url)) return pj.url;
+              if(pj?.status === 'error' || pj?.error) break;
+              if(pj?.status === 'ready' && pj.downloadUrl) return pj.downloadUrl;
+            }catch(_){}
+          }
+        }catch(_){}
         return null;
       }
     ];
@@ -10563,7 +10556,7 @@ async function exportSelectedOpusClipMp4(opts = {}){
               ytSegBlob = new Blob([bytes], { type: j.mime || 'video/mp4' });
             }
           }
-          // Se servidor devolveu URL de clipe já cortado (loader.to), baixa direto
+          // Se servidor devolveu URL de clipe já cortado, baixa direto
           if(!ytSegBlob && (j?.clippedStreamUrl || j?.streamUrl)){
             const clipUrl = j.clippedStreamUrl || j.streamUrl;
             if(clipUrl && /^https?:\/\//i.test(clipUrl)){
@@ -10706,12 +10699,67 @@ async function exportSelectedOpusClipMp4(opts = {}){
       });
     } else {
       // CAMINHO B: YouTube bloqueou download direto — tenta captura real; se falhar, NÃO gera foto+voz IA (usuário quer vídeo original em movimento!)
-      showStatus('opusStatus', `⚠️ YouTube bloqueou download direto deste corte. Tentando extrair clipe real via navegador (start=${clip.startSec}s end=${clip.endSec}s)...`, 'warn');
-      // Tenta uma segunda chance de clipping direto via loader.to sem passar pelo servidor (IP residencial)
+      showStatus('opusStatus', `⚠️ YouTube bloqueou download direto deste corte. Tentando extrair clipe real via seu-worker (start=${clip.startSec}s end=${clip.endSec}s)...`, 'warn');
+      // 2ª chance: clipping via POST /api/video (substitui loader.to direto) — tenta baixar clip real no browser antes de capturar
       try{
-        const retryUrl = `https://ab.cococococ.com/ajax/download.php?copyright=0&format=360&url=${encodeURIComponent('https://www.youtube.com/watch?v='+opusState.ytVideoId)}&start=${Math.floor(clip.startSec||0)}&end=${Math.ceil(clip.endSec||120)}&api=dfcb6d76f2f6a9894gjkege8a4ab232222`;
-        // pequena tentativa extra fora do fluxo principal já feito acima — se falhar, segue para captura
+        const rr = await fetch('/api/video', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ url: `https://www.youtube.com/watch?v=${opusState.ytVideoId}`, start: clip.startSec, end: clip.endSec, resolution: 1080 }), signal: AbortSignal.timeout(12000) });
+        if(rr.ok){
+          const rj = await rr.json();
+          let clipDlUrl = rj?.downloadUrl || rj?.url || null;
+          if(!clipDlUrl && rj?.id){
+            for(let p=0;p<10;p++){
+              await new Promise(res=>setTimeout(res,2000));
+              try{
+                const pr = await fetch(`/api/video?id=${encodeURIComponent(rj.id)}`, { signal: AbortSignal.timeout(6000) });
+                if(pr.ok){
+                  const pj = await pr.json();
+                  if(pj?.downloadUrl && /^https?:\/\//i.test(pj.downloadUrl)) { clipDlUrl = pj.downloadUrl; break; }
+                  if(pj?.url && /^https?:\/\//i.test(pj.url)) { clipDlUrl = pj.url; break; }
+                  if(pj?.status === 'error' || pj?.error) break;
+                }
+              }catch(_){}
+            }
+          }
+          if(clipDlUrl && /^https?:\/\//i.test(clipDlUrl)){
+            try{
+              const cr2 = await fetch(clipDlUrl, { signal: AbortSignal.timeout(12000) });
+              if(cr2.ok){
+                const ab2 = await cr2.arrayBuffer();
+                if(ab2.byteLength>25000) ytSegBlob = new Blob([ab2], { type: 'video/mp4' });
+              }
+            }catch(_){
+              try{ const prox2=await downloadVideoChunksViaProxy(clipDlUrl,null,null,8); if(prox2?.blob?.size>25000) ytSegBlob=prox2.blob; }catch(_){}
+            }
+            if(ytSegBlob && ytSegBlob.size>80000){
+              const vUrl = URL.createObjectURL(ytSegBlob);
+              const vEl = document.createElement('video'); vEl.src=vUrl; vEl.muted=true; vEl.playsInline=true;
+              const ok2 = await new Promise(res=>{ const okFn=()=>{cl(); res(vEl.videoWidth>0);}; const erFn=()=>{cl(); res(false);}; const cl=()=>{vEl.removeEventListener('loadeddata',okFn); vEl.removeEventListener('canplay',okFn); vEl.removeEventListener('error',erFn);}; vEl.addEventListener('loadeddata',okFn,{once:true}); vEl.addEventListener('canplay',okFn,{once:true}); vEl.addEventListener('error',erFn,{once:true}); vEl.load(); setTimeout(()=>{cl(); res(vEl.videoWidth>0);},2000); });
+              if(ok2){ sourceVideoUrl=vUrl; sourceStartOffset=0; } else { URL.revokeObjectURL(vUrl); ytSegBlob=null; }
+            }
+          }
+        }
       }catch(_){}
+      // Se conseguiu clip real via seu-worker, vai direto para render sem captura
+      if(sourceVideoUrl && ytSegBlob){
+        // revalida e cai no CAMINHO A via recursão leve: renderiza agora
+        showStatus('opusStatus', `✅ Clipe real obtido via seu-worker — renderizando em 9:16 com legendas...`, 'success');
+        // segue para bloco abaixo que detecta sourceVideoUrl; então pula captura
+        // para evitar duplicar código, vamos tratar como se já tivesse sourceVideoUrl e pular para CAMINHO A inline:
+        const mode2 = (document.getElementById('opusReframeMode')||{}).value || 'auto_face';
+        const dim2 = mode2 === '1:1' ? { w: 720, h: 720 } : mode2 === '16:9' ? { w: 960, h: 540 } : { w: 540, h: 960 };
+        // Reusa lógica CAMINHO A resumida — se falhar cai no fallback
+        try{
+          exportVid = document.createElement('video'); exportVid.src=sourceVideoUrl; exportVid.muted=true; exportVid.playsInline=true; exportVid.preload='auto';
+          await new Promise((res,rej)=>{ const ok=()=>{cl();res();}; const err=()=>{cl();rej(new Error('Falha preparar video'));}; const cl=()=>{exportVid.removeEventListener('canplay',ok);exportVid.removeEventListener('loadeddata',ok);exportVid.removeEventListener('error',err);}; if(exportVid.readyState>=2) return res(); exportVid.addEventListener('canplay',ok,{once:true}); exportVid.addEventListener('loadeddata',ok,{once:true}); exportVid.addEventListener('error',err,{once:true}); exportVid.load(); setTimeout(ok,2200); });
+          exportVid.currentTime=sourceStartOffset||0; await new Promise(r=>{ const onS=()=>{exportVid.removeEventListener('seeked',onS); r();}; exportVid.addEventListener('seeked',onS,{once:true}); setTimeout(r,600); });
+          const rawDur2=Math.max(2,(clip.endSec||30)-(clip.startSec||0)); const availDur2=(exportVid.duration&&isFinite(exportVid.duration))?Math.max(4,exportVid.duration-sourceStartOffset):rawDur2; const clipDur2=Math.min(rawDur2,availDur2);
+          let clipAudioBuf2=await extractOpusClipAudioBuffer(clip); if(!clipAudioBuf2 && sourceVideoUrl){ try{ clipAudioBuf2=await decodeAudioBufferFromVideoUrl(sourceVideoUrl, sourceStartOffset, clipDur2); if(clipAudioBuf2) clip.dubbedAudioBuffer=clipAudioBuf2; }catch(_){} }
+          showStatus('opusStatus', `🎬 Renderizando Corte #${clip.rank} em 9:16 com legendas sincronizadas (30fps)...`, 'info');
+          const drawFn2=(ctx,t)=>{ drawOpusReframedFrame(ctx, exportVid, clip, t); };
+          const blob2=await recordCanvasVideo({ drawFn:drawFn2, audioBuffer:clipAudioBuf2, audioEl: clipAudioBuf2?null:exportVid, width:dim2.w, height:dim2.h, durationSec:clipDur2, startOffsetSec:sourceStartOffset, alsoPlay:[exportVid], onProgress:p=>{ setProgress('opusProgressFill', Math.round(25+p*75)); } });
+          if(blob2){ triggerBlobDownload(blob2, sanitizeFilename((clip.title||'corte').slice(0,60))+'__'+opusState.ytVideoId+'.mp4'); showStatus('opusStatus', `✅ Corte #${clip.rank} baixado na Galeria (vídeo real em movimento)!`, 'success'); setProgress('opusProgressFill',100); return; }
+        }catch(_){ /* cai para captura abaixo */ }
+      }
       // Fallback original mantido mas com erro explícito se captura cancelada — não gera foto+voz IA
       showStatus('opusStatus', `⚠️ YouTube protegeu este vídeo contra download direto. Abrindo captura do VÍDEO REAL em movimento (não foto) — escolha "Esta aba" + "Compartilhar áudio da aba"...`, 'warn');
       showStatus('opusStatus', `⚠️ YouTube protegeu este vídeo contra download direto. Abrindo captura do VÍDEO REAL em movimento (não foto) — escolha "Esta aba" + "Compartilhar áudio da aba"...`, 'warn');
