@@ -6,8 +6,8 @@ const {
   extractYoutubeVideoId,
   normalizeDownloadableFormats,
   sanitizeVideoFilename
-} = require('../vercel/api/lib/youtube-download');
-const youtubeDownloadHandler = require('../vercel/api/youtube-download');
+} = require('../vercel/lib/youtube-download');
+const clipsHandler = require('../vercel/api/clips');
 
 test('accepts supported YouTube link forms and rejects foreign hosts', () => {
   assert.equal(extractYoutubeVideoId('abcdefghijk'), 'abcdefghijk');
@@ -44,19 +44,25 @@ test('sanitizes filenames for Content-Disposition and Android downloads', () => 
   assert.equal(sanitizeVideoFilename(''), 'video-youtube');
 });
 
-test('download endpoint rejects invalid links without calling YouTube', async () => {
+test('download actions are routed through the existing clips API without extra Vercel functions', async () => {
   const makeResponse = () => ({
     headers: {},
+    headersSent: false,
     setHeader(name, value) { this.headers[name.toLowerCase()] = value; },
+    status(statusCode) { this.statusCode = statusCode; return this; },
+    json(payload) { this.body = JSON.stringify(payload); return this; },
     end(body) { this.body = body; }
   });
+
   const postResponse = makeResponse();
-  await youtubeDownloadHandler({ method: 'POST', url: '/api/youtube-download', body: { videoId: 'short' } }, postResponse);
+  await clipsHandler({ method: 'POST', url: '/api/clips', body: { action: 'youtube_formats', videoId: 'short' } }, postResponse);
   assert.equal(postResponse.statusCode, 400);
   assert.match(JSON.parse(postResponse.body).error, /link válido/i);
 
   const getResponse = makeResponse();
-  await youtubeDownloadHandler({ method: 'GET', url: '/api/youtube-download?videoId=short&itag=18', headers: {} }, getResponse);
+  await clipsHandler({ method: 'GET', url: '/api/clips?action=youtube_download&videoId=short&itag=18', headers: {} }, getResponse);
   assert.equal(getResponse.statusCode, 400);
   assert.match(JSON.parse(getResponse.body).error, /parâmetros de vídeo inválidos/i);
+
+  assert.equal(require('node:fs').existsSync(require('node:path').join(__dirname, '../vercel/api/youtube-download.js')), false);
 });

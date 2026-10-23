@@ -6,7 +6,7 @@ const {
   normalizeDownloadableFormats,
   sanitizeVideoFilename,
   resolveYoutubeVideo
-} = require('./lib/youtube-download');
+} = require('./youtube-download');
 
 const VIDEO_ERROR_MESSAGES = {
   INVALID_YOUTUBE_URL: 'Use um link válido do YouTube.',
@@ -83,8 +83,8 @@ function parseRange(value, totalSize) {
   return { start, end: Math.min(end, totalSize - 1) };
 }
 
-async function handleFormats(req, res) {
-  const body = await getRequestBody(req);
+async function handleFormats(req, res, bodyOverride) {
+  const body = bodyOverride && typeof bodyOverride === 'object' ? bodyOverride : await getRequestBody(req);
   const input = body.videoId || body.url;
   const videoId = extractYoutubeVideoId(input);
   if (!videoId) return sendJson(res, 400, { error: VIDEO_ERROR_MESSAGES.INVALID_YOUTUBE_URL, code: 'INVALID_YOUTUBE_URL' });
@@ -106,6 +106,12 @@ async function handleFormats(req, res) {
       durationSec: Number(info.videoDetails && info.videoDetails.lengthSeconds) || 0,
       formats
     });
+  } catch (error) {
+    console.error('[youtube-download] formats error:', error && error.message || error);
+    const code = error && error.code || 'YOUTUBE_RESOLUTION_FAILED';
+    const message = VIDEO_ERROR_MESSAGES[code]
+      || 'Não foi possível consultar o YouTube agora. O vídeo pode estar indisponível ou restrito; tente novamente mais tarde.';
+    return sendJson(res, code === 'INVALID_YOUTUBE_URL' ? 400 : 502, { error: message, code });
   } finally {
     clearTimeout(timeout);
   }
@@ -192,17 +198,4 @@ async function handleDownload(req, res) {
   if (stream) stream.once('close', () => clearTimeout(timeout));
 }
 
-module.exports = async (req, res) => {
-  try {
-    if (req.method === 'POST') return await handleFormats(req, res);
-    if (req.method === 'GET') return await handleDownload(req, res);
-    res.setHeader('Allow', 'GET, POST');
-    return sendJson(res, 405, { error: 'Use POST para consultar formatos e GET para baixar o MP4.' });
-  } catch (error) {
-    console.error('[youtube-download] handler error:', error && error.message || error);
-    const code = error && error.code || 'YOUTUBE_RESOLUTION_FAILED';
-    const message = VIDEO_ERROR_MESSAGES[code]
-      || 'Não foi possível consultar o YouTube agora. O vídeo pode estar indisponível ou restrito; tente novamente mais tarde.';
-    return sendJson(res, code === 'INVALID_YOUTUBE_URL' ? 400 : 502, { error: message, code });
-  }
-};
+module.exports = { handleFormats, handleDownload };
