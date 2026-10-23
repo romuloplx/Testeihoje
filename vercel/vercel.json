@@ -10,10 +10,7 @@
   ],
   "functions": {
     "api/clips.js": {
-      "includeFiles": [
-        "node_modules/@involvex/yt-dlp-binary-linux-x64/**",
-        "node_modules/@involvex/yt-dlp/binaries/any/**"
-      ]
+      "includeFiles": "node_modules/@involvex/**"
     }
   }
 }
