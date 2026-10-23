@@ -1811,10 +1811,10 @@ async function extractYoutubeDownloadDataFromMirrors(videoId){
 }
 
 async function extractYoutubeDownloadDataFromYtdlServer(watchUrl,videoId){
-  const response=await fetch('/api/youtube-download',{
+  const response=await fetch('/api/clips',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({videoId,url:watchUrl}),
+    body:JSON.stringify({action:'youtube_formats',videoId,url:watchUrl}),
     signal:AbortSignal.timeout(35000)
   });
   const data=await response.json().catch(()=>({}));
@@ -2135,7 +2135,7 @@ async function startYoutubeDownload(){
   const filename=`${title}-${quality}.mp4`;
   if(format.source==='ytdl-core'){
     try{
-      const downloadUrl=`/api/youtube-download?videoId=${encodeURIComponent(youtubeDownloadInfo.videoId)}&itag=${encodeURIComponent(format.itag)}`;
+      const downloadUrl=`/api/clips?action=youtube_download&videoId=${encodeURIComponent(youtubeDownloadInfo.videoId)}&itag=${encodeURIComponent(format.itag)}`;
       const anchor=document.createElement('a');
       anchor.href=downloadUrl;
       anchor.download=filename;
