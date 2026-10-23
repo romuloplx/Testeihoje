@@ -1575,6 +1575,7 @@ input[type="range"]{
 
     <div class="hint" style="margin-top:12px">
       Baixe somente vídeos que você criou ou tem autorização para salvar. A disponibilidade e a qualidade dependem do vídeo e das restrições do YouTube.
+      No Android, este site entrega o MP4 ao navegador, que normalmente o salva em <b>Downloads</b>; ele não pode gravar diretamente em DCIM/Galeria. Se a Galeria não listar o arquivo, mova-o para Movies usando o app Arquivos.
       Código-fonte incorporado: <a href="https://github.com/Tyrrrz/YoutubeDownloader" target="_blank" rel="noopener noreferrer" style="color:#93c5fd">Tyrrrz/YoutubeDownloader (MIT)</a>.
     </div>
   </div>
@@ -1809,6 +1810,40 @@ async function extractYoutubeDownloadDataFromMirrors(videoId){
   return null;
 }
 
+async function extractYoutubeDownloadDataFromYtdlServer(watchUrl,videoId){
+  const response=await fetch('/api/youtube-download',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({videoId,url:watchUrl}),
+    signal:AbortSignal.timeout(35000)
+  });
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok||data.error){
+    const error=new Error(data.error||`Resolvedor indisponível (HTTP ${response.status}).`);
+    error.code=data.code||'';
+    throw error;
+  }
+  const formats=(Array.isArray(data.formats)?data.formats:[])
+    .filter(format=>format&&Number(format.itag)>0)
+    .map(format=>({
+      itag:Number(format.itag),
+      qualityLabel:String(format.qualityLabel||'MP4'),
+      height:Number(format.height)||0,
+      bitrate:Number(format.bitrate)||0,
+      contentLength:Number(format.contentLength)||0,
+      source:'ytdl-core',
+      videoId,
+      url:''
+    }));
+  if(!formats.length) throw new Error('Este vídeo não ofereceu um formato MP4 compatível.');
+  return {
+    title:String(data.title||''),
+    author:String(data.author||''),
+    durationSec:Number(data.durationSec)||0,
+    formats
+  };
+}
+
 async function extractYoutubeDownloadDataFromServer(watchUrl,videoId){
   const response=await fetch('/api/clips',{
     method:'POST',
@@ -1896,19 +1931,28 @@ async function inspectYoutubeDownload(){
   try{
     const parsed=parseYoutubeDownloadInput(input&&input.value);
     if(inspectBtn){ inspectBtn.disabled=true; inspectBtn.textContent='⏳ Buscando...'; }
-    showStatus('youtubeDownloadStatus','🔎 Consultando os formatos MP4 disponíveis...','info');
+    showStatus('youtubeDownloadStatus','🛠️ Consultando o resolvedor de vídeo...','info');
     let result=null;
-    try{ result=await extractYoutubeDownloadDataFromBrowser(parsed.videoId); }catch(_){}
+    let resolverError=null;
+    try{ result=await extractYoutubeDownloadDataFromYtdlServer(parsed.watchUrl,parsed.videoId); }
+    catch(error){ resolverError=error; }
+    if((!result||!result.formats||!result.formats.length)&&requestId===youtubeDownloadRequestId){
+      showStatus('youtubeDownloadStatus','🔎 Tentando ler os formatos disponíveis no navegador...','info');
+      try{ result=await extractYoutubeDownloadDataFromBrowser(parsed.videoId); }catch(_){}
+    }
     if((!result||!result.formats||!result.formats.length)&&requestId===youtubeDownloadRequestId){
       showStatus('youtubeDownloadStatus','🌍 Tentando fontes alternativas de stream...','info');
       try{ result=await extractYoutubeDownloadDataFromMirrors(parsed.videoId); }catch(_){}
     }
     if((!result||!result.formats||!result.formats.length)&&requestId===youtubeDownloadRequestId){
-      showStatus('youtubeDownloadStatus','🌐 Tentando a rota de download do servidor...','info');
-      result=await extractYoutubeDownloadDataFromServer(parsed.watchUrl,parsed.videoId);
+      showStatus('youtubeDownloadStatus','🌐 Tentando a última rota do servidor...','info');
+      try{ result=await extractYoutubeDownloadDataFromServer(parsed.watchUrl,parsed.videoId); }
+      catch(error){ if(!resolverError) resolverError=error; }
     }
     if(requestId!==youtubeDownloadRequestId) return;
-    if(!result||!result.formats||!result.formats.length) throw new Error('Não encontrei formatos MP4 acessíveis para este vídeo.');
+    if(!result||!result.formats||!result.formats.length){
+      throw new Error(resolverError&&resolverError.message||'Este vídeo não disponibilizou um MP4 baixável para o navegador.');
+    }
     youtubeDownloadInfo={
       videoId:parsed.videoId,
       watchUrl:parsed.watchUrl,
@@ -2089,6 +2133,28 @@ async function startYoutubeDownload(){
   const title=sanitizeYoutubeDownloadFilename(youtubeDownloadInfo.title||`video-${youtubeDownloadInfo.videoId}`);
   const quality=sanitizeYoutubeDownloadFilename(format.qualityLabel||'MP4').replace(/\s+/g,'-');
   const filename=`${title}-${quality}.mp4`;
+  if(format.source==='ytdl-core'){
+    try{
+      const downloadUrl=`/api/youtube-download?videoId=${encodeURIComponent(youtubeDownloadInfo.videoId)}&itag=${encodeURIComponent(format.itag)}`;
+      const anchor=document.createElement('a');
+      anchor.href=downloadUrl;
+      anchor.download=filename;
+      anchor.rel='noopener';
+      anchor.style.display='none';
+      document.body.appendChild(anchor);
+      anchor.click();
+      setTimeout(()=>anchor.remove(),1000);
+      const progress=document.getElementById('youtubeDownloadProgress');
+      if(progress) progress.classList.remove('show');
+      showStatus('youtubeDownloadStatus','⬇️ O download foi enviado ao navegador. No Android, procure o MP4 em Downloads; se a Galeria não o listar, mova-o para Movies usando o app Arquivos.','success');
+      toast('⬇️ Download enviado para o Chrome. Confira Downloads.');
+    }catch(error){
+      showStatus('youtubeDownloadStatus','❌ Não consegui iniciar o download: '+(error.message||'erro do navegador'),'error');
+    }finally{
+      if(downloadBtn){downloadBtn.disabled=false;downloadBtn.textContent='⬇️ Baixar vídeo MP4';}
+    }
+    return;
+  }
   let fileHandle=null;
   if(window.isSecureContext&&typeof window.showSaveFilePicker==='function'){
     try{
