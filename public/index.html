@@ -577,7 +577,14 @@ input[type="range"]{
       </label>
       <div class="hint" style="margin:7px 0 0 27px;line-height:1.5">Opcional: envia cada imagem e a ação da cena ao Tencent HunyuanVideo 1.5 (clipe de 5 s em 720p) e incorpora movimento real ao vídeo, mantendo narração, música e legendas. Pode consumir créditos/cota do TokenHub; clipes curtos podem repetir em cenas com fala longa. Requer TENCENT_TOKENHUB_API_KEY no servidor e modelo/cobrança HunyuanVideo ativados no TokenHub. Se a geração falhar, a cena usa o render atual.</div>
     </div>
-    <div class="hint" style="margin:4px 0 12px">🖼️ Imagens das cenas: o FLUX.2 Pro via OpenRouter é priorizado quando OPENROUTER_API_KEY estiver configurada. Retratos dos personagens servem de referência para manter o elenco consistente; isso pode acrescentar cobrança de entrada além da geração (cerca de US$ 0,03/MP de saída). O custo reportado aparece ao final do vídeo. Sem a chave, continuam os provedores/fallbacks atuais.</div>
+    <div class="hint" style="margin:4px 0 8px">🖼️ Imagens das cenas: o FLUX.2 Pro via OpenRouter é priorizado quando OPENROUTER_API_KEY estiver configurada (cerca de US$ 0,03/MP de imagem de saída). Sem a chave, continuam os provedores/fallbacks atuais.</div>
+    <div style="margin:0 0 12px;padding:10px 12px;border:1px solid #a855f766;border-radius:11px;background:linear-gradient(135deg,#17112b,#101127)">
+      <label for="createUseCharacterReferences" style="display:flex;align-items:flex-start;gap:9px;margin:0;color:#e9d5ff;font-weight:800;cursor:pointer">
+        <input id="createUseCharacterReferences" type="checkbox" checked style="width:auto;flex:0 0 auto;margin:3px 0 0;padding:0;border:0;background:#111827;accent-color:#a855f7;transform:scale(1.12)">
+        <span>🧬 Manter a aparência do elenco entre as cenas (recomendado)</span>
+      </label>
+      <div class="hint" style="margin:6px 0 0 27px;line-height:1.45">Usa até 3 retratos dos personagens como referências no OpenRouter; pode gerar cobrança adicional de entrada. Desmarque para não enviar referências e reduzir custos. Quando disponível, o custo informado aparece ao final do vídeo.</div>
+    </div>
 
     <button class="primary" id="createFullVideoBtn" onclick="createAndBuildVideo()" style="font-size:15px;padding:15px">🎬 Criar História & Vídeo Completo (Personagens + Cenários Vivos)</button>
     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
@@ -5685,7 +5692,9 @@ async function buildCreateVideo(){
     }
     const actorMap = {};
     actors.forEach(a => { actorMap[a.id] = a; });
-    const sceneCharacterReferences = await hasConfiguredOpenRouterSceneImages()
+    const referenceToggle = document.getElementById('createUseCharacterReferences');
+    const useSceneIdentityReferences = !referenceToggle || referenceToggle.checked;
+    const sceneCharacterReferences = useSceneIdentityReferences && await hasConfiguredOpenRouterSceneImages()
       ? buildSceneCharacterReferences(actors)
       : [];
 

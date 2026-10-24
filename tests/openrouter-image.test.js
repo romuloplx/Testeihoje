@@ -190,8 +190,11 @@ test('Create uses AI character portraits to anchor scene identity and displays a
   assert.match(html, /buildSceneCharacterReferences\(actors\)/);
   assert.match(html, /hasAiPortrait: isAi/);
   assert.match(html, /references: openRouterEnabled \? characterReferences : \[\]/);
+  assert.match(html, /id="createUseCharacterReferences" type="checkbox" checked/);
+  assert.match(html, /const useSceneIdentityReferences = !referenceToggle \|\| referenceToggle\.checked/);
   assert.match(html, /FLUX\.2 Pro via OpenRouter/);
   assert.match(html, /OPENROUTER_API_KEY/);
   assert.match(html, /_createOpenRouterImageSpendUsd/);
-  assert.match(html, /O custo reportado aparece ao final do vídeo/);
+  assert.match(html, /Desmarque para não enviar referências e reduzir custos/);
+  assert.match(html, /o custo informado aparece ao final do vídeo/);
 });
