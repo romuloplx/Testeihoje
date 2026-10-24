@@ -1,7 +1,12 @@
-const { mockDubResult, dubWithOpenAI, getBody, send } = require('./lib/ai');
+const { mockDubResult, dubWithOpenAI, generateDubSocialMetadata, getBody, send } = require('./lib/ai');
 module.exports = async (req, res) => {
   try {
     if (req.method !== 'POST') return send(res, 405, { error: 'Método não permitido. Use POST.' });
+    const body = await getBody(req) || {};
+    if (body.action === 'social-metadata') {
+      const metadata = await generateDubSocialMetadata(body);
+      return send(res, 200, metadata);
+    }
     const {
       fileName,
       fileSize,
@@ -13,7 +18,7 @@ module.exports = async (req, res) => {
       transcription,
       chunkIndex = 0,
       totalChunks = 1
-    } = await getBody(req);
+    } = body;
 
     if (!fileName) return send(res, 400, { error: 'Selecione um vídeo ou áudio.' });
 

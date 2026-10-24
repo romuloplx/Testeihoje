@@ -1004,6 +1004,24 @@ input[type="range"]{
     <div id="dubResult" class="hidden" style="margin-top:14px">
       <div style="background:linear-gradient(180deg,#0f172a,#090d16);border:1.5px solid #10b98188;border-radius:14px;padding:14px">
         <div id="dubTitle" style="font-weight:800;font-size:14px;color:#6ee7b7;margin-bottom:10px">✅ Dublagem concluída!</div>
+        <div id="dubSocialPackage" class="hidden" style="margin:0 0 12px;padding:12px 13px;border:1px solid #f59e0b88;border-radius:12px;background:linear-gradient(135deg,#25190b,#11162a)" aria-live="polite">
+          <div style="font-weight:900;font-size:13px;color:#fde68a">🔥 Tema e hashtags para publicar a dublagem</div>
+          <div id="dubSocialStatus" class="hint" role="status" style="margin:5px 0 9px">Preparando sugestões com base no conteúdo dublado…</div>
+          <div style="margin-bottom:8px">
+            <div style="font-size:10.5px;font-weight:900;color:#fbbf24;letter-spacing:.05em">TEMA / TÍTULO SUGERIDO</div>
+            <div id="dubSocialTopic" style="margin-top:3px;font-weight:800;color:#f8fafc"></div>
+          </div>
+          <div id="dubSocialDescriptionWrap" style="margin-bottom:8px">
+            <div style="font-size:10.5px;font-weight:900;color:#fbbf24;letter-spacing:.05em">LEGENDA CURTA</div>
+            <div id="dubSocialDescription" style="margin-top:3px;color:#e2e8f0;font-size:12.5px;line-height:1.5"></div>
+          </div>
+          <div style="margin-bottom:10px">
+            <div style="font-size:10.5px;font-weight:900;color:#fbbf24;letter-spacing:.05em">HASHTAGS</div>
+            <div id="dubSocialHashtags" style="margin-top:3px;color:#bae6fd;font-size:13px;line-height:1.6;overflow-wrap:anywhere"></div>
+          </div>
+          <button class="ghost" type="button" onclick="copyDubSocialPackage()" style="border-color:#f59e0b88;color:#fde68a">📋 Copiar tema, legenda e hashtags</button>
+          <div class="hint" style="margin-top:7px">Sugestões baseadas na transcrição/tradução; ajudam na descoberta, mas não garantem viralização.</div>
+        </div>
         <div id="dubPlayerWrap" class="hidden" style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px">
           <video id="dubSyncVideo" controls playsinline class="hidden" style="width:100%;max-height:460px;border-radius:10px;background:#000"></video>
           <audio id="dubAudio" controls style="width:100%"></audio>
@@ -3675,6 +3693,108 @@ function downloadDubSRT(){
   toast('📜 Legendas traduzidas (.SRT) baixadas!');
 }
 
+let dubSocialRequestSeq = 0;
+let lastDubSocialMetadata = null;
+
+function normalizeClientDubHashtags(value){
+  const candidates = Array.isArray(value) ? value : String(value || '').split(/[\s,;]+/);
+  const seen = new Set();
+  return candidates.map(candidate => {
+    const tag = String(candidate || '').trim().replace(/^#+/, '').replace(/[^\p{L}\p{N}_]/gu, '').slice(0, 32);
+    const key = tag.toLocaleLowerCase();
+    if(!tag || seen.has(key)) return '';
+    seen.add(key);
+    return `#${tag}`;
+  }).filter(Boolean).slice(0, 8);
+}
+
+function buildClientDubSocialFallback({ translation = '', originalTranscript = '', fileName = '', targetLanguage = 'pt-BR' } = {}){
+  const source = String(translation || originalTranscript || '').replace(/\s+/g, ' ').trim();
+  const filenameTopic = String(fileName || '').replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
+  const firstSentence = source.split(/(?<=[.!?])\s+/)[0] || '';
+  const topic = (firstSentence || (filenameTopic ? `A história por trás de ${filenameTopic}` : 'O detalhe dessa história que merece ser ouvido'))
+    .replace(/\s+/g, ' ').trim().slice(0, 70);
+  const normalized = source.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const stop = new Set(['sobre','porque','quando','muito','mais','para','como','essa','esse','ainda','depois','antes','nossa','their','there','about','would','could','this','that','with','from','have','your','what','when']);
+  const counts = new Map();
+  for(const word of normalized.match(/[a-z0-9]{4,}/g) || []){
+    if(!stop.has(word) && !/^\d+$/.test(word)) counts.set(word, (counts.get(word)||0)+1);
+  }
+  const topics = [...counts.entries()].sort((a,b)=>b[1]-a[1]).slice(0,2).map(([word])=>`#${word.slice(0,24)}`);
+  const lang = String(targetLanguage || '').toLowerCase();
+  const baseTags = lang.startsWith('pt') ? ['#dublagem','#videodublado','#viral','#shorts','#reels','#tiktok']
+    : lang.startsWith('es') ? ['#doblaje','#videodoblado','#viral','#shorts','#reels','#tiktok']
+      : ['#dubbed','#viral','#shorts','#reels','#tiktok','#video'];
+  return { topic, description: source.slice(0, 180), hashtags: normalizeClientDubHashtags([...baseTags, ...topics]), provider: 'local-fallback', fallback: true };
+}
+
+function renderDubSocialPackage(metadata, statusText){
+  const normalized = {
+    topic: String(metadata && (metadata.topic || metadata.title) || '').replace(/\s+/g, ' ').trim().slice(0, 70),
+    description: String(metadata && metadata.description || '').replace(/\s+/g, ' ').trim().slice(0, 180),
+    hashtags: normalizeClientDubHashtags(metadata && (metadata.hashtags || metadata.tags)),
+    provider: String(metadata && metadata.provider || 'IA'),
+    fallback: !!(metadata && metadata.fallback)
+  };
+  if(!normalized.topic || normalized.hashtags.length < 4) return false;
+  lastDubSocialMetadata = normalized;
+  const topicEl = document.getElementById('dubSocialTopic');
+  const descriptionEl = document.getElementById('dubSocialDescription');
+  const descriptionWrap = document.getElementById('dubSocialDescriptionWrap');
+  const tagsEl = document.getElementById('dubSocialHashtags');
+  const statusEl = document.getElementById('dubSocialStatus');
+  if(topicEl) topicEl.textContent = normalized.topic;
+  if(descriptionEl) descriptionEl.textContent = normalized.description;
+  if(descriptionWrap) descriptionWrap.classList.toggle('hidden', !normalized.description);
+  if(tagsEl) tagsEl.textContent = normalized.hashtags.join(' ');
+  if(statusEl) statusEl.textContent = statusText || (normalized.fallback
+    ? 'Sugestão local criada a partir do conteúdo; a IA de texto não respondeu.'
+    : `Sugestão gerada com ${normalized.provider}.`);
+  return true;
+}
+
+async function generateDubSocialPackage({ translation = '', originalTranscript = '', fileName = '', targetLanguage = 'pt-BR' } = {}){
+  const requestId = ++dubSocialRequestSeq;
+  const card = document.getElementById('dubSocialPackage');
+  const statusEl = document.getElementById('dubSocialStatus');
+  if(card) card.classList.remove('hidden');
+  if(statusEl) statusEl.textContent = '⚡ Criando um tema/título e hashtags com base no conteúdo da dublagem…';
+  try{
+    const requestOptions = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'social-metadata',
+        translation: String(translation || '').slice(0, 5000),
+        originalTranscript: String(originalTranscript || '').slice(0, 2000),
+        fileName: String(fileName || '').slice(0, 100),
+        targetLanguage
+      })
+    };
+    if(typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') requestOptions.signal = AbortSignal.timeout(45000);
+    const response = await fetch('/api/dub', requestOptions);
+    const metadata = await response.json().catch(() => ({}));
+    if(!response.ok || metadata.error) throw new Error(metadata.error || `HTTP ${response.status}`);
+    if(requestId !== dubSocialRequestSeq) return;
+    if(!renderDubSocialPackage(metadata)) throw new Error('A resposta não trouxe um tema e pelo menos quatro hashtags.');
+  }catch(_){
+    if(requestId !== dubSocialRequestSeq) return;
+    const fallback = buildClientDubSocialFallback({ translation, originalTranscript, fileName, targetLanguage });
+    renderDubSocialPackage(fallback, 'A IA de texto não respondeu; estas sugestões locais foram montadas com base no conteúdo.');
+  }
+}
+
+function copyDubSocialPackage(){
+  if(!lastDubSocialMetadata){ toast('Aguarde o pacote de publicação ficar pronto.','warn'); return; }
+  const lines = [
+    `TEMA / TÍTULO: ${lastDubSocialMetadata.topic}`,
+    lastDubSocialMetadata.description ? `LEGENDA: ${lastDubSocialMetadata.description}` : '',
+    `HASHTAGS: ${lastDubSocialMetadata.hashtags.join(' ')}`
+  ].filter(Boolean);
+  copyText(lines.join('\n\n'));
+  toast('🔥 Tema e hashtags copiados!');
+}
+
 async function dubVideo(){
   const file = currentDubFile || $('#videoFile').files[0];
   const language = $('#language').value;
@@ -3691,6 +3811,10 @@ async function dubVideo(){
     return;
   }
 
+  dubSocialRequestSeq++;
+  lastDubSocialMetadata = null;
+  const previousSocialCard = document.getElementById('dubSocialPackage');
+  if(previousSocialCard) previousSocialCard.classList.add('hidden');
   stopPreviewDubBgMusic();
   stopDubRequested = false;
   lastDubVideoBlob = null;
@@ -3892,10 +4016,12 @@ async function dubVideo(){
       return `${stamp}\n🗣️ Original: ${c.transcription}\n🇧🇷 Dublado (${targetLanguage}): ${c.translation}`;
     }).join('\n\n────────────────────────\n\n');
 
+    const fullTranslation = chunkOutputs.map(c => c.translation).filter(Boolean).join(' ');
+    const fullOriginalTranscript = chunkOutputs.map(c => c.transcription).filter(Boolean).join(' ');
     $('#dubScript').textContent = transcriptSummary;
     $('#dubResult').classList.remove('hidden');
+    void generateDubSocialPackage({ translation: fullTranslation, originalTranscript: fullOriginalTranscript, fileName: file.name, targetLanguage });
 
-    const fullTranslation = chunkOutputs.map(c => c.translation).filter(Boolean).join(' ');
     saveProject({
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
       type: 'dub',

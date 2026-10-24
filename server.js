@@ -434,6 +434,11 @@ app.post('/api/scene-image', async (req, res) => {
 
 app.post('/api/dub', async (req, res) => {
   try {
+    const body = req.body || {};
+    if (body.action === 'social-metadata') {
+      const metadata = await require('./vercel/api/lib/ai').generateDubSocialMetadata(body);
+      return res.json(metadata);
+    }
     const {
       fileName,
       fileSize,
@@ -446,7 +451,7 @@ app.post('/api/dub', async (req, res) => {
       chunkIndex = 0,
       totalChunks = 1,
       skipSave = false
-    } = req.body || {};
+    } = body;
     if (!fileName) {
       return res.status(400).json({ error: 'Selecione um vídeo ou áudio.' });
     }
