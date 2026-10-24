@@ -24,12 +24,12 @@ const readOpusCaptionHelpers = () => {
 
 const readMissingCaptionTranscriber = context => {
   const html = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
-  const start = html.indexOf('async function transcribeMissingOpusClipCaptions(');
+  const start = html.indexOf('function getOpusCaptionTokens(');
   const end = html.indexOf('\n// Executa o pipeline completo do OpusClip IA', start);
-  assert.notEqual(start, -1, 'missing-caption transcriber should exist');
+  assert.notEqual(start, -1, 'caption timing helpers should exist');
   assert.notEqual(end, -1, 'missing-caption transcriber should have an end marker');
   vm.createContext(context);
-  vm.runInContext(`${html.slice(start, end)}\nglobalThis.recoverMissingCaptions = transcribeMissingOpusClipCaptions;`, context);
+  vm.runInContext(`${html.slice(start, end)}\nglobalThis.recoverMissingCaptions = transcribeMissingOpusClipCaptions;\nglobalThis.hasWordTiming = hasOpusClipWordTiming;`, context);
   return context;
 };
 
@@ -82,7 +82,12 @@ test('missing clip captions are recovered from that clip audio, without replacin
         ok: true,
         json: async () => ({
           text: 'fala real do trecho',
-          segments: [{ inicio: body.offsetSec + 0.2, fim: body.offsetSec + 0.5, texto: 'fala' }],
+          segments: [
+            { inicio: body.offsetSec + 0.20, fim: body.offsetSec + 0.35, texto: 'fala' },
+            { inicio: body.offsetSec + 0.35, fim: body.offsetSec + 0.50, texto: 'real' },
+            { inicio: body.offsetSec + 0.50, fim: body.offsetSec + 0.62, texto: 'do' },
+            { inicio: body.offsetSec + 0.62, fim: body.offsetSec + 0.85, texto: 'trecho' }
+          ],
           timingGranularity: 'word'
         })
       };
@@ -90,7 +95,16 @@ test('missing clip captions are recovered from that clip audio, without replacin
   });
   const clips = [
     { startSec: 2, endSec: 4, captionText: '' },
-    { startSec: 0, endSec: 2, captionText: 'transcrição já existente' }
+    {
+      startSec: 0,
+      endSec: 2,
+      captionText: 'transcrição já existente',
+      subSegments: [
+        { inicio: 0.1, fim: 0.45, texto: 'transcrição' },
+        { inicio: 0.5, fim: 0.72, texto: 'já' },
+        { inicio: 0.8, fim: 1.2, texto: 'existente' }
+      ]
+    }
   ];
 
   const recovered = await context.recoverMissingCaptions(clips);
@@ -102,7 +116,87 @@ test('missing clip captions are recovered from that clip audio, without replacin
   assert.equal(requests[0].durationSec, 2);
   assert.equal(clips[0].captionText, 'fala real do trecho');
   assert.equal(clips[0].subSegments[0].texto, 'fala');
+  assert.equal(context.hasWordTiming(clips[0]), true);
   assert.equal(clips[1].captionText, 'transcrição já existente');
+  assert.equal(context.hasWordTiming(clips[1]), true);
+});
+
+test('existing caption text is preserved while missing word timings are recovered from its audio', async () => {
+  const requests = [];
+  const context = readMissingCaptionTranscriber({
+    opusState: { mono12k: new Float32Array(12000 * 6).fill(0.2), fullAudioBuffer: null },
+    encodeWavMono: samples => new Uint8Array(samples.length * 2 + 44),
+    bytesToBase64: bytes => `wav-${bytes.length}`,
+    fetch: async (_url, options) => {
+      const body = JSON.parse(options.body);
+      requests.push(body);
+      return {
+        ok: true,
+        json: async () => ({
+          text: 'Fala real do trecho!',
+          segments: [
+            { inicio: 2.1, fim: 2.28, texto: 'Fala' },
+            { inicio: 2.30, fim: 2.48, texto: 'real' },
+            { inicio: 2.50, fim: 2.62, texto: 'do' },
+            { inicio: 2.64, fim: 2.95, texto: 'trecho!' }
+          ],
+          timingGranularity: 'word'
+        })
+      };
+    }
+  });
+  const clip = {
+    startSec: 2,
+    endSec: 4,
+    captionText: 'Fala real do trecho',
+    subSegments: [{ inicio: 2, fim: 4, texto: 'Fala real do trecho' }]
+  };
+
+  const synchronized = await context.recoverMissingCaptions([clip]);
+
+  assert.equal(synchronized, 1);
+  assert.equal(requests.length, 1);
+  assert.equal(clip.captionText, 'Fala real do trecho');
+  assert.equal(clip.captionTimingGranularity, 'word');
+  assert.deepEqual(clip.subSegments.map(segment => segment.texto), ['Fala', 'real', 'do', 'trecho!']);
+  assert.equal(context.hasWordTiming(clip), true);
+
+  const { buildCues } = readOpusCaptionHelpers();
+  const words = buildCues(clip.captionText, 2, clip.startSec, clip.subSegments).flatMap(cue => cue.words);
+  assert.deepEqual(Array.from(words, word => word.word), ['Fala', 'real', 'do', 'trecho!']);
+  assert.equal(Number(words[0].start.toFixed(2)), 0.1);
+  assert.equal(Number(words[0].end.toFixed(2)), 0.28);
+  assert.equal(Number(words[3].start.toFixed(2)), 0.64);
+  assert.equal(Number(words[3].end.toFixed(2)), 0.95);
+});
+
+test('mismatched audio transcript does not replace saved caption text or attach wrong timestamps', async () => {
+  const existingSegments = [{ inicio: 1, fim: 3, texto: 'texto original do usuário' }];
+  const context = readMissingCaptionTranscriber({
+    opusState: { mono12k: new Float32Array(12000 * 5).fill(0.2), fullAudioBuffer: null },
+    encodeWavMono: samples => new Uint8Array(samples.length * 2 + 44),
+    bytesToBase64: bytes => `wav-${bytes.length}`,
+    fetch: async () => ({
+      ok: true,
+      json: async () => ({
+        text: 'fala diferente no áudio',
+        segments: [
+          { inicio: 1.1, fim: 1.3, texto: 'fala' },
+          { inicio: 1.3, fim: 1.6, texto: 'diferente' },
+          { inicio: 1.6, fim: 1.8, texto: 'no' },
+          { inicio: 1.8, fim: 2.1, texto: 'áudio' }
+        ],
+        timingGranularity: 'word'
+      })
+    })
+  });
+  const clip = { startSec: 1, endSec: 3, captionText: 'texto original do usuário', subSegments: existingSegments };
+
+  const synchronized = await context.recoverMissingCaptions([clip]);
+
+  assert.equal(synchronized, 0);
+  assert.equal(clip.captionText, 'texto original do usuário');
+  assert.deepEqual(clip.subSegments, existingSegments);
 });
 
 test('duplicate overlapping transcripts are collapsed without removing repeated words spoken later', () => {
