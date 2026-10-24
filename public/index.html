@@ -1474,7 +1474,10 @@ input[type="range"]{
 
               <label style="margin-top:8px;font-size:11px">🏷️ Auto Hook Banner (Topo do Vídeo)</label>
               <input type="text" id="opusEditHookBanner" oninput="onEditSelectedOpusClip()" style="padding:8px 10px;font-size:12.5px;margin-top:4px;width:100%;border-radius:8px;border:1px solid #282e46;background:#070a14;color:#fff">
-              <label style="margin-top:8px;font-size:11px">💬 Editar Texto da Legenda (Qualquer alteração atualiza no vídeo na hora)</label>
+              <label style="margin-top:8px;font-size:11px">💬 Legendas automáticas da fala (estilo CapCut)</label>
+              <button type="button" id="opusAutoCaptionBtn" onclick="generateSelectedOpusClipCaptionsFromAudio()" style="width:100%;margin-top:5px;padding:9px 12px;border:1px solid #22c55e;border-radius:9px;font-size:12px;font-weight:900;cursor:pointer;color:#dcfce7;background:linear-gradient(135deg,#064e3b,#052e16)" title="Ouve o áudio do corte selecionado, transcreve a fala e sincroniza as palavras no vídeo">🎙️ Gerar legenda automaticamente pelo áudio</button>
+              <div style="font-size:10.5px;color:#94a3b8;margin:5px 0 2px">Transcreve o que é falado no corte selecionado e atualiza a prévia e o MP4. O texto atual pode ser substituído.</div>
+              <label style="margin-top:6px;font-size:11px">✍️ Texto da Legenda (edite se quiser; a mudança aparece no vídeo na hora)</label>
               <textarea id="opusEditCaption" rows="3" oninput="onEditSelectedOpusClip()" style="padding:8px 10px;font-size:12.5px;margin-top:4px;min-height:68px"></textarea>
             </div>
 
@@ -10584,6 +10587,66 @@ function selectOpusClip(idx, autoPlay = false){
   }
 }
 
+async function generateSelectedOpusClipCaptionsFromAudio(){
+  const idx = Number(opusState.selectedIdx) || 0;
+  const clip = opusState.clips && opusState.clips[idx];
+  if(!clip){
+    toast('Selecione um corte antes de gerar a legenda automática.', 'warn');
+    return;
+  }
+  if(!hasOpusClipAudioSource()){
+    showStatus('opusStatus', '⚠️ Para gerar legendas como no CapCut, carregue o arquivo .MP4 local para o app poder ouvir o áudio do corte.', 'warn');
+    toast('📂 Carregue o vídeo .MP4 local para transcrever a fala do áudio.', 'warn');
+    return;
+  }
+
+  const btn = document.getElementById('opusAutoCaptionBtn');
+  const manualBefore = Boolean(clip.captionManuallyEdited);
+  if(btn){
+    btn.disabled = true;
+    btn.textContent = '⏳ Ouvindo o áudio e transcrevendo...';
+  }
+  clip.captionManuallyEdited = false;
+  clip.captionAudioMismatch = false;
+  showStatus('opusStatus', `🎙️ Ouvindo o áudio do corte #${clip.rank || idx + 1} e gerando as legendas automaticamente...`, 'info');
+
+  try{
+    const synchronized = await transcribeMissingOpusClipCaptions([clip], true);
+    clip._cues = null;
+    opusState.lastExportBlob = null;
+    opusState.lastExportClipId = null;
+    const captionEditor = document.getElementById('opusEditCaption');
+    if(captionEditor) captionEditor.value = clip.captionText || '';
+    updateInlineCardCaptionBadges(idx, clip);
+    renderSingleOpusPreviewFrame();
+    renderAllOpusCardStaticPreviews();
+
+    if(clip.captionAudioTranscriptionReceived && String(clip.captionText || '').trim()){
+      clip.captionManuallyEdited = false;
+      if(synchronized > 0){
+        showStatus('opusStatus', '✅ Legenda gerada a partir da fala do vídeo e sincronizada palavra por palavra. A mesma legenda será gravada no MP4.', 'success');
+        toast('✅ Fala transcrita do áudio e sincronizada no vídeo!');
+      } else {
+        showStatus('opusStatus', '⚠️ A fala foi transcrita, mas o serviço não retornou tempos exatos por palavra. Revise a prévia; o MP4 usará os tempos disponíveis.', 'warn');
+        toast('⚠️ Texto reconhecido; confira a sincronia na prévia.', 'warn');
+      }
+    } else {
+      clip.captionManuallyEdited = manualBefore;
+      showStatus('opusStatus', '⚠️ Não foi possível reconhecer fala clara neste corte. A legenda existente foi mantida.', 'warn');
+      toast('⚠️ Não reconheci fala clara no áudio deste corte.', 'warn');
+    }
+  }catch(error){
+    if(!clip.captionAudioTranscriptionReceived) clip.captionManuallyEdited = manualBefore;
+    showStatus('opusStatus', '❌ Erro ao gerar legendas do áudio: ' + (error.message || 'falha de transcrição'), 'error');
+    toast('❌ Não foi possível transcrever o áudio deste corte.', 'error');
+  }finally{
+    if(btn){
+      btn.disabled = false;
+      btn.textContent = '🎙️ Gerar legenda automaticamente pelo áudio';
+    }
+  }
+}
+
 function onEditSelectedOpusClip(){
   const clip = opusState.clips[opusState.selectedIdx];
   if(!clip) return;
@@ -10823,6 +10886,12 @@ function hasOpusClipWordTiming(clip){
   return captionWords.every((word, i) => word === timedWords[i]);
 }
 
+function hasOpusClipAudioSource(){
+  return Boolean((opusState.mono12k && opusState.mono12k.length)
+    || (opusState.fullAudioBuffer && opusState.fullAudioBuffer.length)
+    || (opusState.fileUrl && typeof extractSingleChunkStreaming === 'function'));
+}
+
 // Re-transcreve o áudio exato de cada corte final para corrigir palavras e alinhar timestamps à fala real.
 // Arquivos grandes usam captura local do trecho; texto editado manualmente nunca é sobrescrito.
 async function transcribeMissingOpusClipCaptions(clips, forceResync = false){
@@ -10833,6 +10902,7 @@ async function transcribeMissingOpusClipCaptions(clips, forceResync = false){
     pending.forEach(clip => {
       clip.captionAudioSyncVerified = false;
       clip.captionAudioMismatch = false;
+      clip.captionAudioTranscriptionReceived = false;
     });
   }
 
@@ -10888,6 +10958,7 @@ async function transcribeMissingOpusClipCaptions(clips, forceResync = false){
   let nextIndex = 0;
   let synchronized = 0;
   const transcribeOne = async (clip, streamMedia = null) => {
+    clip.captionAudioTranscriptionReceived = false;
     const startSec = Math.max(0, Number(clip.startSec) || 0);
     const endSecRaw = Number(clip.endSec);
     if(!Number.isFinite(endSecRaw) || endSecRaw <= startSec) return false;
@@ -10945,6 +11016,7 @@ async function transcribeMissingOpusClipCaptions(clips, forceResync = false){
       const result = await response.json();
       const text = String(result && result.text || '').trim();
       if(!text || result.silent) return false;
+      clip.captionAudioTranscriptionReceived = true;
 
       const existingText = String(clip.captionText || '').trim();
       const transcriptMatches = !existingText || opusCaptionTextMatches(existingText, text);
@@ -11109,9 +11181,7 @@ async function runOpusClipAnalysis(skipUrlCheck = false){
     }
 
     const captionsNeedingSync = data.clips.filter(Boolean).length;
-    const hasLocalClipAudio = Boolean((opusState.mono12k && opusState.mono12k.length)
-      || (opusState.fullAudioBuffer && opusState.fullAudioBuffer.length)
-      || (opusState.fileUrl && typeof extractSingleChunkStreaming === 'function'));
+    const hasLocalClipAudio = hasOpusClipAudioSource();
     if(captionsNeedingSync && hasLocalClipAudio){
       setProgress('opusProgressFill', 62);
       showStatus('opusStatus', `📝 Conferindo a fala real e sincronizando palavra por palavra em ${captionsNeedingSync} corte(s)...`, 'info');

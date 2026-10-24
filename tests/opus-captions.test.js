@@ -33,6 +33,17 @@ const readMissingCaptionTranscriber = context => {
   return context;
 };
 
+const readAutoCaptionHandler = context => {
+  const html = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
+  const start = html.indexOf('async function generateSelectedOpusClipCaptionsFromAudio(');
+  const end = html.indexOf('\nfunction onEditSelectedOpusClip', start);
+  assert.notEqual(start, -1, 'CapCut-style automatic caption handler should exist');
+  assert.notEqual(end, -1, 'automatic caption handler should have an end marker');
+  vm.createContext(context);
+  vm.runInContext(`${html.slice(start, end)}\nglobalThis.generateCaptionsFromAudio = generateSelectedOpusClipCaptionsFromAudio;`, context);
+  return context;
+};
+
 test('word timestamps stay absolute-to-relative exact and default to readable two-word blocks', () => {
   const { buildCues } = readOpusCaptionHelpers();
   const cues = buildCues('Olá mundo! Tudo certo.', 2, 10, [
@@ -94,6 +105,73 @@ test('preview and MP4 export share the progressive word-caption renderer', () =>
   assert.match(html, /drawOpusReframedFrame\(ctx, exportVid, clip, t\)/);
 });
 
+test('CapCut-style auto-caption button transcribes the selected cut and updates preview and export source text', async () => {
+  const html = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
+  assert.match(html, /id="opusAutoCaptionBtn" onclick="generateSelectedOpusClipCaptionsFromAudio\(\)"/);
+  const statuses = [];
+  const button = { disabled: false, textContent: '🎙️ Gerar legenda automaticamente pelo áudio' };
+  const captionEditor = { value: '' };
+  const targetClip = { id: 'cut-2', rank: 2, captionText: 'texto manual', captionManuallyEdited: true };
+  const clips = [{ id: 'cut-1', rank: 1 }, targetClip];
+  const calls = [];
+  const context = readAutoCaptionHandler({
+    opusState: { selectedIdx: 1, clips, lastExportBlob: { stale: true }, lastExportClipId: 'old' },
+    hasOpusClipAudioSource: () => true,
+    document: {
+      getElementById: id => id === 'opusAutoCaptionBtn' ? button
+        : id === 'opusEditCaption' ? captionEditor : null
+    },
+    transcribeMissingOpusClipCaptions: async (selectedClips, forceResync) => {
+      calls.push({ selectedClips, forceResync, manualAtCall: targetClip.captionManuallyEdited });
+      targetClip.captionText = 'fala reconhecida do vídeo';
+      targetClip.subSegments = [{ inicio: 4.1, fim: 4.5, texto: 'fala' }];
+      targetClip.captionAudioSyncVerified = true;
+      targetClip.captionAudioTranscriptionReceived = true;
+      return 1;
+    },
+    showStatus: (...args) => statuses.push(args),
+    toast: () => {},
+    updateInlineCardCaptionBadges: () => {},
+    renderSingleOpusPreviewFrame: () => {},
+    renderAllOpusCardStaticPreviews: () => {}
+  });
+
+  await context.generateCaptionsFromAudio();
+
+  assert.equal(calls.length, 1);
+  assert.deepEqual(Array.from(calls[0].selectedClips), [targetClip]);
+  assert.equal(calls[0].forceResync, true);
+  assert.equal(calls[0].manualAtCall, false);
+  assert.equal(targetClip.captionText, 'fala reconhecida do vídeo');
+  assert.equal(targetClip.captionManuallyEdited, false);
+  assert.equal(captionEditor.value, 'fala reconhecida do vídeo');
+  assert.equal(context.opusState.lastExportBlob, null);
+  assert.equal(context.opusState.lastExportClipId, null);
+  assert.equal(button.disabled, false);
+  assert.match(button.textContent, /Gerar legenda automaticamente/);
+  assert.equal(statuses.at(-1)[2], 'success');
+});
+
+test('automatic captions clearly require local video audio when a remote source exposes no audio', async () => {
+  const statuses = [];
+  let transcribeCalls = 0;
+  const clip = { id: 'cut-1', captionText: 'legenda existente' };
+  const context = readAutoCaptionHandler({
+    opusState: { selectedIdx: 0, clips: [clip] },
+    hasOpusClipAudioSource: () => false,
+    document: { getElementById: () => null },
+    transcribeMissingOpusClipCaptions: async () => { transcribeCalls++; },
+    showStatus: (...args) => statuses.push(args),
+    toast: () => {}
+  });
+
+  await context.generateCaptionsFromAudio();
+
+  assert.equal(transcribeCalls, 0);
+  assert.equal(clip.captionText, 'legenda existente');
+  assert.equal(statuses.at(-1)[2], 'warn');
+});
+
 test('missing clip captions are recovered from that clip audio, without replacing existing transcripts', async () => {
   const requests = [];
   const context = readMissingCaptionTranscriber({
@@ -143,6 +221,7 @@ test('missing clip captions are recovered from that clip audio, without replacin
   assert.equal(clips[0].captionText, 'fala real do trecho');
   assert.equal(clips[0].subSegments[0].texto, 'fala');
   assert.equal(context.hasWordTiming(clips[0]), true);
+  assert.equal(clips[0].captionAudioTranscriptionReceived, true);
   assert.equal(clips[1].captionText, 'transcrição já existente');
   assert.equal(context.hasWordTiming(clips[1]), true);
 });
