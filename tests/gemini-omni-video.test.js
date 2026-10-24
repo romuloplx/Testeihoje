@@ -1,5 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
 const {
   generateCreateSceneVideo,
   consumeGeminiOmniVideoRequest
@@ -27,6 +30,30 @@ function makeMp4Base64(){
   mp4.write('ftyp', 4, 'ascii');
   return { mp4, base64: mp4.toString('base64') };
 }
+
+test('connected cinema drawer keeps scene sources in scope for preparation and cleanup', async () => {
+  const html = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
+  const start = html.indexOf('function makeConnectedCinemaDrawer(movie){');
+  const end = html.indexOf('\n// Reamostra qualquer AudioBuffer', start);
+  assert.ok(start >= 0 && end > start, 'connected cinema drawer source should be present');
+  const source = html.slice(start, end);
+  const context = { waitForGeneratedSceneVideo: async video => video };
+  vm.runInNewContext(`${source}\nthis.makeConnectedCinemaDrawer = makeConnectedCinemaDrawer;`, context);
+
+  const staticDrawer = context.makeConnectedCinemaDrawer({ scenes: [{ videoEl: null }] });
+  assert.equal(staticDrawer.requiresRealtimeSources, false);
+  await staticDrawer.prepare();
+  staticDrawer.cleanup();
+  assert.equal(staticDrawer.requiresRealtimeSources, false);
+
+  const video = { readyState: 2, videoWidth: 640, currentTime: 0.2, pause(){} };
+  const motionDrawer = context.makeConnectedCinemaDrawer({ scenes: [{ videoEl: video }] });
+  assert.equal(motionDrawer.requiresRealtimeSources, true);
+  await motionDrawer.prepare();
+  assert.equal(motionDrawer.requiresRealtimeSources, true);
+  assert.equal(video.currentTime, 0);
+  motionDrawer.cleanup();
+});
 
 test('Gemini Omni image-to-video submits a reference image and returns a valid MP4 buffer', async () => {
   process.env.GEMINI_API_KEY = 'unit-test-gemini-key';

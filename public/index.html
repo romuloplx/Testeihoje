@@ -4852,6 +4852,7 @@ const EMOTION_LABELS_PT = {
 
 // Motor principal do CINEMA DE HISTÓRIAS: Cenário Multi-Plano 100% Visível + Personagens Atuando + Palco Picture-in-Scene Sincronizado
 function makeConnectedCinemaDrawer(movie){
+  const scenes = Array.isArray(movie && movie.scenes) ? movie.scenes : [];
   let smoothDialogueMix = 0;
   let smoothActionShotMix = 0;
   let lastT = 0;
@@ -4866,7 +4867,6 @@ function makeConnectedCinemaDrawer(movie){
     const dt = Math.max(0.008, Math.min(0.1, Math.abs(t - lastT) || 0.033));
     lastT = t;
 
-    const scenes = movie.scenes;
     let sIdx = scenes.findIndex(s => t >= s.start && t < s.end);
     if(sIdx < 0) sIdx = t < scenes[0].start ? 0 : scenes.length - 1;
     const sc = scenes[sIdx];
