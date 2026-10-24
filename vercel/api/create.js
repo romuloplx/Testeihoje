@@ -1,4 +1,4 @@
-const { mockCreateFull, generateCreateFull, startCreateSceneVideo, pollCreateSceneVideo, getBody, send } = require('./lib/ai');
+const { mockCreateFull, generateCreateFull, lookupIceAndFireCharacters, startCreateSceneVideo, pollCreateSceneVideo, getBody, send } = require('./lib/ai');
 
 async function sendSceneVideo(res, clip) {
   const buffer = clip.buffer;
@@ -30,6 +30,14 @@ module.exports = async (req, res) => {
   try {
     if (req.method !== 'POST') return send(res, 405, { error: 'Método não permitido. Use POST.' });
     const body = await getBody(req);
+    if (body.action === 'character-lookup') {
+      try {
+        res.setHeader('Cache-Control', 'no-store, private');
+        return send(res, 200, await lookupIceAndFireCharacters({ query: body.query }));
+      } catch (e) {
+        return send(res, Number(e.status) || 502, { error: e.message || 'Falha ao buscar personagens.' });
+      }
+    }
     if (body.action === 'scene-video' || body.action === 'scene-video-status') {
       try {
         res.setHeader('Cache-Control', 'no-store, private');

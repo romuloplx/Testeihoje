@@ -668,6 +668,73 @@ async function generateSceneImage({ prompt, style, width = 1024, height = 576 })
   return { error: errors.join(' | ') || 'nenhum provedor de imagem respondeu' };
 }
 
+// Busca pública de personagens da API An API of Ice and Fire para preencher o elenco de Criar.
+function normalizeIceAndFireCharacter(character) {
+  const value = character && typeof character === 'object' ? character : {};
+  const cleanText = (text, max = 180) => String(text || '').replace(/\s+/g, ' ').trim().slice(0, max);
+  const cleanList = (items, maxItems = 6) => Array.isArray(items)
+    ? items.map(item => cleanText(item, 180)).filter(Boolean).slice(0, maxItems)
+    : [];
+  const url = cleanText(value.url, 240);
+  const idMatch = url.match(/\/characters\/(\d+)\/?$/i);
+  return {
+    id: idMatch ? idMatch[1] : '',
+    name: cleanText(value.name, 100),
+    gender: cleanText(value.gender, 40),
+    culture: cleanText(value.culture, 100),
+    born: cleanText(value.born, 120),
+    died: cleanText(value.died, 120),
+    titles: cleanList(value.titles, 6),
+    aliases: cleanList(value.aliases, 6),
+    tvSeries: cleanList(value.tvSeries, 8),
+    playedBy: cleanList(value.playedBy, 4)
+  };
+}
+
+async function lookupIceAndFireCharacters({ query = '' } = {}) {
+  const cleanQuery = String(query || '').trim().slice(0, 160);
+  if (!cleanQuery) throw Object.assign(new Error('Digite o nome ou o ID de um personagem para buscar.'), { status: 400 });
+
+  const base = 'https://anapioficeandfire.com/api';
+  let requestUrl;
+  if (/^\d{1,12}$/.test(cleanQuery)) {
+    requestUrl = `${base}/characters/${cleanQuery}`;
+  } else if (/^https?:\/\//i.test(cleanQuery)) {
+    let candidate;
+    try { candidate = new URL(cleanQuery); }
+    catch (_) { throw Object.assign(new Error('O link informado não é válido.'), { status: 400 }); }
+    if (candidate.protocol !== 'https:' || candidate.hostname !== 'anapioficeandfire.com' || !/^\/api\/characters\/\d+\/?$/i.test(candidate.pathname)) {
+      throw Object.assign(new Error('Use o nome do personagem, um ID ou um link /api/characters/{id} da An API of Ice and Fire.'), { status: 400 });
+    }
+    requestUrl = `https://anapioficeandfire.com${candidate.pathname}`;
+  } else {
+    const url = new URL(`${base}/characters`);
+    url.searchParams.set('name', cleanQuery);
+    url.searchParams.set('pageSize', '10');
+    requestUrl = url.href;
+  }
+
+  let response;
+  try {
+    response = await fetch(requestUrl, {
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(12000)
+    });
+  } catch (e) {
+    throw Object.assign(new Error(`A API de personagens não respondeu: ${String(e.message || e).slice(0, 140)}`), { status: 504 });
+  }
+  if (response.status === 404) return { results: [] };
+  if (!response.ok) {
+    throw Object.assign(new Error(`A API de personagens respondeu HTTP ${response.status}.`), { status: 502 });
+  }
+
+  let payload;
+  try { payload = await response.json(); }
+  catch (_) { throw Object.assign(new Error('A API de personagens devolveu uma resposta inválida.'), { status: 502 }); }
+  const list = Array.isArray(payload) ? payload : (payload && typeof payload === 'object' ? [payload] : []);
+  return { results: list.map(normalizeIceAndFireCharacter).filter(character => character.name).slice(0, 10) };
+}
+
 // Gerador real de clipes para a aba Criar: Tencent HunyuanVideo 1.5 image-to-video.
 // Requer uma chave TokenHub guardada somente no servidor.
 const CREATE_SCENE_VIDEO_WINDOW_MS = 60 * 60 * 1000;
@@ -4372,7 +4439,7 @@ async function fetchYoutubeClipMp4Segment({ videoId = '', url = '', startSec = 0
 
 module.exports = {
   TTS_VOICES, mockScript, mockCreateFull, mockDubResult,
-  generateWithOpenAI, generateCreateFull, generateSceneImage, generateCreateSceneVideo, startCreateSceneVideo, pollCreateSceneVideo, consumeCreateSceneVideoRequest, dubWithOpenAI, enhanceScript,
+  generateWithOpenAI, generateCreateFull, generateSceneImage, lookupIceAndFireCharacters, generateCreateSceneVideo, startCreateSceneVideo, pollCreateSceneVideo, consumeCreateSceneVideoRequest, dubWithOpenAI, enhanceScript,
   generateAvatarPortrait, generateAvatarScript, generateAvatarVideo, detectAvatarFaceLandmarks,
   transcribeClipSegment, analyzeViralClips, extractYoutubeVideoId, fetchYoutubeVideoInfoAndStream, fetchVideoStreamChunk, fetchYoutubeClipMp4Segment,
   chatWithFallback, ttsWithFallback, runTtsProviderChain, isEdgeTtsHandshakeFailure,

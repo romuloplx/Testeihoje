@@ -466,6 +466,16 @@ input[type="range"]{
     <label style="margin-top:10px">🎭 Personagens da História <span style="font-weight:400;color:var(--muted)">(opcional — ou deixe em branco para a IA criar sozinha)</span></label>
     <input type="text" id="createCharactersInput" placeholder="Ex: Theo (menino curioso de moletom vermelho) e Luna (menina corajosa com lanterna dourada)" style="width:100%;padding:11px 13px;border-radius:10px;border:1px solid var(--border);background:#0c0d1c;color:#f8fafc;font-size:13.5px" />
 
+    <div style="margin-top:10px;padding:10px 12px;border:1px solid #38bdf855;border-radius:11px;background:linear-gradient(135deg,#0b1726,#101127)">
+      <label for="iceFireCharacterQuery" style="margin:0;color:#bae6fd;font-weight:800">📚 Importar personagem de As Crônicas de Gelo e Fogo</label>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:7px">
+        <input type="text" id="iceFireCharacterQuery" placeholder="Nome (ex.: Jon Snow), ID 583 ou URL da API" style="flex:1;min-width:220px;padding:10px 12px;border-radius:9px;border:1px solid var(--border);background:#0c0d1c;color:#f8fafc;font-size:13px" onkeydown="if(event.key==='Enter'){event.preventDefault();searchIceAndFireCharacters()}" />
+        <button class="ghost" id="iceFireCharacterSearchBtn" type="button" onclick="searchIceAndFireCharacters()">🔎 Buscar personagem</button>
+      </div>
+      <div class="hint" style="margin:6px 0 0;line-height:1.45">Consulta a API pública An API of Ice and Fire e preenche o campo de personagens; não gera imagens nem vídeos por si só.</div>
+      <div id="iceFireCharacterResults" class="hidden" style="margin-top:8px;display:grid;gap:7px" aria-live="polite"></div>
+    </div>
+
     <label style="margin-top:12px">🎨 Modelos prontos de Histórias & Vídeos</label>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="ghost" type="button" onclick="applyTemplate('adventure')" style="border-color:#7c3aed88;color:#e9d5ff">📖 História & Aventura</button>
@@ -2240,6 +2250,117 @@ function fillExample(){
   if(document.getElementById('style')) document.getElementById('style').value = 'animation';
   if(document.getElementById('duration')) document.getElementById('duration').value = '1';
   toast('💡 Exemplo de história com personagens preenchido — clique em Criar História & Vídeo Completo!');
+}
+
+let createCharacterApiResults = [];
+
+function characterApiMessage(container, message, isError = false){
+  if(!container) return;
+  container.replaceChildren();
+  container.classList.remove('hidden');
+  const note = document.createElement('div');
+  note.style.cssText = `padding:10px 12px;border-radius:9px;background:#0c0d1c;color:${isError ? '#fecaca' : '#cbd5e1'};font-size:12px`;
+  note.textContent = message;
+  container.appendChild(note);
+}
+
+function formatIceAndFireCharacter(character){
+  const details = [];
+  const gender = String(character.gender || '').toLowerCase();
+  if(gender === 'male') details.push('homem');
+  else if(gender === 'female') details.push('mulher');
+  if(character.culture) details.push(`cultura: ${character.culture}`);
+  const titles = Array.isArray(character.titles) ? character.titles.filter(Boolean).slice(0, 3) : [];
+  if(titles.length) details.push(`títulos: ${titles.join(', ')}`);
+  const aliases = Array.isArray(character.aliases) ? character.aliases.filter(Boolean).slice(0, 3) : [];
+  if(aliases.length) details.push(`também conhecido(a) como ${aliases.join(', ')}`);
+  if(character.born) details.push(`nascimento: ${character.born}`);
+  if(character.died) details.push(`morte: ${character.died}`);
+  const tvSeries = Array.isArray(character.tvSeries) ? character.tvSeries.filter(Boolean).slice(0, 6) : [];
+  if(tvSeries.length) details.push(`aparece em: ${tvSeries.join(', ')}`);
+  const playedBy = Array.isArray(character.playedBy) ? character.playedBy.filter(Boolean).slice(0, 2) : [];
+  if(playedBy.length) details.push(`${gender === 'female' ? 'interpretada' : 'interpretado'} por ${playedBy.join(', ')}`);
+  return `${character.name || 'Personagem'}${details.length ? ` (${details.join('; ')})` : ''}`;
+}
+
+function renderIceAndFireCharacterResults(results){
+  const container = document.getElementById('iceFireCharacterResults');
+  if(!container) return;
+  container.replaceChildren();
+  container.classList.remove('hidden');
+  if(!results.length){
+    characterApiMessage(container, 'Nenhum personagem encontrado. Confira o nome ou tente o ID/URL da API.');
+    return;
+  }
+  results.forEach((character, index) => {
+    const card = document.createElement('div');
+    card.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 12px;border:1px solid #334155;border-radius:9px;background:#0c0d1c';
+    const info = document.createElement('div');
+    info.style.cssText = 'flex:1;min-width:180px';
+    const name = document.createElement('div');
+    name.style.cssText = 'font-size:13px;font-weight:800;color:#e0f2fe';
+    name.textContent = character.name || 'Personagem sem nome';
+    const summary = document.createElement('div');
+    summary.style.cssText = 'margin-top:3px;font-size:11px;color:#cbd5e1;line-height:1.45';
+    const facts = [character.gender, character.culture, ...(character.titles || []).slice(0, 2)].filter(Boolean);
+    summary.textContent = facts.join(' • ') || 'Dados de personagem disponíveis';
+    info.append(name, summary);
+    const add = document.createElement('button');
+    add.type = 'button';
+    add.className = 'ghost';
+    add.textContent = '➕ Usar no vídeo';
+    add.addEventListener('click', () => useIceAndFireCharacter(index));
+    card.append(info, add);
+    container.appendChild(card);
+  });
+}
+
+async function searchIceAndFireCharacters(){
+  const input = document.getElementById('iceFireCharacterQuery');
+  const button = document.getElementById('iceFireCharacterSearchBtn');
+  const container = document.getElementById('iceFireCharacterResults');
+  const query = String(input && input.value || '').trim();
+  if(!query){
+    characterApiMessage(container, 'Digite um nome, um ID como 583 ou a URL de um personagem.');
+    return;
+  }
+  button.disabled = true;
+  button.textContent = '⏳ Buscando...';
+  characterApiMessage(container, 'Consultando a API pública de personagens...');
+  try{
+    const response = await fetch('/api/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'character-lookup', query }),
+      signal: AbortSignal.timeout(15000)
+    });
+    const data = await response.json().catch(() => ({}));
+    if(!response.ok) throw new Error(data.error || `A busca falhou (HTTP ${response.status}).`);
+    createCharacterApiResults = Array.isArray(data.results) ? data.results : [];
+    renderIceAndFireCharacterResults(createCharacterApiResults);
+  }catch(error){
+    characterApiMessage(container, `Não foi possível buscar personagens: ${String(error && error.message || error).slice(0, 180)}`, true);
+  }finally{
+    button.disabled = false;
+    button.textContent = '🔎 Buscar personagem';
+  }
+}
+
+function useIceAndFireCharacter(index){
+  const character = createCharacterApiResults[index];
+  if(!character || !character.name) return;
+  const input = document.getElementById('createCharactersInput');
+  const prompt = document.getElementById('prompt');
+  const current = String(input && input.value || '').trim();
+  if(current.toLowerCase().includes(character.name.toLowerCase())){
+    toast(`${character.name} já está na lista de personagens.`);
+    return;
+  }
+  if(input) input.value = current ? `${current}; ${formatIceAndFireCharacter(character)}` : formatIceAndFireCharacter(character);
+  if(prompt && !String(prompt.value || '').trim()){
+    prompt.value = `Crie uma história cinematográfica original sobre ${character.name}, usando os dados públicos do personagem como referência. Mostre seus conflitos, escolhas e uma aventura marcante.`;
+  }
+  toast(`✅ ${character.name} adicionado ao elenco do vídeo.`);
 }
 
 // ===== Modelos de Histórias & Vídeos com Personagens =====

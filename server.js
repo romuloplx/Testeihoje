@@ -304,6 +304,15 @@ app.delete('/api/projects/:id', (req, res) => {
 app.post('/api/create', async (req, res) => {
   try {
     const body = req.body || {};
+    if (body.action === 'character-lookup') {
+      try {
+        res.set('Cache-Control', 'no-store, private');
+        const result = await require('./vercel/api/lib/ai').lookupIceAndFireCharacters({ query: body.query });
+        return res.json(result);
+      } catch (e) {
+        return res.status(Number(e.status) || 502).json({ error: e.message || 'Falha ao buscar personagens.' });
+      }
+    }
     if (body.action === 'scene-video' || body.action === 'scene-video-status') {
       try {
         res.set('Cache-Control', 'no-store, private');
