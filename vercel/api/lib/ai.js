@@ -553,7 +553,28 @@ async function generateCreateFull({ prompt, duration, style, voice, cinemaMode =
   return { data: { script, scenes, seo: outline.seo || {}, title: outline.title || '' }, provider: [...providers].join(' + ') };
 }
 
-// Imagem de uma cena: Pollinations Flux HD (Grátis & Rápido) + OpenAI + Gemini + Unorouter
+const OPENROUTER_IMAGE_API_URL = 'https://openrouter.ai/api/v1/images';
+const DEFAULT_OPENROUTER_IMAGE_MODEL = 'black-forest-labs/flux.2-pro';
+
+function hasOpenRouterImageApiKey() {
+  return Boolean(String(process.env.OPENROUTER_API_KEY || '').trim());
+}
+
+function openRouterImageAspectRatio(width, height) {
+  const w = Math.max(1, Number(width) || 1024);
+  const h = Math.max(1, Number(height) || 576);
+  const ratio = w / h;
+  const supported = [
+    { label: '1:1', value: 1 }, { label: '4:3', value: 4 / 3 }, { label: '3:4', value: 3 / 4 },
+    { label: '3:2', value: 3 / 2 }, { label: '2:3', value: 2 / 3 }, { label: '16:9', value: 16 / 9 },
+    { label: '9:16', value: 9 / 16 }, { label: '21:9', value: 21 / 9 }
+  ];
+  return supported.reduce((best, candidate) =>
+    Math.abs(Math.log(ratio / candidate.value)) < Math.abs(Math.log(ratio / best.value)) ? candidate : best
+  ).label;
+}
+
+// Imagem de uma cena: OpenRouter FLUX.2 Pro (se configurado) + demais provedores/fallbacks.
 async function generateSceneImage({ prompt, style, width = 1024, height = 576 }) {
   const errors = [];
   const cleanScenePrompt = String(prompt || '')
@@ -561,6 +582,55 @@ async function generateSceneImage({ prompt, style, width = 1024, height = 576 })
     .trim()
     .slice(0, 340);
   const fullPrompt = `${cleanScenePrompt}, masterpiece cinematic scene, rich lighting, no text, no watermark`.slice(0, 390);
+
+  // When the server-side key is configured, prefer OpenRouter's dedicated Image API.
+  const openRouterKey = String(process.env.OPENROUTER_API_KEY || '').trim();
+  if (openRouterKey) {
+    const model = DEFAULT_OPENROUTER_IMAGE_MODEL;
+    try {
+      const response = await fetch(OPENROUTER_IMAGE_API_URL, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${openRouterKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://dubai-pro.vercel.app',
+          'X-OpenRouter-Title': 'DubAI PRO'
+        },
+        body: JSON.stringify({
+          model,
+          prompt: fullPrompt,
+          n: 1,
+          aspect_ratio: openRouterImageAspectRatio(width, height),
+          output_format: 'jpeg'
+        }),
+        signal: AbortSignal.timeout(45000)
+      });
+      const payload = await response.json().catch(() => null);
+      if (response.ok) {
+        const image = payload && Array.isArray(payload.data) ? payload.data[0] : null;
+        const imageBase64 = image && typeof image.b64_json === 'string' ? image.b64_json : '';
+        if (/^[A-Za-z0-9+/]+={0,2}$/.test(imageBase64) && imageBase64.length >= 1000 && imageBase64.length <= 4_000_000) {
+          const reportedMime = String(image.media_type || '').toLowerCase();
+          const mime = ['image/jpeg', 'image/png', 'image/webp'].includes(reportedMime) ? reportedMime : 'image/jpeg';
+          const rawCost = payload && payload.usage && payload.usage.cost;
+          const costUsd = Number(rawCost);
+          return {
+            imageBase64,
+            mime,
+            model: `openrouter/${model}`,
+            ...(rawCost !== undefined && rawCost !== null && Number.isFinite(costUsd) && costUsd >= 0 ? { costUsd } : {})
+          };
+        }
+        errors.push(`openrouter/${model}: resposta sem uma imagem Base64 válida`);
+      } else {
+        const providerMessage = String(payload && payload.error && payload.error.message || '').replaceAll(openRouterKey, '[redacted]').slice(0, 160);
+        errors.push(`openrouter/${model}: HTTP ${response.status}${providerMessage ? ` — ${providerMessage}` : ''}`);
+      }
+    } catch (e) {
+      const safeMessage = String(e && e.message || e).replaceAll(openRouterKey, '[redacted]').slice(0, 140);
+      errors.push(`openrouter/${model}: ${safeMessage}`);
+    }
+  }
 
   if (canUseOfficialOpenAI()) {
     const openai = makeOpenAI();
@@ -4439,7 +4509,7 @@ async function fetchYoutubeClipMp4Segment({ videoId = '', url = '', startSec = 0
 
 module.exports = {
   TTS_VOICES, mockScript, mockCreateFull, mockDubResult,
-  generateWithOpenAI, generateCreateFull, generateSceneImage, lookupIceAndFireCharacters, generateCreateSceneVideo, startCreateSceneVideo, pollCreateSceneVideo, consumeCreateSceneVideoRequest, dubWithOpenAI, enhanceScript,
+  generateWithOpenAI, generateCreateFull, generateSceneImage, hasOpenRouterImageApiKey, lookupIceAndFireCharacters, generateCreateSceneVideo, startCreateSceneVideo, pollCreateSceneVideo, consumeCreateSceneVideoRequest, dubWithOpenAI, enhanceScript,
   generateAvatarPortrait, generateAvatarScript, generateAvatarVideo, detectAvatarFaceLandmarks,
   transcribeClipSegment, analyzeViralClips, extractYoutubeVideoId, fetchYoutubeVideoInfoAndStream, fetchVideoStreamChunk, fetchYoutubeClipMp4Segment,
   chatWithFallback, ttsWithFallback, runTtsProviderChain, isEdgeTtsHandshakeFailure,

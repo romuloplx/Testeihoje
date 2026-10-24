@@ -577,6 +577,7 @@ input[type="range"]{
       </label>
       <div class="hint" style="margin:7px 0 0 27px;line-height:1.5">Opcional: envia cada imagem e a ação da cena ao Tencent HunyuanVideo 1.5 (clipe de 5 s em 720p) e incorpora movimento real ao vídeo, mantendo narração, música e legendas. Pode consumir créditos/cota do TokenHub; clipes curtos podem repetir em cenas com fala longa. Requer TENCENT_TOKENHUB_API_KEY no servidor e modelo/cobrança HunyuanVideo ativados no TokenHub. Se a geração falhar, a cena usa o render atual.</div>
     </div>
+    <div class="hint" style="margin:4px 0 12px">🖼️ Imagens das cenas: o FLUX.2 Pro via OpenRouter é priorizado quando OPENROUTER_API_KEY estiver configurada no servidor. A cobrança é por megapixel (cerca de US$ 0,03/MP); sem a chave, o app mantém os provedores/fallbacks atuais.</div>
 
     <button class="primary" id="createFullVideoBtn" onclick="createAndBuildVideo()" style="font-size:15px;padding:15px">🎬 Criar História & Vídeo Completo (Personagens + Cenários Vivos)</button>
     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
@@ -5384,7 +5385,19 @@ function makeKenBurnsDrawer(scenes, opts={}){
   return draw;
 }
 
-// Busca imagem da cena combinando API Backend (Gemini 3.1 + Unorouter Flux.2/SDXL) + Geração Direta Flux no Navegador em paralelo!
+// Consulta apenas um indicador booleano; a chave OpenRouter nunca sai do servidor.
+let _sceneImageProviderConfigPromise = null;
+async function hasConfiguredOpenRouterSceneImages(){
+  if(!_sceneImageProviderConfigPromise){
+    _sceneImageProviderConfigPromise = fetch('/api/scene-image', { method: 'GET', cache: 'no-store' })
+      .then(r => r.ok ? r.json() : {})
+      .then(data => !!(data && data.openrouterImageConfigured))
+      .catch(() => false);
+  }
+  return _sceneImageProviderConfigPromise;
+}
+
+// OpenRouter ganha prioridade quando configurado; sem chave, preserva o fallback direto rápido.
 async function fetchSceneImage(promptOrScene, style, w=896, h=504){
   const promptText = typeof promptOrScene === 'string'
     ? promptOrScene
@@ -5403,6 +5416,14 @@ async function fetchSceneImage(promptOrScene, style, w=896, h=504){
     }
     throw new Error('sem imagem backend');
   })();
+
+  if(await hasConfiguredOpenRouterSceneImages()){
+    try { return await backendTask; }
+    catch(_){
+      try { return await fetchFreeAiImageDirect(promptText, style, w, h); }
+      catch(__){ return null; }
+    }
+  }
 
   const directTask = (async () => {
     await new Promise(res => setTimeout(res, 1400));

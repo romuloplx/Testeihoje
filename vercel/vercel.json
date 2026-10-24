@@ -14,6 +14,9 @@
     },
     "api/create.js": {
       "maxDuration": 90
+    },
+    "api/scene-image.js": {
+      "maxDuration": 90
     }
   }
 }
