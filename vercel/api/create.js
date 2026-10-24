@@ -1,11 +1,11 @@
-const { mockCreateFull, generateCreateFull, generateCreateSceneVideo, getBody, send } = require('./lib/ai');
+const { mockCreateFull, generateCreateFull, startCreateSceneVideo, pollCreateSceneVideo, getBody, send } = require('./lib/ai');
 
 async function sendSceneVideo(res, clip) {
   const buffer = clip.buffer;
   res.statusCode = 200;
   res.setHeader('Content-Type', clip.mime || 'video/mp4');
   res.setHeader('Cache-Control', 'no-store, private');
-  res.setHeader('X-AI-Video-Provider', clip.provider || 'gemini-omni-1.1-flash');
+  res.setHeader('X-AI-Video-Provider', clip.provider || 'tencent/hy-video-v1.5');
   if (typeof res.write !== 'function') {
     res.setHeader('Content-Length', String(buffer.length));
     return res.end(buffer);
@@ -30,19 +30,25 @@ module.exports = async (req, res) => {
   try {
     if (req.method !== 'POST') return send(res, 405, { error: 'Método não permitido. Use POST.' });
     const body = await getBody(req);
-    if (body.action === 'scene-video') {
+    if (body.action === 'scene-video' || body.action === 'scene-video-status') {
       try {
-        const forwardedFor = String((req.headers || {})['x-forwarded-for'] || '').split(',')[0].trim();
-        const clientKey = String(req.ip || (req.headers || {})['x-real-ip'] || forwardedFor || (req.socket && req.socket.remoteAddress) || 'unknown');
-        const clip = await generateCreateSceneVideo({ ...body, clientKey });
-        return await sendSceneVideo(res, clip);
+        res.setHeader('Cache-Control', 'no-store, private');
+        if (body.action === 'scene-video') {
+          const forwardedFor = String((req.headers || {})['x-forwarded-for'] || '').split(',')[0].trim();
+          const clientKey = String(req.ip || (req.headers || {})['x-real-ip'] || forwardedFor || (req.socket && req.socket.remoteAddress) || 'unknown');
+          const task = await startCreateSceneVideo({ ...body, clientKey });
+          return send(res, 202, task);
+        }
+        const result = await pollCreateSceneVideo({ taskId: body.taskId });
+        if (!result.done) return send(res, 202, result);
+        return await sendSceneVideo(res, result);
       } catch (e) {
         if (res.headersSent) {
           if (typeof res.destroy === 'function') res.destroy(e);
           return;
         }
         if (e.retryAfterSeconds) res.setHeader('Retry-After', String(e.retryAfterSeconds));
-        return send(res, Number(e.status) || 502, { error: e.message || 'Falha ao gerar o clipe com Gemini Omni.' });
+        return send(res, Number(e.status) || 502, { error: e.message || 'Falha ao gerar o clipe com HunyuanVideo.' });
       }
     }
 

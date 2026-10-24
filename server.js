@@ -304,17 +304,23 @@ app.delete('/api/projects/:id', (req, res) => {
 app.post('/api/create', async (req, res) => {
   try {
     const body = req.body || {};
-    if (body.action === 'scene-video') {
+    if (body.action === 'scene-video' || body.action === 'scene-video-status') {
       try {
-        const forwardedFor = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
-        const clientKey = String(req.ip || req.headers['x-real-ip'] || forwardedFor || req.socket.remoteAddress || 'unknown');
-        const clip = await require('./vercel/api/lib/ai').generateCreateSceneVideo({ ...body, clientKey });
         res.set('Cache-Control', 'no-store, private');
-        res.set('X-AI-Video-Provider', clip.provider || 'gemini-omni-1.1-flash');
-        return res.type(clip.mime || 'video/mp4').send(clip.buffer);
+        const ai = require('./vercel/api/lib/ai');
+        if (body.action === 'scene-video') {
+          const forwardedFor = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+          const clientKey = String(req.ip || req.headers['x-real-ip'] || forwardedFor || req.socket.remoteAddress || 'unknown');
+          const task = await ai.startCreateSceneVideo({ ...body, clientKey });
+          return res.status(202).json(task);
+        }
+        const result = await ai.pollCreateSceneVideo({ taskId: body.taskId });
+        if (!result.done) return res.status(202).json(result);
+        res.set('X-AI-Video-Provider', result.provider || 'tencent/hy-video-v1.5');
+        return res.type(result.mime || 'video/mp4').send(result.buffer);
       } catch (e) {
         if (e.retryAfterSeconds) res.set('Retry-After', String(e.retryAfterSeconds));
-        return res.status(Number(e.status) || 502).json({ error: e.message || 'Falha ao gerar o clipe com Gemini Omni.' });
+        return res.status(Number(e.status) || 502).json({ error: e.message || 'Falha ao gerar o clipe com HunyuanVideo.' });
       }
     }
 

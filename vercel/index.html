@@ -563,9 +563,9 @@ input[type="range"]{
     <div style="margin:10px 0 12px;padding:11px 13px;border:1px solid #38bdf866;border-radius:11px;background:linear-gradient(135deg,#0b1726,#101127)">
       <label for="createAiMotion" style="display:flex;align-items:flex-start;gap:9px;margin:0;color:#bae6fd;font-weight:800;cursor:pointer">
         <input id="createAiMotion" type="checkbox" style="width:auto;flex:0 0 auto;margin:3px 0 0;padding:0;border:0;background:#111827;accent-color:#38bdf8;transform:scale(1.12)">
-        <span>🎥 Gerar clipes reais com Gemini Omni Flash</span>
+        <span>🎥 Gerar clipes reais com HunyuanVideo 1.5 (Tencent)</span>
       </label>
-      <div class="hint" style="margin:7px 0 0 27px;line-height:1.5">Opcional: envia cada imagem e descrição de cena ao Gemini e incorpora movimento real no vídeo, mantendo narração, música e legendas. Pode consumir cota/créditos da API; cada clipe é curto e pode repetir em cenas com fala longa. O render final acompanha o tempo do vídeo. Se o modelo falhar ou não estiver disponível, a cena continua com o render atual.</div>
+      <div class="hint" style="margin:7px 0 0 27px;line-height:1.5">Opcional: envia cada imagem e a ação da cena ao Tencent HunyuanVideo 1.5 (clipe de 5 s em 720p) e incorpora movimento real ao vídeo, mantendo narração, música e legendas. Pode consumir créditos/cota do TokenHub; clipes curtos podem repetir em cenas com fala longa. Requer TENCENT_TOKENHUB_API_KEY no servidor e modelo/cobrança HunyuanVideo ativados no TokenHub. Se a geração falhar, a cena usa o render atual.</div>
     </div>
 
     <button class="primary" id="createFullVideoBtn" onclick="createAndBuildVideo()" style="font-size:15px;padding:15px">🎬 Criar História & Vídeo Completo (Personagens + Cenários Vivos)</button>
@@ -4052,7 +4052,7 @@ async function encodeSmoothMp4WithWebCodecs({drawFn, audioBuffer, width=1280, he
   const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
 
   if(typeof drawFn.prepare === 'function') await drawFn.prepare();
-  // MODO C: cenas Gemini contêm fontes de vídeo vivas; registra em tempo real para sincronizar os frames animados com a locução.
+  // MODO C: cenas com clipes HunyuanVideo usam fontes de vídeo vivas; sincroniza os frames animados com a locução.
   if(drawFn.requiresRealtimeSources){
     drawFn(ctx, 0); // inicia a reprodução muda do primeiro clipe de cena
     await new Promise(r => setTimeout(r, 80));
@@ -5316,7 +5316,7 @@ async function sceneBitmapToJpegBase64(bitmap, maxSide = 640){
   const dataUrl = await new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result || ''));
-    reader.onerror = () => reject(new Error('Falha ao codificar a imagem para o Gemini.'));
+    reader.onerror = () => reject(new Error('Falha ao codificar a imagem de referência para o vídeo.'));
     reader.readAsDataURL(jpeg);
   });
   const comma = dataUrl.indexOf(',');
@@ -5339,7 +5339,7 @@ function waitForGeneratedSceneVideo(video, timeoutMs = 30000){
     };
     const onError = () => {
       cleanup();
-      reject(new Error('O navegador não conseguiu abrir o clipe MP4 do Gemini.'));
+      reject(new Error('O navegador não conseguiu abrir o clipe MP4 gerado para a cena.'));
     };
     video.addEventListener('loadeddata', onReady);
     video.addEventListener('canplay', onReady);
@@ -5370,7 +5370,7 @@ async function loadGeneratedSceneVideo(blob){
   }
 }
 
-async function requestGeminiOmniSceneVideo(scene, stylePrompt, format){
+async function requestHunyuanSceneVideo(scene, stylePrompt){
   const imageBase64 = await sceneBitmapToJpegBase64(scene.imgBitmap);
   const beatActions = Array.isArray(scene.beats)
     ? scene.beats.map(beat => String(beat && beat.action || '').trim()).filter(Boolean).slice(0, 3)
@@ -5380,7 +5380,15 @@ async function requestGeminiOmniSceneVideo(scene, stylePrompt, format){
     .filter(Boolean)
     .join(' | ')
     .slice(0, 1200);
-  const response = await fetch('/api/create', {
+  const parseError = async (response, fallback) => {
+    try{
+      const result = await response.json();
+      if(result && result.error) return String(result.error);
+    }catch(_){}
+    return `${fallback} HTTP ${response.status}`;
+  };
+
+  const startResponse = await fetch('/api/create', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -5388,24 +5396,65 @@ async function requestGeminiOmniSceneVideo(scene, stylePrompt, format){
       prompt: motionPrompt,
       imageBase64,
       imageMime: 'image/jpeg',
-      stylePrompt: String(stylePrompt || ''),
-      aspectRatio: format === '9:16' ? '9:16' : '16:9'
+      stylePrompt: String(stylePrompt || '')
     }),
-    signal: AbortSignal.timeout(280000)
+    signal: AbortSignal.timeout(45000)
   });
-  if(!response.ok){
-    let message = `Gemini Omni retornou HTTP ${response.status}`;
-    try{
-      const result = await response.json();
-      if(result && result.error) message = result.error;
-    }catch(_){}
-    throw new Error(message);
+  if(!startResponse.ok){
+    throw new Error(await parseError(startResponse, 'HunyuanVideo não conseguiu iniciar a geração.'));
   }
-  const rawBlob = await response.blob();
-  if(!rawBlob || rawBlob.size < 1000) throw new Error('Gemini Omni devolveu um clipe vazio.');
-  const mime = (response.headers.get('content-type') || rawBlob.type || 'video/mp4').split(';')[0];
-  const videoBlob = mime === 'video/mp4' ? rawBlob : new Blob([rawBlob], { type:'video/mp4' });
-  return { ...(await loadGeneratedSceneVideo(videoBlob)), blob:videoBlob, provider:response.headers.get('x-ai-video-provider') || 'gemini-omni-1.1-flash' };
+  const task = await startResponse.json();
+  if(!task || !task.taskId) throw new Error('HunyuanVideo não devolveu o identificador da tarefa.');
+
+  // O TokenHub gera de forma assíncrona; consultar em chamadas curtas evita manter uma Function da Vercel aberta por minutos.
+  const deadline = Date.now() + 300000;
+  let lastTransientError = '';
+  while(Date.now() < deadline){
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    if(Date.now() >= deadline) break;
+    let pollResponse;
+    try{
+      pollResponse = await fetch('/api/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'scene-video-status', taskId: task.taskId }),
+        signal: AbortSignal.timeout(35000)
+      });
+    }catch(e){
+      lastTransientError = String(e && e.message || e || 'erro de rede').slice(0, 120);
+      continue;
+    }
+
+    if(pollResponse.status === 429 || pollResponse.status === 503 || pollResponse.status === 504){
+      const transientMessage = await parseError(pollResponse, 'Falha temporária consultando HunyuanVideo.');
+      if(pollResponse.status === 429 && /account exception|arrears|depleted|expired|suspended|access denied|not subscribed|billing|credit|crédito|créditos/i.test(transientMessage)){
+        throw new Error(transientMessage);
+      }
+      lastTransientError = transientMessage;
+      continue;
+    }
+    const contentType = (pollResponse.headers.get('content-type') || '').toLowerCase();
+    if(contentType.includes('application/json')){
+      const status = await pollResponse.json().catch(() => ({}));
+      if(!pollResponse.ok) throw new Error(status.error || `HunyuanVideo retornou HTTP ${pollResponse.status}`);
+      if(status.status === 'queued' || status.status === 'running' || status.status === 'pending' || status.status === 'processing'){
+        const progress = document.getElementById('videoBuildMsg');
+        if(progress) progress.textContent = status.status === 'queued'
+          ? '⏳ HunyuanVideo: clipe na fila de geração...'
+          : '⏳ HunyuanVideo: animando a cena (5 s em 720p)...';
+        continue;
+      }
+      if(status.error) throw new Error(status.error);
+      throw new Error('HunyuanVideo devolveu uma resposta inesperada ao consultar a tarefa.');
+    }
+    if(!pollResponse.ok) throw new Error(`HunyuanVideo retornou HTTP ${pollResponse.status}`);
+    const rawBlob = await pollResponse.blob();
+    if(!rawBlob || rawBlob.size < 1000) throw new Error('HunyuanVideo devolveu um clipe vazio.');
+    const mime = (pollResponse.headers.get('content-type') || rawBlob.type || 'video/mp4').split(';')[0];
+    const videoBlob = mime === 'video/mp4' ? rawBlob : new Blob([rawBlob], { type:'video/mp4' });
+    return { ...(await loadGeneratedSceneVideo(videoBlob)), blob:videoBlob, provider:pollResponse.headers.get('x-ai-video-provider') || 'tencent/hy-video-v1.5' };
+  }
+  throw new Error(`Tempo esgotado esperando o HunyuanVideo finalizar${lastTransientError ? `: ${lastTransientError}` : ''}.`);
 }
 
 async function fetchSceneAudio(text,voice,emotion=''){
@@ -5443,7 +5492,7 @@ async function buildCreateVideo(){
   let aiMotionClipCount = 0;
   let aiMotionFailures = [];
 
-  btn.disabled=true; btn.textContent=useAiMotion ? '⏳ Gemini Omni: preparando clipes de vídeo...' : '⏳ Produzindo história animada completa...';
+  btn.disabled=true; btn.textContent=useAiMotion ? '⏳ HunyuanVideo: preparando clipes de vídeo...' : '⏳ Produzindo história animada completa...';
   const prog=document.getElementById('videoBuildProgress');
   prog.classList.remove('hidden');
   $('#createProgress').classList.add('show');
@@ -5473,7 +5522,7 @@ async function buildCreateVideo(){
       document.getElementById('videoBuildFill').style.width = pct + '%';
       setProgress('createProgressFill', 35 + Math.round((i / d.scenes.length) * 20));
 
-      // O clipe Gemini usa o plano aberto como referência; o modo original continua criando os dois ângulos.
+      // O clipe HunyuanVideo usa o plano aberto como referência; o modo original continua criando os dois ângulos.
       const [mainBmp, actBmp] = await Promise.all([
         fetchSceneImage(s.visual || s.title, style, imgDim.w, imgDim.h).then(im => im || placeholderBitmap(s, i)),
         !useAiMotion && s.actionVisual
@@ -5501,12 +5550,12 @@ async function buildCreateVideo(){
       for(let i = 0; i < scenes.length; i++){
         const scene = scenes[i];
         if(scene.videoEl) continue; // reutiliza o clipe já gerado, sem uma nova chamada paga
-        document.getElementById('videoBuildMsg').textContent = `🎥 Gemini Omni Flash está animando a Cena ${i+1} de ${scenes.length} (“${scene.locationName||scene.title}”)...`;
+        document.getElementById('videoBuildMsg').textContent = `🎥 HunyuanVideo 1.5 (Tencent) está animando a Cena ${i+1} de ${scenes.length} (“${scene.locationName||scene.title}”)...`;
         const pct = Math.round(39 + ((i + 0.15) / scenes.length) * 13);
         document.getElementById('videoBuildFill').style.width = pct + '%';
         setProgress('createProgressFill', 55 + Math.round((i / scenes.length) * 8));
         try{
-          const generated = await requestGeminiOmniSceneVideo(scene, d.artStylePrompt || style, fmt);
+          const generated = await requestHunyuanSceneVideo(scene, d.artStylePrompt || style);
           scene.aiMotionVideoBlob = generated.blob;
           scene.aiMotionVideoEl = generated.video;
           scene.aiMotionVideoUrl = generated.url;
@@ -5517,7 +5566,7 @@ async function buildCreateVideo(){
           const message = String(videoErr && videoErr.message || videoErr || 'falha desconhecida');
           aiMotionFailures.push(`Cena ${i+1}: ${message}`);
           scene.videoEl = null; // usa o render local para esta cena e não interrompe o projeto
-          if(/GEMINI_API_KEY não está configurada|Gemini Omni HTTP (401|403|404|429|5\d\d)|limite temporário|tempo esgotado|Failed to fetch|fetch failed|NetworkError|AbortError|aborted/i.test(message)){
+          if(/TENCENT_TOKENHUB_API_KEY não está configurada|HunyuanVideo HTTP (401|403|404|429|5\d\d)|limite temporário|tempo esgotado|Failed to fetch|fetch failed|NetworkError|AbortError|aborted/i.test(message)){
             for(let j = i + 1; j < scenes.length; j++){
               aiMotionFailures.push(`Cena ${j+1}: não tentada após falha do provedor.`);
             }
@@ -5650,7 +5699,7 @@ async function buildCreateVideo(){
     sceneAssets = scenes.map(s => ({ title: s.title, imgBitmap: s.imgBitmap }));
     const wrap = document.getElementById('createdVideoWrap');
     wrap.classList.remove('hidden');
-    const aiMotionBanner = useAiMotion ? ` • Gemini Omni ${aiMotionClipCount}/${scenes.length} clipes` : '';
+    const aiMotionBanner = useAiMotion ? ` • HunyuanVideo ${aiMotionClipCount}/${scenes.length} clipes` : '';
     document.getElementById('createdVideoReadyBanner').textContent =
       `✅ Filme conectado pronto (${Math.round(master.totalDuration)}s • ${scenes.length} cenários${aiMotionBanner} • ${actors.length ? 'Narrador + ' + actors.map(a=>a.name).join(' & ') : 'Narração'} • formato .${ext.toUpperCase()})!`;
 
@@ -5658,7 +5707,7 @@ async function buildCreateVideo(){
       ? `✅ Vídeo pronto para assistir e baixar! (${scenes.length} cenas • vozes: ${[...voiceProviders].join(', ') || 'IA'})`
       : '✅ Vídeo montado com legendas e trilha sincronizadas!';
     const motionSummary = useAiMotion
-      ? (aiMotionClipCount > 0 ? `Clipes com Gemini Omni Flash: ${aiMotionClipCount}/${scenes.length}.` : 'Gemini Omni não gerou clipes; usei o render atual.')
+      ? (aiMotionClipCount > 0 ? `Clipes com HunyuanVideo 1.5 (Tencent): ${aiMotionClipCount}/${scenes.length}.` : 'HunyuanVideo não gerou clipes; usei o render atual.')
       : '';
     const motionWarning = aiMotionFailures.length ? ` Aviso: ${aiMotionFailures[0].slice(0, 180)}` : '';
     const summaryMsg = [voiceSummary, motionSummary].filter(Boolean).join(' ') + motionWarning + ' Clique no botão verde abaixo para baixar.';

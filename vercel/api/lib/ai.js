@@ -668,48 +668,71 @@ async function generateSceneImage({ prompt, style, width = 1024, height = 576 })
   return { error: errors.join(' | ') || 'nenhum provedor de imagem respondeu' };
 }
 
-// Gerador real de clipes para a aba Criar: Gemini Omni Flash image-to-video.
-// A chamada é opt-in no frontend; o limite por IP reduz consumo acidental da chave compartilhada.
-const GEMINI_OMNI_VIDEO_MODEL = 'gemini-omni-1.1-flash';
-const GEMINI_OMNI_VIDEO_WINDOW_MS = 60 * 60 * 1000;
-const GEMINI_OMNI_VIDEO_MAX_PER_WINDOW = 14;
-const _geminiOmniVideoRequests = new Map();
+// Gerador real de clipes para a aba Criar: Tencent HunyuanVideo 1.5 image-to-video.
+// Requer uma chave TokenHub guardada somente no servidor.
+const CREATE_SCENE_VIDEO_WINDOW_MS = 60 * 60 * 1000;
+const CREATE_SCENE_VIDEO_MAX_PER_WINDOW = 10;
+const _createSceneVideoRequests = new Map();
+const TENCENT_HUNYUAN_VIDEO_MODEL = 'hy-video-v1.5';
 
-function consumeGeminiOmniVideoRequest(clientKey = 'unknown', now = Date.now()) {
+function consumeCreateSceneVideoRequest(clientKey = 'unknown', now = Date.now()) {
   const key = String(clientKey || 'unknown').trim().slice(0, 120) || 'unknown';
-  let entry = _geminiOmniVideoRequests.get(key);
-  if (!entry || now - entry.startedAt >= GEMINI_OMNI_VIDEO_WINDOW_MS) {
+  let entry = _createSceneVideoRequests.get(key);
+  if (!entry || now - entry.startedAt >= CREATE_SCENE_VIDEO_WINDOW_MS) {
     entry = { startedAt: now, count: 0 };
   }
-  if (entry.count >= GEMINI_OMNI_VIDEO_MAX_PER_WINDOW) {
+  if (entry.count >= CREATE_SCENE_VIDEO_MAX_PER_WINDOW) {
     return {
       ok: false,
-      retryAfterSeconds: Math.max(1, Math.ceil((entry.startedAt + GEMINI_OMNI_VIDEO_WINDOW_MS - now) / 1000))
+      retryAfterSeconds: Math.max(1, Math.ceil((entry.startedAt + CREATE_SCENE_VIDEO_WINDOW_MS - now) / 1000))
     };
   }
   entry.count += 1;
-  _geminiOmniVideoRequests.set(key, entry);
-  if (_geminiOmniVideoRequests.size > 5000) {
-    for (const [ip, value] of _geminiOmniVideoRequests) {
-      if (now - value.startedAt >= GEMINI_OMNI_VIDEO_WINDOW_MS) _geminiOmniVideoRequests.delete(ip);
+  _createSceneVideoRequests.set(key, entry);
+  if (_createSceneVideoRequests.size > 5000) {
+    for (const [ip, value] of _createSceneVideoRequests) {
+      if (now - value.startedAt >= CREATE_SCENE_VIDEO_WINDOW_MS) _createSceneVideoRequests.delete(ip);
     }
   }
-  return { ok: true, remaining: GEMINI_OMNI_VIDEO_MAX_PER_WINDOW - entry.count };
+  return { ok: true, remaining: CREATE_SCENE_VIDEO_MAX_PER_WINDOW - entry.count };
 }
 
-async function generateCreateSceneVideo({
+function tokenHubVideoBase() {
+  const configured = String(process.env.TENCENT_TOKENHUB_BASE_URL || 'https://tokenhub-intl.tencentcloudmaas.com/v1')
+    .trim().replace(/\/+$/, '');
+  return /\/v1$/i.test(configured) ? configured : `${configured}/v1`;
+}
+
+function parseTokenHubJson(raw, label) {
+  try { return JSON.parse(raw || '{}'); }
+  catch (_) { throw Object.assign(new Error(`HunyuanVideo retornou uma resposta inválida em ${label}.`), { status: 502 }); }
+}
+
+function tokenHubErrorMessage(result, raw) {
+  return String(
+    (result && result.error && (result.error.message || result.error.code)) ||
+    (result && (result.message || result.msg)) || raw || 'falha no provedor'
+  ).slice(0, 300);
+}
+
+function getTokenHubApiKey() {
+  const apiKey = String(process.env.TENCENT_TOKENHUB_API_KEY || '').trim();
+  if (!apiKey) {
+    throw Object.assign(new Error('TENCENT_TOKENHUB_API_KEY não está configurada no servidor para gerar clipes HunyuanVideo.'), { status: 503 });
+  }
+  return apiKey;
+}
+
+const waitForCreateSceneVideo = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+async function startCreateSceneVideo({
   prompt,
   imageBase64,
   imageMime = 'image/jpeg',
   stylePrompt = '',
-  aspectRatio = '16:9',
   clientKey = 'unknown'
 } = {}) {
-  const apiKey = String(process.env.GEMINI_API_KEY || '').trim();
-  if (!apiKey) {
-    throw Object.assign(new Error('GEMINI_API_KEY não está configurada para gerar clipes Gemini Omni.'), { status: 503 });
-  }
-
+  const apiKey = getTokenHubApiKey();
   const cleanPrompt = String(prompt || '').replace(/\s+/g, ' ').trim().slice(0, 1200);
   if (!cleanPrompt) throw Object.assign(new Error('Descreva a ação da cena para gerar o clipe.'), { status: 400 });
 
@@ -723,82 +746,143 @@ async function generateCreateSceneVideo({
     throw Object.assign(new Error('A imagem de referência ficou grande demais. Reduza a resolução e tente novamente.'), { status: 413 });
   }
 
-  const safeMime = /^image\/(jpeg|png|webp)$/i.test(String(imageMime || '')) ? String(imageMime).toLowerCase() : 'image/jpeg';
-  const safeRatio = aspectRatio === '9:16' ? '9:16' : '16:9';
+  const safeMime = /^image\/(jpeg|png)$/i.test(String(imageMime || '')) ? String(imageMime).toLowerCase() : 'image/jpeg';
   const style = String(stylePrompt || '').replace(/\s+/g, ' ').trim().slice(0, 220);
-  const quota = consumeGeminiOmniVideoRequest(clientKey);
+  const quota = consumeCreateSceneVideoRequest(clientKey);
   if (!quota.ok) {
-    throw Object.assign(new Error(`Limite temporário de clipes Gemini atingido. Tente novamente em ${Math.ceil(quota.retryAfterSeconds / 60)} min.`), {
+    throw Object.assign(new Error(`Limite temporário de clipes HunyuanVideo atingido. Tente novamente em ${Math.ceil(quota.retryAfterSeconds / 60)} min.`), {
       status: 429,
       retryAfterSeconds: quota.retryAfterSeconds
     });
   }
 
-  const videoPrompt = [
-    'Animate the supplied storyboard image into one short, continuous cinematic shot.',
-    'Preserve the same characters, faces, clothing, location, composition and art style from the reference image.',
-    'Add natural character movement, environmental motion and a gentle cinematic camera move that fits the action.',
-    'Do not add scene cuts, written text, captions, subtitles, logos or watermarks.',
-    `Scene action: ${cleanPrompt}`,
+  const motionPrompt = [
+    'Create one coherent, cinematic image-to-video shot based on the supplied reference image.',
+    'Preserve the people, faces, clothing, setting, framing, and visual identity from the reference.',
+    'Use natural, clearly visible subject movement and smooth camera motion; keep anatomy and objects stable.',
+    'No cuts, transitions, written words, captions, logos, or watermarks.',
+    `Action: ${cleanPrompt}`,
     style ? `Visual style: ${style}` : ''
   ].filter(Boolean).join(' ').slice(0, 2200);
 
-  const baseUrl = gemBase().replace(/\/+$/, '');
+  const apiBase = tokenHubVideoBase();
   let response;
   try {
-    response = await fetch(`${baseUrl}/interactions`, {
+    response = await fetch(`${apiBase}/wand/hunyuan-video/generation`, {
       method: 'POST',
-      headers: gemHeaders(),
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: GEMINI_OMNI_VIDEO_MODEL,
-        input: [
-          { type: 'image', data: cleanImage, mime_type: safeMime },
-          { type: 'text', text: videoPrompt }
-        ],
-        generation_config: { video_config: { task: 'image_to_video' } },
-        response_format: { type: 'video', aspect_ratio: safeRatio, resolution: '720p' },
-        store: false
+        model: TENCENT_HUNYUAN_VIDEO_MODEL,
+        prompt: motionPrompt,
+        negative_prompt: 'blurry, low resolution, flicker, jitter, warped face, duplicate limbs, changing identity, text, subtitles, logo, watermark, scene cuts',
+        image: `data:${safeMime};base64,${cleanImage}`,
+        duration: 5,
+        revise: true
       }),
-      signal: AbortSignal.timeout(240000)
+      signal: AbortSignal.timeout(30000)
     });
   } catch (e) {
-    throw Object.assign(new Error(`Gemini Omni não respondeu a tempo: ${String(e.message || e).slice(0, 180)}`), { status: 504 });
+    throw Object.assign(new Error(`Não foi possível enviar a cena ao HunyuanVideo: ${String(e.message || e).slice(0, 180)}`), { status: 504 });
   }
 
   const raw = await response.text().catch(() => '');
+  const submitted = parseTokenHubJson(raw, 'envio');
+  if (!response.ok || submitted.status === 'failed' || submitted.error) {
+    throw Object.assign(new Error(`HunyuanVideo HTTP ${response.status}: ${tokenHubErrorMessage(submitted, raw)}`), {
+      status: response.status >= 400 && response.status < 500 ? response.status : 502
+    });
+  }
+  const taskId = String(submitted.task_id || '').trim();
+  if (!taskId) throw Object.assign(new Error('HunyuanVideo não devolveu o identificador da tarefa.'), { status: 502 });
+  return { taskId, status: 'queued', provider: `tencent/${TENCENT_HUNYUAN_VIDEO_MODEL}` };
+}
+
+async function downloadHunyuanTaskVideo(task) {
+  const videoUrl = String((Array.isArray(task.videos) && task.videos[0] && task.videos[0].url) || task.video_url || '').trim();
+  let parsedVideoUrl;
+  try { parsedVideoUrl = new URL(videoUrl); }
+  catch (_) { parsedVideoUrl = null; }
+  if (!parsedVideoUrl || parsedVideoUrl.protocol !== 'https:') {
+    throw Object.assign(new Error('HunyuanVideo concluiu a tarefa, mas não devolveu uma URL HTTPS válida para o MP4.'), { status: 502 });
+  }
+
+  let response;
+  try {
+    // A URL retornada pelo TokenHub é temporária e assinada; não encaminhe a chave TokenHub para ela.
+    response = await fetch(parsedVideoUrl.href, { signal: AbortSignal.timeout(45000) });
+  } catch (e) {
+    throw Object.assign(new Error(`Não foi possível baixar o MP4 gerado pelo HunyuanVideo: ${String(e.message || e).slice(0, 160)}`), { status: 502 });
+  }
   if (!response.ok) {
-    let detail = raw;
-    try {
-      const parsed = JSON.parse(raw || '{}');
-      detail = parsed.error && (parsed.error.message || parsed.error.status) || parsed.message || raw;
-    } catch (_) {}
-    throw Object.assign(new Error(`Gemini Omni HTTP ${response.status}: ${String(detail || 'falha no provedor').slice(0, 300)}`), { status: response.status >= 400 && response.status < 500 ? response.status : 502 });
+    throw Object.assign(new Error(`Falha ao baixar o clipe HunyuanVideo (HTTP ${response.status}).`), { status: 502 });
   }
-
-  let result;
-  try { result = JSON.parse(raw || '{}'); }
-  catch (_) { throw Object.assign(new Error('Gemini Omni retornou uma resposta inválida.'), { status: 502 }); }
-
-  const outputParts = [];
-  for (const step of Array.isArray(result.steps) ? result.steps : []) {
-    if (step && step.type === 'model_output' && Array.isArray(step.content)) outputParts.push(...step.content);
+  const declaredSize = Number(response.headers && response.headers.get('content-length') || 0);
+  if (declaredSize > 25 * 1024 * 1024) {
+    throw Object.assign(new Error('O MP4 retornado pelo HunyuanVideo excede o limite de tamanho de 25 MB.'), { status: 413 });
   }
-  const videoPart = outputParts.find(part => part && (
-    String(part.type || '').toLowerCase() === 'video' || /^video\//i.test(String(part.mime_type || ''))
-  ));
-  let encoded = (videoPart && (videoPart.data || videoPart.video_data)) || (result.output_video && result.output_video.data) || '';
-  encoded = String(encoded).replace(/^data:video\/[a-z0-9.+-]+;base64,/i, '').replace(/\s+/g, '');
-  if (!encoded) {
-    const status = String(result.status || '').trim();
-    throw Object.assign(new Error(`Gemini Omni não devolveu um clipe concluído${status ? ` (status: ${status})` : ''}.`), { status: 502 });
+  const buffer = Buffer.from(await response.arrayBuffer());
+  if (buffer.length > 25 * 1024 * 1024) {
+    throw Object.assign(new Error('O MP4 retornado pelo HunyuanVideo excede o limite de tamanho de 25 MB.'), { status: 413 });
   }
-
-  const buffer = Buffer.from(encoded, 'base64');
   const isMp4 = buffer.length > 1000 && buffer.subarray(0, 64).includes(Buffer.from('ftyp'));
   if (!isMp4) {
-    throw Object.assign(new Error('Gemini Omni respondeu, mas o arquivo recebido não é um MP4 válido.'), { status: 502 });
+    throw Object.assign(new Error('HunyuanVideo respondeu, mas o arquivo recebido não é um MP4 válido.'), { status: 502 });
   }
-  return { buffer, mime: 'video/mp4', provider: GEMINI_OMNI_VIDEO_MODEL };
+  return { done: true, buffer, mime: 'video/mp4', provider: `tencent/${TENCENT_HUNYUAN_VIDEO_MODEL}` };
+}
+
+async function pollCreateSceneVideo({ taskId } = {}) {
+  const apiKey = getTokenHubApiKey();
+  const safeTaskId = String(taskId || '').trim();
+  if (!/^[A-Za-z0-9._-]{1,200}$/.test(safeTaskId)) {
+    throw Object.assign(new Error('O identificador da tarefa HunyuanVideo está inválido.'), { status: 400 });
+  }
+
+  const apiBase = tokenHubVideoBase();
+  let response;
+  try {
+    response = await fetch(`${apiBase}/wand/hunyuan-video/tasks/${encodeURIComponent(safeTaskId)}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(20000)
+    });
+  } catch (e) {
+    throw Object.assign(new Error(`Não foi possível consultar o HunyuanVideo: ${String(e.message || e).slice(0, 160)}`), { status: 504 });
+  }
+
+  const raw = await response.text().catch(() => '');
+  const task = parseTokenHubJson(raw, 'consulta');
+  if (!response.ok) {
+    const message = tokenHubErrorMessage(task, raw);
+    throw Object.assign(new Error(`HunyuanVideo HTTP ${response.status}: ${message}`), {
+      status: response.status === 429 ? 429 : response.status >= 500 ? 503 : response.status,
+      retryAfterSeconds: Number(response.headers && response.headers.get('retry-after')) || undefined
+    });
+  }
+  const state = String(task.status || '').toLowerCase();
+  if (state === 'queued' || state === 'running' || state === 'pending' || state === 'processing' || state === 'in_progress') {
+    return { done: false, taskId: safeTaskId, status: state, provider: `tencent/${TENCENT_HUNYUAN_VIDEO_MODEL}` };
+  }
+  if (state === 'failed') {
+    throw Object.assign(new Error(`HunyuanVideo falhou: ${tokenHubErrorMessage(task, raw)}`), { status: 422 });
+  }
+  if (state !== 'succeeded' && state !== 'success' && state !== 'completed') {
+    throw Object.assign(new Error(`HunyuanVideo devolveu status desconhecido${state ? `: ${state}` : ''}.`), { status: 502 });
+  }
+  return downloadHunyuanTaskVideo(task);
+}
+
+// Compatibilidade para usos internos que prefiram aguardar em uma única chamada;
+// a rota web usa start/poll separados para não manter uma Function aberta por minutos.
+async function generateCreateSceneVideo(options = {}) {
+  const started = await startCreateSceneVideo(options);
+  const maxWaitMs = Math.max(1000, Math.min(295000, Number(options.maxWaitMs) || 245000));
+  const deadline = Date.now() + maxWaitMs;
+  while (Date.now() < deadline) {
+    const result = await pollCreateSceneVideo({ taskId: started.taskId });
+    if (result.done) return result;
+    await waitForCreateSceneVideo(Math.min(4000, Math.max(0, deadline - Date.now())));
+  }
+  throw Object.assign(new Error('Tempo esgotado esperando o HunyuanVideo finalizar.'), { status: 504 });
 }
 
 // Concatena múltiplos buffers de áudio sem corromper cabeçalhos RIFF/WAV (essencial em vídeos longos!)
@@ -4288,7 +4372,7 @@ async function fetchYoutubeClipMp4Segment({ videoId = '', url = '', startSec = 0
 
 module.exports = {
   TTS_VOICES, mockScript, mockCreateFull, mockDubResult,
-  generateWithOpenAI, generateCreateFull, generateSceneImage, generateCreateSceneVideo, consumeGeminiOmniVideoRequest, dubWithOpenAI, enhanceScript,
+  generateWithOpenAI, generateCreateFull, generateSceneImage, generateCreateSceneVideo, startCreateSceneVideo, pollCreateSceneVideo, consumeCreateSceneVideoRequest, dubWithOpenAI, enhanceScript,
   generateAvatarPortrait, generateAvatarScript, generateAvatarVideo, detectAvatarFaceLandmarks,
   transcribeClipSegment, analyzeViralClips, extractYoutubeVideoId, fetchYoutubeVideoInfoAndStream, fetchVideoStreamChunk, fetchYoutubeClipMp4Segment,
   chatWithFallback, ttsWithFallback, runTtsProviderChain, isEdgeTtsHandshakeFailure,
