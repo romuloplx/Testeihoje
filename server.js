@@ -523,7 +523,7 @@ app.post('/api/enhance', async (req, res) => {
   }
 });
 
-// TTS endpoint — cadeia de provedores (OpenAI → Neural HD → Gemini → Unorouter → Google)
+// TTS endpoint — cadeia de provedores (Neural HD → OpenAI → Gemini → Unorouter → Google/StreamElements)
 app.post('/api/tts', async (req, res) => {
   const { text, voice = 'onyx', lang = 'pt-BR', emotion = '' } = req.body;
   if (!text) return res.status(400).json({ error: 'Texto vazio' });

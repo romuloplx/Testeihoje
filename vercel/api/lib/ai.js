@@ -888,7 +888,7 @@ async function dubWithOpenAI({ audioBase64, audioMime = 'audio/wav', language, d
     }
     if (current) parts.push(current);
 
-    // Voz com cadeia de provedores (OpenAI → Gemini 3.1 Neural TTS → Unorouter → Google → StreamElements)
+    // Voz com fallback automático (Edge Neural HD → OpenAI → Gemini → Unorouter → Google → StreamElements para inglês)
     const audioParts = [];
     const usedProviders = new Set();
     for (const part of parts) {
@@ -2073,6 +2073,78 @@ async function ttsStreamElements({ text, voice = 'Brian' }) {
   return b;
 }
 
+async function ttsStreamElementsChunks({ text, voice = 'Brian' }) {
+  const clean = String(text || '').replace(/\s+/g, ' ').trim();
+  const chunks = [];
+  let start = 0;
+  while (start < clean.length) {
+    let end = Math.min(start + 1100, clean.length);
+    if (end < clean.length) {
+      const space = clean.lastIndexOf(' ', end);
+      if (space > start) end = space;
+    }
+    chunks.push(clean.slice(start, end).trim());
+    start = end;
+    while (clean[start] === ' ') start++;
+  }
+  const buffers = [];
+  for (const chunk of chunks) buffers.push(await ttsStreamElements({ text: chunk, voice }));
+  if (!buffers.length) throw new Error('texto vazio');
+  return Buffer.concat(buffers);
+}
+
+async function unorouterTTS({ text, voice = 'onyx' }) {
+  const keys = allValidUniKeys().filter(key => Date.now() >= (_uniKeyCooldown[key] || 0));
+  if (!keys.length) throw new Error('sem chave Unorouter disponível');
+  const input = String(text || '').trim().slice(0, 4096);
+  if (!input) throw new Error('texto vazio');
+  const voiceName = TTS_VOICES[voice] || 'alloy';
+  const models = [...new Set([...UNI_TTS_MODELS, 'tts-1'])];
+  const errors = [];
+
+  for (const key of keys) {
+    for (const model of models) {
+      try {
+        const response = await fetch(uniBase() + '/audio/speech', {
+          method: 'POST',
+          headers: uniHeaders(key),
+          body: JSON.stringify({ model, voice: voiceName, input, response_format: 'mp3' }),
+          signal: AbortSignal.timeout(25000)
+        });
+        if (!response.ok) {
+          const detail = (await response.text().catch(() => '')).slice(0, 120);
+          if (response.status === 401) {
+            _deadUniKeys.add(key);
+            errors.push(`${model}: HTTP 401`);
+            break;
+          }
+          if (response.status === 429 && /allows 1 request|too many requests/i.test(detail)) {
+            markUniRateWindow(key);
+            errors.push(`${model}: HTTP 429 (limite temporário)`);
+            break;
+          }
+          errors.push(`${model}: HTTP ${response.status}${detail ? ' ' + detail : ''}`);
+          continue;
+        }
+        const contentType = response.headers && response.headers.get('content-type') || '';
+        const buffer = Buffer.from(await response.arrayBuffer());
+        if (/application\/(?:json|problem\+json)/i.test(contentType)) {
+          errors.push(`${model}: resposta JSON inesperada`);
+          continue;
+        }
+        if (buffer.length < 250) {
+          errors.push(`${model}: áudio vazio/curto`);
+          continue;
+        }
+        return { buffer, provider: `unorouter/${model}` };
+      } catch (err) {
+        errors.push(`${model}: ${String(err && err.message || err).slice(0, 120)}`);
+      }
+    }
+  }
+  throw new Error(errors.join(' | ').slice(0, 500) || 'nenhum modelo TTS do Unorouter respondeu');
+}
+
 const TTS_LANGS = { 'pt-BR': 'pt-BR', pt: 'pt-BR', en: 'en-US', es: 'es-MX', fr: 'fr-FR', de: 'de-DE', it: 'it-IT', ja: 'ja-JP' };
 
 // Matriz de Vozes Humanas Neurais de Estúdio HD (Microsoft Azure Neural & DragonHD Multilingual — 24kHz 96kbps MP3, zero tom robótico!)
@@ -2122,7 +2194,17 @@ function sanitizeTextForHumanSSML(raw) {
     .trim();
 }
 
+const EDGE_TTS_HANDSHAKE_COOLDOWN_MS = 5 * 60 * 1000;
+let _edgeTtsUnavailableUntil = 0;
+
+function isEdgeTtsHandshakeFailure(err) {
+  return /Unexpected server response:\s*200\b/i.test(String(err && err.message || err || ''));
+}
+
 async function edgeNeuralTTS({ text, voice = 'onyx', lang = 'pt-BR' }) {
+  if (_edgeTtsUnavailableUntil > Date.now()) {
+    throw new Error('Edge TTS temporariamente pausado após falha no handshake WebSocket (HTTP 200)');
+  }
   const { MsEdgeTTS, OUTPUT_FORMAT } = require('msedge-tts');
   const locale = TTS_LANGS[lang] || 'pt-BR';
   const preset = EDGE_VOICE_PRESETS[voice] || EDGE_VOICE_PRESETS.onyx;
@@ -2180,56 +2262,139 @@ async function edgeNeuralTTS({ text, voice = 'onyx', lang = 'pt-BR' }) {
       } catch (err) {
         lastErr = err;
         try { tts.close(); } catch (_) {}
+        if (isEdgeTtsHandshakeFailure(err)) {
+          // HTTP 200 em vez de upgrade WebSocket não é transitório para esta tentativa:
+          // evita repetir a mesma conexão quatro vezes e segue para os outros provedores.
+          _edgeTtsUnavailableUntil = Date.now() + EDGE_TTS_HANDSHAKE_COOLDOWN_MS;
+          break;
+        }
         if (attempt < 3) await sleep(350 * (attempt + 1));
       }
     }
     if (!segSuccess) {
       throw lastErr || new Error('falha na síntese neural HD');
     }
+    _edgeTtsUnavailableUntil = 0;
   }
 
   if (!mp3Buffers.length) throw lastErr || new Error('áudio neural vazio');
   return { buffer: Buffer.concat(mp3Buffers), provider: `neural-hd/${lockedVoice}` };
 }
 
-// Voz com Dublador 100% Travado do Começo ao Fim (Microsoft Azure Neural Studio HD 24kHz na voz exata escolhida)
-async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR', emotion = '' }) {
+async function runTtsProviderChain(attempts = []) {
   const errors = [];
+  for (const attempt of attempts) {
+    const name = attempt && attempt.name || 'tts';
+    try {
+      const result = await attempt.run();
+      if (result && result.error) throw new Error(result.error);
+      let buffer = Buffer.isBuffer(result) ? result : result && result.buffer;
+      if (buffer && !Buffer.isBuffer(buffer)) buffer = Buffer.from(buffer);
+      if (!buffer || buffer.length < 250) throw new Error('áudio vazio/curto');
+      const details = Buffer.isBuffer(result) ? {} : result;
+      return { ...details, buffer, provider: details.provider || name };
+    } catch (err) {
+      errors.push(`${name}: ${String(err && err.message || err).slice(0, 300)}`);
+    }
+  }
+  if (!errors.length) errors.push('nenhum provedor TTS configurado');
+  return { error: errors.join(' | '), errors };
+}
 
-  // 1) Motor Principal com Dublador Travado (garante SEMPRE a mesma voz do início ao fim do vídeo, sem alternar entre provedores!)
-  try {
-    const edge = await edgeNeuralTTS({ text, voice, lang, emotion });
-    if (edge && edge.buffer && edge.buffer.length > 250) return edge;
-  } catch (e) {
-    errors.push('neural-hd: ' + e.message);
+// Voz com fallback real: Edge HD → OpenAI → Gemini → Unorouter → Google (e StreamElements para inglês).
+// Se o handshake WebSocket do Edge responder HTTP 200, ele entra em cooldown e os próximos trechos
+// seguem direto para outro provedor, em vez de repetir uma conexão que já falhou.
+async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR', emotion = '' } = {}, testProviders = null) {
+  const cleanText = String(text || '').trim();
+  if (!cleanText) return { error: 'texto vazio', errors: ['texto vazio'] };
+
+  // Injeção interna para testes unitários; as rotas HTTP não encaminham dados do usuário aqui.
+  if (testProviders && typeof testProviders === 'object') {
+    const attempts = [];
+    const injected = [
+      ['neural-hd', testProviders.edge],
+      ['openai/mock', testProviders.openai],
+      ['gemini-tts', testProviders.gemini],
+      ['unorouter-tts', testProviders.unorouter],
+      ['google-translate-tts', testProviders.google],
+      ['streamelements-tts', testProviders.streamElements]
+    ];
+    for (const [name, provider] of injected) {
+      if (typeof provider === 'function') {
+        attempts.push({ name, run: () => provider({ text: cleanText, voice, lang, emotion }) });
+      }
+    }
+    return runTtsProviderChain(attempts);
   }
 
-  // 2) OpenAI oficial apenas se configurada e caso o motor principal esteja inacessível
+  const attempts = [
+    { name: 'neural-hd', run: () => edgeNeuralTTS({ text: cleanText, voice, lang, emotion }) }
+  ];
+
+  // OpenAI oficial só entra quando há uma chave própria (não a chave do Unorouter).
   if (canUseOfficialOpenAI()) {
     for (const model of ['gpt-4o-mini-tts', 'tts-1-hd', 'tts-1']) {
-      try {
-        const openai = makeOpenAI();
-        const opts = {
-          model,
-          voice: TTS_VOICES[voice] || 'onyx',
-          input: String(text).slice(0, 4096),
-          response_format: 'mp3'
-        };
-        if (model === 'gpt-4o-mini-tts') {
-          opts.instructions = 'Fale como um dublador humano brasileiro autêntico, mantendo sempre o mesmo timbre, tom e cadência do início ao fim.';
+      attempts.push({
+        name: 'openai/' + model,
+        run: async () => {
+          if (!canUseOfficialOpenAI()) throw new Error('chave OpenAI indisponível');
+          const openai = makeOpenAI();
+          const opts = {
+            model,
+            voice: TTS_VOICES[voice] || 'onyx',
+            input: cleanText.slice(0, 4096),
+            response_format: 'mp3'
+          };
+          if (model === 'gpt-4o-mini-tts') {
+            opts.instructions = 'Fale como um dublador humano brasileiro autêntico, mantendo sempre o mesmo timbre, tom e cadência do início ao fim.';
+          }
+          try {
+            const speech = await openai.audio.speech.create(opts);
+            return { buffer: Buffer.from(await speech.arrayBuffer()), provider: 'openai/' + model };
+          } catch (err) {
+            if (err.status === 401) markOpenAi401();
+            throw err;
+          }
         }
-        const s = await openai.audio.speech.create(opts);
-        const b = Buffer.from(await s.arrayBuffer());
-        if (!b.length) throw new Error('áudio vazio');
-        return { buffer: b, provider: 'openai/' + model };
-      } catch (e) {
-        errors.push(`openai/${model}: ${(e.status ? 'HTTP ' + e.status + ' — ' : '')}${e.message}`);
-        if (e.status === 401) { markOpenAi401(); break; }
-      }
+      });
     }
   }
 
-  return { error: errors.join(' | '), errors };
+  if (process.env.GEMINI_API_KEY) {
+    attempts.push({
+      name: 'gemini-tts',
+      run: async () => {
+        const result = await geminiTTS(cleanText, voice, 20000, lang);
+        if (!result || result.error) throw new Error(result && result.error || 'sem áudio Gemini');
+        return result;
+      }
+    });
+  }
+
+  if (allValidUniKeys().length) {
+    attempts.push({ name: 'unorouter-tts', run: () => unorouterTTS({ text: cleanText, voice }) });
+  }
+
+  attempts.push({
+    name: 'google-translate-tts',
+    run: async () => ({
+      buffer: await ttsGoogle({ text: cleanText, lang: String(lang || 'pt-BR').split(/[-_]/)[0].toLowerCase() }),
+      provider: 'google-translate-tts'
+    })
+  });
+
+  if (/^en(?:[-_]|$)/i.test(String(lang || ''))) {
+    const streamVoice = ['nova', 'shimmer', 'coral', 'sage', 'alloy'].includes(voice) ? 'Amy' : 'Brian';
+    attempts.push({
+      name: 'streamelements-tts',
+      run: async () => ({
+        buffer: await ttsStreamElementsChunks({ text: cleanText, voice: streamVoice }),
+        provider: 'streamelements/' + streamVoice
+      })
+    });
+  }
+
+  return runTtsProviderChain(attempts);
 }
 
 // Leitura compatível do body (runtime antigo e novo do Vercel)
@@ -3993,6 +4158,7 @@ module.exports = {
   generateWithOpenAI, generateCreateFull, generateSceneImage, dubWithOpenAI, enhanceScript,
   generateAvatarPortrait, generateAvatarScript, generateAvatarVideo, detectAvatarFaceLandmarks,
   transcribeClipSegment, analyzeViralClips, extractYoutubeVideoId, fetchYoutubeVideoInfoAndStream, fetchVideoStreamChunk, fetchYoutubeClipMp4Segment,
-  chatWithFallback, ttsWithFallback, chatViaPollinations, ttsGoogle, ttsStreamElements,
+  chatWithFallback, ttsWithFallback, runTtsProviderChain, isEdgeTtsHandshakeFailure,
+  chatViaPollinations, ttsGoogle, ttsStreamElements,
   probeOpenAI, fullPipelineProbe, candidatesProbe, unorouterProbe, unorouterVideoProbe, getBody, send
 };
