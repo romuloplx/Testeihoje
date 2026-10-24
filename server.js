@@ -417,11 +417,11 @@ app.get('/api/scene-image', (req, res) => {
 app.post('/api/scene-image', async (req, res) => {
   try {
     res.set('Cache-Control', 'no-store, private');
-    const { prompt, style, width, height } = req.body || {};
+    const { prompt, style, width, height, references } = req.body || {};
     if (!prompt || !prompt.trim()) {
       return res.status(400).json({ error: 'Descreva a cena.' });
     }
-    const img = await require('./vercel/api/lib/ai').generateSceneImage({ prompt, style, width, height });
+    const img = await require('./vercel/api/lib/ai').generateSceneImage({ prompt, style, width, height, references });
     if (!img || !img.imageBase64) {
       return res.json({ imageBase64: null, mock: true, error: img && img.error, message: 'Geração de imagem falhou' + (img && img.error ? ` (${img.error})` : '') + ' — usando renderizador direto.' });
     }

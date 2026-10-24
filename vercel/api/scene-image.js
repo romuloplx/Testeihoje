@@ -11,9 +11,9 @@ module.exports = async (req, res) => {
       return send(res, 405, { error: 'Método não permitido. Use GET ou POST.' });
     }
 
-    const { prompt, style, width, height } = await getBody(req);
+    const { prompt, style, width, height, references } = await getBody(req);
     if (!prompt || !prompt.trim()) return send(res, 400, { error: 'Descreva a cena.' });
-    const img = await generateSceneImage({ prompt, style, width, height });
+    const img = await generateSceneImage({ prompt, style, width, height, references });
     if (!img || !img.imageBase64) {
       return send(res, 200, {
         imageBase64: null,

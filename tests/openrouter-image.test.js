@@ -79,6 +79,35 @@ test('OpenRouter FLUX.2 Pro is used first for video scene images and keeps its k
   }
 });
 
+test('OpenRouter uses sanitized character portraits as visual identity references', async () => {
+  configureOpenRouter();
+  const portrait = `data:image/jpeg;base64,${Buffer.alloc(300, 0x62).toString('base64')}`;
+  let requestBody;
+  global.fetch = async (_url, options = {}) => {
+    requestBody = JSON.parse(options.body);
+    return imageResponse(200, makeImagePayload());
+  };
+  try {
+    await generateSceneImage({
+      prompt: 'A menina e o inventor exploram um observatório antigo.',
+      style: 'animation', width: 896, height: 504,
+      references: [
+        { name: 'Luna', dataUrl: portrait },
+        { name: 'URL externa deve ser ignorada', dataUrl: 'https://attacker.example/portrait.jpg' }
+      ]
+    });
+    assert.equal(requestBody.input_references.length, 1);
+    assert.equal(requestBody.input_references[0].type, 'image_url');
+    assert.equal(requestBody.input_references[0].image_url.url, portrait);
+    assert.match(requestBody.prompt, /Luna/);
+    assert.match(requestBody.prompt, /identity anchors/);
+    assert.match(requestBody.prompt, /animated feature film/);
+    assert.doesNotMatch(JSON.stringify(requestBody), /attacker\.example/);
+  } finally {
+    restoreEnvironment();
+  }
+});
+
 test('OpenRouter image errors never expose the configured key', async () => {
   const key = 'unit-test-openrouter-key';
   configureOpenRouter(key);
@@ -122,10 +151,47 @@ test('scene-image GET exposes only whether the OpenRouter image key is configure
   }
 });
 
-test('Create prioritizes backend OpenRouter images and documents the server-side setup', () => {
+test('scene-image POST forwards approved portrait references and reports the billed amount', async () => {
+  const handler = require('../vercel/api/scene-image');
+  configureOpenRouter();
+  const portrait = `data:image/jpeg;base64,${Buffer.alloc(300, 0x63).toString('base64')}`;
+  let requestBody;
+  global.fetch = async (_url, options = {}) => {
+    requestBody = JSON.parse(options.body);
+    return imageResponse(200, makeImagePayload(0.037));
+  };
+  const res = {
+    headers: {}, statusCode: 0,
+    setHeader(name, value) { this.headers[name.toLowerCase()] = value; },
+    end(body) { this.body = body; }
+  };
+  try {
+    await handler({
+      method: 'POST',
+      body: {
+        prompt: 'Luna encontra um mapa nas ruínas.', style: 'cinematic', width: 896, height: 504,
+        references: [{ name: 'Luna', dataUrl: portrait }]
+      }
+    }, res);
+    const responseBody = JSON.parse(res.body);
+    assert.equal(res.statusCode, 200);
+    assert.equal(requestBody.input_references.length, 1);
+    assert.equal(responseBody.model, 'openrouter/black-forest-labs/flux.2-pro');
+    assert.equal(responseBody.costUsd, 0.037);
+    assert.equal(responseBody.imageBase64, makeImagePayload(0.037).data[0].b64_json);
+  } finally {
+    restoreEnvironment();
+  }
+});
+
+test('Create uses AI character portraits to anchor scene identity and displays actual image cost', () => {
   const html = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
   assert.match(html, /hasConfiguredOpenRouterSceneImages\(\)/);
-  assert.match(html, /if\(await hasConfiguredOpenRouterSceneImages\(\)\)/);
+  assert.match(html, /buildSceneCharacterReferences\(actors\)/);
+  assert.match(html, /hasAiPortrait: isAi/);
+  assert.match(html, /references: openRouterEnabled \? characterReferences : \[\]/);
   assert.match(html, /FLUX\.2 Pro via OpenRouter/);
   assert.match(html, /OPENROUTER_API_KEY/);
+  assert.match(html, /_createOpenRouterImageSpendUsd/);
+  assert.match(html, /O custo reportado aparece ao final do vídeo/);
 });

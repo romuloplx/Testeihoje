@@ -561,8 +561,9 @@ function hasOpenRouterImageApiKey() {
 }
 
 function openRouterImageAspectRatio(width, height) {
-  const w = Math.max(1, Number(width) || 1024);
-  const h = Math.max(1, Number(height) || 576);
+  const rawW = Number(width), rawH = Number(height);
+  const w = Number.isFinite(rawW) && rawW > 0 ? rawW : 1024;
+  const h = Number.isFinite(rawH) && rawH > 0 ? rawH : 576;
   const ratio = w / h;
   const supported = [
     { label: '1:1', value: 1 }, { label: '4:3', value: 4 / 3 }, { label: '3:4', value: 3 / 4 },
@@ -574,20 +575,62 @@ function openRouterImageAspectRatio(width, height) {
   ).label;
 }
 
+function normalizeOpenRouterImageReferences(references) {
+  if (!Array.isArray(references)) return [];
+  const result = [];
+  let totalEncodedLength = 0;
+  for (const reference of references.slice(0, 3)) {
+    const dataUrl = String(reference && (reference.dataUrl || reference.url) || '').trim();
+    const match = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/i.exec(dataUrl);
+    if (!match || match[2].length < 256 || match[2].length > 500_000) continue;
+    if (totalEncodedLength + match[2].length > 900_000) break;
+    totalEncodedLength += match[2].length;
+    const name = String(reference.name || '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 48);
+    result.push({ name, dataUrl });
+  }
+  return result;
+}
+
 // Imagem de uma cena: OpenRouter FLUX.2 Pro (se configurado) + demais provedores/fallbacks.
-async function generateSceneImage({ prompt, style, width = 1024, height = 576 }) {
+async function generateSceneImage({ prompt, style, width = 1024, height = 576, references = [] }) {
   const errors = [];
   const cleanScenePrompt = String(prompt || '')
     .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, 340);
-  const fullPrompt = `${cleanScenePrompt}, masterpiece cinematic scene, rich lighting, no text, no watermark`.slice(0, 390);
+    .slice(0, 850);
+  const styleHints = {
+    realistic: 'photorealistic 35mm cinema photography, natural skin and fabric texture',
+    cinematic: 'epic anamorphic cinema still, expressive film lighting and rich color grading',
+    animation: 'polished 3D animated feature film, expressive character acting and warm global illumination',
+    documentary: 'authentic documentary cinematography, natural light and grounded details',
+    images: 'premium illustrated concept art, painterly detail and a cohesive color palette'
+  };
+  const sceneReferences = normalizeOpenRouterImageReferences(references);
+  const identityHint = sceneReferences.length
+    ? `Use these character portrait references as identity anchors (${sceneReferences.map((reference, index) => `image ${index + 1}: ${reference.name || `character ${index + 1}`}`).join('; ')}). Preserve each character's face, age, skin tone, hair and signature clothing while changing pose naturally to fit the scene; place them in the described environment, not as portrait cutouts.`
+    : '';
+  const compositionHint = 'Premium cinematic frame, deliberate shot composition, clear focal subject, layered foreground/midground/background, believable perspective, natural faces and hands, controlled lighting, rich film color, no text, no logos, no watermark.';
+  const fullPrompt = [cleanScenePrompt, styleHints[style] || '', identityHint, compositionHint]
+    .filter(Boolean).join('. ').slice(0, 1500);
 
   // When the server-side key is configured, prefer OpenRouter's dedicated Image API.
   const openRouterKey = String(process.env.OPENROUTER_API_KEY || '').trim();
   if (openRouterKey) {
     const model = DEFAULT_OPENROUTER_IMAGE_MODEL;
     try {
+      const imageRequest = {
+        model,
+        prompt: fullPrompt,
+        n: 1,
+        aspect_ratio: openRouterImageAspectRatio(width, height),
+        output_format: 'jpeg'
+      };
+      if (sceneReferences.length) {
+        imageRequest.input_references = sceneReferences.map(reference => ({
+          type: 'image_url',
+          image_url: { url: reference.dataUrl }
+        }));
+      }
       const response = await fetch(OPENROUTER_IMAGE_API_URL, {
         method: 'POST',
         headers: {
@@ -596,13 +639,7 @@ async function generateSceneImage({ prompt, style, width = 1024, height = 576 })
           'HTTP-Referer': 'https://dubai-pro.vercel.app',
           'X-OpenRouter-Title': 'DubAI PRO'
         },
-        body: JSON.stringify({
-          model,
-          prompt: fullPrompt,
-          n: 1,
-          aspect_ratio: openRouterImageAspectRatio(width, height),
-          output_format: 'jpeg'
-        }),
+        body: JSON.stringify(imageRequest),
         signal: AbortSignal.timeout(45000)
       });
       const payload = await response.json().catch(() => null);
