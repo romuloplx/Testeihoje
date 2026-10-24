@@ -560,6 +560,14 @@ input[type="range"]{
       </div>
     </div>
 
+    <div style="margin:10px 0 12px;padding:11px 13px;border:1px solid #38bdf866;border-radius:11px;background:linear-gradient(135deg,#0b1726,#101127)">
+      <label for="createAiMotion" style="display:flex;align-items:flex-start;gap:9px;margin:0;color:#bae6fd;font-weight:800;cursor:pointer">
+        <input id="createAiMotion" type="checkbox" style="width:auto;flex:0 0 auto;margin:3px 0 0;padding:0;border:0;background:#111827;accent-color:#38bdf8;transform:scale(1.12)">
+        <span>🎥 Gerar clipes reais com Gemini Omni Flash</span>
+      </label>
+      <div class="hint" style="margin:7px 0 0 27px;line-height:1.5">Opcional: envia cada imagem e descrição de cena ao Gemini e incorpora movimento real no vídeo, mantendo narração, música e legendas. Pode consumir cota/créditos da API; cada clipe é curto e pode repetir em cenas com fala longa. O render final acompanha o tempo do vídeo. Se o modelo falhar ou não estiver disponível, a cena continua com o render atual.</div>
+    </div>
+
     <button class="primary" id="createFullVideoBtn" onclick="createAndBuildVideo()" style="font-size:15px;padding:15px">🎬 Criar História & Vídeo Completo (Personagens + Cenários Vivos)</button>
     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
       <button class="ghost" id="createBtn" onclick="createVideo(false)" style="flex:1;min-width:180px">📝 Gerar roteiro & personagens primeiro</button>
@@ -2518,6 +2526,7 @@ async function createVideo(silentAutoBuild = false){
         : `✅ História e personagens prontos (${data.provider||'IA'})! Clique em Renderizar Vídeo abaixo.`,'success');
     }
     $('#createScript').textContent = data.script || 'Roteiro criado';
+    releaseCreateSceneMotion(currentCreateData && currentCreateData.scenes);
     currentCreateData={
       title: data.title || prompt.slice(0,60),
       script: data.script || '',
@@ -3799,6 +3808,18 @@ let currentCreateData=null;
 let sceneAssets=[];
 let createdAudioURL=null, createdVideoURL=null;
 
+function releaseCreateSceneMotion(scenes){
+  const urls = new Set();
+  (Array.isArray(scenes) ? scenes : []).forEach(scene => {
+    const video = scene && scene.aiMotionVideoEl;
+    if(video){
+      try{ video.pause(); video.removeAttribute('src'); video.load(); }catch(_){}
+    }
+    if(scene && scene.aiMotionVideoUrl) urls.add(scene.aiMotionVideoUrl);
+  });
+  urls.forEach(url => { try{ URL.revokeObjectURL(url); }catch(_){} });
+}
+
 async function previewVoice(voice){
   toast('🔊 Gerando prévia da voz...');
   try{
@@ -4030,8 +4051,51 @@ async function encodeSmoothMp4WithWebCodecs({drawFn, audioBuffer, width=1280, he
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
 
-  // MODO A: Renderização Determinística Offline quadro-a-quadro (Criar Vídeo & Avatar) -> 30.000 FPS PERFEITOS, IMPOSSÍVEL TRAVAR!
-  if(!alsoPlay || !alsoPlay.length){
+  if(typeof drawFn.prepare === 'function') await drawFn.prepare();
+  // MODO C: cenas Gemini contêm fontes de vídeo vivas; registra em tempo real para sincronizar os frames animados com a locução.
+  if(drawFn.requiresRealtimeSources){
+    drawFn(ctx, 0); // inicia a reprodução muda do primeiro clipe de cena
+    await new Promise(r => setTimeout(r, 80));
+    drawFn(ctx, 0); // captura um frame já decodificado antes de começar a linha do tempo
+
+    const frameDurUs = Math.round(1_000_000 / FPS);
+    const durationUs = Math.round(durationSec * 1_000_000);
+    const startedAt = performance.now();
+    let frame = 0;
+    let lastTsUs = -1;
+    const totalFrames = Math.max(1, Math.ceil(durationSec * FPS));
+    while(frame < totalFrames){
+      if(videoErr) throw videoErr;
+      const scheduledAt = startedAt + frame * 1000 / FPS;
+      const delay = scheduledAt - performance.now();
+      if(delay > 0) await new Promise(r => setTimeout(r, delay));
+      const elapsed = Math.max(0, (performance.now() - startedAt) / 1000);
+      if(elapsed >= durationSec) break;
+      drawFn(ctx, elapsed);
+      const timestamp = Math.max(lastTsUs + 1, Math.round(elapsed * 1_000_000));
+      const frameDuration = Math.max(1, Math.min(frameDurUs, durationUs - timestamp));
+      const vf = new VideoFrame(canvas, { timestamp, duration: frameDuration });
+      vEnc.encode(vf, { keyFrame: frame % 60 === 0 });
+      vf.close();
+      lastTsUs = timestamp;
+      frame++;
+      while(vEnc.encodeQueueSize > 8){
+        await new Promise(r => setTimeout(r, 8));
+      }
+      if(frame % 6 === 0 && onProgress) onProgress(Math.min(0.99, elapsed / Math.max(0.5, durationSec)));
+      const nowFrame = Math.floor((performance.now() - startedAt) * FPS / 1000) + 1;
+      if(nowFrame > frame) frame = nowFrame; // pula frames perdidos se o aparelho não codificar a 30 fps
+    }
+    const finalT = Math.max(0, durationSec - 1 / FPS);
+    const finalTs = Math.round(finalT * 1_000_000);
+    if(finalTs > lastTsUs + 1000){
+      drawFn(ctx, finalT);
+      const vf = new VideoFrame(canvas, { timestamp: finalTs, duration: frameDurUs });
+      vEnc.encode(vf, { keyFrame: frame % 60 === 0 });
+      vf.close();
+    }
+    if(onProgress) onProgress(1);
+  } else if(!alsoPlay || !alsoPlay.length){
     const totalFrames = Math.max(1, Math.round(durationSec * FPS));
     const frameDurUs = Math.round(1_000_000 / FPS);
     for(let f = 0; f < totalFrames; f++){
@@ -4201,7 +4265,12 @@ async function recordCanvasVideo({drawFn, audioEl, audioBuffer, width=1280, heig
   const canvas=document.createElement('canvas');
   canvas.width=W; canvas.height=H;
   const ctx=canvas.getContext('2d', { alpha: false });
+  if(typeof drawFn.prepare === 'function') await drawFn.prepare();
   drawFn(ctx,0);
+  if(drawFn.requiresRealtimeSources){
+    await new Promise(r => setTimeout(r, 80));
+    drawFn(ctx,0);
+  }
   const stream=canvas.captureStream(30);
 
   let recAudioCtx=null, bufSrc=null;
@@ -4711,9 +4780,10 @@ function renderActorLipSyncCanvas(actor, mouthOpen, mouthWide, blink){
 // Desenha um cenário com movimento de câmera cinematográfico fluido (cubic-bezier + respiração orgânica de lente) cobrindo W×H
 function drawSceneryWithCamera(ctx, img, W, H, p, move='zoomIn', alpha=1, t=0){
   if(!img) return;
+  if(('videoWidth' in img) && (img.readyState < 2 || !img.videoWidth)) return;
   ctx.save();
   ctx.globalAlpha = alpha;
-  const iw = img.width || 1280, ih = img.height || 720;
+  const iw = img.videoWidth || img.naturalWidth || img.width || 1280, ih = img.videoHeight || img.naturalHeight || img.height || 720;
   const ir = iw / ih, cr = W / H;
   // Curva suave S-curve (easeInOutSine) para fluidez cinematográfica real
   const ep = 0.5 - 0.5 * Math.cos(Math.PI * Math.max(0, Math.min(1, p)));
@@ -4788,8 +4858,9 @@ function makeConnectedCinemaDrawer(movie){
   let lastBeatIdx = -1;
   let cutFlash = 0;
   const smoothScale = {};
+  let activeSceneVideo = null;
 
-  return (ctx, t) => {
+  const draw = (ctx, t) => {
     const W = ctx.canvas.width, H = ctx.canvas.height;
     const isLandscape = W >= H;
     const dt = Math.max(0.008, Math.min(0.1, Math.abs(t - lastT) || 0.033));
@@ -4799,6 +4870,20 @@ function makeConnectedCinemaDrawer(movie){
     let sIdx = scenes.findIndex(s => t >= s.start && t < s.end);
     if(sIdx < 0) sIdx = t < scenes[0].start ? 0 : scenes.length - 1;
     const sc = scenes[sIdx];
+    const requestedVideo = sc.videoEl && sc.videoEl.readyState >= 2 && sc.videoEl.videoWidth ? sc.videoEl : null;
+    if(requestedVideo !== activeSceneVideo){
+      if(activeSceneVideo){ try{ activeSceneVideo.pause(); }catch(_){} }
+      activeSceneVideo = requestedVideo;
+      if(activeSceneVideo){
+        activeSceneVideo.muted = true;
+        activeSceneVideo.loop = true;
+        activeSceneVideo.playsInline = true;
+        try{ if(activeSceneVideo.currentTime > 0.05) activeSceneVideo.currentTime = 0; }catch(_){}
+        try{ const playPromise = activeSceneVideo.play(); if(playPromise && playPromise.catch) playPromise.catch(()=>{}); }catch(_){}
+      }
+    }
+    const mainVisual = requestedVideo || sc.imgBitmap;
+    const sceneActionBitmap = requestedVideo ? null : sc.actionBitmap;
     const span = Math.max(0.5, sc.end - sc.start);
     const sp = Math.max(0, Math.min(1, (t - sc.start) / span));
 
@@ -4820,21 +4905,22 @@ function makeConnectedCinemaDrawer(movie){
     const camMove = (activeBeat && activeBeat.cameraMove) || sc.cameraMove || 'zoomIn';
 
     // Alterna suavemente entre Shot A (Plano Aberto do Cenário) e Shot B (Plano de Ação dos Personagens no Cenário)
-    const wantActionShot = !!(sc.actionBitmap && ((activeBeat && activeBeat.shot === 'action') || sp > 0.42));
+    const wantActionShot = !!(sceneActionBitmap && ((activeBeat && activeBeat.shot === 'action') || sp > 0.42));
     smoothActionShotMix += ((wantActionShot ? 1 : 0) - smoothActionShotMix) * Math.min(1, dt * 3.8);
 
     // 1) CENÁRIO VIVO EM TELA CHEIA (100% VISÍVEL E ILUMINADO — NUNCA COBERTO NO CENTRO!)
     ctx.fillStyle = '#05060f';
     ctx.fillRect(0, 0, W, H);
-    drawSceneryWithCamera(ctx, sc.imgBitmap, W, H, sp, sc.cameraMove || 'zoomIn', 1, t);
-    if(sc.actionBitmap && smoothActionShotMix > 0.02){
-      drawSceneryWithCamera(ctx, sc.actionBitmap, W, H, beatP, camMove, smoothActionShotMix, t);
+    drawSceneryWithCamera(ctx, mainVisual, W, H, sp, sc.cameraMove || 'zoomIn', 1, t);
+    if(sceneActionBitmap && smoothActionShotMix > 0.02){
+      drawSceneryWithCamera(ctx, sceneActionBitmap, W, H, beatP, camMove, smoothActionShotMix, t);
     }
     // Cross-dissolve suave entre cenas consecutivas
     if(sIdx > 0 && (t - sc.start) < 0.75){
       const prevSc = scenes[sIdx - 1];
       const fadePrev = 1 - Math.max(0, (t - sc.start) / 0.75);
-      drawSceneryWithCamera(ctx, prevSc.actionBitmap || prevSc.imgBitmap, W, H, 1, prevSc.cameraMove || 'zoomIn', fadePrev, t);
+      const prevVideo = prevSc.videoEl && prevSc.videoEl.readyState >= 2 && prevSc.videoEl.videoWidth ? prevSc.videoEl : null;
+      drawSceneryWithCamera(ctx, prevVideo || prevSc.actionBitmap || prevSc.imgBitmap, W, H, 1, prevSc.cameraMove || 'zoomIn', fadePrev, t);
     }
     drawSceneAtmosphere(ctx, W, H, t, sc.atmosphere || 'particles');
 
@@ -5026,6 +5112,21 @@ function makeConnectedCinemaDrawer(movie){
       }
     }
   };
+  draw.requiresRealtimeSources = scenes.some(scene => !!scene.videoEl);
+  draw.prepare = async () => {
+    const videos = scenes.map(scene => scene.videoEl).filter(Boolean);
+    await Promise.all(videos.map(video => waitForGeneratedSceneVideo(video, 12000).catch(() => null)));
+    videos.forEach(video => {
+      try{ video.pause(); if(video.currentTime > 0.05) video.currentTime = 0; }catch(_){}
+    });
+    activeSceneVideo = null;
+    draw.requiresRealtimeSources = videos.some(video => video.readyState >= 2 && video.videoWidth > 0);
+  };
+  draw.cleanup = () => {
+    scenes.forEach(scene => { try{ if(scene.videoEl) scene.videoEl.pause(); }catch(_){} });
+    activeSceneVideo = null;
+  };
+  return draw;
 }
 
 // Reamostra qualquer AudioBuffer decodificado para 24000 Hz e mistura trilha cinematográfica com ducking automático
@@ -5101,18 +5202,33 @@ function buildMasterCinemaAudioBuffer(decodedItems, addMusic = true, mood = 'cin
 }
 
 function makeKenBurnsDrawer(scenes, opts={}){
-  return (ctx,t)=>{
+  let activeSceneVideo = null;
+  const draw = (ctx,t)=>{
     const W=ctx.canvas.width,H=ctx.canvas.height;
     let sc=scenes.find(s=>t>=s.start&&t<s.end);
     if(!sc) sc=t<scenes[0].start?scenes[0]:scenes[scenes.length-1];
+    const requestedVideo = sc.videoEl && sc.videoEl.readyState >= 2 && sc.videoEl.videoWidth ? sc.videoEl : null;
+    if(requestedVideo !== activeSceneVideo){
+      if(activeSceneVideo){ try{ activeSceneVideo.pause(); }catch(_){} }
+      activeSceneVideo = requestedVideo;
+      if(activeSceneVideo){
+        activeSceneVideo.muted = true;
+        activeSceneVideo.loop = true;
+        activeSceneVideo.playsInline = true;
+        try{ if(activeSceneVideo.currentTime > 0.05) activeSceneVideo.currentTime = 0; }catch(_){}
+        try{ const playPromise = activeSceneVideo.play(); if(playPromise && playPromise.catch) playPromise.catch(()=>{}); }catch(_){}
+      }
+    }
     const span=Math.max(1,sc.end-sc.start);
     const p=Math.max(0,Math.min(1,(t-sc.start)/span));
     const dir=((sc.i||0)%2===0)?1:-1;
     const zoom=1+0.12*p;
     ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
-    const img=(p > 0.5 && sc.actionBitmap) ? sc.actionBitmap : sc.imgBitmap;
+    const img=requestedVideo || ((p > 0.5 && sc.actionBitmap) ? sc.actionBitmap : sc.imgBitmap);
     if(img){
-      const ir=img.width/img.height, cr=W/H;
+      const iw=img.videoWidth || img.naturalWidth || img.width || 1280;
+      const ih=img.videoHeight || img.naturalHeight || img.height || 720;
+      const ir=iw/ih, cr=W/H;
       let dw,dh;
       if(ir>cr){ dh=H*zoom; dw=dh*ir; } else { dw=W*zoom; dh=dw/ir; }
       ctx.drawImage(img,(W-dw)/2+dir*dw*0.035*(p-0.5),(H-dh)/2,dw,dh);
@@ -5130,6 +5246,21 @@ function makeKenBurnsDrawer(scenes, opts={}){
       wrapText(ctx,sc.narration.slice(0,260),40,H-124,W-80,38);
     }
   };
+  draw.requiresRealtimeSources = scenes.some(scene => !!scene.videoEl);
+  draw.prepare = async () => {
+    const videos = scenes.map(scene => scene.videoEl).filter(Boolean);
+    await Promise.all(videos.map(video => waitForGeneratedSceneVideo(video, 12000).catch(() => null)));
+    videos.forEach(video => {
+      try{ video.pause(); if(video.currentTime > 0.05) video.currentTime = 0; }catch(_){}
+    });
+    activeSceneVideo = null;
+    draw.requiresRealtimeSources = videos.some(video => video.readyState >= 2 && video.videoWidth > 0);
+  };
+  draw.cleanup = () => {
+    scenes.forEach(scene => { try{ if(scene.videoEl) scene.videoEl.pause(); }catch(_){} });
+    activeSceneVideo = null;
+  };
+  return draw;
 }
 
 // Busca imagem da cena combinando API Backend (Gemini 3.1 + Unorouter Flux.2/SDXL) + Geração Direta Flux no Navegador em paralelo!
@@ -5166,6 +5297,117 @@ async function fetchSceneImage(promptOrScene, style, w=896, h=504){
   }
 }
 
+async function sceneBitmapToJpegBase64(bitmap, maxSide = 640){
+  if(!bitmap) throw new Error('Imagem de referência da cena indisponível.');
+  const sourceW = Number(bitmap.videoWidth || bitmap.naturalWidth || bitmap.width || 0);
+  const sourceH = Number(bitmap.videoHeight || bitmap.naturalHeight || bitmap.height || 0);
+  if(!sourceW || !sourceH) throw new Error('A imagem da cena ainda não foi carregada.');
+  const scale = Math.min(1, maxSide / Math.max(sourceW, sourceH));
+  const width = Math.max(1, Math.round(sourceW * scale));
+  const height = Math.max(1, Math.round(sourceH * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = width; canvas.height = height;
+  const ctx = canvas.getContext('2d', { alpha:false });
+  if(!ctx) throw new Error('Não foi possível preparar a imagem de referência.');
+  ctx.drawImage(bitmap, 0, 0, width, height);
+  const jpeg = await new Promise((resolve, reject) => {
+    canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Falha ao comprimir a imagem da cena.')), 'image/jpeg', 0.78);
+  });
+  const dataUrl = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Falha ao codificar a imagem para o Gemini.'));
+    reader.readAsDataURL(jpeg);
+  });
+  const comma = dataUrl.indexOf(',');
+  if(comma < 0) throw new Error('Formato inválido da imagem de referência.');
+  return dataUrl.slice(comma + 1);
+}
+
+function waitForGeneratedSceneVideo(video, timeoutMs = 30000){
+  return new Promise((resolve, reject) => {
+    if(video.readyState >= 2 && video.videoWidth > 0) return resolve(video);
+    let timer;
+    const cleanup = () => {
+      clearTimeout(timer);
+      video.removeEventListener('loadeddata', onReady);
+      video.removeEventListener('canplay', onReady);
+      video.removeEventListener('error', onError);
+    };
+    const onReady = () => {
+      if(video.readyState >= 2 && video.videoWidth > 0){ cleanup(); resolve(video); }
+    };
+    const onError = () => {
+      cleanup();
+      reject(new Error('O navegador não conseguiu abrir o clipe MP4 do Gemini.'));
+    };
+    video.addEventListener('loadeddata', onReady);
+    video.addEventListener('canplay', onReady);
+    video.addEventListener('error', onError);
+    timer = setTimeout(() => {
+      cleanup();
+      reject(new Error('Tempo esgotado ao carregar o clipe MP4 da cena.'));
+    }, timeoutMs);
+    try{ video.load(); }catch(e){ cleanup(); reject(e); }
+  });
+}
+
+async function loadGeneratedSceneVideo(blob){
+  const url = URL.createObjectURL(blob);
+  const video = document.createElement('video');
+  video.muted = true;
+  video.loop = true;
+  video.playsInline = true;
+  video.preload = 'auto';
+  video.src = url;
+  try{
+    await waitForGeneratedSceneVideo(video);
+    return { video, url };
+  }catch(e){
+    try{ video.pause(); video.removeAttribute('src'); video.load(); }catch(_){}
+    try{ URL.revokeObjectURL(url); }catch(_){}
+    throw e;
+  }
+}
+
+async function requestGeminiOmniSceneVideo(scene, stylePrompt, format){
+  const imageBase64 = await sceneBitmapToJpegBase64(scene.imgBitmap);
+  const beatActions = Array.isArray(scene.beats)
+    ? scene.beats.map(beat => String(beat && beat.action || '').trim()).filter(Boolean).slice(0, 3)
+    : [];
+  const motionPrompt = [scene.actionVisual, ...beatActions, scene.visual, scene.title]
+    .map(value => String(value || '').trim())
+    .filter(Boolean)
+    .join(' | ')
+    .slice(0, 1200);
+  const response = await fetch('/api/create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: 'scene-video',
+      prompt: motionPrompt,
+      imageBase64,
+      imageMime: 'image/jpeg',
+      stylePrompt: String(stylePrompt || ''),
+      aspectRatio: format === '9:16' ? '9:16' : '16:9'
+    }),
+    signal: AbortSignal.timeout(280000)
+  });
+  if(!response.ok){
+    let message = `Gemini Omni retornou HTTP ${response.status}`;
+    try{
+      const result = await response.json();
+      if(result && result.error) message = result.error;
+    }catch(_){}
+    throw new Error(message);
+  }
+  const rawBlob = await response.blob();
+  if(!rawBlob || rawBlob.size < 1000) throw new Error('Gemini Omni devolveu um clipe vazio.');
+  const mime = (response.headers.get('content-type') || rawBlob.type || 'video/mp4').split(';')[0];
+  const videoBlob = mime === 'video/mp4' ? rawBlob : new Blob([rawBlob], { type:'video/mp4' });
+  return { ...(await loadGeneratedSceneVideo(videoBlob)), blob:videoBlob, provider:response.headers.get('x-ai-video-provider') || 'gemini-omni-1.1-flash' };
+}
+
 async function fetchSceneAudio(text,voice,emotion=''){
   for(let attempt=0; attempt<3; attempt++){
     try{
@@ -5195,8 +5437,13 @@ async function buildCreateVideo(){
   const imgDim = fmt === '9:16' ? { w:576, h:1024 } : fmt === '1:1' ? { w:768, h:768 } : { w:896, h:504 };
   const addMusic = ((document.getElementById('createMusic')||{}).value||'cinematic') !== 'none';
   const isConnected = (d.cinemaMode || (document.getElementById('cinemaMode')||{}).value || 'story') !== 'classic';
+  const useAiMotion = !!(document.getElementById('createAiMotion')||{}).checked;
+  let buildScenes = [];
+  let sceneDrawer = null;
+  let aiMotionClipCount = 0;
+  let aiMotionFailures = [];
 
-  btn.disabled=true; btn.textContent='⏳ Produzindo história animada completa...';
+  btn.disabled=true; btn.textContent=useAiMotion ? '⏳ Gemini Omni: preparando clipes de vídeo...' : '⏳ Produzindo história animada completa...';
   const prog=document.getElementById('videoBuildProgress');
   prog.classList.remove('hidden');
   $('#createProgress').classList.add('show');
@@ -5218,17 +5465,18 @@ async function buildCreateVideo(){
     actors.forEach(a => { actorMap[a.id] = a; });
 
     const scenes = new Array(d.scenes.length);
+    buildScenes = scenes;
     for(let i = 0; i < d.scenes.length; i++){
       const s = d.scenes[i];
-      document.getElementById('videoBuildMsg').textContent = `🏞️ Gerando cenário e ação da Cena ${i+1} de ${d.scenes.length} (“${s.locationName||s.title}”)...`;
-      const pct = Math.round(14 + (i / d.scenes.length) * 28);
+      document.getElementById('videoBuildMsg').textContent = `🏞️ Gerando cenário${useAiMotion ? '' : ' e ação'} da Cena ${i+1} de ${d.scenes.length} (“${s.locationName||s.title}”)...`;
+      const pct = Math.round(14 + (i / d.scenes.length) * (useAiMotion ? 24 : 28));
       document.getElementById('videoBuildFill').style.width = pct + '%';
       setProgress('createProgressFill', 35 + Math.round((i / d.scenes.length) * 20));
 
-      // Gera simultaneamente o Plano Aberto (Shot A) e o Plano de Ação (Shot B) da cena!
+      // O clipe Gemini usa o plano aberto como referência; o modo original continua criando os dois ângulos.
       const [mainBmp, actBmp] = await Promise.all([
         fetchSceneImage(s.visual || s.title, style, imgDim.w, imgDim.h).then(im => im || placeholderBitmap(s, i)),
-        s.actionVisual
+        !useAiMotion && s.actionVisual
           ? fetchSceneImage(s.actionVisual, style, imgDim.w, imgDim.h)
           : Promise.resolve(null)
       ]);
@@ -5236,8 +5484,51 @@ async function buildCreateVideo(){
         ...s,
         i: s.i || (i + 1),
         imgBitmap: mainBmp,
-        actionBitmap: actBmp || mainBmp
+        actionBitmap: useAiMotion ? null : (actBmp || mainBmp),
+        aiMotionVideoBlob: s.aiMotionVideoBlob || null,
+        aiMotionVideoUrl: s.aiMotionVideoUrl || null,
+        aiMotionVideoEl: s.aiMotionVideoEl || null,
+        aiMotionVideoProvider: s.aiMotionVideoProvider || '',
+        videoEl: null
       };
+      if(useAiMotion && scenes[i].aiMotionVideoEl){
+        scenes[i].videoEl = scenes[i].aiMotionVideoEl;
+        aiMotionClipCount++;
+      }
+    }
+
+    if(useAiMotion){
+      for(let i = 0; i < scenes.length; i++){
+        const scene = scenes[i];
+        if(scene.videoEl) continue; // reutiliza o clipe já gerado, sem uma nova chamada paga
+        document.getElementById('videoBuildMsg').textContent = `🎥 Gemini Omni Flash está animando a Cena ${i+1} de ${scenes.length} (“${scene.locationName||scene.title}”)...`;
+        const pct = Math.round(39 + ((i + 0.15) / scenes.length) * 13);
+        document.getElementById('videoBuildFill').style.width = pct + '%';
+        setProgress('createProgressFill', 55 + Math.round((i / scenes.length) * 8));
+        try{
+          const generated = await requestGeminiOmniSceneVideo(scene, d.artStylePrompt || style, fmt);
+          scene.aiMotionVideoBlob = generated.blob;
+          scene.aiMotionVideoEl = generated.video;
+          scene.aiMotionVideoUrl = generated.url;
+          scene.aiMotionVideoProvider = generated.provider;
+          scene.videoEl = generated.video;
+          aiMotionClipCount++;
+        }catch(videoErr){
+          const message = String(videoErr && videoErr.message || videoErr || 'falha desconhecida');
+          aiMotionFailures.push(`Cena ${i+1}: ${message}`);
+          scene.videoEl = null; // usa o render local para esta cena e não interrompe o projeto
+          if(/GEMINI_API_KEY não está configurada|Gemini Omni HTTP (401|403|404|429|5\d\d)|limite temporário|tempo esgotado|Failed to fetch|fetch failed|NetworkError|AbortError|aborted/i.test(message)){
+            for(let j = i + 1; j < scenes.length; j++){
+              aiMotionFailures.push(`Cena ${j+1}: não tentada após falha do provedor.`);
+            }
+            break;
+          }
+        }
+        const completed = Math.min(scenes.length, i + 1);
+        const nextPct = Math.round(39 + (completed / scenes.length) * 13);
+        document.getElementById('videoBuildFill').style.width = nextPct + '%';
+        setProgress('createProgressFill', 55 + Math.round((completed / scenes.length) * 8));
+      }
     }
 
     setStep(['s1','s2','s3','s4'], 2);
@@ -5270,9 +5561,9 @@ async function buildCreateVideo(){
     for(let i = 0; i < flatBeats.length; i += 2){
       const pair = flatBeats.slice(i, i + 2);
       document.getElementById('videoBuildMsg').textContent = `🎙️ Gravando dublagem unificada ${i+1}–${Math.min(flatBeats.length, i+2)} de ${flatBeats.length} (${pair.map(p=>p.speakerName).join(' & ')})...`;
-      const pct = Math.round(42 + (i / Math.max(1, flatBeats.length)) * 22);
+      const pct = Math.round(52 + (i / Math.max(1, flatBeats.length)) * 18);
       document.getElementById('videoBuildFill').style.width = pct + '%';
-      setProgress('createProgressFill', 55 + Math.round((i / Math.max(1, flatBeats.length)) * 18));
+      setProgress('createProgressFill', 63 + Math.round((i / Math.max(1, flatBeats.length)) * 16));
 
       const audios = await Promise.all(pair.map(b => fetchSceneAudio(b.text, narratorVoice, '')));
       for(let j = 0; j < pair.length; j++){
@@ -5318,19 +5609,19 @@ async function buildCreateVideo(){
 
     setStep(['s1','s2','s3','s4'], 3);
     document.getElementById('videoBuildMsg').textContent = `🎬 Gravando vídeo final sincronizado (${Math.round(master.totalDuration)}s • ${fmt})...`;
-    const drawer = isConnected
+    sceneDrawer = isConnected
       ? makeConnectedCinemaDrawer({ scenes, actors, timedBeats })
       : makeKenBurnsDrawer(scenes, { withNarration: realVoiceClips === 0 });
 
     const videoBlob = await recordCanvasVideo({
-      drawFn: drawer,
+      drawFn: sceneDrawer,
       audioBuffer: master.audioBuffer,
       width: dim.w,
       height: dim.h,
       durationSec: master.totalDuration,
       onProgress: p => {
-        document.getElementById('videoBuildFill').style.width = Math.round(64 + p * 36) + '%';
-        setProgress('createProgressFill', Math.round(73 + p * 27));
+        document.getElementById('videoBuildFill').style.width = Math.round(70 + p * 30) + '%';
+        setProgress('createProgressFill', Math.round(79 + p * 21));
       }
     });
 
@@ -5359,14 +5650,20 @@ async function buildCreateVideo(){
     sceneAssets = scenes.map(s => ({ title: s.title, imgBitmap: s.imgBitmap }));
     const wrap = document.getElementById('createdVideoWrap');
     wrap.classList.remove('hidden');
+    const aiMotionBanner = useAiMotion ? ` • Gemini Omni ${aiMotionClipCount}/${scenes.length} clipes` : '';
     document.getElementById('createdVideoReadyBanner').textContent =
-      `✅ Filme conectado pronto (${Math.round(master.totalDuration)}s • ${scenes.length} cenários • ${actors.length ? 'Narrador + ' + actors.map(a=>a.name).join(' & ') : 'Narração'} • formato .${ext.toUpperCase()})!`;
+      `✅ Filme conectado pronto (${Math.round(master.totalDuration)}s • ${scenes.length} cenários${aiMotionBanner} • ${actors.length ? 'Narrador + ' + actors.map(a=>a.name).join(' & ') : 'Narração'} • formato .${ext.toUpperCase()})!`;
 
-    const summaryMsg = realVoiceClips > 0
-      ? `✅ Vídeo completo pronto para assistir e baixar! (${scenes.length} cenas conectadas • vozes: ${[...voiceProviders].join(', ') || 'IA'})`
-      : `✅ Vídeo conectado montado com legendas e trilha sincronizadas! Clique no botão verde abaixo para baixar.`;
+    const voiceSummary = realVoiceClips > 0
+      ? `✅ Vídeo pronto para assistir e baixar! (${scenes.length} cenas • vozes: ${[...voiceProviders].join(', ') || 'IA'})`
+      : '✅ Vídeo montado com legendas e trilha sincronizadas!';
+    const motionSummary = useAiMotion
+      ? (aiMotionClipCount > 0 ? `Clipes com Gemini Omni Flash: ${aiMotionClipCount}/${scenes.length}.` : 'Gemini Omni não gerou clipes; usei o render atual.')
+      : '';
+    const motionWarning = aiMotionFailures.length ? ` Aviso: ${aiMotionFailures[0].slice(0, 180)}` : '';
+    const summaryMsg = [voiceSummary, motionSummary].filter(Boolean).join(' ') + motionWarning + ' Clique no botão verde abaixo para baixar.';
     document.getElementById('videoBuildMsg').textContent = summaryMsg;
-    showStatus('createStatus', summaryMsg, 'success');
+    showStatus('createStatus', summaryMsg, useAiMotion && aiMotionFailures.length ? 'warn' : 'success');
     toast('🎬 Vídeo pronto! Clique no botão verde para baixar!');
     setTimeout(()=> wrap.scrollIntoView({ behavior:'smooth', block:'center' }), 200);
   }catch(e){
@@ -5374,6 +5671,8 @@ async function buildCreateVideo(){
     showStatus('createStatus','❌ Erro na montagem: '+e.message,'error');
     toast(e.message,'error');
   }finally{
+    if(sceneDrawer && typeof sceneDrawer.cleanup === 'function') sceneDrawer.cleanup();
+    buildScenes.forEach(scene => { try{ if(scene.videoEl) scene.videoEl.pause(); }catch(_){} });
     btn.disabled=false; btn.textContent='🎬 Renderizar / Atualizar Vídeo Conectado';
     setTimeout(()=>{ $('#createProgress').classList.remove('show'); }, 1500);
   }

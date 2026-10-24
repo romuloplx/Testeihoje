@@ -668,6 +668,139 @@ async function generateSceneImage({ prompt, style, width = 1024, height = 576 })
   return { error: errors.join(' | ') || 'nenhum provedor de imagem respondeu' };
 }
 
+// Gerador real de clipes para a aba Criar: Gemini Omni Flash image-to-video.
+// A chamada é opt-in no frontend; o limite por IP reduz consumo acidental da chave compartilhada.
+const GEMINI_OMNI_VIDEO_MODEL = 'gemini-omni-1.1-flash';
+const GEMINI_OMNI_VIDEO_WINDOW_MS = 60 * 60 * 1000;
+const GEMINI_OMNI_VIDEO_MAX_PER_WINDOW = 14;
+const _geminiOmniVideoRequests = new Map();
+
+function consumeGeminiOmniVideoRequest(clientKey = 'unknown', now = Date.now()) {
+  const key = String(clientKey || 'unknown').trim().slice(0, 120) || 'unknown';
+  let entry = _geminiOmniVideoRequests.get(key);
+  if (!entry || now - entry.startedAt >= GEMINI_OMNI_VIDEO_WINDOW_MS) {
+    entry = { startedAt: now, count: 0 };
+  }
+  if (entry.count >= GEMINI_OMNI_VIDEO_MAX_PER_WINDOW) {
+    return {
+      ok: false,
+      retryAfterSeconds: Math.max(1, Math.ceil((entry.startedAt + GEMINI_OMNI_VIDEO_WINDOW_MS - now) / 1000))
+    };
+  }
+  entry.count += 1;
+  _geminiOmniVideoRequests.set(key, entry);
+  if (_geminiOmniVideoRequests.size > 5000) {
+    for (const [ip, value] of _geminiOmniVideoRequests) {
+      if (now - value.startedAt >= GEMINI_OMNI_VIDEO_WINDOW_MS) _geminiOmniVideoRequests.delete(ip);
+    }
+  }
+  return { ok: true, remaining: GEMINI_OMNI_VIDEO_MAX_PER_WINDOW - entry.count };
+}
+
+async function generateCreateSceneVideo({
+  prompt,
+  imageBase64,
+  imageMime = 'image/jpeg',
+  stylePrompt = '',
+  aspectRatio = '16:9',
+  clientKey = 'unknown'
+} = {}) {
+  const apiKey = String(process.env.GEMINI_API_KEY || '').trim();
+  if (!apiKey) {
+    throw Object.assign(new Error('GEMINI_API_KEY não está configurada para gerar clipes Gemini Omni.'), { status: 503 });
+  }
+
+  const cleanPrompt = String(prompt || '').replace(/\s+/g, ' ').trim().slice(0, 1200);
+  if (!cleanPrompt) throw Object.assign(new Error('Descreva a ação da cena para gerar o clipe.'), { status: 400 });
+
+  const cleanImage = String(imageBase64 || '')
+    .replace(/^data:image\/[a-z0-9.+-]+;base64,/i, '')
+    .replace(/\s+/g, '');
+  if (!cleanImage || !/^[a-z0-9+/]+={0,2}$/i.test(cleanImage) || cleanImage.length < 100) {
+    throw Object.assign(new Error('A imagem de referência da cena está inválida.'), { status: 400 });
+  }
+  if (cleanImage.length > 1_600_000) {
+    throw Object.assign(new Error('A imagem de referência ficou grande demais. Reduza a resolução e tente novamente.'), { status: 413 });
+  }
+
+  const safeMime = /^image\/(jpeg|png|webp)$/i.test(String(imageMime || '')) ? String(imageMime).toLowerCase() : 'image/jpeg';
+  const safeRatio = aspectRatio === '9:16' ? '9:16' : '16:9';
+  const style = String(stylePrompt || '').replace(/\s+/g, ' ').trim().slice(0, 220);
+  const quota = consumeGeminiOmniVideoRequest(clientKey);
+  if (!quota.ok) {
+    throw Object.assign(new Error(`Limite temporário de clipes Gemini atingido. Tente novamente em ${Math.ceil(quota.retryAfterSeconds / 60)} min.`), {
+      status: 429,
+      retryAfterSeconds: quota.retryAfterSeconds
+    });
+  }
+
+  const videoPrompt = [
+    'Animate the supplied storyboard image into one short, continuous cinematic shot.',
+    'Preserve the same characters, faces, clothing, location, composition and art style from the reference image.',
+    'Add natural character movement, environmental motion and a gentle cinematic camera move that fits the action.',
+    'Do not add scene cuts, written text, captions, subtitles, logos or watermarks.',
+    `Scene action: ${cleanPrompt}`,
+    style ? `Visual style: ${style}` : ''
+  ].filter(Boolean).join(' ').slice(0, 2200);
+
+  const baseUrl = gemBase().replace(/\/+$/, '');
+  let response;
+  try {
+    response = await fetch(`${baseUrl}/interactions`, {
+      method: 'POST',
+      headers: gemHeaders(),
+      body: JSON.stringify({
+        model: GEMINI_OMNI_VIDEO_MODEL,
+        input: [
+          { type: 'image', data: cleanImage, mime_type: safeMime },
+          { type: 'text', text: videoPrompt }
+        ],
+        generation_config: { video_config: { task: 'image_to_video' } },
+        response_format: { type: 'video', aspect_ratio: safeRatio, resolution: '720p' },
+        store: false
+      }),
+      signal: AbortSignal.timeout(240000)
+    });
+  } catch (e) {
+    throw Object.assign(new Error(`Gemini Omni não respondeu a tempo: ${String(e.message || e).slice(0, 180)}`), { status: 504 });
+  }
+
+  const raw = await response.text().catch(() => '');
+  if (!response.ok) {
+    let detail = raw;
+    try {
+      const parsed = JSON.parse(raw || '{}');
+      detail = parsed.error && (parsed.error.message || parsed.error.status) || parsed.message || raw;
+    } catch (_) {}
+    throw Object.assign(new Error(`Gemini Omni HTTP ${response.status}: ${String(detail || 'falha no provedor').slice(0, 300)}`), { status: response.status >= 400 && response.status < 500 ? response.status : 502 });
+  }
+
+  let result;
+  try { result = JSON.parse(raw || '{}'); }
+  catch (_) { throw Object.assign(new Error('Gemini Omni retornou uma resposta inválida.'), { status: 502 }); }
+
+  const outputParts = [];
+  for (const step of Array.isArray(result.steps) ? result.steps : []) {
+    if (step && step.type === 'model_output' && Array.isArray(step.content)) outputParts.push(...step.content);
+  }
+  const videoPart = outputParts.find(part => part && (
+    String(part.type || '').toLowerCase() === 'video' || /^video\//i.test(String(part.mime_type || ''))
+  ));
+  let encoded = (videoPart && (videoPart.data || videoPart.video_data)) || (result.output_video && result.output_video.data) || '';
+  encoded = String(encoded).replace(/^data:video\/[a-z0-9.+-]+;base64,/i, '').replace(/\s+/g, '');
+  if (!encoded) {
+    const status = String(result.status || '').trim();
+    throw Object.assign(new Error(`Gemini Omni não devolveu um clipe concluído${status ? ` (status: ${status})` : ''}.`), { status: 502 });
+  }
+
+  const buffer = Buffer.from(encoded, 'base64');
+  const isMp4 = buffer.length > 1000 && buffer.subarray(0, 64).includes(Buffer.from('ftyp'));
+  if (!isMp4) {
+    throw Object.assign(new Error('Gemini Omni respondeu, mas o arquivo recebido não é um MP4 válido.'), { status: 502 });
+  }
+  return { buffer, mime: 'video/mp4', provider: GEMINI_OMNI_VIDEO_MODEL };
+}
+
 // Concatena múltiplos buffers de áudio sem corromper cabeçalhos RIFF/WAV (essencial em vídeos longos!)
 function concatAudioBuffers(buffers) {
   const list = (buffers || []).filter(b => b && b.length > 0);
@@ -4155,7 +4288,7 @@ async function fetchYoutubeClipMp4Segment({ videoId = '', url = '', startSec = 0
 
 module.exports = {
   TTS_VOICES, mockScript, mockCreateFull, mockDubResult,
-  generateWithOpenAI, generateCreateFull, generateSceneImage, dubWithOpenAI, enhanceScript,
+  generateWithOpenAI, generateCreateFull, generateSceneImage, generateCreateSceneVideo, consumeGeminiOmniVideoRequest, dubWithOpenAI, enhanceScript,
   generateAvatarPortrait, generateAvatarScript, generateAvatarVideo, detectAvatarFaceLandmarks,
   transcribeClipSegment, analyzeViralClips, extractYoutubeVideoId, fetchYoutubeVideoInfoAndStream, fetchVideoStreamChunk, fetchYoutubeClipMp4Segment,
   chatWithFallback, ttsWithFallback, runTtsProviderChain, isEdgeTtsHandshakeFailure,

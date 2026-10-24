@@ -303,7 +303,22 @@ app.delete('/api/projects/:id', (req, res) => {
 
 app.post('/api/create', async (req, res) => {
   try {
-    const { prompt, duration, style, voice, cinemaMode, customCharacters, aiModel } = req.body || {};
+    const body = req.body || {};
+    if (body.action === 'scene-video') {
+      try {
+        const forwardedFor = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+        const clientKey = String(req.ip || req.headers['x-real-ip'] || forwardedFor || req.socket.remoteAddress || 'unknown');
+        const clip = await require('./vercel/api/lib/ai').generateCreateSceneVideo({ ...body, clientKey });
+        res.set('Cache-Control', 'no-store, private');
+        res.set('X-AI-Video-Provider', clip.provider || 'gemini-omni-1.1-flash');
+        return res.type(clip.mime || 'video/mp4').send(clip.buffer);
+      } catch (e) {
+        if (e.retryAfterSeconds) res.set('Retry-After', String(e.retryAfterSeconds));
+        return res.status(Number(e.status) || 502).json({ error: e.message || 'Falha ao gerar o clipe com Gemini Omni.' });
+      }
+    }
+
+    const { prompt, duration, style, voice, cinemaMode, customCharacters, aiModel } = body;
 
     if (!prompt || !prompt.trim()) {
       return res.status(400).json({ error: 'Descreva o vídeo primeiro.' });

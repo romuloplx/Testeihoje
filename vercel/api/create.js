@@ -1,8 +1,52 @@
-const { mockCreateFull, generateCreateFull, getBody, send } = require('./lib/ai');
+const { mockCreateFull, generateCreateFull, generateCreateSceneVideo, getBody, send } = require('./lib/ai');
+
+async function sendSceneVideo(res, clip) {
+  const buffer = clip.buffer;
+  res.statusCode = 200;
+  res.setHeader('Content-Type', clip.mime || 'video/mp4');
+  res.setHeader('Cache-Control', 'no-store, private');
+  res.setHeader('X-AI-Video-Provider', clip.provider || 'gemini-omni-1.1-flash');
+  if (typeof res.write !== 'function') {
+    res.setHeader('Content-Length', String(buffer.length));
+    return res.end(buffer);
+  }
+
+  // Write bounded chunks so Vercel can stream MP4 output instead of buffering a large function response.
+  const chunkSize = 64 * 1024;
+  for (let offset = 0; offset < buffer.length; offset += chunkSize) {
+    if (!res.write(buffer.subarray(offset, Math.min(buffer.length, offset + chunkSize)))) {
+      await new Promise((resolve, reject) => {
+        const onDrain = () => { res.removeListener('error', onError); resolve(); };
+        const onError = error => { res.removeListener('drain', onDrain); reject(error); };
+        res.once('drain', onDrain);
+        res.once('error', onError);
+      });
+    }
+  }
+  return res.end();
+}
+
 module.exports = async (req, res) => {
   try {
     if (req.method !== 'POST') return send(res, 405, { error: 'Método não permitido. Use POST.' });
-    const { prompt, duration, style, voice, cinemaMode, customCharacters, aiModel } = await getBody(req);
+    const body = await getBody(req);
+    if (body.action === 'scene-video') {
+      try {
+        const forwardedFor = String((req.headers || {})['x-forwarded-for'] || '').split(',')[0].trim();
+        const clientKey = String(req.ip || (req.headers || {})['x-real-ip'] || forwardedFor || (req.socket && req.socket.remoteAddress) || 'unknown');
+        const clip = await generateCreateSceneVideo({ ...body, clientKey });
+        return await sendSceneVideo(res, clip);
+      } catch (e) {
+        if (res.headersSent) {
+          if (typeof res.destroy === 'function') res.destroy(e);
+          return;
+        }
+        if (e.retryAfterSeconds) res.setHeader('Retry-After', String(e.retryAfterSeconds));
+        return send(res, Number(e.status) || 502, { error: e.message || 'Falha ao gerar o clipe com Gemini Omni.' });
+      }
+    }
+
+    const { prompt, duration, style, voice, cinemaMode, customCharacters, aiModel } = body;
     if (!prompt || !prompt.trim()) return send(res, 400, { error: 'Descreva o vídeo primeiro.' });
     if (prompt.length > 8000) return send(res, 400, { error: 'Descrição muito longa (máx 8000 caracteres).' });
 
