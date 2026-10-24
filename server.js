@@ -303,7 +303,37 @@ app.delete('/api/projects/:id', (req, res) => {
 
 app.post('/api/create', async (req, res) => {
   try {
-    const { prompt, duration, style, voice, cinemaMode, customCharacters, aiModel } = req.body || {};
+    const body = req.body || {};
+    if (body.action === 'character-lookup') {
+      try {
+        res.set('Cache-Control', 'no-store, private');
+        const result = await require('./vercel/api/lib/ai').lookupIceAndFireCharacters({ query: body.query });
+        return res.json(result);
+      } catch (e) {
+        return res.status(Number(e.status) || 502).json({ error: e.message || 'Falha ao buscar personagens.' });
+      }
+    }
+    if (body.action === 'scene-video' || body.action === 'scene-video-status') {
+      try {
+        res.set('Cache-Control', 'no-store, private');
+        const ai = require('./vercel/api/lib/ai');
+        if (body.action === 'scene-video') {
+          const forwardedFor = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+          const clientKey = String(req.ip || req.headers['x-real-ip'] || forwardedFor || req.socket.remoteAddress || 'unknown');
+          const task = await ai.startCreateSceneVideo({ ...body, clientKey });
+          return res.status(202).json(task);
+        }
+        const result = await ai.pollCreateSceneVideo({ taskId: body.taskId });
+        if (!result.done) return res.status(202).json(result);
+        res.set('X-AI-Video-Provider', result.provider || 'tencent/hy-video-v1.5');
+        return res.type(result.mime || 'video/mp4').send(result.buffer);
+      } catch (e) {
+        if (e.retryAfterSeconds) res.set('Retry-After', String(e.retryAfterSeconds));
+        return res.status(Number(e.status) || 502).json({ error: e.message || 'Falha ao gerar o clipe com HunyuanVideo.' });
+      }
+    }
+
+    const { prompt, duration, style, voice, cinemaMode, customCharacters, aiModel } = body;
 
     if (!prompt || !prompt.trim()) {
       return res.status(400).json({ error: 'Descreva o vídeo primeiro.' });
@@ -378,17 +408,24 @@ app.post('/api/create', async (req, res) => {
   }
 });
 
+app.get('/api/scene-image', (req, res) => {
+  res.set('Cache-Control', 'no-store, private').json({
+    openrouterImageConfigured: require('./vercel/api/lib/ai').hasOpenRouterImageApiKey()
+  });
+});
+
 app.post('/api/scene-image', async (req, res) => {
   try {
-    const { prompt, style, width, height } = req.body || {};
+    res.set('Cache-Control', 'no-store, private');
+    const { prompt, style, width, height, references } = req.body || {};
     if (!prompt || !prompt.trim()) {
       return res.status(400).json({ error: 'Descreva a cena.' });
     }
-    const img = await require('./vercel/api/lib/ai').generateSceneImage({ prompt, style, width, height });
+    const img = await require('./vercel/api/lib/ai').generateSceneImage({ prompt, style, width, height, references });
     if (!img || !img.imageBase64) {
       return res.json({ imageBase64: null, mock: true, error: img && img.error, message: 'Geração de imagem falhou' + (img && img.error ? ` (${img.error})` : '') + ' — usando renderizador direto.' });
     }
-    res.json({ imageBase64: img.imageBase64, mime: img.mime, model: img.model });
+    res.json({ imageBase64: img.imageBase64, mime: img.mime, model: img.model, costUsd: img.costUsd });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Erro ao gerar imagem: ' + e.message });
@@ -397,6 +434,11 @@ app.post('/api/scene-image', async (req, res) => {
 
 app.post('/api/dub', async (req, res) => {
   try {
+    const body = req.body || {};
+    if (body.action === 'social-metadata') {
+      const metadata = await require('./vercel/api/lib/ai').generateDubSocialMetadata(body);
+      return res.json(metadata);
+    }
     const {
       fileName,
       fileSize,
@@ -409,7 +451,7 @@ app.post('/api/dub', async (req, res) => {
       chunkIndex = 0,
       totalChunks = 1,
       skipSave = false
-    } = req.body || {};
+    } = body;
     if (!fileName) {
       return res.status(400).json({ error: 'Selecione um vídeo ou áudio.' });
     }
@@ -523,7 +565,7 @@ app.post('/api/enhance', async (req, res) => {
   }
 });
 
-// TTS endpoint — cadeia de provedores (OpenAI → Neural HD → Gemini → Unorouter → Google)
+// TTS endpoint — cadeia de provedores (Neural HD → OpenAI → Gemini → Unorouter → Google/StreamElements)
 app.post('/api/tts', async (req, res) => {
   const { text, voice = 'onyx', lang = 'pt-BR', emotion = '' } = req.body;
   if (!text) return res.status(400).json({ error: 'Texto vazio' });

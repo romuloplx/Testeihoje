@@ -11,6 +11,12 @@
   "functions": {
     "api/clips.js": {
       "includeFiles": "node_modules/@involvex/**"
+    },
+    "api/create.js": {
+      "maxDuration": 90
+    },
+    "api/scene-image.js": {
+      "maxDuration": 90
     }
   }
 }

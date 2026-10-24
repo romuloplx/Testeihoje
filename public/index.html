@@ -466,6 +466,16 @@ input[type="range"]{
     <label style="margin-top:10px">🎭 Personagens da História <span style="font-weight:400;color:var(--muted)">(opcional — ou deixe em branco para a IA criar sozinha)</span></label>
     <input type="text" id="createCharactersInput" placeholder="Ex: Theo (menino curioso de moletom vermelho) e Luna (menina corajosa com lanterna dourada)" style="width:100%;padding:11px 13px;border-radius:10px;border:1px solid var(--border);background:#0c0d1c;color:#f8fafc;font-size:13.5px" />
 
+    <div style="margin-top:10px;padding:10px 12px;border:1px solid #38bdf855;border-radius:11px;background:linear-gradient(135deg,#0b1726,#101127)">
+      <label for="iceFireCharacterQuery" style="margin:0;color:#bae6fd;font-weight:800">📚 Importar personagem de As Crônicas de Gelo e Fogo</label>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:7px">
+        <input type="text" id="iceFireCharacterQuery" placeholder="Nome (ex.: Jon Snow), ID 583 ou URL da API" style="flex:1;min-width:220px;padding:10px 12px;border-radius:9px;border:1px solid var(--border);background:#0c0d1c;color:#f8fafc;font-size:13px" onkeydown="if(event.key==='Enter'){event.preventDefault();searchIceAndFireCharacters()}" />
+        <button class="ghost" id="iceFireCharacterSearchBtn" type="button" onclick="searchIceAndFireCharacters()">🔎 Buscar personagem</button>
+      </div>
+      <div class="hint" style="margin:6px 0 0;line-height:1.45">Consulta a API pública An API of Ice and Fire e preenche o campo de personagens; não gera imagens nem vídeos por si só.</div>
+      <div id="iceFireCharacterResults" class="hidden" style="margin-top:8px;display:grid;gap:7px" aria-live="polite"></div>
+    </div>
+
     <label style="margin-top:12px">🎨 Modelos prontos de Histórias & Vídeos</label>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="ghost" type="button" onclick="applyTemplate('adventure')" style="border-color:#7c3aed88;color:#e9d5ff">📖 História & Aventura</button>
@@ -558,6 +568,22 @@ input[type="range"]{
           <option value="none">🔇 Sem música (apenas vozes)</option>
         </select>
       </div>
+    </div>
+
+    <div style="margin:10px 0 12px;padding:11px 13px;border:1px solid #38bdf866;border-radius:11px;background:linear-gradient(135deg,#0b1726,#101127)">
+      <label for="createAiMotion" style="display:flex;align-items:flex-start;gap:9px;margin:0;color:#bae6fd;font-weight:800;cursor:pointer">
+        <input id="createAiMotion" type="checkbox" style="width:auto;flex:0 0 auto;margin:3px 0 0;padding:0;border:0;background:#111827;accent-color:#38bdf8;transform:scale(1.12)">
+        <span>🎥 Gerar clipes reais com HunyuanVideo 1.5 (Tencent)</span>
+      </label>
+      <div class="hint" style="margin:7px 0 0 27px;line-height:1.5">Opcional: envia cada imagem e a ação da cena ao Tencent HunyuanVideo 1.5 (clipe de 5 s em 720p) e incorpora movimento real ao vídeo, mantendo narração, música e legendas. Pode consumir créditos/cota do TokenHub; clipes curtos podem repetir em cenas com fala longa. Requer TENCENT_TOKENHUB_API_KEY no servidor e modelo/cobrança HunyuanVideo ativados no TokenHub. Se a geração falhar, a cena usa o render atual.</div>
+    </div>
+    <div class="hint" style="margin:4px 0 8px">🖼️ Imagens das cenas: o FLUX.2 Pro via OpenRouter é priorizado quando OPENROUTER_API_KEY estiver configurada (cerca de US$ 0,03/MP de imagem de saída). Sem a chave, continuam os provedores/fallbacks atuais.</div>
+    <div style="margin:0 0 12px;padding:10px 12px;border:1px solid #a855f766;border-radius:11px;background:linear-gradient(135deg,#17112b,#101127)">
+      <label for="createUseCharacterReferences" style="display:flex;align-items:flex-start;gap:9px;margin:0;color:#e9d5ff;font-weight:800;cursor:pointer">
+        <input id="createUseCharacterReferences" type="checkbox" checked style="width:auto;flex:0 0 auto;margin:3px 0 0;padding:0;border:0;background:#111827;accent-color:#a855f7;transform:scale(1.12)">
+        <span>🧬 Manter a aparência do elenco entre as cenas (recomendado)</span>
+      </label>
+      <div class="hint" style="margin:6px 0 0 27px;line-height:1.45">Usa até 3 retratos dos personagens como referências no OpenRouter; pode gerar cobrança adicional de entrada. Desmarque para não enviar referências e reduzir custos. Quando disponível, o custo informado aparece ao final do vídeo.</div>
     </div>
 
     <button class="primary" id="createFullVideoBtn" onclick="createAndBuildVideo()" style="font-size:15px;padding:15px">🎬 Criar História & Vídeo Completo (Personagens + Cenários Vivos)</button>
@@ -978,6 +1004,24 @@ input[type="range"]{
     <div id="dubResult" class="hidden" style="margin-top:14px">
       <div style="background:linear-gradient(180deg,#0f172a,#090d16);border:1.5px solid #10b98188;border-radius:14px;padding:14px">
         <div id="dubTitle" style="font-weight:800;font-size:14px;color:#6ee7b7;margin-bottom:10px">✅ Dublagem concluída!</div>
+        <div id="dubSocialPackage" class="hidden" style="margin:0 0 12px;padding:12px 13px;border:1px solid #f59e0b88;border-radius:12px;background:linear-gradient(135deg,#25190b,#11162a)" aria-live="polite">
+          <div style="font-weight:900;font-size:13px;color:#fde68a">🔥 Tema e hashtags para publicar a dublagem</div>
+          <div id="dubSocialStatus" class="hint" role="status" style="margin:5px 0 9px">Preparando sugestões com base no conteúdo dublado…</div>
+          <div style="margin-bottom:8px">
+            <div style="font-size:10.5px;font-weight:900;color:#fbbf24;letter-spacing:.05em">TEMA / TÍTULO SUGERIDO</div>
+            <div id="dubSocialTopic" style="margin-top:3px;font-weight:800;color:#f8fafc"></div>
+          </div>
+          <div id="dubSocialDescriptionWrap" style="margin-bottom:8px">
+            <div style="font-size:10.5px;font-weight:900;color:#fbbf24;letter-spacing:.05em">LEGENDA CURTA</div>
+            <div id="dubSocialDescription" style="margin-top:3px;color:#e2e8f0;font-size:12.5px;line-height:1.5"></div>
+          </div>
+          <div style="margin-bottom:10px">
+            <div style="font-size:10.5px;font-weight:900;color:#fbbf24;letter-spacing:.05em">HASHTAGS</div>
+            <div id="dubSocialHashtags" style="margin-top:3px;color:#bae6fd;font-size:13px;line-height:1.6;overflow-wrap:anywhere"></div>
+          </div>
+          <button class="ghost" type="button" onclick="copyDubSocialPackage()" style="border-color:#f59e0b88;color:#fde68a">📋 Copiar tema, legenda e hashtags</button>
+          <div class="hint" style="margin-top:7px">Sugestões baseadas na transcrição/tradução; ajudam na descoberta, mas não garantem viralização.</div>
+        </div>
         <div id="dubPlayerWrap" class="hidden" style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px">
           <video id="dubSyncVideo" controls playsinline class="hidden" style="width:100%;max-height:460px;border-radius:10px;background:#000"></video>
           <audio id="dubAudio" controls style="width:100%"></audio>
@@ -1474,7 +1518,10 @@ input[type="range"]{
 
               <label style="margin-top:8px;font-size:11px">🏷️ Auto Hook Banner (Topo do Vídeo)</label>
               <input type="text" id="opusEditHookBanner" oninput="onEditSelectedOpusClip()" style="padding:8px 10px;font-size:12.5px;margin-top:4px;width:100%;border-radius:8px;border:1px solid #282e46;background:#070a14;color:#fff">
-              <label style="margin-top:8px;font-size:11px">💬 Editar Texto da Legenda (Qualquer alteração atualiza no vídeo na hora)</label>
+              <label style="margin-top:8px;font-size:11px">💬 Legendas automáticas da fala (estilo CapCut)</label>
+              <button type="button" id="opusAutoCaptionBtn" onclick="generateSelectedOpusClipCaptionsFromAudio()" style="width:100%;margin-top:5px;padding:9px 12px;border:1px solid #22c55e;border-radius:9px;font-size:12px;font-weight:900;cursor:pointer;color:#dcfce7;background:linear-gradient(135deg,#064e3b,#052e16)" title="Ouve o áudio do corte selecionado, transcreve a fala e sincroniza as palavras no vídeo">🎙️ Gerar legenda automaticamente pelo áudio</button>
+              <div style="font-size:10.5px;color:#94a3b8;margin:5px 0 2px">Transcreve o que é falado no corte selecionado e atualiza a prévia e o MP4. O texto atual pode ser substituído.</div>
+              <label style="margin-top:6px;font-size:11px">✍️ Texto da Legenda (edite se quiser; a mudança aparece no vídeo na hora)</label>
               <textarea id="opusEditCaption" rows="3" oninput="onEditSelectedOpusClip()" style="padding:8px 10px;font-size:12.5px;margin-top:4px;min-height:68px"></textarea>
             </div>
 
@@ -2231,6 +2278,117 @@ function fillExample(){
   toast('💡 Exemplo de história com personagens preenchido — clique em Criar História & Vídeo Completo!');
 }
 
+let createCharacterApiResults = [];
+
+function characterApiMessage(container, message, isError = false){
+  if(!container) return;
+  container.replaceChildren();
+  container.classList.remove('hidden');
+  const note = document.createElement('div');
+  note.style.cssText = `padding:10px 12px;border-radius:9px;background:#0c0d1c;color:${isError ? '#fecaca' : '#cbd5e1'};font-size:12px`;
+  note.textContent = message;
+  container.appendChild(note);
+}
+
+function formatIceAndFireCharacter(character){
+  const details = [];
+  const gender = String(character.gender || '').toLowerCase();
+  if(gender === 'male') details.push('homem');
+  else if(gender === 'female') details.push('mulher');
+  if(character.culture) details.push(`cultura: ${character.culture}`);
+  const titles = Array.isArray(character.titles) ? character.titles.filter(Boolean).slice(0, 3) : [];
+  if(titles.length) details.push(`títulos: ${titles.join(', ')}`);
+  const aliases = Array.isArray(character.aliases) ? character.aliases.filter(Boolean).slice(0, 3) : [];
+  if(aliases.length) details.push(`também conhecido(a) como ${aliases.join(', ')}`);
+  if(character.born) details.push(`nascimento: ${character.born}`);
+  if(character.died) details.push(`morte: ${character.died}`);
+  const tvSeries = Array.isArray(character.tvSeries) ? character.tvSeries.filter(Boolean).slice(0, 6) : [];
+  if(tvSeries.length) details.push(`aparece em: ${tvSeries.join(', ')}`);
+  const playedBy = Array.isArray(character.playedBy) ? character.playedBy.filter(Boolean).slice(0, 2) : [];
+  if(playedBy.length) details.push(`${gender === 'female' ? 'interpretada' : 'interpretado'} por ${playedBy.join(', ')}`);
+  return `${character.name || 'Personagem'}${details.length ? ` (${details.join('; ')})` : ''}`;
+}
+
+function renderIceAndFireCharacterResults(results){
+  const container = document.getElementById('iceFireCharacterResults');
+  if(!container) return;
+  container.replaceChildren();
+  container.classList.remove('hidden');
+  if(!results.length){
+    characterApiMessage(container, 'Nenhum personagem encontrado. Confira o nome ou tente o ID/URL da API.');
+    return;
+  }
+  results.forEach((character, index) => {
+    const card = document.createElement('div');
+    card.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 12px;border:1px solid #334155;border-radius:9px;background:#0c0d1c';
+    const info = document.createElement('div');
+    info.style.cssText = 'flex:1;min-width:180px';
+    const name = document.createElement('div');
+    name.style.cssText = 'font-size:13px;font-weight:800;color:#e0f2fe';
+    name.textContent = character.name || 'Personagem sem nome';
+    const summary = document.createElement('div');
+    summary.style.cssText = 'margin-top:3px;font-size:11px;color:#cbd5e1;line-height:1.45';
+    const facts = [character.gender, character.culture, ...(character.titles || []).slice(0, 2)].filter(Boolean);
+    summary.textContent = facts.join(' • ') || 'Dados de personagem disponíveis';
+    info.append(name, summary);
+    const add = document.createElement('button');
+    add.type = 'button';
+    add.className = 'ghost';
+    add.textContent = '➕ Usar no vídeo';
+    add.addEventListener('click', () => useIceAndFireCharacter(index));
+    card.append(info, add);
+    container.appendChild(card);
+  });
+}
+
+async function searchIceAndFireCharacters(){
+  const input = document.getElementById('iceFireCharacterQuery');
+  const button = document.getElementById('iceFireCharacterSearchBtn');
+  const container = document.getElementById('iceFireCharacterResults');
+  const query = String(input && input.value || '').trim();
+  if(!query){
+    characterApiMessage(container, 'Digite um nome, um ID como 583 ou a URL de um personagem.');
+    return;
+  }
+  button.disabled = true;
+  button.textContent = '⏳ Buscando...';
+  characterApiMessage(container, 'Consultando a API pública de personagens...');
+  try{
+    const response = await fetch('/api/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'character-lookup', query }),
+      signal: AbortSignal.timeout(15000)
+    });
+    const data = await response.json().catch(() => ({}));
+    if(!response.ok) throw new Error(data.error || `A busca falhou (HTTP ${response.status}).`);
+    createCharacterApiResults = Array.isArray(data.results) ? data.results : [];
+    renderIceAndFireCharacterResults(createCharacterApiResults);
+  }catch(error){
+    characterApiMessage(container, `Não foi possível buscar personagens: ${String(error && error.message || error).slice(0, 180)}`, true);
+  }finally{
+    button.disabled = false;
+    button.textContent = '🔎 Buscar personagem';
+  }
+}
+
+function useIceAndFireCharacter(index){
+  const character = createCharacterApiResults[index];
+  if(!character || !character.name) return;
+  const input = document.getElementById('createCharactersInput');
+  const prompt = document.getElementById('prompt');
+  const current = String(input && input.value || '').trim();
+  if(current.toLowerCase().includes(character.name.toLowerCase())){
+    toast(`${character.name} já está na lista de personagens.`);
+    return;
+  }
+  if(input) input.value = current ? `${current}; ${formatIceAndFireCharacter(character)}` : formatIceAndFireCharacter(character);
+  if(prompt && !String(prompt.value || '').trim()){
+    prompt.value = `Crie uma história cinematográfica original sobre ${character.name}, usando os dados públicos do personagem como referência. Mostre seus conflitos, escolhas e uma aventura marcante.`;
+  }
+  toast(`✅ ${character.name} adicionado ao elenco do vídeo.`);
+}
+
 // ===== Modelos de Histórias & Vídeos com Personagens =====
 const TEMPLATES = {
   adventure: {
@@ -2515,6 +2673,7 @@ async function createVideo(silentAutoBuild = false){
         : `✅ História e personagens prontos (${data.provider||'IA'})! Clique em Renderizar Vídeo abaixo.`,'success');
     }
     $('#createScript').textContent = data.script || 'Roteiro criado';
+    releaseCreateSceneMotion(currentCreateData && currentCreateData.scenes);
     currentCreateData={
       title: data.title || prompt.slice(0,60),
       script: data.script || '',
@@ -3534,6 +3693,108 @@ function downloadDubSRT(){
   toast('📜 Legendas traduzidas (.SRT) baixadas!');
 }
 
+let dubSocialRequestSeq = 0;
+let lastDubSocialMetadata = null;
+
+function normalizeClientDubHashtags(value){
+  const candidates = Array.isArray(value) ? value : String(value || '').split(/[\s,;]+/);
+  const seen = new Set();
+  return candidates.map(candidate => {
+    const tag = String(candidate || '').trim().replace(/^#+/, '').replace(/[^\p{L}\p{N}_]/gu, '').slice(0, 32);
+    const key = tag.toLocaleLowerCase();
+    if(!tag || seen.has(key)) return '';
+    seen.add(key);
+    return `#${tag}`;
+  }).filter(Boolean).slice(0, 8);
+}
+
+function buildClientDubSocialFallback({ translation = '', originalTranscript = '', fileName = '', targetLanguage = 'pt-BR' } = {}){
+  const source = String(translation || originalTranscript || '').replace(/\s+/g, ' ').trim();
+  const filenameTopic = String(fileName || '').replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
+  const firstSentence = source.split(/(?<=[.!?])\s+/)[0] || '';
+  const topic = (firstSentence || (filenameTopic ? `A história por trás de ${filenameTopic}` : 'O detalhe dessa história que merece ser ouvido'))
+    .replace(/\s+/g, ' ').trim().slice(0, 70);
+  const normalized = source.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const stop = new Set(['sobre','porque','quando','muito','mais','para','como','essa','esse','ainda','depois','antes','nossa','their','there','about','would','could','this','that','with','from','have','your','what','when']);
+  const counts = new Map();
+  for(const word of normalized.match(/[a-z0-9]{4,}/g) || []){
+    if(!stop.has(word) && !/^\d+$/.test(word)) counts.set(word, (counts.get(word)||0)+1);
+  }
+  const topics = [...counts.entries()].sort((a,b)=>b[1]-a[1]).slice(0,2).map(([word])=>`#${word.slice(0,24)}`);
+  const lang = String(targetLanguage || '').toLowerCase();
+  const baseTags = lang.startsWith('pt') ? ['#dublagem','#videodublado','#viral','#shorts','#reels','#tiktok']
+    : lang.startsWith('es') ? ['#doblaje','#videodoblado','#viral','#shorts','#reels','#tiktok']
+      : ['#dubbed','#viral','#shorts','#reels','#tiktok','#video'];
+  return { topic, description: source.slice(0, 180), hashtags: normalizeClientDubHashtags([...baseTags, ...topics]), provider: 'local-fallback', fallback: true };
+}
+
+function renderDubSocialPackage(metadata, statusText){
+  const normalized = {
+    topic: String(metadata && (metadata.topic || metadata.title) || '').replace(/\s+/g, ' ').trim().slice(0, 70),
+    description: String(metadata && metadata.description || '').replace(/\s+/g, ' ').trim().slice(0, 180),
+    hashtags: normalizeClientDubHashtags(metadata && (metadata.hashtags || metadata.tags)),
+    provider: String(metadata && metadata.provider || 'IA'),
+    fallback: !!(metadata && metadata.fallback)
+  };
+  if(!normalized.topic || normalized.hashtags.length < 4) return false;
+  lastDubSocialMetadata = normalized;
+  const topicEl = document.getElementById('dubSocialTopic');
+  const descriptionEl = document.getElementById('dubSocialDescription');
+  const descriptionWrap = document.getElementById('dubSocialDescriptionWrap');
+  const tagsEl = document.getElementById('dubSocialHashtags');
+  const statusEl = document.getElementById('dubSocialStatus');
+  if(topicEl) topicEl.textContent = normalized.topic;
+  if(descriptionEl) descriptionEl.textContent = normalized.description;
+  if(descriptionWrap) descriptionWrap.classList.toggle('hidden', !normalized.description);
+  if(tagsEl) tagsEl.textContent = normalized.hashtags.join(' ');
+  if(statusEl) statusEl.textContent = statusText || (normalized.fallback
+    ? 'Sugestão local criada a partir do conteúdo; a IA de texto não respondeu.'
+    : `Sugestão gerada com ${normalized.provider}.`);
+  return true;
+}
+
+async function generateDubSocialPackage({ translation = '', originalTranscript = '', fileName = '', targetLanguage = 'pt-BR' } = {}){
+  const requestId = ++dubSocialRequestSeq;
+  const card = document.getElementById('dubSocialPackage');
+  const statusEl = document.getElementById('dubSocialStatus');
+  if(card) card.classList.remove('hidden');
+  if(statusEl) statusEl.textContent = '⚡ Criando um tema/título e hashtags com base no conteúdo da dublagem…';
+  try{
+    const requestOptions = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'social-metadata',
+        translation: String(translation || '').slice(0, 5000),
+        originalTranscript: String(originalTranscript || '').slice(0, 2000),
+        fileName: String(fileName || '').slice(0, 100),
+        targetLanguage
+      })
+    };
+    if(typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') requestOptions.signal = AbortSignal.timeout(45000);
+    const response = await fetch('/api/dub', requestOptions);
+    const metadata = await response.json().catch(() => ({}));
+    if(!response.ok || metadata.error) throw new Error(metadata.error || `HTTP ${response.status}`);
+    if(requestId !== dubSocialRequestSeq) return;
+    if(!renderDubSocialPackage(metadata)) throw new Error('A resposta não trouxe um tema e pelo menos quatro hashtags.');
+  }catch(_){
+    if(requestId !== dubSocialRequestSeq) return;
+    const fallback = buildClientDubSocialFallback({ translation, originalTranscript, fileName, targetLanguage });
+    renderDubSocialPackage(fallback, 'A IA de texto não respondeu; estas sugestões locais foram montadas com base no conteúdo.');
+  }
+}
+
+function copyDubSocialPackage(){
+  if(!lastDubSocialMetadata){ toast('Aguarde o pacote de publicação ficar pronto.','warn'); return; }
+  const lines = [
+    `TEMA / TÍTULO: ${lastDubSocialMetadata.topic}`,
+    lastDubSocialMetadata.description ? `LEGENDA: ${lastDubSocialMetadata.description}` : '',
+    `HASHTAGS: ${lastDubSocialMetadata.hashtags.join(' ')}`
+  ].filter(Boolean);
+  copyText(lines.join('\n\n'));
+  toast('🔥 Tema e hashtags copiados!');
+}
+
 async function dubVideo(){
   const file = currentDubFile || $('#videoFile').files[0];
   const language = $('#language').value;
@@ -3550,6 +3811,10 @@ async function dubVideo(){
     return;
   }
 
+  dubSocialRequestSeq++;
+  lastDubSocialMetadata = null;
+  const previousSocialCard = document.getElementById('dubSocialPackage');
+  if(previousSocialCard) previousSocialCard.classList.add('hidden');
   stopPreviewDubBgMusic();
   stopDubRequested = false;
   lastDubVideoBlob = null;
@@ -3751,10 +4016,12 @@ async function dubVideo(){
       return `${stamp}\n🗣️ Original: ${c.transcription}\n🇧🇷 Dublado (${targetLanguage}): ${c.translation}`;
     }).join('\n\n────────────────────────\n\n');
 
+    const fullTranslation = chunkOutputs.map(c => c.translation).filter(Boolean).join(' ');
+    const fullOriginalTranscript = chunkOutputs.map(c => c.transcription).filter(Boolean).join(' ');
     $('#dubScript').textContent = transcriptSummary;
     $('#dubResult').classList.remove('hidden');
+    void generateDubSocialPackage({ translation: fullTranslation, originalTranscript: fullOriginalTranscript, fileName: file.name, targetLanguage });
 
-    const fullTranslation = chunkOutputs.map(c => c.translation).filter(Boolean).join(' ');
     saveProject({
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
       type: 'dub',
@@ -3795,6 +4062,18 @@ let lastDubAudioBlob=null;
 let currentCreateData=null;
 let sceneAssets=[];
 let createdAudioURL=null, createdVideoURL=null;
+
+function releaseCreateSceneMotion(scenes){
+  const urls = new Set();
+  (Array.isArray(scenes) ? scenes : []).forEach(scene => {
+    const video = scene && scene.aiMotionVideoEl;
+    if(video){
+      try{ video.pause(); video.removeAttribute('src'); video.load(); }catch(_){}
+    }
+    if(scene && scene.aiMotionVideoUrl) urls.add(scene.aiMotionVideoUrl);
+  });
+  urls.forEach(url => { try{ URL.revokeObjectURL(url); }catch(_){} });
+}
 
 async function previewVoice(voice){
   toast('🔊 Gerando prévia da voz...');
@@ -4027,8 +4306,51 @@ async function encodeSmoothMp4WithWebCodecs({drawFn, audioBuffer, width=1280, he
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
 
-  // MODO A: Renderização Determinística Offline quadro-a-quadro (Criar Vídeo & Avatar) -> 30.000 FPS PERFEITOS, IMPOSSÍVEL TRAVAR!
-  if(!alsoPlay || !alsoPlay.length){
+  if(typeof drawFn.prepare === 'function') await drawFn.prepare();
+  // MODO C: cenas com clipes HunyuanVideo usam fontes de vídeo vivas; sincroniza os frames animados com a locução.
+  if(drawFn.requiresRealtimeSources){
+    drawFn(ctx, 0); // inicia a reprodução muda do primeiro clipe de cena
+    await new Promise(r => setTimeout(r, 80));
+    drawFn(ctx, 0); // captura um frame já decodificado antes de começar a linha do tempo
+
+    const frameDurUs = Math.round(1_000_000 / FPS);
+    const durationUs = Math.round(durationSec * 1_000_000);
+    const startedAt = performance.now();
+    let frame = 0;
+    let lastTsUs = -1;
+    const totalFrames = Math.max(1, Math.ceil(durationSec * FPS));
+    while(frame < totalFrames){
+      if(videoErr) throw videoErr;
+      const scheduledAt = startedAt + frame * 1000 / FPS;
+      const delay = scheduledAt - performance.now();
+      if(delay > 0) await new Promise(r => setTimeout(r, delay));
+      const elapsed = Math.max(0, (performance.now() - startedAt) / 1000);
+      if(elapsed >= durationSec) break;
+      drawFn(ctx, elapsed);
+      const timestamp = Math.max(lastTsUs + 1, Math.round(elapsed * 1_000_000));
+      const frameDuration = Math.max(1, Math.min(frameDurUs, durationUs - timestamp));
+      const vf = new VideoFrame(canvas, { timestamp, duration: frameDuration });
+      vEnc.encode(vf, { keyFrame: frame % 60 === 0 });
+      vf.close();
+      lastTsUs = timestamp;
+      frame++;
+      while(vEnc.encodeQueueSize > 8){
+        await new Promise(r => setTimeout(r, 8));
+      }
+      if(frame % 6 === 0 && onProgress) onProgress(Math.min(0.99, elapsed / Math.max(0.5, durationSec)));
+      const nowFrame = Math.floor((performance.now() - startedAt) * FPS / 1000) + 1;
+      if(nowFrame > frame) frame = nowFrame; // pula frames perdidos se o aparelho não codificar a 30 fps
+    }
+    const finalT = Math.max(0, durationSec - 1 / FPS);
+    const finalTs = Math.round(finalT * 1_000_000);
+    if(finalTs > lastTsUs + 1000){
+      drawFn(ctx, finalT);
+      const vf = new VideoFrame(canvas, { timestamp: finalTs, duration: frameDurUs });
+      vEnc.encode(vf, { keyFrame: frame % 60 === 0 });
+      vf.close();
+    }
+    if(onProgress) onProgress(1);
+  } else if(!alsoPlay || !alsoPlay.length){
     const totalFrames = Math.max(1, Math.round(durationSec * FPS));
     const frameDurUs = Math.round(1_000_000 / FPS);
     for(let f = 0; f < totalFrames; f++){
@@ -4198,7 +4520,12 @@ async function recordCanvasVideo({drawFn, audioEl, audioBuffer, width=1280, heig
   const canvas=document.createElement('canvas');
   canvas.width=W; canvas.height=H;
   const ctx=canvas.getContext('2d', { alpha: false });
+  if(typeof drawFn.prepare === 'function') await drawFn.prepare();
   drawFn(ctx,0);
+  if(drawFn.requiresRealtimeSources){
+    await new Promise(r => setTimeout(r, 80));
+    drawFn(ctx,0);
+  }
   const stream=canvas.captureStream(30);
 
   let recAudioCtx=null, bufSrc=null;
@@ -4553,6 +4880,7 @@ async function prepareCinemaActor(char, idx, artStylePrompt, style='cinematic'){
     workCanvas: workCv,
     srcImageData,
     workImageData,
+    hasAiPortrait: isAi,
     blinkOffset: idx * 1.85,
     mouth: await detectActorMouthAndEyes(srcCv, isAi)
   };
@@ -4708,9 +5036,10 @@ function renderActorLipSyncCanvas(actor, mouthOpen, mouthWide, blink){
 // Desenha um cenário com movimento de câmera cinematográfico fluido (cubic-bezier + respiração orgânica de lente) cobrindo W×H
 function drawSceneryWithCamera(ctx, img, W, H, p, move='zoomIn', alpha=1, t=0){
   if(!img) return;
+  if(('videoWidth' in img) && (img.readyState < 2 || !img.videoWidth)) return;
   ctx.save();
   ctx.globalAlpha = alpha;
-  const iw = img.width || 1280, ih = img.height || 720;
+  const iw = img.videoWidth || img.naturalWidth || img.width || 1280, ih = img.videoHeight || img.naturalHeight || img.height || 720;
   const ir = iw / ih, cr = W / H;
   // Curva suave S-curve (easeInOutSine) para fluidez cinematográfica real
   const ep = 0.5 - 0.5 * Math.cos(Math.PI * Math.max(0, Math.min(1, p)));
@@ -4779,23 +5108,38 @@ const EMOTION_LABELS_PT = {
 
 // Motor principal do CINEMA DE HISTÓRIAS: Cenário Multi-Plano 100% Visível + Personagens Atuando + Palco Picture-in-Scene Sincronizado
 function makeConnectedCinemaDrawer(movie){
+  const scenes = Array.isArray(movie && movie.scenes) ? movie.scenes : [];
   let smoothDialogueMix = 0;
   let smoothActionShotMix = 0;
   let lastT = 0;
   let lastBeatIdx = -1;
   let cutFlash = 0;
   const smoothScale = {};
+  let activeSceneVideo = null;
 
-  return (ctx, t) => {
+  const draw = (ctx, t) => {
     const W = ctx.canvas.width, H = ctx.canvas.height;
     const isLandscape = W >= H;
     const dt = Math.max(0.008, Math.min(0.1, Math.abs(t - lastT) || 0.033));
     lastT = t;
 
-    const scenes = movie.scenes;
     let sIdx = scenes.findIndex(s => t >= s.start && t < s.end);
     if(sIdx < 0) sIdx = t < scenes[0].start ? 0 : scenes.length - 1;
     const sc = scenes[sIdx];
+    const requestedVideo = sc.videoEl && sc.videoEl.readyState >= 2 && sc.videoEl.videoWidth ? sc.videoEl : null;
+    if(requestedVideo !== activeSceneVideo){
+      if(activeSceneVideo){ try{ activeSceneVideo.pause(); }catch(_){} }
+      activeSceneVideo = requestedVideo;
+      if(activeSceneVideo){
+        activeSceneVideo.muted = true;
+        activeSceneVideo.loop = true;
+        activeSceneVideo.playsInline = true;
+        try{ if(activeSceneVideo.currentTime > 0.05) activeSceneVideo.currentTime = 0; }catch(_){}
+        try{ const playPromise = activeSceneVideo.play(); if(playPromise && playPromise.catch) playPromise.catch(()=>{}); }catch(_){}
+      }
+    }
+    const mainVisual = requestedVideo || sc.imgBitmap;
+    const sceneActionBitmap = requestedVideo ? null : sc.actionBitmap;
     const span = Math.max(0.5, sc.end - sc.start);
     const sp = Math.max(0, Math.min(1, (t - sc.start) / span));
 
@@ -4817,21 +5161,22 @@ function makeConnectedCinemaDrawer(movie){
     const camMove = (activeBeat && activeBeat.cameraMove) || sc.cameraMove || 'zoomIn';
 
     // Alterna suavemente entre Shot A (Plano Aberto do Cenário) e Shot B (Plano de Ação dos Personagens no Cenário)
-    const wantActionShot = !!(sc.actionBitmap && ((activeBeat && activeBeat.shot === 'action') || sp > 0.42));
+    const wantActionShot = !!(sceneActionBitmap && ((activeBeat && activeBeat.shot === 'action') || sp > 0.42));
     smoothActionShotMix += ((wantActionShot ? 1 : 0) - smoothActionShotMix) * Math.min(1, dt * 3.8);
 
     // 1) CENÁRIO VIVO EM TELA CHEIA (100% VISÍVEL E ILUMINADO — NUNCA COBERTO NO CENTRO!)
     ctx.fillStyle = '#05060f';
     ctx.fillRect(0, 0, W, H);
-    drawSceneryWithCamera(ctx, sc.imgBitmap, W, H, sp, sc.cameraMove || 'zoomIn', 1, t);
-    if(sc.actionBitmap && smoothActionShotMix > 0.02){
-      drawSceneryWithCamera(ctx, sc.actionBitmap, W, H, beatP, camMove, smoothActionShotMix, t);
+    drawSceneryWithCamera(ctx, mainVisual, W, H, sp, sc.cameraMove || 'zoomIn', 1, t);
+    if(sceneActionBitmap && smoothActionShotMix > 0.02){
+      drawSceneryWithCamera(ctx, sceneActionBitmap, W, H, beatP, camMove, smoothActionShotMix, t);
     }
     // Cross-dissolve suave entre cenas consecutivas
     if(sIdx > 0 && (t - sc.start) < 0.75){
       const prevSc = scenes[sIdx - 1];
       const fadePrev = 1 - Math.max(0, (t - sc.start) / 0.75);
-      drawSceneryWithCamera(ctx, prevSc.actionBitmap || prevSc.imgBitmap, W, H, 1, prevSc.cameraMove || 'zoomIn', fadePrev, t);
+      const prevVideo = prevSc.videoEl && prevSc.videoEl.readyState >= 2 && prevSc.videoEl.videoWidth ? prevSc.videoEl : null;
+      drawSceneryWithCamera(ctx, prevVideo || prevSc.actionBitmap || prevSc.imgBitmap, W, H, 1, prevSc.cameraMove || 'zoomIn', fadePrev, t);
     }
     drawSceneAtmosphere(ctx, W, H, t, sc.atmosphere || 'particles');
 
@@ -5023,6 +5368,21 @@ function makeConnectedCinemaDrawer(movie){
       }
     }
   };
+  draw.requiresRealtimeSources = scenes.some(scene => !!scene.videoEl);
+  draw.prepare = async () => {
+    const videos = scenes.map(scene => scene.videoEl).filter(Boolean);
+    await Promise.all(videos.map(video => waitForGeneratedSceneVideo(video, 12000).catch(() => null)));
+    videos.forEach(video => {
+      try{ video.pause(); if(video.currentTime > 0.05) video.currentTime = 0; }catch(_){}
+    });
+    activeSceneVideo = null;
+    draw.requiresRealtimeSources = videos.some(video => video.readyState >= 2 && video.videoWidth > 0);
+  };
+  draw.cleanup = () => {
+    scenes.forEach(scene => { try{ if(scene.videoEl) scene.videoEl.pause(); }catch(_){} });
+    activeSceneVideo = null;
+  };
+  return draw;
 }
 
 // Reamostra qualquer AudioBuffer decodificado para 24000 Hz e mistura trilha cinematográfica com ducking automático
@@ -5098,18 +5458,33 @@ function buildMasterCinemaAudioBuffer(decodedItems, addMusic = true, mood = 'cin
 }
 
 function makeKenBurnsDrawer(scenes, opts={}){
-  return (ctx,t)=>{
+  let activeSceneVideo = null;
+  const draw = (ctx,t)=>{
     const W=ctx.canvas.width,H=ctx.canvas.height;
     let sc=scenes.find(s=>t>=s.start&&t<s.end);
     if(!sc) sc=t<scenes[0].start?scenes[0]:scenes[scenes.length-1];
+    const requestedVideo = sc.videoEl && sc.videoEl.readyState >= 2 && sc.videoEl.videoWidth ? sc.videoEl : null;
+    if(requestedVideo !== activeSceneVideo){
+      if(activeSceneVideo){ try{ activeSceneVideo.pause(); }catch(_){} }
+      activeSceneVideo = requestedVideo;
+      if(activeSceneVideo){
+        activeSceneVideo.muted = true;
+        activeSceneVideo.loop = true;
+        activeSceneVideo.playsInline = true;
+        try{ if(activeSceneVideo.currentTime > 0.05) activeSceneVideo.currentTime = 0; }catch(_){}
+        try{ const playPromise = activeSceneVideo.play(); if(playPromise && playPromise.catch) playPromise.catch(()=>{}); }catch(_){}
+      }
+    }
     const span=Math.max(1,sc.end-sc.start);
     const p=Math.max(0,Math.min(1,(t-sc.start)/span));
     const dir=((sc.i||0)%2===0)?1:-1;
     const zoom=1+0.12*p;
     ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
-    const img=(p > 0.5 && sc.actionBitmap) ? sc.actionBitmap : sc.imgBitmap;
+    const img=requestedVideo || ((p > 0.5 && sc.actionBitmap) ? sc.actionBitmap : sc.imgBitmap);
     if(img){
-      const ir=img.width/img.height, cr=W/H;
+      const iw=img.videoWidth || img.naturalWidth || img.width || 1280;
+      const ih=img.videoHeight || img.naturalHeight || img.height || 720;
+      const ir=iw/ih, cr=W/H;
       let dw,dh;
       if(ir>cr){ dh=H*zoom; dw=dh*ir; } else { dw=W*zoom; dh=dw/ir; }
       ctx.drawImage(img,(W-dw)/2+dir*dw*0.035*(p-0.5),(H-dh)/2,dw,dh);
@@ -5127,20 +5502,75 @@ function makeKenBurnsDrawer(scenes, opts={}){
       wrapText(ctx,sc.narration.slice(0,260),40,H-124,W-80,38);
     }
   };
+  draw.requiresRealtimeSources = scenes.some(scene => !!scene.videoEl);
+  draw.prepare = async () => {
+    const videos = scenes.map(scene => scene.videoEl).filter(Boolean);
+    await Promise.all(videos.map(video => waitForGeneratedSceneVideo(video, 12000).catch(() => null)));
+    videos.forEach(video => {
+      try{ video.pause(); if(video.currentTime > 0.05) video.currentTime = 0; }catch(_){}
+    });
+    activeSceneVideo = null;
+    draw.requiresRealtimeSources = videos.some(video => video.readyState >= 2 && video.videoWidth > 0);
+  };
+  draw.cleanup = () => {
+    scenes.forEach(scene => { try{ if(scene.videoEl) scene.videoEl.pause(); }catch(_){} });
+    activeSceneVideo = null;
+  };
+  return draw;
 }
 
-// Busca imagem da cena combinando API Backend (Gemini 3.1 + Unorouter Flux.2/SDXL) + Geração Direta Flux no Navegador em paralelo!
-async function fetchSceneImage(promptOrScene, style, w=896, h=504){
+// Consulta apenas um indicador booleano; a chave OpenRouter nunca sai do servidor.
+let _sceneImageProviderConfigPromise = null;
+async function hasConfiguredOpenRouterSceneImages(){
+  if(!_sceneImageProviderConfigPromise){
+    _sceneImageProviderConfigPromise = fetch('/api/scene-image', { method: 'GET', cache: 'no-store' })
+      .then(r => r.ok ? r.json() : {})
+      .then(data => !!(data && data.openrouterImageConfigured))
+      .catch(() => false);
+  }
+  return _sceneImageProviderConfigPromise;
+}
+
+let _createOpenRouterImageSpendUsd = 0;
+let _createOpenRouterImageSpendCount = 0;
+
+function buildSceneCharacterReferences(actors){
+  const references = [];
+  for(const actor of Array.isArray(actors) ? actors : []){
+    if(!actor || !actor.hasAiPortrait || !actor.srcCanvas || references.length >= 3) continue;
+    try{
+      const dataUrl = actor.srcCanvas.toDataURL('image/jpeg', 0.72);
+      if(!/^data:image\/jpeg;base64,/i.test(dataUrl) || dataUrl.length > 500000) continue;
+      references.push({
+        name: String(actor.name || 'personagem').replace(/\s+/g, ' ').trim().slice(0, 48),
+        dataUrl
+      });
+    }catch(_){}
+  }
+  return references;
+}
+
+// OpenRouter ganha prioridade quando configurado; retratos do elenco ancoram a identidade entre cenas.
+async function fetchSceneImage(promptOrScene, style, w=896, h=504, characterReferences=[]){
   const promptText = typeof promptOrScene === 'string'
     ? promptOrScene
     : (promptOrScene.visual || promptOrScene.title || '');
+  const openRouterEnabled = await hasConfiguredOpenRouterSceneImages();
   const backendTask = (async () => {
     const r = await fetch('/api/scene-image', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: promptText, style, width: w, height: h })
+      body: JSON.stringify({
+        prompt: promptText, style, width: w, height: h,
+        references: openRouterEnabled ? characterReferences : []
+      })
     });
     const j = await r.json();
+    const imageCost = Number(j && j.costUsd);
+    if(j && String(j.model || '').startsWith('openrouter/') && Number.isFinite(imageCost) && imageCost >= 0){
+      _createOpenRouterImageSpendUsd += imageCost;
+      _createOpenRouterImageSpendCount++;
+    }
     if(j && j.imageBase64){
       const blob = await (await fetch(`data:${j.mime||'image/png'};base64,${j.imageBase64}`)).blob();
       const bmp = await createImageBitmap(blob);
@@ -5148,6 +5578,14 @@ async function fetchSceneImage(promptOrScene, style, w=896, h=504){
     }
     throw new Error('sem imagem backend');
   })();
+
+  if(openRouterEnabled){
+    try { return await backendTask; }
+    catch(_){
+      try { return await fetchFreeAiImageDirect(promptText, style, w, h); }
+      catch(__){ return null; }
+    }
+  }
 
   const directTask = (async () => {
     await new Promise(res => setTimeout(res, 1400));
@@ -5161,6 +5599,166 @@ async function fetchSceneImage(promptOrScene, style, w=896, h=504){
   } catch (_) {
     return null;
   }
+}
+
+async function sceneBitmapToJpegBase64(bitmap, maxSide = 640){
+  if(!bitmap) throw new Error('Imagem de referência da cena indisponível.');
+  const sourceW = Number(bitmap.videoWidth || bitmap.naturalWidth || bitmap.width || 0);
+  const sourceH = Number(bitmap.videoHeight || bitmap.naturalHeight || bitmap.height || 0);
+  if(!sourceW || !sourceH) throw new Error('A imagem da cena ainda não foi carregada.');
+  const scale = Math.min(1, maxSide / Math.max(sourceW, sourceH));
+  const width = Math.max(1, Math.round(sourceW * scale));
+  const height = Math.max(1, Math.round(sourceH * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = width; canvas.height = height;
+  const ctx = canvas.getContext('2d', { alpha:false });
+  if(!ctx) throw new Error('Não foi possível preparar a imagem de referência.');
+  ctx.drawImage(bitmap, 0, 0, width, height);
+  const jpeg = await new Promise((resolve, reject) => {
+    canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Falha ao comprimir a imagem da cena.')), 'image/jpeg', 0.78);
+  });
+  const dataUrl = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Falha ao codificar a imagem de referência para o vídeo.'));
+    reader.readAsDataURL(jpeg);
+  });
+  const comma = dataUrl.indexOf(',');
+  if(comma < 0) throw new Error('Formato inválido da imagem de referência.');
+  return dataUrl.slice(comma + 1);
+}
+
+function waitForGeneratedSceneVideo(video, timeoutMs = 30000){
+  return new Promise((resolve, reject) => {
+    if(video.readyState >= 2 && video.videoWidth > 0) return resolve(video);
+    let timer;
+    const cleanup = () => {
+      clearTimeout(timer);
+      video.removeEventListener('loadeddata', onReady);
+      video.removeEventListener('canplay', onReady);
+      video.removeEventListener('error', onError);
+    };
+    const onReady = () => {
+      if(video.readyState >= 2 && video.videoWidth > 0){ cleanup(); resolve(video); }
+    };
+    const onError = () => {
+      cleanup();
+      reject(new Error('O navegador não conseguiu abrir o clipe MP4 gerado para a cena.'));
+    };
+    video.addEventListener('loadeddata', onReady);
+    video.addEventListener('canplay', onReady);
+    video.addEventListener('error', onError);
+    timer = setTimeout(() => {
+      cleanup();
+      reject(new Error('Tempo esgotado ao carregar o clipe MP4 da cena.'));
+    }, timeoutMs);
+    try{ video.load(); }catch(e){ cleanup(); reject(e); }
+  });
+}
+
+async function loadGeneratedSceneVideo(blob){
+  const url = URL.createObjectURL(blob);
+  const video = document.createElement('video');
+  video.muted = true;
+  video.loop = true;
+  video.playsInline = true;
+  video.preload = 'auto';
+  video.src = url;
+  try{
+    await waitForGeneratedSceneVideo(video);
+    return { video, url };
+  }catch(e){
+    try{ video.pause(); video.removeAttribute('src'); video.load(); }catch(_){}
+    try{ URL.revokeObjectURL(url); }catch(_){}
+    throw e;
+  }
+}
+
+async function requestHunyuanSceneVideo(scene, stylePrompt){
+  const imageBase64 = await sceneBitmapToJpegBase64(scene.imgBitmap);
+  const beatActions = Array.isArray(scene.beats)
+    ? scene.beats.map(beat => String(beat && beat.action || '').trim()).filter(Boolean).slice(0, 3)
+    : [];
+  const motionPrompt = [scene.actionVisual, ...beatActions, scene.visual, scene.title]
+    .map(value => String(value || '').trim())
+    .filter(Boolean)
+    .join(' | ')
+    .slice(0, 1200);
+  const parseError = async (response, fallback) => {
+    try{
+      const result = await response.json();
+      if(result && result.error) return String(result.error);
+    }catch(_){}
+    return `${fallback} HTTP ${response.status}`;
+  };
+
+  const startResponse = await fetch('/api/create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: 'scene-video',
+      prompt: motionPrompt,
+      imageBase64,
+      imageMime: 'image/jpeg',
+      stylePrompt: String(stylePrompt || '')
+    }),
+    signal: AbortSignal.timeout(45000)
+  });
+  if(!startResponse.ok){
+    throw new Error(await parseError(startResponse, 'HunyuanVideo não conseguiu iniciar a geração.'));
+  }
+  const task = await startResponse.json();
+  if(!task || !task.taskId) throw new Error('HunyuanVideo não devolveu o identificador da tarefa.');
+
+  // O TokenHub gera de forma assíncrona; consultar em chamadas curtas evita manter uma Function da Vercel aberta por minutos.
+  const deadline = Date.now() + 300000;
+  let lastTransientError = '';
+  while(Date.now() < deadline){
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    if(Date.now() >= deadline) break;
+    let pollResponse;
+    try{
+      pollResponse = await fetch('/api/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'scene-video-status', taskId: task.taskId }),
+        signal: AbortSignal.timeout(35000)
+      });
+    }catch(e){
+      lastTransientError = String(e && e.message || e || 'erro de rede').slice(0, 120);
+      continue;
+    }
+
+    if(pollResponse.status === 429 || pollResponse.status === 503 || pollResponse.status === 504){
+      const transientMessage = await parseError(pollResponse, 'Falha temporária consultando HunyuanVideo.');
+      if(pollResponse.status === 429 && /account exception|arrears|depleted|expired|suspended|access denied|not subscribed|billing|credit|crédito|créditos/i.test(transientMessage)){
+        throw new Error(transientMessage);
+      }
+      lastTransientError = transientMessage;
+      continue;
+    }
+    const contentType = (pollResponse.headers.get('content-type') || '').toLowerCase();
+    if(contentType.includes('application/json')){
+      const status = await pollResponse.json().catch(() => ({}));
+      if(!pollResponse.ok) throw new Error(status.error || `HunyuanVideo retornou HTTP ${pollResponse.status}`);
+      if(status.status === 'queued' || status.status === 'running' || status.status === 'pending' || status.status === 'processing'){
+        const progress = document.getElementById('videoBuildMsg');
+        if(progress) progress.textContent = status.status === 'queued'
+          ? '⏳ HunyuanVideo: clipe na fila de geração...'
+          : '⏳ HunyuanVideo: animando a cena (5 s em 720p)...';
+        continue;
+      }
+      if(status.error) throw new Error(status.error);
+      throw new Error('HunyuanVideo devolveu uma resposta inesperada ao consultar a tarefa.');
+    }
+    if(!pollResponse.ok) throw new Error(`HunyuanVideo retornou HTTP ${pollResponse.status}`);
+    const rawBlob = await pollResponse.blob();
+    if(!rawBlob || rawBlob.size < 1000) throw new Error('HunyuanVideo devolveu um clipe vazio.');
+    const mime = (pollResponse.headers.get('content-type') || rawBlob.type || 'video/mp4').split(';')[0];
+    const videoBlob = mime === 'video/mp4' ? rawBlob : new Blob([rawBlob], { type:'video/mp4' });
+    return { ...(await loadGeneratedSceneVideo(videoBlob)), blob:videoBlob, provider:pollResponse.headers.get('x-ai-video-provider') || 'tencent/hy-video-v1.5' };
+  }
+  throw new Error(`Tempo esgotado esperando o HunyuanVideo finalizar${lastTransientError ? `: ${lastTransientError}` : ''}.`);
 }
 
 async function fetchSceneAudio(text,voice,emotion=''){
@@ -5192,8 +5790,15 @@ async function buildCreateVideo(){
   const imgDim = fmt === '9:16' ? { w:576, h:1024 } : fmt === '1:1' ? { w:768, h:768 } : { w:896, h:504 };
   const addMusic = ((document.getElementById('createMusic')||{}).value||'cinematic') !== 'none';
   const isConnected = (d.cinemaMode || (document.getElementById('cinemaMode')||{}).value || 'story') !== 'classic';
+  const useAiMotion = !!(document.getElementById('createAiMotion')||{}).checked;
+  _createOpenRouterImageSpendUsd = 0;
+  _createOpenRouterImageSpendCount = 0;
+  let buildScenes = [];
+  let sceneDrawer = null;
+  let aiMotionClipCount = 0;
+  let aiMotionFailures = [];
 
-  btn.disabled=true; btn.textContent='⏳ Produzindo história animada completa...';
+  btn.disabled=true; btn.textContent=useAiMotion ? '⏳ HunyuanVideo: preparando clipes de vídeo...' : '⏳ Produzindo história animada completa...';
   const prog=document.getElementById('videoBuildProgress');
   prog.classList.remove('hidden');
   $('#createProgress').classList.add('show');
@@ -5213,28 +5818,77 @@ async function buildCreateVideo(){
     }
     const actorMap = {};
     actors.forEach(a => { actorMap[a.id] = a; });
+    const referenceToggle = document.getElementById('createUseCharacterReferences');
+    const useSceneIdentityReferences = !referenceToggle || referenceToggle.checked;
+    const sceneCharacterReferences = useSceneIdentityReferences && await hasConfiguredOpenRouterSceneImages()
+      ? buildSceneCharacterReferences(actors)
+      : [];
 
     const scenes = new Array(d.scenes.length);
+    buildScenes = scenes;
     for(let i = 0; i < d.scenes.length; i++){
       const s = d.scenes[i];
-      document.getElementById('videoBuildMsg').textContent = `🏞️ Gerando cenário e ação da Cena ${i+1} de ${d.scenes.length} (“${s.locationName||s.title}”)...`;
-      const pct = Math.round(14 + (i / d.scenes.length) * 28);
+      document.getElementById('videoBuildMsg').textContent = `🏞️ Gerando cenário${useAiMotion ? '' : ' e ação'} da Cena ${i+1} de ${d.scenes.length} (“${s.locationName||s.title}”)...`;
+      const pct = Math.round(14 + (i / d.scenes.length) * (useAiMotion ? 24 : 28));
       document.getElementById('videoBuildFill').style.width = pct + '%';
       setProgress('createProgressFill', 35 + Math.round((i / d.scenes.length) * 20));
 
-      // Gera simultaneamente o Plano Aberto (Shot A) e o Plano de Ação (Shot B) da cena!
+      // O clipe HunyuanVideo usa o plano aberto como referência; o modo original continua criando os dois ângulos.
       const [mainBmp, actBmp] = await Promise.all([
-        fetchSceneImage(s.visual || s.title, style, imgDim.w, imgDim.h).then(im => im || placeholderBitmap(s, i)),
-        s.actionVisual
-          ? fetchSceneImage(s.actionVisual, style, imgDim.w, imgDim.h)
+        fetchSceneImage(s.visual || s.title, style, imgDim.w, imgDim.h, sceneCharacterReferences).then(im => im || placeholderBitmap(s, i)),
+        !useAiMotion && s.actionVisual
+          ? fetchSceneImage(s.actionVisual, style, imgDim.w, imgDim.h, sceneCharacterReferences)
           : Promise.resolve(null)
       ]);
       scenes[i] = {
         ...s,
         i: s.i || (i + 1),
         imgBitmap: mainBmp,
-        actionBitmap: actBmp || mainBmp
+        actionBitmap: useAiMotion ? null : (actBmp || mainBmp),
+        aiMotionVideoBlob: s.aiMotionVideoBlob || null,
+        aiMotionVideoUrl: s.aiMotionVideoUrl || null,
+        aiMotionVideoEl: s.aiMotionVideoEl || null,
+        aiMotionVideoProvider: s.aiMotionVideoProvider || '',
+        videoEl: null
       };
+      if(useAiMotion && scenes[i].aiMotionVideoEl){
+        scenes[i].videoEl = scenes[i].aiMotionVideoEl;
+        aiMotionClipCount++;
+      }
+    }
+
+    if(useAiMotion){
+      for(let i = 0; i < scenes.length; i++){
+        const scene = scenes[i];
+        if(scene.videoEl) continue; // reutiliza o clipe já gerado, sem uma nova chamada paga
+        document.getElementById('videoBuildMsg').textContent = `🎥 HunyuanVideo 1.5 (Tencent) está animando a Cena ${i+1} de ${scenes.length} (“${scene.locationName||scene.title}”)...`;
+        const pct = Math.round(39 + ((i + 0.15) / scenes.length) * 13);
+        document.getElementById('videoBuildFill').style.width = pct + '%';
+        setProgress('createProgressFill', 55 + Math.round((i / scenes.length) * 8));
+        try{
+          const generated = await requestHunyuanSceneVideo(scene, d.artStylePrompt || style);
+          scene.aiMotionVideoBlob = generated.blob;
+          scene.aiMotionVideoEl = generated.video;
+          scene.aiMotionVideoUrl = generated.url;
+          scene.aiMotionVideoProvider = generated.provider;
+          scene.videoEl = generated.video;
+          aiMotionClipCount++;
+        }catch(videoErr){
+          const message = String(videoErr && videoErr.message || videoErr || 'falha desconhecida');
+          aiMotionFailures.push(`Cena ${i+1}: ${message}`);
+          scene.videoEl = null; // usa o render local para esta cena e não interrompe o projeto
+          if(/TENCENT_TOKENHUB_API_KEY não está configurada|HunyuanVideo HTTP (401|403|404|429|5\d\d)|limite temporário|tempo esgotado|Failed to fetch|fetch failed|NetworkError|AbortError|aborted/i.test(message)){
+            for(let j = i + 1; j < scenes.length; j++){
+              aiMotionFailures.push(`Cena ${j+1}: não tentada após falha do provedor.`);
+            }
+            break;
+          }
+        }
+        const completed = Math.min(scenes.length, i + 1);
+        const nextPct = Math.round(39 + (completed / scenes.length) * 13);
+        document.getElementById('videoBuildFill').style.width = nextPct + '%';
+        setProgress('createProgressFill', 55 + Math.round((completed / scenes.length) * 8));
+      }
     }
 
     setStep(['s1','s2','s3','s4'], 2);
@@ -5267,9 +5921,9 @@ async function buildCreateVideo(){
     for(let i = 0; i < flatBeats.length; i += 2){
       const pair = flatBeats.slice(i, i + 2);
       document.getElementById('videoBuildMsg').textContent = `🎙️ Gravando dublagem unificada ${i+1}–${Math.min(flatBeats.length, i+2)} de ${flatBeats.length} (${pair.map(p=>p.speakerName).join(' & ')})...`;
-      const pct = Math.round(42 + (i / Math.max(1, flatBeats.length)) * 22);
+      const pct = Math.round(52 + (i / Math.max(1, flatBeats.length)) * 18);
       document.getElementById('videoBuildFill').style.width = pct + '%';
-      setProgress('createProgressFill', 55 + Math.round((i / Math.max(1, flatBeats.length)) * 18));
+      setProgress('createProgressFill', 63 + Math.round((i / Math.max(1, flatBeats.length)) * 16));
 
       const audios = await Promise.all(pair.map(b => fetchSceneAudio(b.text, narratorVoice, '')));
       for(let j = 0; j < pair.length; j++){
@@ -5315,19 +5969,19 @@ async function buildCreateVideo(){
 
     setStep(['s1','s2','s3','s4'], 3);
     document.getElementById('videoBuildMsg').textContent = `🎬 Gravando vídeo final sincronizado (${Math.round(master.totalDuration)}s • ${fmt})...`;
-    const drawer = isConnected
+    sceneDrawer = isConnected
       ? makeConnectedCinemaDrawer({ scenes, actors, timedBeats })
       : makeKenBurnsDrawer(scenes, { withNarration: realVoiceClips === 0 });
 
     const videoBlob = await recordCanvasVideo({
-      drawFn: drawer,
+      drawFn: sceneDrawer,
       audioBuffer: master.audioBuffer,
       width: dim.w,
       height: dim.h,
       durationSec: master.totalDuration,
       onProgress: p => {
-        document.getElementById('videoBuildFill').style.width = Math.round(64 + p * 36) + '%';
-        setProgress('createProgressFill', Math.round(73 + p * 27));
+        document.getElementById('videoBuildFill').style.width = Math.round(70 + p * 30) + '%';
+        setProgress('createProgressFill', Math.round(79 + p * 21));
       }
     });
 
@@ -5356,14 +6010,23 @@ async function buildCreateVideo(){
     sceneAssets = scenes.map(s => ({ title: s.title, imgBitmap: s.imgBitmap }));
     const wrap = document.getElementById('createdVideoWrap');
     wrap.classList.remove('hidden');
+    const aiMotionBanner = useAiMotion ? ` • HunyuanVideo ${aiMotionClipCount}/${scenes.length} clipes` : '';
+    const imageCostBanner = _createOpenRouterImageSpendCount
+      ? ` • FLUX.2 Pro ${_createOpenRouterImageSpendCount} imagens • ${new Intl.NumberFormat('pt-BR', { style:'currency', currency:'USD' }).format(_createOpenRouterImageSpendUsd)}`
+      : '';
     document.getElementById('createdVideoReadyBanner').textContent =
-      `✅ Filme conectado pronto (${Math.round(master.totalDuration)}s • ${scenes.length} cenários • ${actors.length ? 'Narrador + ' + actors.map(a=>a.name).join(' & ') : 'Narração'} • formato .${ext.toUpperCase()})!`;
+      `✅ Filme conectado pronto (${Math.round(master.totalDuration)}s • ${scenes.length} cenários${aiMotionBanner}${imageCostBanner} • ${actors.length ? 'Narrador + ' + actors.map(a=>a.name).join(' & ') : 'Narração'} • formato .${ext.toUpperCase()})!`;
 
-    const summaryMsg = realVoiceClips > 0
-      ? `✅ Vídeo completo pronto para assistir e baixar! (${scenes.length} cenas conectadas • vozes: ${[...voiceProviders].join(', ') || 'IA'})`
-      : `✅ Vídeo conectado montado com legendas e trilha sincronizadas! Clique no botão verde abaixo para baixar.`;
+    const voiceSummary = realVoiceClips > 0
+      ? `✅ Vídeo pronto para assistir e baixar! (${scenes.length} cenas • vozes: ${[...voiceProviders].join(', ') || 'IA'})`
+      : '✅ Vídeo montado com legendas e trilha sincronizadas!';
+    const motionSummary = useAiMotion
+      ? (aiMotionClipCount > 0 ? `Clipes com HunyuanVideo 1.5 (Tencent): ${aiMotionClipCount}/${scenes.length}.` : 'HunyuanVideo não gerou clipes; usei o render atual.')
+      : '';
+    const motionWarning = aiMotionFailures.length ? ` Aviso: ${aiMotionFailures[0].slice(0, 180)}` : '';
+    const summaryMsg = [voiceSummary, motionSummary].filter(Boolean).join(' ') + motionWarning + ' Clique no botão verde abaixo para baixar.';
     document.getElementById('videoBuildMsg').textContent = summaryMsg;
-    showStatus('createStatus', summaryMsg, 'success');
+    showStatus('createStatus', summaryMsg, useAiMotion && aiMotionFailures.length ? 'warn' : 'success');
     toast('🎬 Vídeo pronto! Clique no botão verde para baixar!');
     setTimeout(()=> wrap.scrollIntoView({ behavior:'smooth', block:'center' }), 200);
   }catch(e){
@@ -5371,6 +6034,8 @@ async function buildCreateVideo(){
     showStatus('createStatus','❌ Erro na montagem: '+e.message,'error');
     toast(e.message,'error');
   }finally{
+    if(sceneDrawer && typeof sceneDrawer.cleanup === 'function') sceneDrawer.cleanup();
+    buildScenes.forEach(scene => { try{ if(scene.videoEl) scene.videoEl.pause(); }catch(_){} });
     btn.disabled=false; btn.textContent='🎬 Renderizar / Atualizar Vídeo Conectado';
     setTimeout(()=>{ $('#createProgress').classList.remove('show'); }, 1500);
   }
@@ -9334,6 +9999,13 @@ function findActiveOpusCaptionCue(cues, timeSec){
   return cues.find(c => c && t >= Number(c.start) && t < Number(c.end) + 0.08) || null;
 }
 
+// Revela palavras gradualmente; não antecipa palavras futuras dentro do mesmo bloco de legenda.
+function getVisibleOpusCaptionWords(cue, timeSec){
+  const t = Number(timeSec);
+  if(!cue || !Array.isArray(cue.words) || !Number.isFinite(t)) return [];
+  return cue.words.filter(word => Number.isFinite(Number(word && word.start)) && t >= Number(word.start));
+}
+
 // A folga extra impede que contorno, brilho e pop da palavra ativa apaguem o espaço entre as palavras.
 function getOpusCaptionWordGap(fontSize, measuredSpaceWidth){
   const size = Math.max(0, Number(fontSize) || 0);
@@ -9367,6 +10039,7 @@ function drawOpusReframedFrame(ctx, videoEl, clip, relSec){
   const captionRelSec = Math.max(0, (relSec - capOffset) * capSpeed);
 
   const activeCue = findActiveOpusCaptionCue(cues, captionRelSec);
+  const visibleCaptionWords = getVisibleOpusCaptionWords(activeCue, captionRelSec);
   const activeWordObj = activeCue && activeCue.words ? activeCue.words.find(w => captionRelSec >= w.start && captionRelSec <= w.end + 0.05) : null;
 
   // Calcula o fator de Zoom Dinâmico (Jump-Cut Punch-In estilo OpusClip Pro)
@@ -9591,7 +10264,7 @@ function drawOpusReframedFrame(ctx, videoEl, clip, relSec){
   }
 
   // 5) LEGENDAS ULTRA-PROFISSIONAIS OPUSCLIP PRO 3.0 (MULTI-LINHA INTELIGENTE, ZERO CORTE NAS BORDAS, AJUSTÁVEIS NA POSIÇÃO E SINCRONIA COM A FALA)
-  if(captionStyle !== 'none' && activeCue && activeCue.words && activeCue.words.length){
+  if(captionStyle !== 'none' && activeCue && visibleCaptionWords.length){
     ctx.save();
     const maxSafeWidth = W * 0.86;
     const fontScale = Math.max(0.55, Math.min(1.6, (Number(clip.captionFontScale) || Number((document.getElementById('opusEditCaptionScale')||{}).value) || 100) / 100));
@@ -9679,6 +10352,10 @@ function drawOpusReframedFrame(ctx, videoEl, clip, relSec){
       let cursorX = blockCenterX - lineObj.totalW * 0.5;
 
       lineObj.words.forEach((wObj) => {
+        if(captionRelSec < wObj.start){
+          cursorX += wObj.wW + spaceW;
+          return;
+        }
         const isCurrent = captionRelSec >= wObj.start && captionRelSec <= wObj.end + 0.05;
         const wordCenterX = cursorX + wObj.wW * 0.5;
         const wordCenterY = yPos - baseFont * 0.34;
@@ -10447,7 +11124,16 @@ function resetOpusCaptionSync(cardIdx = null){
 function onInlineEditCardCaptionText(idx, val){
   const clip = opusState.clips[idx];
   if(!clip) return;
-  clip.captionText = String(val || '');
+  const nextText = String(val || '');
+  if(nextText !== String(clip.captionText || '')){
+    clip.captionManuallyEdited = true;
+    if(!opusCaptionTextMatches(clip.captionText, nextText)){
+      clip.subSegments = [];
+      clip.captionTimingGranularity = 'none';
+    }
+  }
+  clip.captionText = nextText;
+  clip.captionAudioMismatch = false;
   clip._cues = null;
   opusState.lastExportBlob = null; opusState.lastExportClipId = null;
   if(idx === opusState.selectedIdx){
@@ -10563,6 +11249,66 @@ function selectOpusClip(idx, autoPlay = false){
   }
 }
 
+async function generateSelectedOpusClipCaptionsFromAudio(){
+  const idx = Number(opusState.selectedIdx) || 0;
+  const clip = opusState.clips && opusState.clips[idx];
+  if(!clip){
+    toast('Selecione um corte antes de gerar a legenda automática.', 'warn');
+    return;
+  }
+  if(!hasOpusClipAudioSource()){
+    showStatus('opusStatus', '⚠️ Para gerar legendas como no CapCut, carregue o arquivo .MP4 local para o app poder ouvir o áudio do corte.', 'warn');
+    toast('📂 Carregue o vídeo .MP4 local para transcrever a fala do áudio.', 'warn');
+    return;
+  }
+
+  const btn = document.getElementById('opusAutoCaptionBtn');
+  const manualBefore = Boolean(clip.captionManuallyEdited);
+  if(btn){
+    btn.disabled = true;
+    btn.textContent = '⏳ Ouvindo o áudio e transcrevendo...';
+  }
+  clip.captionManuallyEdited = false;
+  clip.captionAudioMismatch = false;
+  showStatus('opusStatus', `🎙️ Ouvindo o áudio do corte #${clip.rank || idx + 1} e gerando as legendas automaticamente...`, 'info');
+
+  try{
+    const synchronized = await transcribeMissingOpusClipCaptions([clip], true);
+    clip._cues = null;
+    opusState.lastExportBlob = null;
+    opusState.lastExportClipId = null;
+    const captionEditor = document.getElementById('opusEditCaption');
+    if(captionEditor) captionEditor.value = clip.captionText || '';
+    updateInlineCardCaptionBadges(idx, clip);
+    renderSingleOpusPreviewFrame();
+    renderAllOpusCardStaticPreviews();
+
+    if(clip.captionAudioTranscriptionReceived && String(clip.captionText || '').trim()){
+      clip.captionManuallyEdited = false;
+      if(synchronized > 0){
+        showStatus('opusStatus', '✅ Legenda gerada a partir da fala do vídeo e sincronizada palavra por palavra. A mesma legenda será gravada no MP4.', 'success');
+        toast('✅ Fala transcrita do áudio e sincronizada no vídeo!');
+      } else {
+        showStatus('opusStatus', '⚠️ A fala foi transcrita, mas o serviço não retornou tempos exatos por palavra. Revise a prévia; o MP4 usará os tempos disponíveis.', 'warn');
+        toast('⚠️ Texto reconhecido; confira a sincronia na prévia.', 'warn');
+      }
+    } else {
+      clip.captionManuallyEdited = manualBefore;
+      showStatus('opusStatus', '⚠️ Não foi possível reconhecer fala clara neste corte. A legenda existente foi mantida.', 'warn');
+      toast('⚠️ Não reconheci fala clara no áudio deste corte.', 'warn');
+    }
+  }catch(error){
+    if(!clip.captionAudioTranscriptionReceived) clip.captionManuallyEdited = manualBefore;
+    showStatus('opusStatus', '❌ Erro ao gerar legendas do áudio: ' + (error.message || 'falha de transcrição'), 'error');
+    toast('❌ Não foi possível transcrever o áudio deste corte.', 'error');
+  }finally{
+    if(btn){
+      btn.disabled = false;
+      btn.textContent = '🎙️ Gerar legenda automaticamente pelo áudio';
+    }
+  }
+}
+
 function onEditSelectedOpusClip(){
   const clip = opusState.clips[opusState.selectedIdx];
   if(!clip) return;
@@ -10572,7 +11318,16 @@ function onEditSelectedOpusClip(){
   if(isFinite(e) && e > clip.startSec + 2) clip.endSec = Number(Math.min(opusState.durationSec || 3600, e).toFixed(1));
   clip.durationSec = Number(Math.max(2, clip.endSec - clip.startSec).toFixed(1));
   clip.hookBanner = document.getElementById('opusEditHookBanner').value;
-  clip.captionText = document.getElementById('opusEditCaption').value;
+  const editedCaption = String(document.getElementById('opusEditCaption').value || '');
+  if(editedCaption !== String(clip.captionText || '')){
+    clip.captionManuallyEdited = true;
+    if(!opusCaptionTextMatches(clip.captionText, editedCaption)){
+      clip.subSegments = [];
+      clip.captionTimingGranularity = 'none';
+    }
+  }
+  clip.captionText = editedCaption;
+  clip.captionAudioMismatch = false;
   clip._cues = null;
   opusState.lastExportBlob = null; opusState.lastExportClipId = null;
   renderOpusClipsListUI();
@@ -10793,80 +11548,166 @@ function hasOpusClipWordTiming(clip){
   return captionWords.every((word, i) => word === timedWords[i]);
 }
 
-// Recupera texto ausente e refina os tempos por palavra usando o áudio exato de cada corte.
-// Se já houver legenda, preserva o texto e só aplica novos tempos quando a fala reconhecida coincide.
-async function transcribeMissingOpusClipCaptions(clips){
+function hasOpusClipAudioSource(){
+  return Boolean((opusState.mono12k && opusState.mono12k.length)
+    || (opusState.fullAudioBuffer && opusState.fullAudioBuffer.length)
+    || (opusState.fileUrl && typeof extractSingleChunkStreaming === 'function'));
+}
+
+// Re-transcreve o áudio exato de cada corte final para corrigir palavras e alinhar timestamps à fala real.
+// Arquivos grandes usam captura local do trecho; texto editado manualmente nunca é sobrescrito.
+async function transcribeMissingOpusClipCaptions(clips, forceResync = false){
   const pending = (Array.isArray(clips) ? clips : []).filter(clip => clip
-    && (!String(clip.captionText || '').trim() || !hasOpusClipWordTiming(clip)));
+    && (forceResync || !String(clip.captionText || '').trim() || !hasOpusClipWordTiming(clip)));
   if(!pending.length) return 0;
+  if(forceResync){
+    pending.forEach(clip => {
+      clip.captionAudioSyncVerified = false;
+      clip.captionAudioMismatch = false;
+      clip.captionAudioTranscriptionReceived = false;
+    });
+  }
 
   const SR = 12000;
   const mono = opusState.mono12k && opusState.mono12k.length ? opusState.mono12k : null;
   const audioBuffer = !mono && opusState.fullAudioBuffer && opusState.fullAudioBuffer.length
     ? opusState.fullAudioBuffer : null;
-  if(!mono && !audioBuffer) return 0;
+  const monoSource = mono || (audioBuffer ? audioBuffer.getChannelData(0) : null);
+  const sourceRate = mono ? SR : Number(audioBuffer && audioBuffer.sampleRate) || SR;
+  let streamMediaElements = [];
+  let sourceDuration = mono ? mono.length / SR : audioBuffer ? audioBuffer.duration : Number(opusState.durationSec) || 0;
 
-  const monoSource = mono || audioBuffer.getChannelData(0);
-  const sourceRate = mono ? SR : Number(audioBuffer.sampleRate) || SR;
+  const disposeStreamMedia = media => {
+    try{ media.pause(); media.removeAttribute('src'); media.load(); }catch(_){}
+  };
+  if(!mono && !audioBuffer && opusState.fileUrl && typeof document !== 'undefined'
+    && typeof extractSingleChunkStreaming === 'function'){
+    const prepareStreamMedia = () => new Promise(resolve => {
+      let media;
+      try{ media = document.createElement('video'); }catch(_){ resolve(null); return; }
+      media.preload = 'metadata';
+      media.playsInline = true;
+      media.muted = false;
+      media.volume = 0.0001;
+      let settled = false;
+      let timer = null;
+      const finish = ok => {
+        if(settled) return;
+        settled = true;
+        if(timer !== null) clearTimeout(timer);
+        try{
+          media.removeEventListener('loadedmetadata', onLoaded);
+          media.removeEventListener('error', onError);
+        }catch(_){}
+        resolve(ok && Number.isFinite(Number(media.duration)) && Number(media.duration) > 0 ? media : null);
+      };
+      const onLoaded = () => finish(true);
+      const onError = () => finish(false);
+      media.addEventListener('loadedmetadata', onLoaded, { once: true });
+      media.addEventListener('error', onError, { once: true });
+      timer = setTimeout(() => finish(false), 5000);
+      media.src = opusState.fileUrl;
+      if(typeof media.load === 'function') media.load();
+    });
+    const mediaCount = Math.min(2, pending.length);
+    streamMediaElements = (await Promise.all(Array.from({ length: mediaCount }, prepareStreamMedia))).filter(Boolean);
+    if(streamMediaElements.length){
+      sourceDuration = Number(streamMediaElements[0].duration) || sourceDuration;
+    }
+  }
+  if(!mono && !audioBuffer && !streamMediaElements.length) return 0;
+
   let nextIndex = 0;
   let synchronized = 0;
-
-  const transcribeOne = async clip => {
+  const transcribeOne = async (clip, streamMedia = null) => {
+    clip.captionAudioTranscriptionReceived = false;
     const startSec = Math.max(0, Number(clip.startSec) || 0);
     const endSecRaw = Number(clip.endSec);
     if(!Number.isFinite(endSecRaw) || endSecRaw <= startSec) return false;
-    const maxEndSec = Math.min(endSecRaw, startSec + 120, monoSource.length / sourceRate);
+    const maxEndSec = Math.min(endSecRaw, startSec + 120, sourceDuration);
     const durationSec = maxEndSec - startSec;
     if(durationSec < 2) return false;
 
-    let samples;
-    if(mono){
-      const s0 = Math.max(0, Math.floor(startSec * SR));
-      const s1 = Math.min(mono.length, Math.ceil(maxEndSec * SR));
-      samples = mono.subarray(s0, s1);
-    } else {
-      const count = Math.floor(durationSec * SR);
-      const sourceStart = Math.floor(startSec * sourceRate);
-      const sourceStep = sourceRate / SR;
-      samples = new Float32Array(count);
-      for(let i = 0; i < count; i++){
-        const pos = sourceStart + i * sourceStep;
-        const idx = Math.floor(pos);
-        const frac = pos - idx;
-        samples[i] = (monoSource[idx] || 0) * (1 - frac) + (monoSource[idx + 1] || 0) * frac;
-      }
-    }
-    if(samples.length < SR * 2) return false;
-
     try{
-      const wavBytes = encodeWavMono(samples, SR);
+      let audioBase64 = '';
+      let audioMime = 'audio/wav';
+      let audioDurationSec = durationSec;
+      if(streamMedia){
+        const extracted = await extractSingleChunkStreaming(streamMedia, startSec, maxEndSec);
+        if(!extracted || !extracted.base64) return false;
+        audioBase64 = extracted.base64;
+        audioMime = extracted.audioMime || 'audio/webm';
+        audioDurationSec = Number(extracted.seconds) || durationSec;
+      } else {
+        let samples;
+        if(mono){
+          const s0 = Math.max(0, Math.floor(startSec * SR));
+          const s1 = Math.min(mono.length, Math.ceil(maxEndSec * SR));
+          samples = mono.subarray(s0, s1);
+        } else {
+          const count = Math.floor(durationSec * SR);
+          const sourceStart = Math.floor(startSec * sourceRate);
+          const sourceStep = sourceRate / SR;
+          samples = new Float32Array(count);
+          for(let i = 0; i < count; i++){
+            const pos = sourceStart + i * sourceStep;
+            const idx = Math.floor(pos);
+            const frac = pos - idx;
+            samples[i] = (monoSource[idx] || 0) * (1 - frac) + (monoSource[idx + 1] || 0) * frac;
+          }
+        }
+        if(samples.length < SR * 2) return false;
+        const wavBytes = encodeWavMono(samples, SR);
+        audioBase64 = bytesToBase64(wavBytes);
+        audioDurationSec = samples.length / SR;
+      }
+      if(audioDurationSec < 2) return false;
+
       const response = await fetch('/api/clips', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'transcribe_segment',
-          audioBase64: bytesToBase64(wavBytes),
-          audioMime: 'audio/wav',
+          audioBase64,
+          audioMime,
           offsetSec: startSec,
-          durationSec: Number((samples.length / SR).toFixed(2))
+          durationSec: Number(audioDurationSec.toFixed(2))
         })
       });
       if(!response.ok) return false;
       const result = await response.json();
       const text = String(result && result.text || '').trim();
       if(!text || result.silent) return false;
+      clip.captionAudioTranscriptionReceived = true;
 
       const existingText = String(clip.captionText || '').trim();
-      if(existingText && !opusCaptionTextMatches(existingText, text)) return false;
-      if(!existingText) clip.captionText = text;
+      const transcriptMatches = !existingText || opusCaptionTextMatches(existingText, text);
+      if(existingText && !transcriptMatches && clip.captionManuallyEdited){
+        clip.captionAudioMismatch = true;
+        clip.captionAudioSyncVerified = false;
+        return false;
+      }
+      if(!existingText || !transcriptMatches){
+        clip.captionText = text;
+        clip.captionManuallyEdited = false;
+        clip.subSegments = [];
+        clip.captionTimingGranularity = 'none';
+        clip._cues = null;
+      }
 
       const segments = Array.isArray(result.segments) ? result.segments : [];
       if(segments.length){
         clip.subSegments = segments;
         clip.captionTimingGranularity = result.timingGranularity || 'estimated';
         clip._cues = null;
+      } else if(forceResync){
+        clip.subSegments = [];
+        clip.captionTimingGranularity = 'none';
+        clip._cues = null;
       }
-      const isWordTimed = hasOpusClipWordTiming(clip);
+      clip.captionAudioMismatch = false;
+      const isWordTimed = segments.length > 0 && hasOpusClipWordTiming(clip);
+      clip.captionAudioSyncVerified = isWordTimed;
       if(isWordTimed) synchronized++;
       return isWordTimed;
     }catch(_){
@@ -10874,13 +11715,19 @@ async function transcribeMissingOpusClipCaptions(clips){
     }
   };
 
-  const worker = async () => {
+  const workerCount = Math.min(2, pending.length, streamMediaElements.length || 2);
+  const worker = async workerIndex => {
     while(nextIndex < pending.length){
       const clip = pending[nextIndex++];
-      await transcribeOne(clip);
+      const streamMedia = streamMediaElements.length ? streamMediaElements[workerIndex] : null;
+      await transcribeOne(clip, streamMedia);
     }
   };
-  await Promise.all(Array.from({ length: Math.min(2, pending.length) }, worker));
+  try{
+    await Promise.all(Array.from({ length: workerCount }, (_, idx) => worker(idx)));
+  }finally{
+    streamMediaElements.forEach(disposeStreamMedia);
+  }
   return synchronized;
 }
 
@@ -10995,12 +11842,12 @@ async function runOpusClipAnalysis(skipUrlCheck = false){
       throw new Error((data && data.error) || 'Não foi possível gerar os cortes virais.');
     }
 
-    const captionsNeedingSync = data.clips.filter(clip => clip
-      && (!String(clip.captionText || '').trim() || !hasOpusClipWordTiming(clip))).length;
-    if(captionsNeedingSync && ((opusState.mono12k && opusState.mono12k.length) || (opusState.fullAudioBuffer && opusState.fullAudioBuffer.length))){
+    const captionsNeedingSync = data.clips.filter(Boolean).length;
+    const hasLocalClipAudio = hasOpusClipAudioSource();
+    if(captionsNeedingSync && hasLocalClipAudio){
       setProgress('opusProgressFill', 62);
-      showStatus('opusStatus', `📝 Sincronizando as legendas palavra por palavra com o áudio de ${captionsNeedingSync} corte(s)...`, 'info');
-      await transcribeMissingOpusClipCaptions(data.clips);
+      showStatus('opusStatus', `📝 Conferindo a fala real e sincronizando palavra por palavra em ${captionsNeedingSync} corte(s)...`, 'info');
+      await transcribeMissingOpusClipCaptions(data.clips, true);
     }
 
     setStep(['op1','op2','op3','op4','op5','op6'], 3);
@@ -11044,16 +11891,29 @@ async function runOpusClipAnalysis(skipUrlCheck = false){
     setStep(['op1','op2','op3','op4','op5','op6'],5);
     const clipsWithoutCaptions = data.clips.filter(c => !String(c.captionText || '').trim()).length;
     const clipsWithoutWordSync = data.clips.filter(c => String(c.captionText || '').trim() && !hasOpusClipWordTiming(c)).length;
+    const clipsWithAudioMismatch = data.clips.filter(c => c.captionAudioMismatch).length;
+    const clipsNotAudioVerified = hasLocalClipAudio
+      ? data.clips.filter(c => !c.captionAudioSyncVerified && !c.captionAudioMismatch).length : 0;
+    const audioNotRechecked = captionsNeedingSync > 0 && !hasLocalClipAudio;
     const completionMessage = `✅ Pipeline [6/6] Concluído! ${data.clips.length} Melhores Partes cortadas em 9:16 (Score até ${data.clips[0].viralityScore}/100 • MP4 normal YouTube • 100% Sem Marca d'Água)!`;
     const missingCaptionNote = clipsWithoutCaptions ? ` ⚠️ ${clipsWithoutCaptions} corte(s) sem transcrição confiável; a legenda foi omitida para não inventar fala.` : '';
-    const timingNote = clipsWithoutWordSync ? ` ⚠️ ${clipsWithoutWordSync} corte(s) sem timestamps por palavra; a sincronia da legenda pode ser aproximada.` : '';
-    const needsCaptionWarning = clipsWithoutCaptions > 0 || clipsWithoutWordSync > 0;
-    showStatus('opusStatus', completionMessage + missingCaptionNote + timingNote, needsCaptionWarning ? 'warn' : 'success');
+    const timingNote = clipsWithoutWordSync ? ` ⚠️ ${clipsWithoutWordSync} corte(s) sem timestamps por palavra; a sincronia pode ser aproximada.` : '';
+    const mismatchNote = clipsWithAudioMismatch ? ` ⚠️ ${clipsWithAudioMismatch} legenda(s) editada(s) manualmente divergem do áudio e foram preservadas; revise-as.` : '';
+    const verificationNote = clipsNotAudioVerified ? ` ⚠️ Não foi possível confirmar a sincronização por áudio em ${clipsNotAudioVerified} corte(s); confira a prévia.` : '';
+    const audioNote = audioNotRechecked ? ' ⚠️ O navegador não disponibilizou o áudio local para conferir a sincronização.' : '';
+    const needsCaptionWarning = clipsWithoutCaptions > 0 || clipsWithoutWordSync > 0 || clipsWithAudioMismatch > 0 || clipsNotAudioVerified > 0 || audioNotRechecked;
+    showStatus('opusStatus', completionMessage + missingCaptionNote + timingNote + mismatchNote + verificationNote + audioNote, needsCaptionWarning ? 'warn' : 'success');
     toast(clipsWithoutCaptions
       ? `⚠️ ${clipsWithoutCaptions} corte(s) sem transcrição confiável; confira o áudio ou tente novamente.`
-      : clipsWithoutWordSync
-        ? `⚠️ ${clipsWithoutWordSync} corte(s) ficaram sem alinhamento palavra por palavra; confira o áudio.`
-        : `🔥 ${data.clips.length} Melhores Partes cortadas em MP4 normal YouTube (9:16) com legendas sincronizadas!`);
+      : clipsWithAudioMismatch
+        ? `⚠️ ${clipsWithAudioMismatch} legenda(s) manual(is) diferem da fala e foram preservadas.`
+        : clipsWithoutWordSync
+          ? `⚠️ ${clipsWithoutWordSync} corte(s) ficaram sem timestamps por palavra; confira o áudio.`
+          : clipsNotAudioVerified
+            ? `⚠️ Não foi possível confirmar o sincronismo em ${clipsNotAudioVerified} corte(s); confira a prévia.`
+            : audioNotRechecked
+              ? '⚠️ O áudio local não pôde ser usado para conferir as legendas.'
+              : `🔥 ${data.clips.length} Melhores Partes cortadas em MP4 normal YouTube (9:16) com legendas sincronizadas!`);
     if(data.project) saveProject(data.project);
     setTimeout(() => {
       document.getElementById('opusResultWrap').scrollIntoView({ behavior: 'smooth', block: 'start' });
