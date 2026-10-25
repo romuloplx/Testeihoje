@@ -10,6 +10,13 @@ const {
   handleDouyinVideoSearch,
   clearDouyinSearchCaches
 } = require('../vercel/lib/douyin-search-handler');
+const {
+  ACTOR_RUN_URL,
+  normalizeSearchInput,
+  normalizeActorItems,
+  handleApifyDouyinSearch,
+  clearApifyDouyinSearchCache
+} = require('../vercel/lib/apify-douyin-search-handler');
 const clipsHandler = require('../vercel/api/clips');
 
 function makeResponse() {
@@ -59,6 +66,166 @@ function validVideoSearchResponse() {
     }
   };
 }
+
+test('validates external search filters and clamps each query to ten results', () => {
+  assert.deepEqual(normalizeSearchInput({
+    keyword: '  美食  ', sortType: '2', publishTime: '180', count: '5000'
+  }), {
+    keyword: '美食', sortType: 2, sortLabel: '最新发布', publishTime: 180,
+    publishTimeLabel: '半年内', count: 10
+  });
+  assert.equal(normalizeSearchInput({ keyword: 'pets', count: 3 }).count, 3);
+  assert.throws(() => normalizeSearchInput({ keyword: '   ' }), { code: 'DOUYIN_SEARCH_KEYWORD_REQUIRED' });
+  assert.throws(() => normalizeSearchInput({ keyword: 'x'.repeat(101) }), { code: 'DOUYIN_SEARCH_KEYWORD_TOO_LONG' });
+  assert.throws(() => normalizeSearchInput({ keyword: 'cats', sortType: 9 }), { code: 'DOUYIN_SEARCH_INVALID_SORT' });
+  assert.throws(() => normalizeSearchInput({ keyword: 'cats', publishTime: 30 }), { code: 'DOUYIN_SEARCH_INVALID_PERIOD' });
+});
+
+test('returns Apify setup instructions without outbound calls when no server token is configured', async () => {
+  clearApifyDouyinSearchCache();
+  const response = makeResponse();
+  let called = false;
+  await handleApifyDouyinSearch({ method: 'POST' }, response, { keyword: '宠物' }, {
+    env: {},
+    fetchImpl: async () => { called = true; throw new Error('should not be called'); }
+  });
+
+  assert.equal(response.statusCode, 503);
+  assert.equal(response.body.code, 'APIFY_SEARCH_NOT_CONFIGURED');
+  assert.match(response.body.error, /APIFY_API_TOKEN/);
+  assert.match(response.body.error, /não precisa de conta Douyin/);
+  assert.equal(called, false);
+});
+
+test('runs the Apify keyword-search Actor with a server-side bearer token and normalizes metadata', async () => {
+  clearApifyDouyinSearchCache();
+  const calls = [];
+  const response = makeResponse();
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    return jsonResponse([{
+      mode: 'search',
+      videoId: '7481234567890123456',
+      desc: 'Vídeo viral sobre comida',
+      url: 'https://www.douyin.com/video/7481234567890123456',
+      coverUrl: 'https://p11-sign.douyinpic.com/example.jpeg',
+      createTime: 1750000000000,
+      author: { nickname: 'Criadora Apify' },
+      stats: { diggCount: 4321, commentCount: 87, shareCount: 65, playCount: 90000 },
+      downloadUrl: 'https://media.invalid/private.mp4'
+    }]);
+  };
+
+  await handleApifyDouyinSearch({ method: 'POST' }, response, {
+    keyword: '美食', sortType: 1, publishTime: 7, count: 500
+  }, { env: { APIFY_API_TOKEN: 'apify-test-token' }, fetchImpl });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.ok, true);
+  assert.equal(response.body.provider, 'Apify');
+  assert.equal(response.body.hasMore, false);
+  assert.equal(response.body.videos.length, 1);
+  assert.deepEqual(response.body.videos[0], {
+    id: '7481234567890123456',
+    title: 'Vídeo viral sobre comida',
+    creator: 'Criadora Apify',
+    likes: 4321,
+    comments: 87,
+    shares: 65,
+    views: 90000,
+    createdAt: 1750000000,
+    url: 'https://www.douyin.com/video/7481234567890123456',
+    cover: 'https://p11-sign.douyinpic.com/example.jpeg'
+  });
+  assert.equal(calls.length, 1);
+  assert.ok(calls[0].url.startsWith(ACTOR_RUN_URL));
+  const requestUrl = new URL(calls[0].url);
+  assert.equal(requestUrl.searchParams.get('timeout'), '60');
+  assert.equal(requestUrl.searchParams.has('token'), false, 'the Apify token must not be placed in the URL');
+  assert.equal(calls[0].options.headers.Authorization, 'Bearer apify-test-token');
+  assert.deepEqual(JSON.parse(calls[0].options.body), {
+    searchType: 'search',
+    keywords: ['美食'],
+    maxItems: 10,
+    sortType: '最多点赞',
+    publishTime: '一周内',
+    duration: '不限',
+    contentType: '视频'
+  });
+  assert.equal(Object.hasOwn(response.body.videos[0], 'downloadUrl'), false, 'search results must never pass download URLs to the UI');
+
+  const cachedResponse = makeResponse();
+  await handleApifyDouyinSearch({ method: 'POST' }, cachedResponse, {
+    keyword: '美食', sortType: 1, publishTime: 7, count: 500
+  }, { env: { APIFY_API_TOKEN: 'apify-test-token' }, fetchImpl });
+  assert.equal(calls.length, 1, 'identical searches should use the short server cache');
+  assert.deepEqual(cachedResponse.body, response.body);
+});
+
+test('drops untrusted Apify links and covers and removes duplicate results', () => {
+  const videos = normalizeActorItems([
+    {
+      videoId: '7481234567890123456',
+      url: 'https://attacker.invalid/repost',
+      coverUrl: 'https://attacker.invalid/cover.jpg',
+      downloadUrl: 'https://attacker.invalid/file.mp4'
+    },
+    { videoId: '7481234567890123456', desc: 'duplicate' }
+  ]);
+  assert.equal(videos.length, 1);
+  assert.equal(videos[0].url, 'https://www.douyin.com/video/7481234567890123456');
+  assert.equal(videos[0].cover, '');
+  assert.equal(Object.hasOwn(videos[0], 'downloadUrl'), false);
+});
+
+test('rate-limits uncached Apify searches per client to help prevent unexpected spend', async () => {
+  clearApifyDouyinSearchCache();
+  let calls = 0;
+  const fetchImpl = async () => {
+    calls++;
+    return jsonResponse([]);
+  };
+  const req = { headers: { 'x-forwarded-for': '203.0.113.44' } };
+  for (let index = 0; index < 10; index++) {
+    const response = makeResponse();
+    await handleApifyDouyinSearch(req, response, { keyword: `tema-${index}` }, {
+      env: { APIFY_API_TOKEN: 'apify-test-token' }, fetchImpl
+    });
+    assert.equal(response.statusCode, 200);
+  }
+
+  const limitedResponse = makeResponse();
+  await handleApifyDouyinSearch(req, limitedResponse, { keyword: 'tema-10' }, {
+    env: { APIFY_API_TOKEN: 'apify-test-token' }, fetchImpl
+  });
+  assert.equal(limitedResponse.statusCode, 429);
+  assert.equal(limitedResponse.body.code, 'APIFY_RATE_LIMITED');
+  assert.ok(Number(limitedResponse.headers['retry-after']) > 0);
+  assert.equal(calls, 10);
+});
+
+test('maps Apify authentication and billing errors to actionable safe responses', async () => {
+  clearApifyDouyinSearchCache();
+  const response = makeResponse();
+  await handleApifyDouyinSearch({ method: 'POST' }, response, { keyword: '旅行' }, {
+    env: { APIFY_API_TOKEN: 'invalid-test-token' },
+    fetchImpl: async () => jsonResponse({ error: { message: 'token invalid' } }, 401)
+  });
+  assert.equal(response.statusCode, 502);
+  assert.equal(response.body.code, 'APIFY_AUTH_FAILED');
+  assert.match(response.body.error, /APIFY_API_TOKEN/);
+  assert.doesNotMatch(response.body.error, /invalid-test-token|token invalid/);
+
+  clearApifyDouyinSearchCache();
+  const billingResponse = makeResponse();
+  await handleApifyDouyinSearch({ method: 'POST' }, billingResponse, { keyword: '旅行' }, {
+    env: { APIFY_API_TOKEN: 'valid-test-token' },
+    fetchImpl: async () => jsonResponse({ error: { message: 'payment required' } }, 402)
+  });
+  assert.equal(billingResponse.statusCode, 429);
+  assert.equal(billingResponse.body.code, 'APIFY_LIMIT_REACHED');
+  assert.doesNotMatch(billingResponse.body.error, /payment required/);
+});
 
 test('validates Douyin search keyword, sorting, date filter, cursor and device id', () => {
   assert.deepEqual(normalizeDouyinSearchInput({ keyword: '  美食  ', sortType: '1', publishTime: '7' }), {
@@ -163,7 +330,28 @@ test('reports missing Douyin search scope without exposing upstream internals', 
   assert.doesNotMatch(response.body.error, /test-token|permission not enabled/);
 });
 
-test('routes inspiration search through the existing clips serverless function', async () => {
+test('routes primary inspiration searches through Apify and reports missing server token', async () => {
+  clearApifyDouyinSearchCache();
+  const oldToken = process.env.APIFY_API_TOKEN;
+  delete process.env.APIFY_API_TOKEN;
+  const response = makeResponse();
+  try {
+    await clipsHandler({
+      method: 'POST',
+      url: '/api/clips',
+      body: { action: 'douyin_search', keyword: 'viral' }
+    }, response);
+  } finally {
+    if (oldToken == null) delete process.env.APIFY_API_TOKEN;
+    else process.env.APIFY_API_TOKEN = oldToken;
+  }
+
+  assert.equal(response.statusCode, 503);
+  assert.equal(response.body.code, 'APIFY_SEARCH_NOT_CONFIGURED');
+  assert.match(response.body.error, /APIFY_API_TOKEN/);
+});
+
+test('retains the optional official Douyin search under an explicit action', async () => {
   clearDouyinSearchCaches();
   const oldKey = process.env.DOUYIN_CLIENT_KEY;
   const oldSecret = process.env.DOUYIN_CLIENT_SECRET;
@@ -174,7 +362,7 @@ test('routes inspiration search through the existing clips serverless function',
     await clipsHandler({
       method: 'POST',
       url: '/api/clips',
-      body: { action: 'douyin_search', keyword: 'viral' }
+      body: { action: 'douyin_search_official', keyword: 'viral' }
     }, response);
   } finally {
     if (oldKey == null) delete process.env.DOUYIN_CLIENT_KEY;
@@ -194,6 +382,9 @@ test('publishes the trend-only boundary and local review queue in both HTML copi
     const html = fs.readFileSync(path.join(__dirname, file), 'utf8');
     assert.match(html, /id="douyinTrendDiscoveryCard"/);
     assert.match(html, /action:'douyin_search'/);
+    assert.match(html, /BUSCA EXTERNA · APIFY/);
+    assert.match(html, /APIFY_API_TOKEN/);
+    assert.match(html, /cobrança na Apify por resultado/);
     assert.match(html, /somente como inspiração/);
     assert.match(html, /douyinRightsConfirmed/);
     assert.match(html, /function addDubToReviewQueue\(\)/);

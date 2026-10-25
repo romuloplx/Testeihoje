@@ -11,7 +11,7 @@ Baseado no código original enviado, agora com **backend funcional**, armazename
 - **🌍 Dublar vídeo** — upload de vídeo/áudio → transcrição + tradução PT-BR + dublagem simulada (estrutura pronta para Whisper/TTS)
 - **📁 Projetos** — listagem, expandir, copiar, ouvir com `speechSynthesis`, baixar .txt, excluir, persistência em `data/projects.json`
 - **🔊 TTS** — endpoint `/api/tts` (usa OpenAI TTS quando há chave, senão usa voz do navegador)
-- **🇨🇳 Inspiração Douyin** — busca oficial de vídeos por palavra-chave, ordenação por curtidas/recência e paginação; os resultados são apenas referências, sem download automático
+- **🇨🇳 Inspiração Douyin** — busca externa via Apify por palavra-chave, ordenação por curtidas/relevância/recência e até 10 resultados; não exige conta Douyin, e os resultados são apenas referências, sem download automático
 - **📋 Fila de revisão** — guarda vídeos dublados e metadados no IndexedDB local do navegador; não publica nem envia arquivos ao TikTok
 
 ## 🚀 Como rodar
@@ -36,7 +36,7 @@ cp .env.example .env
 
 - Sem `OPENAI_API_KEY` → modo **MOCK** (perfeito para demo, não gasta créditos)
 - Com `OPENAI_API_KEY` → usa **GPT-4o** para roteiros e pode usar Whisper/TTS
-- Com `DOUYIN_CLIENT_KEY` + `DOUYIN_CLIENT_SECRET` → habilita a busca oficial de vídeos por palavra-chave. Antes, solicite a capacidade `aweme.dy.video_search` no Douyin Open Platform; mantenha o segredo somente no servidor/Vercel.
+- Com `APIFY_API_TOKEN` → habilita a busca externa de inspiração no Douyin pelo Actor `atomus/douyin-scraper`; não é preciso criar conta nem autenticar no Douyin. O token fica apenas no servidor/Vercel. O Actor pode cobrar por resultado ou consulta, inclusive quando não há resultados: confira o preço e os créditos vigentes na [página do Actor](https://apify.com/atomus/douyin-scraper) antes de pesquisar.
 
 ## 📡 API
 
@@ -49,7 +49,7 @@ cp .env.example .env
 | DELETE | `/api/projects/:id` | remove |
 | POST | `/api/dub` | `multipart` `video` + `language` + `dubVoice` |
 | POST | `/api/tts` | `{text,voice}` → mp3 ou instrução browser |
-| POST | `/api/clips` | `{action:"douyin_search",keyword,sortType,publishTime}` → metadados públicos de busca no Douyin |
+| POST | `/api/clips` | `{action:"douyin_search",keyword,sortType,publishTime,count}` → busca externa de metadados públicos no Douyin via Apify (`count` é limitado a 10) |
 
 Projetos salvos em `data/projects.json` + uploads em `uploads/`.
 
@@ -58,7 +58,7 @@ Projetos salvos em `data/projects.json` + uploads em `uploads/`.
 `public/index.html` — código original evoluído:
 
 - Tabs Criar/Dublar/Projetos/Fila de revisão/Downloads
-- Busca oficial de inspiração Douyin; resultados públicos não iniciam downloads
+- Busca externa de inspiração Douyin via Apify; resultados públicos não iniciam downloads e podem gerar cobrança por resultado ou consulta
 - Progress bar com etapas, status colorido, toasts
 - Preview de vídeo/áudio
 - Cards com thumbnail, tags, detalhes colapsáveis

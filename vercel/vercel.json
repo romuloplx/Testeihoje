@@ -10,7 +10,8 @@
   ],
   "functions": {
     "api/clips.js": {
-      "includeFiles": "node_modules/@involvex/**"
+      "includeFiles": "node_modules/@involvex/**",
+      "maxDuration": 90
     },
     "api/create.js": {
       "maxDuration": 90

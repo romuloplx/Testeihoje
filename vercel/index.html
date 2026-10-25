@@ -1669,10 +1669,11 @@ input[type="range"]{
   <div id="douyinTrendDiscoveryCard" class="card" style="background:linear-gradient(145deg,#21152f,#101324);border:1px solid #a855f777">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
       <h2 style="margin:0">🔥 Tendências Douyin — painel de inspiração</h2>
-      <span class="kbd" style="background:#3b0764;border-color:#a855f7;color:#f3e8ff">BUSCA OFICIAL</span>
+      <span class="kbd" style="background:#3b0764;border-color:#a855f7;color:#f3e8ff">BUSCA EXTERNA · APIFY</span>
     </div>
-    <p style="margin-top:10px">Pesquise vídeos por tema e ordene por curtidas ou recência para encontrar ideias. Estes resultados servem <b>somente como inspiração</b>: nada é baixado automaticamente.</p>
+    <p style="margin-top:10px">Pesquise vídeos públicos por tema no Douyin via Apify, sem precisar de cadastro ou login Douyin. Ordene por curtidas, relevância ou recência para encontrar ideias. Estes resultados servem <b>somente como inspiração</b>: nada é baixado automaticamente.</p>
     <div class="hint" style="padding:10px 12px;border-radius:10px;background:#0b1020;border:1px solid #64748b55;color:#e2e8f0">Para dublar, use apenas um vídeo seu ou autorizado. Cole o link autorizado no campo do Dublador abaixo; os resultados desta busca não são enviados nem copiados automaticamente.</div>
+    <div class="hint" style="margin-top:8px;padding:9px 12px;border-radius:10px;background:#42200655;border:1px solid #f59e0b66;color:#fde68a">⚠️ A busca externa pode gerar cobrança na Apify por resultado e/ou consulta, inclusive sem resultados. O painel limita cada busca a 10 vídeos; confira o preço e o uso no painel Apify antes de pesquisar.</div>
     <form id="douyinTrendSearchForm" onsubmit="event.preventDefault();searchDouyinTrends(false)" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-top:12px">
       <div style="flex:1;min-width:220px">
         <label for="douyinTrendKeyword" style="margin-top:0">🔎 Tema ou palavra-chave</label>
@@ -1701,12 +1702,13 @@ input[type="range"]{
     <div id="douyinTrendResults" role="list" aria-label="Vídeos encontrados no Douyin" style="display:grid;gap:10px;margin-top:12px"></div>
     <button class="ghost hidden" type="button" id="douyinTrendLoadMoreBtn" onclick="searchDouyinTrends(true)" style="width:100%;margin-top:10px">＋ Carregar mais resultados</button>
     <details style="margin-top:12px;padding:10px 12px;border-radius:10px;background:#0b1020;border:1px solid #334155">
-      <summary style="cursor:pointer;font-weight:800;color:#c4b5fd">Configuração necessária para a busca oficial</summary>
+      <summary style="cursor:pointer;font-weight:800;color:#c4b5fd">Como configurar a busca externa (não exige conta Douyin)</summary>
       <ol class="hint" style="padding-left:20px;line-height:1.7">
-        <li>Registre um aplicativo no <a href="https://developer.open-douyin.com/" target="_blank" rel="noopener noreferrer">Douyin Open Platform</a> e solicite a capacidade de busca de vídeos <code>aweme.dy.video_search</code>.</li>
-        <li>Configure <code>DOUYIN_CLIENT_KEY</code> e <code>DOUYIN_CLIENT_SECRET</code> como variáveis de ambiente no servidor/Vercel. Não coloque a chave secreta no navegador nem a envie pelo chat.</li>
+        <li>Crie ou use uma conta <a href="https://apify.com/" target="_blank" rel="noopener noreferrer">Apify</a> e copie seu token em <a href="https://console.apify.com/settings/integrations" target="_blank" rel="noopener noreferrer">API &amp; Integrations</a>.</li>
+        <li>Adicione <code>APIFY_API_TOKEN</code> às variáveis de ambiente do servidor/Vercel. Mantenha o token somente no servidor; nunca o coloque no navegador nem o envie pelo chat.</li>
+        <li>Confira o <a href="https://apify.com/atomus/douyin-scraper" target="_blank" rel="noopener noreferrer">Actor de busca Douyin</a> e o preço vigente antes de usar; cada consulta pode gerar cobrança por resultado.</li>
       </ol>
-      <div class="hint">A busca usa o token oficial no servidor. Sem a permissão do Douyin e as duas variáveis configuradas, o painel mostra instruções em vez de buscar.</div>
+      <div class="hint">A busca é executada no servidor pela API da Apify; o token não é enviado ao navegador. Sem <code>APIFY_API_TOKEN</code>, o painel mostra instruções em vez de buscar. Não é necessário criar conta no Douyin.</div>
     </details>
   </div>
 
@@ -2082,25 +2084,9 @@ let douyinTrendSearchState = {
   keyword: '',
   sortType: 1,
   publishTime: 7,
-  cursor: '0',
-  searchId: '',
   hasMore: false,
   loading: false
 };
-
-function getDouyinSearchDeviceId(){
-  const key='dubai_douyin_device_id_v1';
-  try{
-    const existing=localStorage.getItem(key)||'';
-    if(/^\\d{1,19}$/.test(existing)) return existing;
-    const random=new Uint32Array(1);
-    if(window.crypto&&typeof window.crypto.getRandomValues==='function') window.crypto.getRandomValues(random);
-    else random[0]=Math.floor(Math.random()*0xffffffff);
-    const value=`${Math.floor(Date.now()/1000)}${String(random[0]%1000000).padStart(6,'0')}`;
-    localStorage.setItem(key,value);
-    return value;
-  }catch(_){ return `${Math.floor(Date.now()/1000)}000001`; }
-}
 
 function isSafeDouyinSearchLink(value){
   try{
@@ -2173,8 +2159,12 @@ function renderDouyinSearchResults(videos,{append=false}={}){
     title.textContent=String(video.title||'Vídeo sem título');
     title.style.cssText='font-size:14px;font-weight:800;color:#f8fafc;white-space:pre-wrap;overflow-wrap:anywhere';
     const stats=document.createElement('div');
-    const likes=Number.isFinite(Number(video.likes))?new Intl.NumberFormat('pt-BR').format(Number(video.likes)):'—';
-    stats.textContent=`@${String(video.creator||'criador desconhecido')} · ❤️ ${likes} curtidas · ${formatDouyinSearchDate(video.createdAt)}`;
+    const formatMetric=value=>value!==null&&value!==undefined&&value!==''&&Number.isFinite(Number(value))&&Number(value)>=0?new Intl.NumberFormat('pt-BR').format(Number(value)):'';
+    const metrics=[`❤️ ${formatMetric(video.likes)||'—'} curtidas`];
+    if(formatMetric(video.comments)) metrics.push(`💬 ${formatMetric(video.comments)} comentários`);
+    if(formatMetric(video.shares)) metrics.push(`↗ ${formatMetric(video.shares)} compartilhamentos`);
+    if(formatMetric(video.views)) metrics.push(`▶ ${formatMetric(video.views)} visualizações`);
+    stats.textContent=`@${String(video.creator||'criador desconhecido')} · ${metrics.join(' · ')} · ${formatDouyinSearchDate(video.createdAt)}`;
     stats.className='hint';
     stats.style.marginTop='5px';
     content.append(title,stats);
@@ -2216,14 +2206,14 @@ async function searchDouyinTrends(loadMore=false){
     return;
   }
   if(!loadMore){
-    douyinTrendSearchState={keyword,sortType:Number(document.getElementById('douyinTrendSort')?.value||1),publishTime:Number(document.getElementById('douyinTrendPeriod')?.value||7),cursor:'0',searchId:'',hasMore:false,loading:false};
+    douyinTrendSearchState={keyword,sortType:Number(document.getElementById('douyinTrendSort')?.value||1),publishTime:Number(document.getElementById('douyinTrendPeriod')?.value||7),hasMore:false,loading:false};
     if(results) results.innerHTML='';
   }
   if(loadMore&&!douyinTrendSearchState.hasMore) return;
   douyinTrendSearchState.loading=true;
   if(searchButton) searchButton.disabled=true;
   if(moreButton){ moreButton.disabled=true; moreButton.textContent='⏳ Buscando...'; }
-  showStatus('douyinTrendSearchStatus',loadMore?'⏳ Carregando mais inspirações do Douyin...':'⏳ Consultando a busca oficial do Douyin...','info');
+  showStatus('douyinTrendSearchStatus',loadMore?'⏳ Carregando mais inspirações do Douyin...':'⏳ Consultando busca externa via Apify...','info');
   try{
     const response=await fetch('/api/clips',{
       method:'POST',
@@ -2233,10 +2223,7 @@ async function searchDouyinTrends(loadMore=false){
         keyword:douyinTrendSearchState.keyword,
         sortType:douyinTrendSearchState.sortType,
         publishTime:douyinTrendSearchState.publishTime,
-        count:10,
-        cursor:loadMore?douyinTrendSearchState.cursor:'0',
-        searchId:loadMore?douyinTrendSearchState.searchId:'',
-        deviceId:getDouyinSearchDeviceId()
+        count:10
       })
     });
     const data=await response.json().catch(()=>({}));
@@ -2247,17 +2234,15 @@ async function searchDouyinTrends(loadMore=false){
     }
     const videos=Array.isArray(data.videos)?data.videos:[];
     renderDouyinSearchResults(videos,{append:loadMore});
-    douyinTrendSearchState.cursor=String(data.cursor||'0');
-    douyinTrendSearchState.searchId=String(data.searchId||'');
-    douyinTrendSearchState.hasMore=Boolean(data.hasMore&&douyinTrendSearchState.searchId);
+    douyinTrendSearchState.hasMore=false;
     if(moreButton) moreButton.classList.toggle('hidden',!douyinTrendSearchState.hasMore);
     showStatus('douyinTrendSearchStatus',videos.length
-      ? `✅ ${videos.length} resultado${videos.length===1?'':'s'} carregado${videos.length===1?'':'s'}. Abra no Douyin para pesquisar; os vídeos não são baixados por este painel.`
-      : 'Busca concluída, sem resultados nesta página. Experimente outra palavra-chave.','success');
+      ? `✅ ${videos.length} resultado${videos.length===1?'':'s'} carregado${videos.length===1?'':'s'} via Apify. Abra no Douyin para pesquisar; os vídeos não são baixados por este painel.`
+      : 'Busca externa concluída, sem resultados. Experimente outra palavra-chave.','success');
   }catch(error){
     const message=error&&error.message||'Falha ao consultar o Douyin.';
     showStatus('douyinTrendSearchStatus','❌ '+message,'error');
-    if(error&&error.code==='DOUYIN_SEARCH_NOT_CONFIGURED'){
+    if(error&&error.code==='APIFY_SEARCH_NOT_CONFIGURED'){
       const setup=document.querySelector('#douyinTrendDiscoveryCard details');
       if(setup) setup.open=true;
     }
