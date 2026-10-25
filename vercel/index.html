@@ -986,6 +986,45 @@ input[type="range"]{
       </div>
     </div>
 
+    <div id="dubLogoPanel" role="group" aria-label="Logo no vídeo dublado" style="margin-top:12px;padding:13px 14px;border-radius:12px;background:linear-gradient(180deg,#111b2c,#0b1120);border:1px solid #38bdf866">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:9px">
+        <div style="font-weight:850;font-size:13px;color:#bae6fd">🏷️ Logo / marca no vídeo</div>
+        <span style="font-size:11px;color:#94a3b8">Opcional • aplicado ao vídeo exportado</span>
+      </div>
+      <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap">
+        <div style="flex:1.5;min-width:230px">
+          <label for="dubLogoFile" style="margin-top:0">Sua logo</label>
+          <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+            <button class="ghost" type="button" onclick="document.getElementById('dubLogoFile').click()" style="padding:8px 11px;border-color:#38bdf888;color:#bae6fd">📂 Escolher imagem</button>
+            <input type="file" id="dubLogoFile" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" onchange="onSelectDubLogo(this)" style="display:none">
+            <span id="dubLogoInfo" class="hint" style="margin:0;flex:1;min-width:160px">Nenhuma logo selecionada. PNG transparente é recomendado.</span>
+          </div>
+        </div>
+        <div style="flex:1;min-width:155px">
+          <label for="dubLogoPosition" style="margin-top:0">Posição no quadro</label>
+          <select id="dubLogoPosition" onchange="onDubLogoSettingsChange()">
+            <option value="bottom-right" selected>↘️ Inferior direito</option>
+            <option value="bottom-left">↙️ Inferior esquerdo</option>
+            <option value="top-right">↗️ Superior direito</option>
+            <option value="top-left">↖️ Superior esquerdo</option>
+          </select>
+        </div>
+        <div style="flex:1;min-width:150px">
+          <label for="dubLogoSize" style="margin-top:0">Tamanho (<span id="dubLogoSizeLabel">18%</span>)</label>
+          <input type="range" id="dubLogoSize" min="8" max="30" step="1" value="18" oninput="updateDubLogoLabels()" onchange="onDubLogoSettingsChange()" style="width:100%;accent-color:#38bdf8;cursor:pointer">
+        </div>
+        <div style="flex:1;min-width:150px">
+          <label for="dubLogoOpacity" style="margin-top:0">Opacidade (<span id="dubLogoOpacityLabel">90%</span>)</label>
+          <input type="range" id="dubLogoOpacity" min="20" max="100" step="5" value="90" oninput="updateDubLogoLabels()" onchange="onDubLogoSettingsChange()" style="width:100%;accent-color:#38bdf8;cursor:pointer">
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:9px">
+        <img id="dubLogoPreview" class="hidden" alt="Prévia da logo enviada" style="width:56px;height:56px;object-fit:contain;padding:4px;border-radius:9px;background:#070b14;border:1px solid #475569">
+        <button class="ghost hidden" type="button" id="dubLogoRemoveBtn" onclick="removeDubLogo()" style="padding:7px 10px;border-color:#f8717188;color:#fecaca">✕ Remover logo</button>
+        <span class="hint" style="margin:0">Mantém a proporção original e respeita as margens. Formatos: PNG, JPG ou WebP (até 20 MB). A logo aparece no vídeo final, não no áudio nem na prévia original.</span>
+      </div>
+    </div>
+
     <div id="dubTrimRow" class="row hidden" style="background:#101528;padding:10px 12px;border-radius:10px;border:1px solid #334155">
       <div>
         <label style="margin-top:0">⏱️ Começar em (segundos ou min:seg)</label>
@@ -2778,6 +2817,160 @@ let lastDubMasterBuffer = null;
 let lastDubTotalDuration = 0;
 let lastDubVideoBlob = null;
 let lastDubVideoFilename = 'video-dublado-dubai-pro.mp4';
+const DUB_LOGO_MAX_BYTES = 20 * 1024 * 1024;
+let dubLogoImage = null;
+let dubLogoObjectUrl = null;
+let dubLogoPendingUrl = null;
+let dubLogoLoadSeq = 0;
+let dubLogoConfigVersion = 0;
+
+function invalidateDubVideoExport(){
+  const exported = document.getElementById('dubExportedVideo');
+  const hadExport = !!lastDubVideoBlob || !!(exported && !exported.classList.contains('hidden'));
+  if(!hadExport) return false;
+  lastDubVideoBlob = null;
+  if(exported){
+    try{ exported.pause(); }catch(_){}
+    const src = exported.getAttribute('src') || '';
+    if(/^blob:/i.test(src)){ try{ URL.revokeObjectURL(src); }catch(_){} }
+    exported.removeAttribute('src');
+    try{ exported.load(); }catch(_){}
+    exported.classList.add('hidden');
+  }
+  const btn = document.getElementById('dubMainDownloadBtn');
+  if(btn) btn.textContent = '⬇️ GERAR E BAIXAR VÍDEO DUBLADO LISO (.MP4 GALERIA)';
+  return true;
+}
+
+function updateDubLogoLabels(){
+  const size = document.getElementById('dubLogoSize');
+  const opacity = document.getElementById('dubLogoOpacity');
+  const sizeLabel = document.getElementById('dubLogoSizeLabel');
+  const opacityLabel = document.getElementById('dubLogoOpacityLabel');
+  if(sizeLabel && size) sizeLabel.textContent = `${size.value}%`;
+  if(opacityLabel && opacity) opacityLabel.textContent = `${opacity.value}%`;
+}
+
+function onDubLogoSettingsChange(){
+  updateDubLogoLabels();
+  dubLogoConfigVersion++;
+  if(invalidateDubVideoExport()){
+    showStatus('dubStatus','ℹ️ Ajustes da logo alterados. Gere o vídeo novamente para aplicar.','info');
+  }
+}
+
+function onSelectDubLogo(input){
+  const file = input && input.files && input.files[0];
+  if(!file) return;
+  const mime = String(file.type || '').toLowerCase();
+  const isRasterLogo = /^image\/(png|jpeg|webp)$/.test(mime) || /\.(png|jpe?g|webp)$/i.test(String(file.name || ''));
+  if(!isRasterLogo){
+    input.value = '';
+    toast('Use uma imagem PNG, JPG ou WebP para a logo.','warn');
+    return;
+  }
+  if(file.size > DUB_LOGO_MAX_BYTES){
+    input.value = '';
+    toast('A logo precisa ter até 20 MB.','warn');
+    return;
+  }
+
+  invalidateDubVideoExport();
+  dubLogoConfigVersion++;
+  const loadSeq = ++dubLogoLoadSeq;
+  if(dubLogoPendingUrl){ try{ URL.revokeObjectURL(dubLogoPendingUrl); }catch(_){} }
+  if(dubLogoObjectUrl){ try{ URL.revokeObjectURL(dubLogoObjectUrl); }catch(_){} }
+  dubLogoPendingUrl = null;
+  dubLogoObjectUrl = null;
+  dubLogoImage = null;
+
+  const preview = document.getElementById('dubLogoPreview');
+  const removeBtn = document.getElementById('dubLogoRemoveBtn');
+  const info = document.getElementById('dubLogoInfo');
+  if(preview){ preview.removeAttribute('src'); preview.classList.add('hidden'); }
+  if(removeBtn) removeBtn.classList.add('hidden');
+  if(info) info.textContent = `⏳ Carregando ${file.name}...`;
+
+  const objectUrl = URL.createObjectURL(file);
+  dubLogoPendingUrl = objectUrl;
+  const image = new Image();
+  image.onload = () => {
+    if(loadSeq !== dubLogoLoadSeq){ try{ URL.revokeObjectURL(objectUrl); }catch(_){} return; }
+    dubLogoPendingUrl = null;
+    dubLogoObjectUrl = objectUrl;
+    dubLogoImage = image;
+    if(preview){ preview.src = objectUrl; preview.classList.remove('hidden'); }
+    if(removeBtn) removeBtn.classList.remove('hidden');
+    if(info) info.textContent = `✅ ${file.name} • ${image.naturalWidth} × ${image.naturalHeight}px`;
+    if(input) input.value = '';
+    dubLogoConfigVersion++;
+    invalidateDubVideoExport();
+    toast('🏷️ Logo carregada. Ela será gravada no vídeo ao exportar.');
+  };
+  image.onerror = () => {
+    if(loadSeq !== dubLogoLoadSeq){ try{ URL.revokeObjectURL(objectUrl); }catch(_){} return; }
+    dubLogoPendingUrl = null;
+    try{ URL.revokeObjectURL(objectUrl); }catch(_){}
+    if(input) input.value = '';
+    if(info) info.textContent = 'Não foi possível abrir essa imagem. Tente outro PNG, JPG ou WebP.';
+    toast('Não foi possível carregar a imagem da logo.','error');
+  };
+  image.src = objectUrl;
+}
+
+function removeDubLogo(){
+  dubLogoLoadSeq++;
+  dubLogoConfigVersion++;
+  if(dubLogoPendingUrl){ try{ URL.revokeObjectURL(dubLogoPendingUrl); }catch(_){} }
+  if(dubLogoObjectUrl){ try{ URL.revokeObjectURL(dubLogoObjectUrl); }catch(_){} }
+  dubLogoPendingUrl = null;
+  dubLogoObjectUrl = null;
+  dubLogoImage = null;
+  const input = document.getElementById('dubLogoFile');
+  const preview = document.getElementById('dubLogoPreview');
+  const removeBtn = document.getElementById('dubLogoRemoveBtn');
+  const info = document.getElementById('dubLogoInfo');
+  if(input) input.value = '';
+  if(preview){ preview.removeAttribute('src'); preview.classList.add('hidden'); }
+  if(removeBtn) removeBtn.classList.add('hidden');
+  if(info) info.textContent = 'Nenhuma logo selecionada. PNG transparente é recomendado.';
+  if(invalidateDubVideoExport()){
+    showStatus('dubStatus','ℹ️ Logo removida. Gere o vídeo novamente para exportar sem ela.','info');
+  }
+  toast('Logo removida do vídeo.');
+}
+
+function drawDubLogo(ctx, image, settings = {}){
+  if(!ctx || !image) return;
+  const sourceW = image.naturalWidth || image.width || 0;
+  const sourceH = image.naturalHeight || image.height || 0;
+  const cw = ctx.canvas.width, ch = ctx.canvas.height;
+  if(!sourceW || !sourceH || !cw || !ch) return;
+
+  const requestedSize = Number(settings.sizePct);
+  const sizePct = Math.max(8, Math.min(30, Number.isFinite(requestedSize) ? requestedSize : 18));
+  const requestedOpacity = Number(settings.opacityPct);
+  const opacity = Math.max(20, Math.min(100, Number.isFinite(requestedOpacity) ? requestedOpacity : 90)) / 100;
+  const scale = Math.min((cw * sizePct / 100) / sourceW, (ch * 0.24) / sourceH);
+  if(!Number.isFinite(scale) || scale <= 0) return;
+  const w = sourceW * scale, h = sourceH * scale;
+  const inset = Math.min(Math.round(Math.min(cw, ch) * 0.035), Math.max(0, (Math.min(cw, ch) - Math.min(w, h)) / 2));
+  const position = settings.position || 'bottom-right';
+  const left = position.endsWith('left');
+  const top = position.startsWith('top');
+  const x = left ? inset : Math.max(0, cw - w - inset);
+  const y = top ? inset : Math.max(0, ch - h - inset);
+
+  ctx.save();
+  try{
+    ctx.globalAlpha = opacity;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(image, x, y, w, h);
+  }finally{
+    ctx.restore();
+  }
+}
 
 function requestStopDubbing(){
   stopDubRequested = true;
@@ -6157,6 +6350,13 @@ async function downloadDubVideo(opts = {}){
       }
     }
 
+    const dubLogoConfigAtStart = dubLogoConfigVersion;
+    const dubLogoForExport = dubLogoImage;
+    const dubLogoSettings = {
+      position: (document.getElementById('dubLogoPosition')||{}).value || 'bottom-right',
+      sizePct: Number((document.getElementById('dubLogoSize')||{}).value || 18),
+      opacityPct: Number((document.getElementById('dubLogoOpacity')||{}).value || 90)
+    };
     const totalDur = Math.min(
       exportVid.duration || v.duration || lastDubTotalDuration || 10,
       lastDubMasterBuffer ? lastDubMasterBuffer.duration : (lastDubTotalDuration || v.duration || 10)
@@ -6168,6 +6368,9 @@ async function downloadDubVideo(opts = {}){
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, cw, ch);
       try{ ctx.drawImage(exportVid, 0, 0, cw, ch); }catch(e){}
+      if(dubLogoForExport){
+        try{ drawDubLogo(ctx, dubLogoForExport, dubLogoSettings); }catch(e){}
+      }
 
       if(subCues.length){
         const cue = subCues.find(c => t >= c.start && t < c.end);
@@ -6218,6 +6421,10 @@ async function downloadDubVideo(opts = {}){
         if(mainBtn) mainBtn.textContent = `⏳ Exportando vídeo dublado liso... ${pct}% (${fmtClockSec(p * totalDur)} / ${fmtClockSec(totalDur)})`;
       }
     });
+
+    if(dubLogoConfigVersion !== dubLogoConfigAtStart){
+      throw new Error('A logo ou seus ajustes mudaram durante a exportação. Gere o vídeo novamente para aplicar as novas configurações.');
+    }
 
     const isMp4 = blob.type.includes('mp4');
     const slug = ((currentDubFile && currentDubFile.name) || 'video').replace(/\.[^.]+$/, '').replace(/[^a-z0-9_-]+/gi, '-').slice(0, 36) || 'video';
