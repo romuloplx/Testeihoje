@@ -917,10 +917,10 @@ input[type="range"]{
 
     <div class="row">
       <div>
-        <label>Mixagem com áudio original</label>
+        <label>Áudio original (opcional)</label>
         <select id="dubBgMix">
-          <option value="duck" selected>🔉 Voz dublada + som ambiente original suave (12%)</option>
-          <option value="mute">🔇 100% só a voz nova (silenciar áudio original)</option>
+          <option value="mute" selected>🔇 Reproduzir só a dublagem (recomendado)</option>
+          <option value="duck">🔉 Manter som original suave (a voz original pode ser ouvida)</option>
         </select>
       </div>
       <div>
@@ -3322,7 +3322,7 @@ function togglePreviewDubBgMusic(){
 function remixDubBackgroundInstant(){
   if(!lastDubChunksTimeline || !lastDubChunksTimeline.length || !lastDubTotalDuration) return;
   stopPreviewDubBgMusic();
-  const bgMixMode = (document.getElementById('dubBgMix')||{}).value || 'duck';
+  const bgMixMode = (document.getElementById('dubBgMix')||{}).value || 'mute';
   const bgMusicStyle = (document.getElementById('dubBgMusicStyle')||{}).value || 'soft_piano';
   const bgMusicVol = Number((document.getElementById('dubBgMusicVol')||{}).value ?? 12) / 100;
 
@@ -3424,7 +3424,7 @@ function detectOrigSpeechStartOffset(origMono12k, chunkStartSec, chunkEndSec){
 }
 
 // Monta o Áudio Master 24kHz sincronizado do segundo 0:00 até o fim do vídeo (com timbre humano 100% preservado!)
-function assembleDubbedMasterAudio({ chunkOutputs, totalDurationSec, origMono12k, bgMixMode = 'duck', bgMusicStyle = null, bgMusicVol = null }){
+function assembleDubbedMasterAudio({ chunkOutputs, totalDurationSec, origMono12k, bgMixMode = 'mute', bgMusicStyle = null, bgMusicVol = null }){
   const SR = 24000;
   const totalSamples = Math.max(SR, Math.ceil(totalDurationSec * SR));
   const AC = window.AudioContext || window.webkitAudioContext;
@@ -3800,7 +3800,7 @@ async function dubVideo(){
   const language = $('#language').value;
   const dubVoice = $('#dubVoice').value;
   const targetLanguage = $('#targetLanguage').value;
-  const bgMixMode = (document.getElementById('dubBgMix')||{}).value || 'duck';
+  const bgMixMode = (document.getElementById('dubBgMix')||{}).value || 'mute';
   const rangeMode = (document.getElementById('dubRangeMode')||{}).value || 'full';
   const btn = $('#dubBtn');
   const stopBtn = document.getElementById('dubStopBtn');
