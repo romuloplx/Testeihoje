@@ -9,8 +9,12 @@ const { transcribeClipSegment } = require('../vercel/api/lib/ai');
 
 const readOpusCaptionHelpers = () => {
   const html = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
+  const timedStart = html.indexOf('function buildTimedCaptions(text, totalDur){');
+  const timedEnd = html.indexOf('\nfunction getAvatarDimensions', timedStart);
   const start = html.indexOf('function buildOpusWordByWordCues(');
   const end = html.indexOf('\n// Renderiza 1 frame ultra-profissional', start);
+  assert.notEqual(timedStart, -1, 'Dublador caption timing helper should exist');
+  assert.notEqual(timedEnd, -1, 'Dublador caption helper section should have an end marker');
   assert.notEqual(start, -1, 'caption builder should exist');
   assert.notEqual(end, -1, 'caption helper section should have an end marker');
   const context = {
@@ -18,7 +22,7 @@ const readOpusCaptionHelpers = () => {
     pickOpusEmojiForPhrase: () => '🎯'
   };
   vm.createContext(context);
-  vm.runInContext(`${html.slice(start, end)}\nglobalThis.buildCues = buildOpusWordByWordCues;\nglobalThis.findCue = findActiveOpusCaptionCue;\nglobalThis.visibleWords = getVisibleOpusCaptionWords;\nglobalThis.wordGap = getOpusCaptionWordGap;`, context);
+  vm.runInContext(`${html.slice(timedStart, timedEnd)}\n${html.slice(start, end)}\nglobalThis.buildCues = buildOpusWordByWordCues;\nglobalThis.findCue = findActiveOpusCaptionCue;\nglobalThis.visibleWords = getVisibleOpusCaptionWords;\nglobalThis.wordGap = getOpusCaptionWordGap;`, context);
   return context;
 };
 
@@ -36,11 +40,33 @@ const readMissingCaptionTranscriber = context => {
 const readAutoCaptionHandler = context => {
   const html = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
   const start = html.indexOf('async function generateSelectedOpusClipCaptionsFromAudio(');
-  const end = html.indexOf('\nfunction onEditSelectedOpusClip', start);
+  const end = html.indexOf('\nasync function syncAllOpusClipCaptionsFromAudio', start);
   assert.notEqual(start, -1, 'CapCut-style automatic caption handler should exist');
   assert.notEqual(end, -1, 'automatic caption handler should have an end marker');
   vm.createContext(context);
   vm.runInContext(`${html.slice(start, end)}\nglobalThis.generateCaptionsFromAudio = generateSelectedOpusClipCaptionsFromAudio;`, context);
+  return context;
+};
+
+const readSyncAllCaptionHandler = context => {
+  const html = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
+  const start = html.indexOf('async function syncAllOpusClipCaptionsFromAudio(');
+  const end = html.indexOf('\nfunction onEditSelectedOpusClip', start);
+  assert.notEqual(start, -1, 'all-clips audio synchronization handler should exist');
+  assert.notEqual(end, -1, 'all-clips synchronization helper should have an end marker');
+  vm.createContext(context);
+  vm.runInContext(`${html.slice(start, end)}\nglobalThis.syncAllCaptions = syncAllOpusClipCaptionsFromAudio;`, context);
+  return context;
+};
+
+const readStreamingAudioExtractor = context => {
+  const html = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
+  const start = html.indexOf('async function extractSingleChunkStreaming(');
+  const end = html.indexOf('\n// Prepara plano inteligente', start);
+  assert.notEqual(start, -1, 'streaming audio extractor should exist');
+  assert.notEqual(end, -1, 'streaming audio extractor should have an end marker');
+  vm.createContext(context);
+  vm.runInContext(`${html.slice(start, end)}\nglobalThis.extractAudio = extractSingleChunkStreaming;`, context);
   return context;
 };
 
@@ -69,6 +95,31 @@ test('word timestamps stay absolute-to-relative exact and default to readable tw
     Array.from(sentenceCues, cue => Array.from(cue.words, word => word.word)),
     [['do', 'episódio!'], ['Presta', 'atenção']]
   );
+});
+
+test('Opus fallback uses Dublador timing and keeps every caption word when timestamps are missing or partial', () => {
+  const context = readOpusCaptionHelpers();
+  const text = 'Uma fala, com pausa. Depois continua!';
+  const duration = 4.8;
+  const speechInset = 0.06;
+  const expected = context.buildTimedCaptions(text, duration - 0.16)
+    .flatMap(cue => cue.words);
+  const actual = context.buildCues(text, duration, 8, null)
+    .flatMap(cue => cue.words);
+
+  assert.equal(actual.map(word => word.word).join(' '), text);
+  assert.equal(actual.length, expected.length);
+  expected.forEach((word, index) => {
+    assert.equal(Number(actual[index].start.toFixed(4)), Number((speechInset + word.start).toFixed(4)));
+    assert.equal(Number(actual[index].end.toFixed(4)), Number((speechInset + word.end).toFixed(4)));
+  });
+
+  const partial = context.buildCues(text, duration, 8, [
+    { inicio: 8.4, fim: 8.6, texto: 'Uma' },
+    { inicio: 9.1, fim: 9.4, texto: 'pausa.' }
+  ]).flatMap(cue => cue.words);
+  assert.equal(partial.map(word => word.word).join(' '), text);
+  assert.equal(Number(partial[0].start.toFixed(2)), speechInset);
 });
 
 test('burned-in captions keep a readable gap between highlighted words', () => {
@@ -150,6 +201,56 @@ test('CapCut-style auto-caption button transcribes the selected cut and updates 
   assert.equal(button.disabled, false);
   assert.match(button.textContent, /Gerar legenda automaticamente/);
   assert.equal(statuses.at(-1)[2], 'success');
+});
+
+test('the Dublador-style sync button rechecks every Opus clip and preserves manually edited text when it conflicts', async () => {
+  const html = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
+  assert.match(html, /id="opusSyncAllCaptionsBtn" onclick="syncAllOpusClipCaptionsFromAudio\(\)"/);
+  const button = { disabled: false, textContent: '🎙️ Sincronizar legendas pelo áudio' };
+  const captionEditor = { value: '' };
+  const syncedClip = { id: 'cut-1', captionText: 'legenda velha', captionManuallyEdited: false };
+  const manualClip = { id: 'cut-2', captionText: 'texto manual', captionManuallyEdited: true };
+  const clips = [syncedClip, manualClip];
+  const calls = [];
+  const statuses = [];
+  const context = readSyncAllCaptionHandler({
+    opusState: { clips, selectedIdx: 0, lastExportBlob: { stale: true }, lastExportClipId: 'old' },
+    document: {
+      getElementById: id => id === 'opusSyncAllCaptionsBtn' ? button
+        : id === 'opusEditCaption' ? captionEditor : null
+    },
+    hasOpusClipAudioSource: () => true,
+    transcribeMissingOpusClipCaptions: async (selectedClips, forceResync) => {
+      calls.push({ selectedClips, forceResync });
+      syncedClip.captionText = 'fala revisada pelo áudio';
+      syncedClip.subSegments = [{ inicio: 1.1, fim: 1.5, texto: 'fala' }];
+      syncedClip.captionAudioSyncVerified = true;
+      syncedClip.captionAudioMismatch = false;
+      manualClip.captionAudioSyncVerified = false;
+      manualClip.captionAudioMismatch = true;
+    },
+    hasOpusClipWordTiming: clip => !!clip.captionAudioSyncVerified,
+    updateInlineCardCaptionBadges: () => {},
+    renderOpusClipsListUI: () => {},
+    renderSingleOpusPreviewFrame: () => {},
+    renderAllOpusCardStaticPreviews: () => {},
+    showStatus: (...args) => statuses.push(args),
+    toast: () => {}
+  });
+
+  await context.syncAllCaptions();
+
+  assert.equal(calls.length, 1);
+  assert.deepEqual(Array.from(calls[0].selectedClips), clips);
+  assert.equal(calls[0].forceResync, true);
+  assert.equal(syncedClip.captionText, 'fala revisada pelo áudio');
+  assert.equal(manualClip.captionText, 'texto manual');
+  assert.equal(captionEditor.value, 'fala revisada pelo áudio');
+  assert.equal(context.opusState.lastExportBlob, null);
+  assert.equal(context.opusState.lastExportClipId, null);
+  assert.equal(button.disabled, false);
+  assert.equal(button.textContent, '🎙️ Sincronizar legendas pelo áudio');
+  assert.equal(statuses.at(-1)[2], 'warn');
 });
 
 test('automatic captions clearly require local video audio when a remote source exposes no audio', async () => {
@@ -347,6 +448,56 @@ test('manual caption text is preserved when it differs from the cut audio', asyn
   assert.deepEqual(clip.subSegments, existingSegments);
   assert.equal(clip.captionAudioMismatch, true);
   assert.equal(clip.captionAudioSyncVerified, false);
+});
+
+test('large-video audio extraction supports Safari MP4 recordings for Opus and dubbing synchronization', async () => {
+  const supportedCalls = [];
+  class FakeMediaRecorder {
+    static isTypeSupported(type){
+      supportedCalls.push(type);
+      return type === 'audio/mp4';
+    }
+    constructor(_stream, options){ this.mimeType = options.mimeType; }
+    start(){
+      setTimeout(() => this.ondataavailable?.({ data: new Blob(['captured-audio'], { type: this.mimeType }) }), 0);
+    }
+    stop(){ setTimeout(() => this.onstop?.(), 0); }
+  }
+  const context = readStreamingAudioExtractor({
+    window: { MediaRecorder: FakeMediaRecorder },
+    MediaRecorder: FakeMediaRecorder,
+    MediaStream: class { constructor(tracks){ this.getAudioTracks = () => tracks; } },
+    Blob,
+    Buffer,
+    performance,
+    setTimeout,
+    clearTimeout,
+    bytesToBase64: bytes => Buffer.from(bytes).toString('base64')
+  });
+  let currentTime = 0;
+  const listeners = {};
+  const media = {
+    addEventListener: (name, callback) => { listeners[name] = callback; },
+    removeEventListener: name => { delete listeners[name]; },
+    captureStream: () => ({ getAudioTracks: () => ['audio-track'] }),
+    play: async () => { currentTime = 7; },
+    pause: () => {}
+  };
+  Object.defineProperty(media, 'currentTime', {
+    get: () => currentTime,
+    set: value => {
+      currentTime = value;
+      if(listeners.seeked) setTimeout(listeners.seeked, 0);
+    }
+  });
+
+  const extracted = await context.extractAudio(media, 5, 7);
+
+  assert.equal(supportedCalls[0], 'audio/mp4;codecs=mp4a.40.2');
+  assert.ok(supportedCalls.includes('audio/mp4'));
+  assert.equal(extracted.audioMime, 'audio/mp4');
+  assert.equal(extracted.seconds, 2);
+  assert.equal(Buffer.from(extracted.base64, 'base64').toString(), 'captured-audio');
 });
 
 test('large local videos recheck captions by capturing each final cut without decoding the whole file', async () => {

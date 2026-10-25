@@ -1455,6 +1455,7 @@ input[type="range"]{
             <option value="time">⏱️ Sort: Timeline Order</option>
           </select>
           <button type="button" class="ghost" onclick="toggleOpusPipelineJsonDrawer()" style="padding:7px 11px;font-size:11.5px;border-color:#a855f788;color:#e9d5ff">{ } JSON Pipeline</button>
+          <button type="button" id="opusSyncAllCaptionsBtn" onclick="syncAllOpusClipCaptionsFromAudio()" style="padding:7px 12px;font-size:11.5px;font-weight:900;border-radius:9px;border:1px solid #22c55e;background:#064e3b;color:#bbf7d0;cursor:pointer" title="Reouve o áudio de cada corte e sincroniza a legenda palavra por palavra, como no Dublador">🎙️ Sincronizar legendas pelo áudio</button>
           <button type="button" class="ghost" onclick="toggleOpusStudioDrawer()" style="padding:7px 12px;font-size:11.5px;border-color:#38bdf888;color:#bae6fd">✂️ Studio Editor</button>
         </div>
       </div>
@@ -3147,16 +3148,25 @@ function probeMediaDuration(file){
 // Extrator Streaming Zero-RAM para vídeos GIGANTES (>95MB, ex: 300MB, 800MB, 1.5GB+) ou containers especiais (.MOV/.MKV)
 async function extractSingleChunkStreaming(mediaEl, startSec, endSec){
   const dur = Math.max(0.4, endSec - startSec);
-  const mimeCandidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'video/webm;codecs=vp8,opus'];
+  // iOS/Safari costuma gravar áudio em MP4; Chromium geralmente prefere WebM/Opus.
+  const mimeCandidates = ['audio/mp4;codecs=mp4a.40.2', 'audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'video/webm;codecs=vp8,opus'];
   let recMime = '';
   for(const m of mimeCandidates){ if(window.MediaRecorder && MediaRecorder.isTypeSupported(m)){ recMime = m; break; } }
   if(!recMime) throw new Error('Navegador sem suporte a gravação de stream de áudio.');
 
-  await new Promise(res => {
-    const onSeek = () => { mediaEl.removeEventListener('seeked', onSeek); res(); };
-    mediaEl.addEventListener('seeked', onSeek);
-    try { mediaEl.currentTime = startSec; } catch(e){ res(); }
-    setTimeout(res, 1800);
+  await new Promise(resolve => {
+    let seekTimer = null;
+    let seekFinished = false;
+    const finishSeek = () => {
+      if(seekFinished) return;
+      seekFinished = true;
+      if(seekTimer) clearTimeout(seekTimer);
+      mediaEl.removeEventListener('seeked', finishSeek);
+      resolve();
+    };
+    mediaEl.addEventListener('seeked', finishSeek);
+    try { mediaEl.currentTime = startSec; } catch(e){ finishSeek(); }
+    if(!seekFinished) seekTimer = setTimeout(finishSeek, 1800);
   });
 
   const rawStream = (mediaEl.captureStream || mediaEl.mozCaptureStream).call(mediaEl);
@@ -9871,7 +9881,7 @@ function loadOpusVideoFile(file, customLabel = '', skipAutoClip = false){
     if(meta){
       meta.innerHTML =
         `📹 <b>${escapeHtml(opusState.fileName)}</b> • Tamanho: <b>${fmtHumanBytes(file.size || 0)}</b> • Duração: <b>${fmtClockSec(opusState.durationSec)}</b> • Resolução Original: <b>${opusState.videoW}×${opusState.videoH}</b>` +
-        `<br><span style="color:#4ade80">✅ Vídeo carregado no monitor! O OpusClip IA pega as melhores partes deste vídeo, corta em 9:16 e aplica as legendas sincronizadas.</span>`;
+        `<br><span style="color:#4ade80">✅ Vídeo carregado! Ao gerar os cortes, o OpusClip IA confere o áudio real e sincroniza as legendas palavra por palavra, como no Dublador.</span>`;
     }
     const autoToggle = document.getElementById('opusAutoClipToggle');
     if(!skipAutoClip && (!autoToggle || autoToggle.checked)){
@@ -10279,7 +10289,18 @@ function buildOpusWordByWordCues(text, clipDurationSec, clipStartSec = 0, subSeg
     });
   }
 
-  // Sem timestamps, distribui pelo intervalo de fala detectável; mantém a estimativa dentro da duração real do corte.
+  // Sem uma linha completa de tempos reais, não usa timestamps parciais que poderiam apagar palavras.
+  // O fallback reaproveita a mesma distribuição de fala do Dublador, limitada ao início/fim acústico do corte.
+  const normalizeTimingTokens = value => String(value || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    .match(/[a-z0-9]+(?:['’\-][a-z0-9]+)*/g) || [];
+  const captionTokens = rawWords.flatMap(normalizeTimingTokens);
+  const segmentTokens = timedWords.flatMap(word => normalizeTimingTokens(word.word));
+  const hasCompleteTimedTranscript = captionTokens.length > 0
+    && captionTokens.length === segmentTokens.length
+    && captionTokens.every((token, i) => token === segmentTokens[i]);
+  if(timedWords.length && !hasCompleteTimedTranscript) timedWords = [];
+
   if(!timedWords.length){
     let speechStartOffset = 0.06;
     let speechEndOffset = totalDur - 0.10;
@@ -10309,23 +10330,38 @@ function buildOpusWordByWordCues(text, clipDurationSec, clipStartSec = 0, subSeg
       }
     }
 
-    const weights = rawWords.map(w => {
-      const cleanW = w.replace(/[^a-zA-ZÀ-ÿ0-9]/g, '');
-      return Math.max(1, Math.round(cleanW.length / 2.6));
-    });
-    const totalW = weights.reduce((a, b) => a + b, 0) || 1;
-    let cursor = speechStartOffset;
     const usableDur = Math.max(0.1, speechEndOffset - speechStartOffset);
-    timedWords = rawWords.map((w, i) => {
-      const start = cursor;
-      const d = i === rawWords.length - 1 ? Math.max(0, speechEndOffset - cursor) : (weights[i] / totalW) * usableDur;
-      const end = Math.min(speechEndOffset, start + d);
-      cursor = end;
-      const cleanW = w.replace(/[^a-zA-ZÀ-ÿ0-9]/g, '');
-      const isPowerWord = /^(segredo|verdade|nunca|sempre|agora|dinheiro|milhões|incrível|impossível|absurdo|atenção|olha|resultado|sucesso|viral|erro|cuidado|ouro|muda|tudo)$/i.test(cleanW);
-      const isHighlight = isPowerWord || cleanW.length >= 6 || /[!?🔥⚡💎]/.test(w) || (i % 3 === 1);
-      return { word: w, start, end, isHighlight, isPowerWord };
-    });
+    const dubStyleCues = typeof buildTimedCaptions === 'function'
+      ? buildTimedCaptions(rawWords.join(' '), usableDur) : [];
+    const dubStyleWords = dubStyleCues.flatMap(cue => Array.isArray(cue && cue.words) ? cue.words : []);
+    if(dubStyleWords.length === rawWords.length){
+      timedWords = dubStyleWords.map((item, i) => {
+        const word = rawWords[i];
+        const start = speechStartOffset + Math.max(0, Number(item.start) || 0);
+        const end = Math.min(speechEndOffset, speechStartOffset + Math.max(Number(item.start) || 0, Number(item.end) || 0));
+        const cleanW = word.replace(/[^a-zA-ZÀ-ÿ0-9]/g, '');
+        const isPowerWord = /^(segredo|verdade|nunca|sempre|agora|dinheiro|milhões|incrível|impossível|absurdo|atenção|olha|resultado|sucesso|viral|erro|cuidado|ouro|muda|tudo)$/i.test(cleanW);
+        const isHighlight = isPowerWord || cleanW.length >= 6 || /[!?🔥⚡💎]/.test(word) || (i % 3 === 1);
+        return { word, start, end: Math.max(start, end), isHighlight, isPowerWord };
+      });
+    } else {
+      const weights = rawWords.map(w => {
+        const cleanW = w.replace(/[^a-zA-ZÀ-ÿ0-9]/g, '');
+        return Math.max(1, Math.round(cleanW.length / 2.6));
+      });
+      const totalW = weights.reduce((a, b) => a + b, 0) || 1;
+      let cursor = speechStartOffset;
+      timedWords = rawWords.map((w, i) => {
+        const start = cursor;
+        const d = i === rawWords.length - 1 ? Math.max(0, speechEndOffset - cursor) : (weights[i] / totalW) * usableDur;
+        const end = Math.min(speechEndOffset, start + d);
+        cursor = end;
+        const cleanW = w.replace(/[^a-zA-ZÀ-ÿ0-9]/g, '');
+        const isPowerWord = /^(segredo|verdade|nunca|sempre|agora|dinheiro|milhões|incrível|impossível|absurdo|atenção|olha|resultado|sucesso|viral|erro|cuidado|ouro|muda|tudo)$/i.test(cleanW);
+        const isHighlight = isPowerWord || cleanW.length >= 6 || /[!?🔥⚡💎]/.test(w) || (i % 3 === 1);
+        return { word: w, start, end, isHighlight, isPowerWord };
+      });
+    }
   }
 
   // Blocos menores deixam a legenda mais arejada; a pontuação final também fecha o bloco para não misturar frases.
@@ -11669,6 +11705,71 @@ async function generateSelectedOpusClipCaptionsFromAudio(){
   }
 }
 
+// Re-sincroniza todos os cortes pelo áudio local, usando tempos reais por palavra quando o Whisper os fornece.
+// O processamento automático após o upload chama o mesmo transcritor; este botão permite repetir a conferência.
+async function syncAllOpusClipCaptionsFromAudio(){
+  const clips = Array.isArray(opusState.clips) ? opusState.clips : [];
+  const validClips = clips.filter(Boolean);
+  if(!validClips.length){
+    toast('Gere os cortes antes de sincronizar as legendas.', 'warn');
+    return;
+  }
+  if(!hasOpusClipAudioSource()){
+    showStatus('opusStatus', '⚠️ Para sincronizar todas as legendas pelo áudio, carregue o arquivo de vídeo local no OpusClip IA.', 'warn');
+    toast('📂 Carregue o vídeo local para sincronizar as legendas com a fala.', 'warn');
+    return;
+  }
+
+  const btn = document.getElementById('opusSyncAllCaptionsBtn');
+  if(btn){
+    btn.disabled = true;
+    btn.textContent = '⏳ Ouvindo os cortes e sincronizando...';
+  }
+  showStatus('opusStatus', `🎙️ Reouvindo o áudio original e sincronizando palavra por palavra em ${validClips.length} corte(s), como no Dublador...`, 'info');
+  try{
+    await transcribeMissingOpusClipCaptions(clips, true);
+    clips.forEach((clip, idx) => {
+      if(!clip) return;
+      clip._cues = null;
+      try{ updateInlineCardCaptionBadges(idx, clip); }catch(_){}
+    });
+    opusState.lastExportBlob = null;
+    opusState.lastExportClipId = null;
+    const selectedIdx = Math.max(0, Number(opusState.selectedIdx) || 0);
+    const selectedClip = clips[selectedIdx] || validClips[0];
+    const captionEditor = document.getElementById('opusEditCaption');
+    if(captionEditor && selectedClip) captionEditor.value = selectedClip.captionText || '';
+    try{ renderOpusClipsListUI(); }catch(_){}
+    try{ renderSingleOpusPreviewFrame(); }catch(_){}
+    try{ renderAllOpusCardStaticPreviews(); }catch(_){}
+
+    const preciselySynced = validClips.filter(clip => clip.captionAudioSyncVerified && hasOpusClipWordTiming(clip)).length;
+    const preservedManual = validClips.filter(clip => clip.captionAudioMismatch).length;
+    const notPreciselySynced = validClips.filter(clip => String(clip.captionText || '').trim()
+      && !clip.captionAudioSyncVerified && !clip.captionAudioMismatch).length;
+    if(preciselySynced === validClips.length && !preservedManual){
+      showStatus('opusStatus', `✅ Legendas sincronizadas palavra por palavra pelo áudio em todos os ${validClips.length} cortes. A prévia e o MP4 usam a mesma linha do tempo.`, 'success');
+      toast('✅ Legendas dos cortes sincronizadas com o áudio!');
+    }else{
+      const details = [
+        `${preciselySynced}/${validClips.length} com tempos exatos por palavra`,
+        notPreciselySynced ? `${notPreciselySynced} sem tempos exatos (confira a prévia)` : '',
+        preservedManual ? `${preservedManual} legenda(s) manual(is) mantida(s) por divergirem da fala` : ''
+      ].filter(Boolean).join(' • ');
+      showStatus('opusStatus', `⚠️ Conferência de sincronia concluída: ${details}.`, 'warn');
+      toast(`⚠️ Sincronia verificada: ${preciselySynced}/${validClips.length} corte(s) com tempos exatos.`, 'warn');
+    }
+  }catch(error){
+    showStatus('opusStatus', '❌ Não foi possível sincronizar as legendas: ' + (error.message || 'falha de transcrição'), 'error');
+    toast('❌ Erro ao sincronizar as legendas com o áudio.', 'error');
+  }finally{
+    if(btn){
+      btn.disabled = false;
+      btn.textContent = '🎙️ Sincronizar legendas pelo áudio';
+    }
+  }
+}
+
 function onEditSelectedOpusClip(){
   const clip = opusState.clips[opusState.selectedIdx];
   if(!clip) return;
@@ -12206,7 +12307,7 @@ async function runOpusClipAnalysis(skipUrlCheck = false){
     const hasLocalClipAudio = hasOpusClipAudioSource();
     if(captionsNeedingSync && hasLocalClipAudio){
       setProgress('opusProgressFill', 62);
-      showStatus('opusStatus', `📝 Conferindo a fala real e sincronizando palavra por palavra em ${captionsNeedingSync} corte(s)...`, 'info');
+      showStatus('opusStatus', `📝 Conferindo o áudio exato de cada corte e sincronizando como no Dublador, palavra por palavra (${captionsNeedingSync} corte(s))...`, 'info');
       await transcribeMissingOpusClipCaptions(data.clips, true);
     }
 
