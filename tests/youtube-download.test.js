@@ -62,6 +62,22 @@ test('sanitizes filenames for Content-Disposition and Android downloads', () => 
   assert.equal(sanitizeVideoFilename(''), 'video-youtube');
 });
 
+test('download tab links to Brasil Downloader safely as an external alternative', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  for (const file of ['../public/index.html', '../vercel/index.html']) {
+    const html = fs.readFileSync(path.join(__dirname, file), 'utf8');
+    const downloaderStart = html.indexOf('<section id="youtube-download"');
+    const downloaderEnd = html.indexOf('</section>', downloaderStart);
+    assert.ok(downloaderStart >= 0 && downloaderEnd > downloaderStart, 'download section should exist');
+    const downloaderSection = html.slice(downloaderStart, downloaderEnd);
+    assert.match(downloaderSection, /href="https:\/\/brasil-downloader\.vercel\.app\/"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*aria-label="Abrir Brasil Downloader em uma nova aba \(serviço externo\)"/);
+    assert.match(downloaderSection, /Abrir Brasil Downloader \(externo\)/);
+    assert.match(downloaderSection, /Brasil Downloader abre o serviço externo em nova aba/);
+    assert.doesNotMatch(downloaderSection, /y2mate/i);
+  }
+});
+
 test('download actions are routed through the existing clips API without extra Vercel functions', async () => {
   const makeResponse = () => ({
     headers: {},
