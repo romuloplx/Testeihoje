@@ -68,19 +68,21 @@ test('routes Douyin downloads through clips API and rejects invalid links before
   assert.equal(JSON.parse(response.body).code, 'INVALID_DOUYIN_URL');
 });
 
-test('adds the Douyin handoff and manual TikTok share flow to both deployed HTML copies', () => {
+test('offers direct Douyin MP4 download on both HTML copies and keeps TikTok sharing manual', () => {
   const fs = require('node:fs');
   const path = require('node:path');
   for (const file of ['../public/index.html', '../vercel/index.html']) {
     const html = fs.readFileSync(path.join(__dirname, file), 'utf8');
-    const downloaderStart = html.indexOf('<section id="youtube-download"');
+    const downloaderStart = html.indexOf('<section id="douyin-download"');
     const downloaderEnd = html.indexOf('</section>', downloaderStart);
-    assert.ok(downloaderStart >= 0 && downloaderEnd > downloaderStart, 'download section should exist');
+    assert.ok(downloaderStart >= 0 && downloaderEnd > downloaderStart, 'Douyin download section should exist');
     const downloaderSection = html.slice(downloaderStart, downloaderEnd);
     assert.match(downloaderSection, /id="douyinDownloadUrl"/);
-    assert.match(downloaderSection, /onclick="downloadDouyinAndOpenDub\(\)"/);
-    assert.match(downloaderSection, /href="https:\/\/brasil-downloader\.vercel\.app\/"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*aria-label="Abrir Brasil Downloader em uma nova aba \(serviço externo\)"/);
-    assert.match(html, /function downloadDouyinAndOpenDub\(\)[\s\S]*previewVideo\(videoFile\)/);
+    assert.match(downloaderSection, /onclick="downloadDouyinVideo\(\)"/);
+    assert.match(downloaderSection, /Baixar MP4/);
+    assert.doesNotMatch(downloaderSection, /youtube|tendências|Apify|Brasil Downloader/i);
+    assert.match(html, /function downloadDouyinVideo\(\)[\s\S]*URL\.createObjectURL\(videoFile\)[\s\S]*downloadLink\.click\(\)/);
+    assert.doesNotMatch(html, /searchDouyinTrends|douyin_search/);
 
     const dubSectionStart = html.indexOf('<section id="dub"');
     const dubSectionEnd = html.indexOf('</section>', dubSectionStart);
@@ -89,7 +91,7 @@ test('adds the Douyin handoff and manual TikTok share flow to both deployed HTML
     assert.match(dubSection, /onclick="shareDubToTikTok\(\)"/);
     assert.match(dubSection, /Escolha TikTok e confirme a postagem no app/);
     assert.match(html, /navigator\.share\(\{[\s\S]*files:\[file\]/);
-    assert.match(html, /nada é publicado automaticamente/);
+    assert.match(html, /async function shareDubToTikTok\(\)/);
   }
 });
 
