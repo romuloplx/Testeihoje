@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { cleanDubTranslationText, isEdgeTtsHandshakeFailure, runTtsProviderChain, ttsWithFallback } = require('../vercel/api/lib/ai');
+const { buildOpenAITtsOptions, cleanDubTranslationText, isEdgeTtsHandshakeFailure, runTtsProviderChain, ttsWithFallback } = require('../vercel/api/lib/ai');
 
 test('recognizes Edge TTS WebSocket handshakes that incorrectly return HTTP 200', () => {
   assert.equal(isEdgeTtsHandshakeFailure(new Error('Unexpected server response: 200')), true);
@@ -15,6 +15,19 @@ test('dubbing translation removes model headers and quote wrappers without chang
   assert.equal(cleanDubTranslationText('La traducción: Buenos días.'), 'Buenos días.');
   assert.equal(cleanDubTranslationText('```text\nTranslation: Good morning.\n```'), 'Good morning.');
   assert.equal(cleanDubTranslationText('A fala começa agora.'), 'A fala começa agora.');
+});
+
+test('OpenAI dubbing TTS receives the selected voice without extra spoken instructions', () => {
+  const opts = buildOpenAITtsOptions({ model: 'gpt-4o-mini-tts', text: 'Só as palavras traduzidas.', voice: 'coral', exactTextOnly: true });
+  assert.deepEqual(opts, {
+    model: 'gpt-4o-mini-tts',
+    voice: 'coral',
+    input: 'Só as palavras traduzidas.',
+    response_format: 'mp3'
+  });
+
+  const genericOpts = buildOpenAITtsOptions({ model: 'gpt-4o-mini-tts', text: 'Teste.', voice: 'nova' });
+  assert.match(genericOpts.instructions, /dublador humano brasileiro/);
 });
 
 test('falls through from a failed Edge TTS WebSocket to the first working voice provider', async () => {
@@ -78,32 +91,54 @@ test('ttsWithFallback sends Edge HTTP 200 failures to Gemini without losing the 
   assert.strictEqual(result.buffer, audio);
 });
 
-test('strict dubbing fallback skips prompt-based Gemini speech and synthesizes only the translated words', async () => {
+test('strict dubbing fallback skips providers that cannot keep the selected voice', async () => {
   const called = [];
   const audio = Buffer.alloc(384, 0x44);
   const result = await ttsWithFallback(
-    { text: '  A tradução exata do vídeo.  ', voice: 'nova', lang: 'pt-BR', exactTextOnly: true },
+    { text: '  A tradução exata do vídeo.  ', voice: 'coral', lang: 'pt-BR', exactTextOnly: true },
     {
       edge: async options => {
         called.push('edge');
-        assert.deepEqual(options, { text: 'A tradução exata do vídeo.', voice: 'nova', lang: 'pt-BR', emotion: '' });
+        assert.deepEqual(options, { text: 'A tradução exata do vídeo.', voice: 'coral', lang: 'pt-BR', emotion: '' });
         throw new Error('Edge TTS indisponível');
       },
       gemini: async () => {
         called.push('gemini');
         return { buffer: Buffer.alloc(384), provider: 'gemini/tts' };
       },
-      google: async options => {
+      unorouter: async options => {
+        called.push('unorouter');
+        assert.deepEqual(options, { text: 'A tradução exata do vídeo.', voice: 'coral', lang: 'pt-BR', emotion: '' });
+        return { buffer: audio, provider: 'unorouter/aura-1:free' };
+      },
+      google: async () => {
         called.push('google');
-        assert.deepEqual(options, { text: 'A tradução exata do vídeo.', voice: 'nova', lang: 'pt-BR', emotion: '' });
-        return { buffer: audio, provider: 'google-translate-tts' };
+        return { buffer: Buffer.alloc(384), provider: 'google-translate-tts' };
+      },
+      streamElements: async () => {
+        called.push('streamElements');
+        return Buffer.alloc(384);
       }
     }
   );
 
-  assert.deepEqual(called, ['edge', 'google']);
-  assert.equal(result.provider, 'google-translate-tts');
+  assert.deepEqual(called, ['edge', 'unorouter']);
+  assert.equal(result.provider, 'unorouter/aura-1:free');
   assert.strictEqual(result.buffer, audio);
+});
+
+test('strict dubbing does not silently switch to a fixed Google voice when selected-voice providers fail', async () => {
+  const called = [];
+  const result = await ttsWithFallback(
+    { text: 'Texto para dublar.', voice: 'sage', lang: 'pt-BR', exactTextOnly: true },
+    {
+      edge: async () => { called.push('edge'); throw new Error('indisponível'); },
+      google: async () => { called.push('google'); return Buffer.alloc(384); }
+    }
+  );
+
+  assert.deepEqual(called, ['edge']);
+  assert.match(result.error, /neural-hd: indisponível/);
 });
 
 test('ttsWithFallback proceeds to Unorouter when Edge and Gemini both fail', async () => {

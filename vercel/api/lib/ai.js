@@ -2831,9 +2831,21 @@ async function runTtsProviderChain(attempts = []) {
   return { error: errors.join(' | '), errors };
 }
 
-// Voz com fallback real: Edge HD → OpenAI → Gemini → Unorouter → Google (e StreamElements para inglês).
-// Se o handshake WebSocket do Edge responder HTTP 200, ele entra em cooldown e os próximos trechos
-// seguem direto para outro provedor, em vez de repetir uma conexão que já falhou.
+function buildOpenAITtsOptions({ model, text, voice = 'onyx', exactTextOnly = false } = {}) {
+  const options = {
+    model,
+    voice: TTS_VOICES[voice] || 'onyx',
+    input: String(text || '').slice(0, 4096),
+    response_format: 'mp3'
+  };
+  if (model === 'gpt-4o-mini-tts' && !exactTextOnly) {
+    options.instructions = 'Fale como um dublador humano brasileiro autêntico, mantendo sempre o mesmo timbre, tom e cadência do início ao fim.';
+  }
+  return options;
+}
+
+// Na dublagem estrita, use apenas serviços que recebem texto e voz selecionada diretamente.
+// Se esses serviços falharem, é preferível falhar claramente a trocar silenciosamente de voz.
 async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR', emotion = '', exactTextOnly = false } = {}, testProviders = null) {
   const cleanText = String(text || '').trim();
   if (!cleanText) return { error: 'texto vazio', errors: ['texto vazio'] };
@@ -2850,7 +2862,7 @@ async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR', emotion =
       ['streamelements-tts', testProviders.streamElements]
     ];
     for (const [name, provider] of injected) {
-      if (exactTextOnly && name === 'gemini-tts') continue;
+      if (exactTextOnly && ['gemini-tts', 'google-translate-tts', 'streamelements-tts'].includes(name)) continue;
       if (typeof provider === 'function') {
         attempts.push({ name, run: () => provider({ text: cleanText, voice, lang, emotion }) });
       }
@@ -2864,23 +2876,15 @@ async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR', emotion =
 
   // OpenAI oficial só entra quando há uma chave própria (não a chave do Unorouter).
   if (canUseOfficialOpenAI()) {
-    // No modo estrito, evita TTS generativo que recebe instruções de interpretação além do texto falado.
-    const openAiTtsModels = exactTextOnly ? ['tts-1-hd', 'tts-1'] : ['gpt-4o-mini-tts', 'tts-1-hd', 'tts-1'];
+    // O texto e a voz escolhida vão em campos separados; na dublagem, omitimos instruções faláveis.
+    const openAiTtsModels = ['gpt-4o-mini-tts', 'tts-1-hd', 'tts-1'];
     for (const model of openAiTtsModels) {
       attempts.push({
         name: 'openai/' + model,
         run: async () => {
           if (!canUseOfficialOpenAI()) throw new Error('chave OpenAI indisponível');
           const openai = makeOpenAI();
-          const opts = {
-            model,
-            voice: TTS_VOICES[voice] || 'onyx',
-            input: cleanText.slice(0, 4096),
-            response_format: 'mp3'
-          };
-          if (model === 'gpt-4o-mini-tts') {
-            opts.instructions = 'Fale como um dublador humano brasileiro autêntico, mantendo sempre o mesmo timbre, tom e cadência do início ao fim.';
-          }
+          const opts = buildOpenAITtsOptions({ model, text: cleanText, voice, exactTextOnly });
           try {
             const speech = await openai.audio.speech.create(opts);
             return { buffer: Buffer.from(await speech.arrayBuffer()), provider: 'openai/' + model };
@@ -2910,15 +2914,18 @@ async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR', emotion =
     attempts.push({ name: 'unorouter-tts', run: () => unorouterTTS({ text: cleanText, voice }) });
   }
 
-  attempts.push({
-    name: 'google-translate-tts',
-    run: async () => ({
-      buffer: await ttsGoogle({ text: cleanText, lang: String(lang || 'pt-BR').split(/[-_]/)[0].toLowerCase() }),
-      provider: 'google-translate-tts'
-    })
-  });
+  // Google Translate TTS usa uma voz fixa por idioma e não consegue respeitar a voz escolhida.
+  if (!exactTextOnly) {
+    attempts.push({
+      name: 'google-translate-tts',
+      run: async () => ({
+        buffer: await ttsGoogle({ text: cleanText, lang: String(lang || 'pt-BR').split(/[-_]/)[0].toLowerCase() }),
+        provider: 'google-translate-tts'
+      })
+    });
+  }
 
-  if (/^en(?:[-_]|$)/i.test(String(lang || ''))) {
+  if (!exactTextOnly && /^en(?:[-_]|$)/i.test(String(lang || ''))) {
     const streamVoice = ['nova', 'shimmer', 'coral', 'sage', 'alloy'].includes(voice) ? 'Amy' : 'Brian';
     attempts.push({
       name: 'streamelements-tts',
@@ -4693,7 +4700,7 @@ module.exports = {
   generateWithOpenAI, generateCreateFull, generateSceneImage, hasOpenRouterImageApiKey, lookupIceAndFireCharacters, generateCreateSceneVideo, startCreateSceneVideo, pollCreateSceneVideo, consumeCreateSceneVideoRequest, dubWithOpenAI, enhanceScript, generateDubSocialMetadata,
   generateAvatarPortrait, generateAvatarScript, generateAvatarVideo, detectAvatarFaceLandmarks,
   transcribeClipSegment, analyzeViralClips, extractYoutubeVideoId, fetchYoutubeVideoInfoAndStream, fetchVideoStreamChunk, fetchYoutubeClipMp4Segment,
-  chatWithFallback, cleanDubTranslationText, ttsWithFallback, runTtsProviderChain, isEdgeTtsHandshakeFailure,
+  chatWithFallback, buildOpenAITtsOptions, cleanDubTranslationText, ttsWithFallback, runTtsProviderChain, isEdgeTtsHandshakeFailure,
   chatViaPollinations, ttsGoogle, ttsStreamElements,
   probeOpenAI, fullPipelineProbe, candidatesProbe, unorouterProbe, unorouterVideoProbe, getBody, send
 };
