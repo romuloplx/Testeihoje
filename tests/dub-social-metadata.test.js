@@ -92,6 +92,14 @@ test('Vercel dubbing route dispatches social metadata without requiring an uploa
   }
 });
 
+test('Dublagem silences the source audio by default and makes it an explicit option', () => {
+  const mixOptions = html.match(/<select id="dubBgMix">([\s\S]*?)<\/select>/)?.[1] || '';
+  assert.match(mixOptions, /<option value="mute" selected>/);
+  assert.match(mixOptions, /<option value="duck">/);
+  assert.match(html, /function assembleDubbedMasterAudio\(\{[^}]+bgMixMode = 'mute'/s);
+  assert.match(html, /const hasOrigDuck = \(bgMixMode === 'duck'/);
+});
+
 test('Dublagem displays the generated topic, caption and hashtags with a one-tap copy action', () => {
   const server = fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8');
   assert.match(html, /id="dubSocialPackage"/);

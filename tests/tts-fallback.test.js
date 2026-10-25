@@ -1,11 +1,20 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { isEdgeTtsHandshakeFailure, runTtsProviderChain, ttsWithFallback } = require('../vercel/api/lib/ai');
+const { cleanDubTranslationText, isEdgeTtsHandshakeFailure, runTtsProviderChain, ttsWithFallback } = require('../vercel/api/lib/ai');
 
 test('recognizes Edge TTS WebSocket handshakes that incorrectly return HTTP 200', () => {
   assert.equal(isEdgeTtsHandshakeFailure(new Error('Unexpected server response: 200')), true);
   assert.equal(isEdgeTtsHandshakeFailure(new Error('Unexpected server response: 403')), false);
   assert.equal(isEdgeTtsHandshakeFailure(new Error('connection timed out')), false);
+});
+
+test('dubbing translation removes model headers and quote wrappers without changing the spoken words', () => {
+  assert.equal(cleanDubTranslationText('Claro! Aqui está a tradução: “Olá, mundo!”'), 'Olá, mundo!');
+  assert.equal(cleanDubTranslationText('A tradução é: Olá, mundo!'), 'Olá, mundo!');
+  assert.equal(cleanDubTranslationText('"Tradução: Olá, mundo!"'), 'Olá, mundo!');
+  assert.equal(cleanDubTranslationText('La traducción: Buenos días.'), 'Buenos días.');
+  assert.equal(cleanDubTranslationText('```text\nTranslation: Good morning.\n```'), 'Good morning.');
+  assert.equal(cleanDubTranslationText('A fala começa agora.'), 'A fala começa agora.');
 });
 
 test('falls through from a failed Edge TTS WebSocket to the first working voice provider', async () => {
@@ -66,6 +75,34 @@ test('ttsWithFallback sends Edge HTTP 200 failures to Gemini without losing the 
 
   assert.deepEqual(called, ['edge', 'gemini']);
   assert.equal(result.provider, 'gemini/tts');
+  assert.strictEqual(result.buffer, audio);
+});
+
+test('strict dubbing fallback skips prompt-based Gemini speech and synthesizes only the translated words', async () => {
+  const called = [];
+  const audio = Buffer.alloc(384, 0x44);
+  const result = await ttsWithFallback(
+    { text: '  A tradução exata do vídeo.  ', voice: 'nova', lang: 'pt-BR', exactTextOnly: true },
+    {
+      edge: async options => {
+        called.push('edge');
+        assert.deepEqual(options, { text: 'A tradução exata do vídeo.', voice: 'nova', lang: 'pt-BR', emotion: '' });
+        throw new Error('Edge TTS indisponível');
+      },
+      gemini: async () => {
+        called.push('gemini');
+        return { buffer: Buffer.alloc(384), provider: 'gemini/tts' };
+      },
+      google: async options => {
+        called.push('google');
+        assert.deepEqual(options, { text: 'A tradução exata do vídeo.', voice: 'nova', lang: 'pt-BR', emotion: '' });
+        return { buffer: audio, provider: 'google-translate-tts' };
+      }
+    }
+  );
+
+  assert.deepEqual(called, ['edge', 'google']);
+  assert.equal(result.provider, 'google-translate-tts');
   assert.strictEqual(result.buffer, audio);
 });
 
