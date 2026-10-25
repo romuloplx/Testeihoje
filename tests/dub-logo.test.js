@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 
 const root = path.join(__dirname, '..');
 const publicHtml = fs.readFileSync(path.join(root, 'public/index.html'), 'utf8');
@@ -28,6 +29,8 @@ test('Dubbing UI supports free dragging over the video preview plus corner prese
     assert.match(html, /id="dubLogoPreview" class="hidden"/);
     assert.match(html, /id="dubLogoDragOverlay"[^>]*onpointerdown="startDubLogoDrag\(event\)"/);
     assert.match(html, /onpointermove="moveDubLogoDrag\(event\)"[^>]*onpointerup="endDubLogoDrag\(event\)"/);
+    assert.match(html, /id="dubSyncPreviewFrame"[^>]*class="hidden"/);
+    assert.match(html, /id="dubSyncLogoOverlay"[^>]*pointer-events:none/);
     assert.match(html, /id="dubLogoRemoveBtn"[^>]*onclick="removeDubLogo\(\)"/);
     assert.match(html, /Arraste a logo por cima da prévia do vídeo para colocar exatamente onde quiser/);
     assert.ok(html.includes(`function onSelectDubLogo(input){`), `${file} must load the selected logo`);
@@ -47,6 +50,33 @@ test('uploaded logos are validated as small raster images and stale exports are 
     assert.match(html, /overlay\.setPointerCapture\(event\.pointerId\)/);
     assert.match(html, /dubLogoPositionX = x \/ frameRect\.width/);
     assert.match(html, /dubLogoPositionY = y \/ frameRect\.height/);
+  }
+});
+
+test('dubbed-video preview shows the selected logo and the downloaded export keeps it burned in', () => {
+  for (const html of [publicHtml, vercelHtml]) {
+    const previewStart = html.indexOf('function updateDubResultLogoOverlay(){');
+    const previewEnd = html.indexOf('\nfunction startDubLogoDrag', previewStart);
+    assert.ok(previewStart >= 0 && previewEnd > previewStart, 'synchronized result logo overlay helper should exist');
+    const previewSource = html.slice(previewStart, previewEnd);
+    assert.match(previewSource, /dubSyncLogoOverlay/);
+    assert.match(previewSource, /getDubLogoRenderMetrics\(videoRect\.width, videoRect\.height, dubLogoImage\)/);
+    assert.match(previewSource, /dubLogoPositionX \* videoRect\.width/);
+    assert.match(previewSource, /dubLogoPositionY \* videoRect\.height/);
+
+    const dubStart = html.indexOf('async function dubVideo(){');
+    const dubEnd = html.indexOf('\n// --- Vozes + montagem de vídeo', dubStart);
+    assert.ok(dubStart >= 0 && dubEnd > dubStart, 'dubbing pipeline source should be present');
+    const dubSource = html.slice(dubStart, dubEnd);
+    assert.match(dubSource, /vResFrame\.classList\.remove\('hidden'\)/);
+    assert.match(dubSource, /requestAnimationFrame\(updateDubResultPreviewLayout\)/);
+
+    const exportStart = html.indexOf('async function downloadDubVideo(opts = {})');
+    const exportEnd = html.indexOf('// --- Projects', exportStart);
+    const exportSource = html.slice(exportStart, exportEnd);
+    assert.match(exportSource, /drawDubLogo\(ctx, dubLogoForExport, dubLogoSettings\);/);
+    assert.match(exportSource, /syncFrame\.classList\.add\('hidden'\)/);
+    assert.match(exportSource, /syncLogoOverlay\.classList\.add\('hidden'\)/);
   }
 });
 
@@ -118,6 +148,84 @@ test('logo renderer preserves ratio, opacity, corner presets, and arbitrary drag
   const clamped = renderAt('custom', { xFraction: 0.99, yFraction: 0.99 });
   assert.equal(clamped.x, frame.width - metrics.width);
   assert.equal(clamped.y, frame.height - metrics.height);
+});
+
+test('synchronized dubbing preview keeps the logo aligned with the resized result video', () => {
+  const metricsMatch = publicHtml.match(/function getDubLogoRenderMetrics\([\s\S]*?\n\}/);
+  const updateMatch = publicHtml.match(/function updateDubResultLogoOverlay\(\)\{[\s\S]*?\n\}/);
+  assert.ok(metricsMatch, 'logo size helper should exist');
+  assert.ok(updateMatch, 'result preview overlay updater should exist');
+
+  const image = { naturalWidth: 400, naturalHeight: 200 };
+  const overlay = {
+    src: '',
+    style: {},
+    getAttribute(name){ return name === 'src' ? this.src : null; },
+    classList: { hidden: true, add(){ this.hidden = true; }, remove(){ this.hidden = false; } }
+  };
+  const frame = { getBoundingClientRect: () => ({ left: 10, top: 20, width: 1040, height: 540 }) };
+  const video = {
+    videoWidth: 1920,
+    videoHeight: 1080,
+    classList: { contains: () => false },
+    getBoundingClientRect: () => ({ left: 28, top: 46, width: 1000, height: 500 })
+  };
+  const controls = {
+    dubLogoPosition: { value: 'custom' },
+    dubLogoSize: { value: '20' },
+    dubLogoOpacity: { value: '60' }
+  };
+  const context = vm.createContext({
+    document: {
+      getElementById: id => ({
+        dubSyncLogoOverlay: overlay,
+        dubSyncPreviewFrame: frame,
+        dubSyncVideo: video,
+        ...controls
+      })[id] || null
+    },
+    dubLogoImage: image,
+    dubLogoObjectUrl: 'blob:logo',
+    dubLogoPositionX: 0.4,
+    dubLogoPositionY: 0.3
+  });
+  vm.runInContext(`${metricsMatch[0]}\n${updateMatch[0]}\nglobalThis.update = updateDubResultLogoOverlay;`, context);
+  context.update();
+
+  assert.equal(overlay.src, 'blob:logo');
+  assert.equal(overlay.style.left, '418px');
+  assert.equal(overlay.style.top, '176px');
+  assert.equal(overlay.style.width, '200px');
+  assert.equal(overlay.style.height, '100px');
+  assert.equal(overlay.style.opacity, '0.6');
+  assert.equal(overlay.classList.hidden, false);
+});
+
+test('synchronized result player is resized to video aspect ratio before placing the logo', () => {
+  const layoutMatch = publicHtml.match(/function updateDubResultPreviewLayout\(\)\{[\s\S]*?\n\}/);
+  assert.ok(layoutMatch, 'result preview layout updater should exist');
+  const frame = { style: {}, parentElement: { clientWidth: 800 } };
+  const video = {
+    videoWidth: 1920,
+    videoHeight: 1080,
+    style: {},
+    classList: { contains: () => false }
+  };
+  let overlayRefreshes = 0;
+  const context = vm.createContext({
+    document: { getElementById: id => id === 'dubSyncPreviewFrame' ? frame : id === 'dubSyncVideo' ? video : null },
+    updateDubResultLogoOverlay: () => overlayRefreshes++
+  });
+  vm.runInContext(layoutMatch[0], context);
+  context.updateDubResultPreviewLayout();
+
+  assert.equal(frame.style.width, '800px');
+  assert.equal(frame.style.height, '450px');
+  assert.equal(video.style.width, '100%');
+  assert.equal(video.style.height, '100%');
+  assert.equal(video.style.maxHeight, 'none');
+  assert.equal(video.style.objectFit, 'fill');
+  assert.equal(overlayRefreshes, 1);
 });
 
 test('public and Vercel HTML copies stay synchronized', () => {

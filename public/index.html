@@ -1078,7 +1078,10 @@ input[type="range"]{
           <div class="hint" style="margin-top:7px">Sugestões baseadas na transcrição/tradução; ajudam na descoberta, mas não garantem viralização.</div>
         </div>
         <div id="dubPlayerWrap" class="hidden" style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px">
-          <video id="dubSyncVideo" controls playsinline class="hidden" style="width:100%;max-height:460px;border-radius:10px;background:#000"></video>
+          <div id="dubSyncPreviewFrame" class="hidden" style="position:relative;width:100%;max-height:460px;overflow:hidden;border-radius:10px;background:#000;line-height:0">
+            <video id="dubSyncVideo" controls playsinline class="hidden" style="display:block;width:100%;max-height:460px;border-radius:10px;background:#000"></video>
+            <img id="dubSyncLogoOverlay" class="hidden" alt="" aria-hidden="true" draggable="false" style="position:absolute;left:0;top:0;display:block;object-fit:contain;z-index:5;pointer-events:none;user-select:none;-webkit-user-drag:none;filter:drop-shadow(0 2px 6px rgba(0,0,0,.65))">
+          </div>
           <audio id="dubAudio" controls style="width:100%"></audio>
           <video id="dubExportedVideo" controls playsinline class="hidden" style="width:100%;max-height:460px;border-radius:10px;background:#000"></video>
 
@@ -2857,6 +2860,13 @@ function invalidateDubVideoExport(){
   }
   const btn = document.getElementById('dubMainDownloadBtn');
   if(btn) btn.textContent = '⬇️ GERAR E BAIXAR VÍDEO DUBLADO LISO (.MP4 GALERIA)';
+  const syncVideo = document.getElementById('dubSyncVideo');
+  const syncFrame = document.getElementById('dubSyncPreviewFrame');
+  if(syncVideo && syncVideo.src && dubAudioURL){
+    syncVideo.classList.remove('hidden');
+    if(syncFrame) syncFrame.classList.remove('hidden');
+    updateDubResultPreviewLayout();
+  }
   return true;
 }
 
@@ -2885,10 +2895,11 @@ function updateDubVideoPreviewLayout(){
   if(!frame || !video || video.hidden || !video.videoWidth || !video.videoHeight){
     if(frame && video && video.hidden) frame.style.display = 'none';
     updateDubLogoOverlay();
+    updateDubResultPreviewLayout();
     return;
   }
   const hostWidth = frame.parentElement ? frame.parentElement.clientWidth : 0;
-  if(!hostWidth) return;
+  if(!hostWidth){ updateDubResultPreviewLayout(); return; }
   const scale = Math.min(hostWidth / video.videoWidth, 440 / video.videoHeight);
   const width = Math.max(2, video.videoWidth * scale);
   const height = Math.max(2, video.videoHeight * scale);
@@ -2902,6 +2913,7 @@ function updateDubVideoPreviewLayout(){
   video.style.marginTop = '0';
   video.style.objectFit = 'fill';
   updateDubLogoOverlay();
+  updateDubResultPreviewLayout();
 }
 
 function updateDubLogoOverlay(){
@@ -2934,6 +2946,69 @@ function updateDubLogoOverlay(){
   if(dubLogoObjectUrl && overlay.getAttribute('src') !== dubLogoObjectUrl) overlay.src = dubLogoObjectUrl;
   overlay.style.left = `${x}px`;
   overlay.style.top = `${y}px`;
+  overlay.style.width = `${metrics.width}px`;
+  overlay.style.height = `${metrics.height}px`;
+  overlay.style.opacity = String(Math.max(20, Math.min(100, Number((document.getElementById('dubLogoOpacity')||{}).value || 90))) / 100);
+  overlay.classList.remove('hidden');
+}
+
+function updateDubResultPreviewLayout(){
+  const frame = document.getElementById('dubSyncPreviewFrame');
+  const video = document.getElementById('dubSyncVideo');
+  if(!frame || !video || video.classList.contains('hidden') || !video.videoWidth || !video.videoHeight){
+    updateDubResultLogoOverlay();
+    return;
+  }
+  const hostWidth = frame.parentElement ? frame.parentElement.clientWidth : 0;
+  if(!hostWidth){ updateDubResultLogoOverlay(); return; }
+  const scale = Math.min(hostWidth / video.videoWidth, 460 / video.videoHeight);
+  const width = Math.max(2, video.videoWidth * scale);
+  const height = Math.max(2, video.videoHeight * scale);
+  frame.style.display = 'block';
+  frame.style.width = `${width}px`;
+  frame.style.height = `${height}px`;
+  frame.style.maxWidth = '100%';
+  video.style.display = 'block';
+  video.style.width = '100%';
+  video.style.height = '100%';
+  video.style.maxHeight = 'none';
+  video.style.marginTop = '0';
+  video.style.objectFit = 'fill';
+  updateDubResultLogoOverlay();
+}
+
+function updateDubResultLogoOverlay(){
+  const overlay = document.getElementById('dubSyncLogoOverlay');
+  const frame = document.getElementById('dubSyncPreviewFrame');
+  const video = document.getElementById('dubSyncVideo');
+  if(!overlay || !frame || !video || !dubLogoImage || video.classList.contains('hidden') || !video.videoWidth || !video.videoHeight){
+    if(overlay) overlay.classList.add('hidden');
+    return;
+  }
+  const frameRect = frame.getBoundingClientRect();
+  const videoRect = video.getBoundingClientRect();
+  if(!frameRect.width || !frameRect.height || !videoRect.width || !videoRect.height){
+    overlay.classList.add('hidden');
+    return;
+  }
+  const metrics = getDubLogoRenderMetrics(videoRect.width, videoRect.height, dubLogoImage);
+  if(!metrics){ overlay.classList.add('hidden'); return; }
+
+  const position = (document.getElementById('dubLogoPosition')||{}).value || 'bottom-right';
+  if(position !== 'custom'){
+    const left = position.endsWith('left');
+    const top = position.startsWith('top');
+    const x = left ? metrics.inset : videoRect.width - metrics.width - metrics.inset;
+    const y = top ? metrics.inset : videoRect.height - metrics.height - metrics.inset;
+    dubLogoPositionX = Math.max(0, x) / videoRect.width;
+    dubLogoPositionY = Math.max(0, y) / videoRect.height;
+  }
+
+  const x = Math.max(0, Math.min(videoRect.width - metrics.width, dubLogoPositionX * videoRect.width));
+  const y = Math.max(0, Math.min(videoRect.height - metrics.height, dubLogoPositionY * videoRect.height));
+  if(dubLogoObjectUrl && overlay.getAttribute('src') !== dubLogoObjectUrl) overlay.src = dubLogoObjectUrl;
+  overlay.style.left = `${videoRect.left - frameRect.left + x}px`;
+  overlay.style.top = `${videoRect.top - frameRect.top + y}px`;
   overlay.style.width = `${metrics.width}px`;
   overlay.style.height = `${metrics.height}px`;
   overlay.style.opacity = String(Math.max(20, Math.min(100, Number((document.getElementById('dubLogoOpacity')||{}).value || 90))) / 100);
@@ -2991,6 +3066,7 @@ function updateDubLogoLabels(){
   if(sizeLabel && size) sizeLabel.textContent = `${size.value}%`;
   if(opacityLabel && opacity) opacityLabel.textContent = `${opacity.value}%`;
   updateDubLogoOverlay();
+  updateDubResultLogoOverlay();
 }
 
 function onDubLogoSettingsChange(){
@@ -3003,6 +3079,12 @@ function onDubLogoSettingsChange(){
 }
 
 window.addEventListener('resize', updateDubVideoPreviewLayout, { passive: true });
+const dubSyncVideoLogoEvents = document.getElementById('dubSyncVideo');
+if(dubSyncVideoLogoEvents){
+  dubSyncVideoLogoEvents.addEventListener('loadedmetadata', updateDubResultPreviewLayout);
+  dubSyncVideoLogoEvents.addEventListener('loadeddata', updateDubResultPreviewLayout);
+  dubSyncVideoLogoEvents.addEventListener('resize', updateDubResultPreviewLayout);
+}
 
 function onSelectDubLogo(input){
   const file = input && input.files && input.files[0];
@@ -3031,10 +3113,12 @@ function onSelectDubLogo(input){
 
   const preview = document.getElementById('dubLogoPreview');
   const overlay = document.getElementById('dubLogoDragOverlay');
+  const resultOverlay = document.getElementById('dubSyncLogoOverlay');
   const removeBtn = document.getElementById('dubLogoRemoveBtn');
   const info = document.getElementById('dubLogoInfo');
   if(preview){ preview.removeAttribute('src'); preview.classList.add('hidden'); }
   if(overlay){ overlay.removeAttribute('src'); overlay.classList.add('hidden'); }
+  if(resultOverlay){ resultOverlay.removeAttribute('src'); resultOverlay.classList.add('hidden'); }
   if(removeBtn) removeBtn.classList.add('hidden');
   if(info) info.textContent = `⏳ Carregando ${file.name}...`;
 
@@ -3053,6 +3137,7 @@ function onSelectDubLogo(input){
     dubLogoConfigVersion++;
     updateDubLogoOverlay();
     invalidateDubVideoExport();
+    updateDubResultLogoOverlay();
     toast('🏷️ Logo carregada. Arraste-a na prévia para escolher a posição.');
   };
   image.onerror = () => {
@@ -3077,13 +3162,16 @@ function removeDubLogo(){
   const input = document.getElementById('dubLogoFile');
   const preview = document.getElementById('dubLogoPreview');
   const overlay = document.getElementById('dubLogoDragOverlay');
+  const resultOverlay = document.getElementById('dubSyncLogoOverlay');
   const removeBtn = document.getElementById('dubLogoRemoveBtn');
   const info = document.getElementById('dubLogoInfo');
   if(input) input.value = '';
   if(preview){ preview.removeAttribute('src'); preview.classList.add('hidden'); }
   if(overlay){ overlay.removeAttribute('src'); overlay.classList.add('hidden'); }
+  if(resultOverlay){ resultOverlay.removeAttribute('src'); resultOverlay.classList.add('hidden'); }
   if(removeBtn) removeBtn.classList.add('hidden');
   if(info) info.textContent = 'Nenhuma logo selecionada. PNG transparente é recomendado.';
+  updateDubResultLogoOverlay();
   if(invalidateDubVideoExport()){
     showStatus('dubStatus','ℹ️ Logo removida. Gere o vídeo novamente para exportar sem ela.','info');
   }
@@ -3706,6 +3794,13 @@ function remixDubBackgroundInstant(){
   lastDubVideoBlob = null; // Garante que o próximo download .MP4 já grave o novo som de fundo!
   const expVid = document.getElementById('dubExportedVideo');
   if(expVid) expVid.classList.add('hidden');
+  const syncVideo = document.getElementById('dubSyncVideo');
+  const syncFrame = document.getElementById('dubSyncPreviewFrame');
+  if(syncVideo && syncVideo.src){
+    syncVideo.classList.remove('hidden');
+    if(syncFrame) syncFrame.classList.remove('hidden');
+    requestAnimationFrame(updateDubResultPreviewLayout);
+  }
 
   const aud = document.getElementById('dubAudio');
   const prevTime = aud ? (aud.currentTime || 0) : 0;
@@ -4184,6 +4279,7 @@ async function dubVideo(){
   if(previousSocialCard) previousSocialCard.classList.add('hidden');
   stopPreviewDubBgMusic();
   stopDubRequested = false;
+  invalidateDubVideoExport();
   lastDubVideoBlob = null;
   btn.disabled = true; btn.textContent = '⏳ Dublando arquivo...';
   if(stopBtn) stopBtn.classList.remove('hidden');
@@ -4352,13 +4448,17 @@ async function dubVideo(){
       // Configura o player de vídeo sincronizado direto dentro do card de resultado (zero engasgo e zero delay!)
       const vTop = document.getElementById('preview');
       const vRes = document.getElementById('dubSyncVideo');
+      const vResFrame = document.getElementById('dubSyncPreviewFrame');
       if(vTop && !vTop.hidden && vTop.src && vRes){
         vRes.src = vTop.src;
         vRes.muted = true;
         vRes.playbackRate = 1;
         vRes.classList.remove('hidden');
-      } else if(vRes){
-        vRes.classList.add('hidden');
+        if(vResFrame) vResFrame.classList.remove('hidden');
+        requestAnimationFrame(updateDubResultPreviewLayout);
+      } else {
+        if(vRes) vRes.classList.add('hidden');
+        if(vResFrame) vResFrame.classList.add('hidden');
       }
 
       const dlLink = document.getElementById('dubDownload');
@@ -6436,6 +6536,11 @@ function downloadSceneImages(){
 
 async function downloadDubVideo(opts = {}){
   const silentExport = !!(opts && opts.silentExport);
+  if(dubLogoPendingUrl && !dubLogoImage){
+    showStatus('dubStatus','⏳ Aguarde a logo terminar de carregar antes de gerar o vídeo final.','warn');
+    toast('⏳ A logo ainda está carregando. Tente gerar o vídeo novamente em instantes.','warn');
+    return null;
+  }
   // Se já foi exportado nesta sessão, baixa instantaneamente sem regravar!
   if(lastDubVideoBlob){
     if(!silentExport){
@@ -6533,7 +6638,7 @@ async function downloadDubVideo(opts = {}){
       ctx.fillRect(0, 0, cw, ch);
       try{ ctx.drawImage(exportVid, 0, 0, cw, ch); }catch(e){}
       if(dubLogoForExport){
-        try{ drawDubLogo(ctx, dubLogoForExport, dubLogoSettings); }catch(e){}
+        drawDubLogo(ctx, dubLogoForExport, dubLogoSettings);
       }
 
       if(subCues.length){
@@ -6600,6 +6705,10 @@ async function downloadDubVideo(opts = {}){
       expV.src = URL.createObjectURL(blob);
       expV.classList.remove('hidden');
       if(vRes) vRes.classList.add('hidden');
+      const syncFrame = document.getElementById('dubSyncPreviewFrame');
+      if(syncFrame) syncFrame.classList.add('hidden');
+      const syncLogoOverlay = document.getElementById('dubSyncLogoOverlay');
+      if(syncLogoOverlay) syncLogoOverlay.classList.add('hidden');
     }
     bindSmoothDubSync();
     if(!silentExport){
