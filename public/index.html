@@ -4078,7 +4078,7 @@ function releaseCreateSceneMotion(scenes){
 async function previewVoice(voice){
   toast('🔊 Gerando prévia da voz...');
   try{
-    const r=await fetch('/api/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:'Olá! Esta é a minha voz no DubAI PRO. Escolha a que mais combina com o seu vídeo.',voice})});
+    const r=await fetch('/api/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:'Olá! Esta é a minha voz no DubAI PRO. Escolha a que mais combina com o seu vídeo.',voice,exactTextOnly:true})});
     const ct=r.headers.get('content-type')||'';
     if(ct.includes('audio')){
       new Audio(URL.createObjectURL(await r.blob())).play();
@@ -5764,7 +5764,7 @@ async function requestHunyuanSceneVideo(scene, stylePrompt){
 async function fetchSceneAudio(text,voice,emotion=''){
   for(let attempt=0; attempt<3; attempt++){
     try{
-      const r=await fetch('/api/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,voice,emotion})});
+      const r=await fetch('/api/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,voice,emotion,exactTextOnly:true})});
       const ct=r.headers.get('content-type')||'';
       if(r.ok&&ct.includes('audio')) return { blob: await r.blob(), provider: r.headers.get('x-audio-provider')||'' };
       let msg='resposta inválida do servidor';
@@ -5807,6 +5807,7 @@ async function buildCreateVideo(){
   try{
     const voiceProviders = new Set();
     let realVoiceClips = 0;
+    const selectedVoiceErrors = [];
 
     setStep(['s1','s2','s3','s4'], 1);
     let actors = [];
@@ -5936,9 +5937,18 @@ async function buildCreateVideo(){
             pair[j].lipProfile = buildPcmLipProfile(audioBuffer);
             realVoiceClips++;
             if(a.provider) voiceProviders.add(a.provider);
-          }catch(decErr){ console.warn('Falha ao decodificar trecho TTS:', decErr); }
+          }catch(decErr){
+            console.warn('Falha ao decodificar trecho TTS:', decErr);
+            selectedVoiceErrors.push(decErr.message || 'não foi possível decodificar o áudio');
+          }
+        } else {
+          selectedVoiceErrors.push(a && a.error ? a.error : 'o provedor não retornou áudio');
         }
       }
+    }
+    if(selectedVoiceErrors.length || realVoiceClips !== flatBeats.length){
+      await decCtx.close().catch(()=>{});
+      throw new Error('Voz selecionada indisponível: ' + (selectedVoiceErrors[0] || 'não foi possível gerar todos os trechos de narração.'));
     }
     await decCtx.close().catch(()=>{});
 
@@ -6329,7 +6339,8 @@ function copyProjectText(id){
 function speakProjectText(id){
   const p = (currentProjects || getLocalProjects()).find(x => String(x.id) === String(id));
   if(!p) return toast('Projeto não encontrado', 'warn');
-  speakText(String(p.script || p.transcription || '').slice(0, 2000));
+  const savedVoice = p.dubVoice || p.voice || p.avatarVoice || '';
+  speakText(String(p.script || p.transcription || '').slice(0, 2000), savedVoice);
 }
 function deleteProject(id){
   if(!confirm('Excluir este projeto?')) return;
@@ -6359,7 +6370,7 @@ function downloadText(id){
   toast('⬇️ Download iniciado');
 }
 let activeNeuralPreviewAudio = null;
-async function speakText(text){
+async function speakText(text, voiceOverride = ''){
   if(!text || !text.trim()) return toast('Nada para narrar','warn');
   // Se já estiver tocando prévia neural, clicar de novo pausa na hora!
   if(activeNeuralPreviewAudio && !activeNeuralPreviewAudio.paused){
@@ -6379,18 +6390,18 @@ async function speakText(text){
     .trim()
     .slice(0, 3200);
 
-  const chosenVoice = (document.getElementById('voice') && !document.getElementById('create').classList.contains('hidden'))
+  const chosenVoice = voiceOverride || ((document.getElementById('voice') && !document.getElementById('create').classList.contains('hidden'))
     ? document.getElementById('voice').value
     : (!document.getElementById('dub').classList.contains('hidden') && document.getElementById('dubVoice'))
       ? document.getElementById('dubVoice').value
-      : 'nova';
+      : 'nova');
 
-  toast('🎙️ Gerando Voz Humana Neural HD...');
+  toast('🎙️ Gerando a voz selecionada...');
   try{
     const r = await fetch('/api/tts', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ text: cleaned || text.slice(0, 2000), voice: chosenVoice, lang: 'pt-BR' })
+      body: JSON.stringify({ text: cleaned || text.slice(0, 2000), voice: chosenVoice, lang: 'pt-BR', exactTextOnly: true })
     });
     const ct = r.headers.get('content-type') || '';
     if(r.ok && ct.includes('audio')){
@@ -6398,23 +6409,14 @@ async function speakText(text){
       const player = new Audio(URL.createObjectURL(blob));
       activeNeuralPreviewAudio = player;
       await player.play();
-      toast('🔊 Reproduzindo Voz Humana Neural (' + (r.headers.get('x-audio-provider') || 'Estúdio HD') + ')');
+      toast('🔊 Reproduzindo a voz escolhida (' + (r.headers.get('x-audio-provider') || 'TTS') + ')');
       return;
     }
-  }catch(e){}
-
-  // Fallback somente se estiver 100% sem internet
-  if('speechSynthesis' in window){
-    speechSynthesis.cancel();
-    const u=new SpeechSynthesisUtterance((cleaned || text).slice(0,3000));
-    u.lang='pt-BR'; u.rate=1; u.pitch=1;
-    const voices=speechSynthesis.getVoices();
-    const pt=voices.find(v=>v.lang.toLowerCase().includes('pt-br')) || voices.find(v=>v.lang.toLowerCase().includes('pt'));
-    if(pt) u.voice=pt;
-    speechSynthesis.speak(u);
-    toast('🔊 Reproduzindo narração offline');
-  }else{
-    toast('Voz indisponível neste aparelho','error');
+    let errorMessage = 'nenhum provedor disponível para essa voz';
+    try { const result = await r.json(); errorMessage = result.error || result.message || errorMessage; } catch(e) {}
+    toast('⚠️ Voz selecionada indisponível: ' + errorMessage, 'warn');
+  }catch(e){
+    toast('⚠️ Não foi possível gerar a voz selecionada. Tente novamente.', 'warn');
   }
 }
 
@@ -7964,7 +7966,7 @@ async function synthesizeAvatarSpeech(text, voice, onStep){
       if(onStep) onStep(i + 1, chunks.length);
       const r = await fetch('/api/tts', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ text: chunks[i], voice })
+        body: JSON.stringify({ text: chunks[i], voice, exactTextOnly: true })
       });
       const ct = r.headers.get('content-type') || '';
       if(!r.ok || !ct.includes('audio')) throw new Error('provedor de voz indisponível');
@@ -8063,30 +8065,10 @@ async function toggleAvatarLivePreview(){
       toast('🗣️ Avatar falando ao vivo (' + (tts.providers.join(', ') || 'IA') + ')');
     } else {
       if(unlockedCtx){ try{ unlockedCtx.close(); }catch(e){} }
-      // Fallback instantâneo com voz local do navegador + sincronia fonética sílaba-a-sílaba
-      const estDur = Math.max(3.5, previewText.split(/\s+/).length / 2.25);
-      avatarLiveState.audioCtx = null;
-      avatarLiveState.profile = null;
-      avatarLiveState.duration = estDur;
-      avatarLiveState.startAt = performance.now();
-      avatarLiveState.wallStartAt = performance.now();
-      avatarLiveState.text = previewText;
-      avatarLiveState.smoothOpen = 0;
-      avatarLiveState.smoothWide = 0;
-      avatarLiveState.clickPulseUntil = 0;
-      avatarLiveState.playing = true;
-      if('speechSynthesis' in window){
-        speechSynthesis.cancel();
-        const u = new SpeechSynthesisUtterance(previewText);
-        u.lang = 'pt-BR'; u.rate = 1.02;
-        const vs = speechSynthesis.getVoices();
-        const pt = vs.find(v => v.lang.toLowerCase().includes('pt-br')) || vs.find(v => v.lang.toLowerCase().includes('pt'));
-        if(pt) u.voice = pt;
-        u.onend = () => stopAvatarLivePreview();
-        avatarLiveState.synthActive = true;
-        speechSynthesis.speak(u);
-      }
-      toast('🗣️ Prévia ao vivo iniciada (sincronia fonética local)');
+      stopAvatarLivePreview();
+      const reason = tts && tts.error ? tts.error : 'o provedor não retornou áudio';
+      toast('⚠️ Voz selecionada indisponível: ' + reason, 'warn');
+      return;
     }
     if(btn) btn.textContent = '⏹️ Parar Prévia';
     ensureAvatarLoop();
@@ -8209,6 +8191,9 @@ async function renderAvatarVideo(){
       showStatus('avatarStatus', `🎙️ Gerando voz neural (${i}/${n})...`, 'info');
       setProgress('avatarProgressFill', Math.round(10 + (i / n) * 25));
     });
+    if(!tts || !tts.audioBuffer){
+      throw new Error('Voz selecionada indisponível: ' + ((tts && tts.error) || 'o provedor não retornou áudio.'));
+    }
 
     // 2) Se o usuário escolheu testar geração neural de vídeo via Unorouter (hy4-preview / Fase 3)
     if(animMode === 'unorouter'){
@@ -8347,6 +8332,7 @@ async function renderAvatarVideo(){
       prompt: `${activeAvatarName} • Formato ${fmt}`,
       format: fmt,
       script: text,
+      avatarVoice: voice,
       mode: hasRealAudio ? 'openai' : 'mock',
       status: 'vídeo avatar pronto',
       createdAt: new Date().toISOString(),
@@ -9551,17 +9537,18 @@ async function generateOpusDemoVideo(){
 
     const AC = window.AudioContext || window.webkitAudioContext;
     const decCtx = new AC();
-    const decodedSegs = await Promise.all(podcastLines.map(async (item) => {
+    const decodedResults = await Promise.all(podcastLines.map(async item => {
       try{
         const tts = await fetchSceneAudio(item.text, item.voice, 'excited');
-        if(tts && tts.blob){
-          const ab = await decCtx.decodeAudioData(await tts.blob.arrayBuffer());
-          return { text: item.text, speaker: item.speaker, audioBuffer: ab };
-        }
-      }catch(_){}
-      return { text: item.text, speaker: item.speaker, audioBuffer: null };
+        if(!tts || !tts.blob) return { error: (tts && tts.error) || 'o provedor não retornou áudio' };
+        const ab = await decCtx.decodeAudioData(await tts.blob.arrayBuffer());
+        return { segment: { text: item.text, speaker: item.speaker, audioBuffer: ab } };
+      }catch(e){ return { error: e.message || 'falha ao decodificar o áudio' }; }
     }));
     await decCtx.close().catch(()=>{});
+    const failedTts = decodedResults.find(result => result.error);
+    if(failedTts) throw new Error('Voz selecionada indisponível: ' + failedTts.error);
+    const decodedSegs = decodedResults.map(result => result.segment);
 
     const master = buildMasterCinemaAudioBuffer(
       decodedSegs.map((s, idx) => ({ ...s, isLastInScene: idx === decodedSegs.length - 1 })),
@@ -12619,6 +12606,8 @@ async function exportSelectedOpusClipMp4(opts = {}){
         if(synth && synth.audioBuffer){
           studioAudioBuf = synth.audioBuffer;
           clip.dubbedAudioBuffer = studioAudioBuf;
+        } else {
+          throw new Error('Voz selecionada indisponível: ' + ((synth && synth.error) || 'o provedor não retornou áudio.'));
         }
       }
 

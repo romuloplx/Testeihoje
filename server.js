@@ -567,13 +567,13 @@ app.post('/api/enhance', async (req, res) => {
 
 // TTS endpoint — cadeia de provedores (Neural HD → OpenAI → Gemini → Unorouter → Google/StreamElements)
 app.post('/api/tts', async (req, res) => {
-  const { text, voice = 'onyx', lang = 'pt-BR', emotion = '' } = req.body;
+  const { text, voice = 'onyx', lang = 'pt-BR', emotion = '', exactTextOnly = false } = req.body;
   if (!text) return res.status(400).json({ error: 'Texto vazio' });
 
   try {
-    const out = await require('./vercel/api/lib/ai').ttsWithFallback({ text, voice, lang, emotion });
+    const out = await require('./vercel/api/lib/ai').ttsWithFallback({ text, voice, lang, emotion, exactTextOnly: exactTextOnly === true });
     if (out.error) {
-      return res.status(502).json({ error: 'Voz falhou em todos os provedores: ' + out.error, fallback: 'browser' });
+      return res.status(502).json({ error: 'Voz selecionada indisponível: ' + out.error });
     }
     const isWav = out.buffer && out.buffer.length >= 4 && out.buffer.subarray(0, 4).toString('ascii') === 'RIFF';
     res.set({
@@ -585,7 +585,7 @@ app.post('/api/tts', async (req, res) => {
     res.send(out.buffer);
   } catch (e) {
     console.error('TTS error', e);
-    res.status(500).json({ error: 'Erro TTS: ' + e.message, fallback: 'browser' });
+    res.status(500).json({ error: 'Erro TTS: ' + e.message });
   }
 });
 
