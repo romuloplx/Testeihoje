@@ -1,6 +1,7 @@
 const { transcribeClipSegment, analyzeViralClips, fetchYoutubeVideoInfoAndStream, fetchVideoStreamChunk, fetchYoutubeClipMp4Segment, getBody, send } = require('./lib/ai');
 const { handleFormats: handleYoutubeDownloadFormats, handleDownload: handleYoutubeDownload } = require('../lib/youtube-download-handler');
 const { handleDouyinDownload } = require('../lib/douyin-download-handler');
+const { handleDouyinVideoSearch } = require('../lib/douyin-search-handler');
 
 module.exports = async (req, res) => {
   try {
@@ -15,6 +16,7 @@ module.exports = async (req, res) => {
 
     if (action === 'youtube_formats') return await handleYoutubeDownloadFormats(req, res, body);
     if (action === 'douyin_download') return await handleDouyinDownload(req, res, body.url);
+    if (action === 'douyin_search') return await handleDouyinVideoSearch(req, res, body);
 
     if (action === 'fetch_url') {
       const out = await fetchYoutubeVideoInfoAndStream({

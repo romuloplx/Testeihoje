@@ -447,6 +447,7 @@ input[type="range"]{
   <button id="tab-avatar" onclick="openTab('avatar',this)">🗣️ Avatar <span class="kbd" style="margin-left:4px;background:#3b0764;border-color:#7c3aed;color:#e9d5ff">NOVO</span></button>
   <button id="tab-dub" onclick="openTab('dub',this)">🌍 Dublar</button>
   <button id="tab-projects" onclick="openTab('projects',this)">📁 Projetos <span id="projCount" class="kbd" style="margin-left:4px">0</span></button>
+  <button id="tab-review-queue" onclick="openTab('review-queue',this)">📋 Fila de revisão <span id="dubReviewQueueCount" class="kbd" style="margin-left:4px">0</span></button>
   <button id="tab-youtube-download" onclick="openTab('youtube-download',this)">⬇️ Baixar vídeo</button>
 </div>
 
@@ -1077,6 +1078,12 @@ input[type="range"]{
             <div id="dubSocialHashtags" style="margin-top:3px;color:#bae6fd;font-size:13px;line-height:1.6;overflow-wrap:anywhere"></div>
           </div>
           <button class="ghost" type="button" onclick="copyDubSocialPackage()" style="border-color:#f59e0b88;color:#fde68a">📋 Copiar tema, legenda e hashtags</button>
+          <label for="dubReviewRightsConfirmed" style="display:flex;align-items:flex-start;gap:9px;margin-top:10px;padding:9px 10px;border:1px solid #64748b66;border-radius:9px;color:#e2e8f0;line-height:1.45">
+            <input type="checkbox" id="dubReviewRightsConfirmed" onchange="updateDubReviewQueueSaveButton()" style="margin-top:3px;accent-color:#a78bfa">
+            <span>Confirmo que sou o autor do vídeo ou tenho autorização para dublar e reutilizar o conteúdo.</span>
+          </label>
+          <button class="ghost" type="button" id="addDubToReviewQueueBtn" onclick="addDubToReviewQueue()" disabled style="margin-top:8px;border-color:#8b5cf6;color:#ddd6fe">📌 Adicionar vídeo e metadados à fila de revisão</button>
+          <div class="hint" style="margin-top:7px">A fila é salva somente neste navegador; nenhuma publicação ou envio ao TikTok acontece nesta etapa.</div>
           <div class="hint" style="margin-top:7px">Sugestões baseadas na transcrição/tradução; ajudam na descoberta, mas não garantem viralização.</div>
         </div>
         <div id="dubPlayerWrap" class="hidden" style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px">
@@ -1638,21 +1645,87 @@ input[type="range"]{
   </div>
 </section>
 
+<!-- LOCAL DUB REVIEW QUEUE -->
+<section id="review-queue" class="hidden">
+  <div class="card" style="background:linear-gradient(145deg,#1b1834,#101324);border:1px solid #8b5cf677">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+      <h2 style="margin:0">📋 Fila local de revisão</h2>
+      <span class="kbd" style="background:#2e1065;border-color:#8b5cf6;color:#ede9fe">SEM PUBLICAÇÃO AUTOMÁTICA</span>
+    </div>
+    <p style="margin-top:10px">Os vídeos dublados que você salvar aqui ficam neste navegador para assistir, revisar e ajustar título/legenda/hashtags. Esta etapa não conecta nem envia nada ao TikTok.</p>
+    <div class="hint" style="padding:10px 12px;border:1px solid #64748b55;border-radius:10px;background:#0b1020">Os arquivos ficam armazenados localmente no IndexedDB deste dispositivo. Limpar os dados do navegador pode apagar a fila; baixe uma cópia dos vídeos importantes.</div>
+    <div class="status" id="dubReviewQueueStatus" role="status" aria-live="polite"></div>
+    <div id="dubReviewQueueList" style="display:grid;gap:12px;margin-top:12px"></div>
+    <div class="empty hidden" id="dubReviewQueueEmpty" style="margin-top:12px">
+      <div class="empty-ico">🗂️</div>
+      <div style="font-weight:800">Sua fila está vazia</div>
+      <p style="margin:6px 0 0">Depois de dublar um vídeo, gere as sugestões de título/hashtags e toque em <b>Adicionar à fila de revisão</b>.</p>
+    </div>
+  </div>
+</section>
 
 <!-- VIDEO DOWNLOADER -->
 <section id="youtube-download" class="hidden">
+  <div id="douyinTrendDiscoveryCard" class="card" style="background:linear-gradient(145deg,#21152f,#101324);border:1px solid #a855f777">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+      <h2 style="margin:0">🔥 Tendências Douyin — painel de inspiração</h2>
+      <span class="kbd" style="background:#3b0764;border-color:#a855f7;color:#f3e8ff">BUSCA OFICIAL</span>
+    </div>
+    <p style="margin-top:10px">Pesquise vídeos por tema e ordene por curtidas ou recência para encontrar ideias. Estes resultados servem <b>somente como inspiração</b>: nada é baixado automaticamente.</p>
+    <div class="hint" style="padding:10px 12px;border-radius:10px;background:#0b1020;border:1px solid #64748b55;color:#e2e8f0">Para dublar, use apenas um vídeo seu ou autorizado. Cole o link autorizado no campo do Dublador abaixo; os resultados desta busca não são enviados nem copiados automaticamente.</div>
+    <form id="douyinTrendSearchForm" onsubmit="event.preventDefault();searchDouyinTrends(false)" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-top:12px">
+      <div style="flex:1;min-width:220px">
+        <label for="douyinTrendKeyword" style="margin-top:0">🔎 Tema ou palavra-chave</label>
+        <input id="douyinTrendKeyword" type="search" maxlength="100" autocomplete="off" placeholder="Ex.: 美食 (comida), 宠物 (pets), 旅行 (viagem)" style="width:100%;padding:12px 14px;border-radius:10px;border:1px solid #334155;background:#080b16;color:#fff;font-size:14px">
+      </div>
+      <div style="min-width:150px">
+        <label for="douyinTrendSort" style="margin-top:0">Ordenar por</label>
+        <select id="douyinTrendSort" style="width:100%;padding:12px 10px">
+          <option value="1" selected>Mais curtidos</option>
+          <option value="0">Relevância</option>
+          <option value="2">Mais recentes</option>
+        </select>
+      </div>
+      <div style="min-width:150px">
+        <label for="douyinTrendPeriod" style="margin-top:0">Período</label>
+        <select id="douyinTrendPeriod" style="width:100%;padding:12px 10px">
+          <option value="7" selected>Últimos 7 dias</option>
+          <option value="1">Últimas 24 horas</option>
+          <option value="180">Últimos 6 meses</option>
+          <option value="0">Qualquer período</option>
+        </select>
+      </div>
+      <button class="primary" type="submit" id="douyinTrendSearchBtn" style="padding:12px 16px;white-space:nowrap;background:linear-gradient(135deg,#9333ea,#7c3aed)">🔎 Buscar tendências</button>
+    </form>
+    <div class="status" id="douyinTrendSearchStatus" role="status" aria-live="polite"></div>
+    <div id="douyinTrendResults" role="list" aria-label="Vídeos encontrados no Douyin" style="display:grid;gap:10px;margin-top:12px"></div>
+    <button class="ghost hidden" type="button" id="douyinTrendLoadMoreBtn" onclick="searchDouyinTrends(true)" style="width:100%;margin-top:10px">＋ Carregar mais resultados</button>
+    <details style="margin-top:12px;padding:10px 12px;border-radius:10px;background:#0b1020;border:1px solid #334155">
+      <summary style="cursor:pointer;font-weight:800;color:#c4b5fd">Configuração necessária para a busca oficial</summary>
+      <ol class="hint" style="padding-left:20px;line-height:1.7">
+        <li>Registre um aplicativo no <a href="https://developer.open-douyin.com/" target="_blank" rel="noopener noreferrer">Douyin Open Platform</a> e solicite a capacidade de busca de vídeos <code>aweme.dy.video_search</code>.</li>
+        <li>Configure <code>DOUYIN_CLIENT_KEY</code> e <code>DOUYIN_CLIENT_SECRET</code> como variáveis de ambiente no servidor/Vercel. Não coloque a chave secreta no navegador nem a envie pelo chat.</li>
+      </ol>
+      <div class="hint">A busca usa o token oficial no servidor. Sem a permissão do Douyin e as duas variáveis configuradas, o painel mostra instruções em vez de buscar.</div>
+    </details>
+  </div>
+
   <div id="douyinDownloadCard" class="card" style="background:linear-gradient(145deg,#102623,#101324);border:1px solid #22c55e77">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
       <h2 style="margin:0">🇨🇳 Douyin (TikTok China) → Dublar</h2>
       <span class="kbd" style="background:#052e16;border-color:#22c55e;color:#bbf7d0">DOWNLOAD + ENVIO DIRETO</span>
     </div>
     <p style="margin-top:10px">Cole o link do Douyin. O vídeo será baixado e aberto automaticamente na aba <b>Dublar</b>, sem precisar salvar e enviar o arquivo de novo.</p>
-    <label for="douyinDownloadUrl">🔗 Link do vídeo Douyin</label>
+    <label for="douyinDownloadUrl">🔗 Link de um vídeo seu ou autorizado do Douyin</label>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <input type="url" id="douyinDownloadUrl" autocomplete="url" placeholder="https://v.douyin.com/... ou https://www.douyin.com/video/..." onkeydown="if(event.key==='Enter'){event.preventDefault();downloadDouyinAndOpenDub();}" style="flex:1;min-width:220px;padding:12px 14px;border-radius:10px;border:1px solid #334155;background:#080b16;color:#fff;font-size:14px">
       <button class="primary" type="button" id="douyinDownloadBtn" onclick="downloadDouyinAndOpenDub()" style="padding:11px 16px;white-space:nowrap;background:linear-gradient(135deg,#16a34a,#059669)">⚡ Baixar e abrir no Dublador</button>
       <a href="https://brasil-downloader.vercel.app/" class="ghost" target="_blank" rel="noopener noreferrer" aria-label="Abrir Brasil Downloader em uma nova aba (serviço externo)" style="display:inline-block;text-decoration:none;white-space:nowrap">↗ Abrir Brasil Downloader (externo)</a>
     </div>
+    <label for="douyinRightsConfirmed" style="display:flex;align-items:flex-start;gap:9px;margin-top:10px;padding:10px 12px;border:1px solid #22c55e55;border-radius:10px;background:#071b12;color:#d1fae5;line-height:1.5">
+      <input type="checkbox" id="douyinRightsConfirmed" style="margin-top:3px;accent-color:#22c55e">
+      <span>Confirmo que sou o autor deste vídeo ou tenho autorização para baixá-lo, dublá-lo e reutilizá-lo.</span>
+    </label>
     <div class="progress-wrap" id="douyinDownloadProgress" aria-live="polite">
       <div class="progress-bar"><div class="progress-fill" id="douyinDownloadProgressFill"></div></div>
       <div id="douyinDownloadProgressText" class="hint" style="margin-top:6px">Conectando ao Douyin...</div>
@@ -1785,6 +1858,7 @@ function openTab(id, button){
   const targetBtn = button || document.getElementById('tab-'+id);
   if(targetBtn) targetBtn.classList.add('active');
   if(id==='projects') loadProjects();
+  if(id==='review-queue' && typeof renderDubReviewQueue==='function') void renderDubReviewQueue();
   if(id==='avatar'){
     if(!avatarLiveState.playing) avatarLiveState.clickPulseUntil = performance.now() + 1800;
     ensureAvatarLoop();
@@ -1895,7 +1969,14 @@ async function downloadDouyinAndOpenDub(){
   const button=document.getElementById('douyinDownloadBtn');
   const fill=document.getElementById('douyinDownloadProgressFill');
   const wrap=document.getElementById('douyinDownloadProgress');
+  const rightsConfirmed=document.getElementById('douyinRightsConfirmed');
   if(!input || !button) return;
+  if(!rightsConfirmed || !rightsConfirmed.checked){
+    showStatus('douyinDownloadStatus','⚠️ Confirme que você é o autor ou tem autorização para baixar e reutilizar este vídeo.','warn');
+    toast('Confirme os direitos de uso antes de baixar.','warn');
+    if(rightsConfirmed) rightsConfirmed.focus();
+    return;
+  }
   let videoUrl;
   try{ videoUrl=parseDouyinDownloadInput(input.value); }
   catch(error){ showStatus('douyinDownloadStatus','❌ '+error.message,'error'); input.focus(); return; }
@@ -1994,6 +2075,198 @@ async function downloadDouyinAndOpenDub(){
     button.textContent=originalButtonText;
     if(fill) fill.classList.remove('indeterminate');
     if(wrap) setTimeout(()=>wrap.classList.remove('show'),2200);
+  }
+}
+
+let douyinTrendSearchState = {
+  keyword: '',
+  sortType: 1,
+  publishTime: 7,
+  cursor: '0',
+  searchId: '',
+  hasMore: false,
+  loading: false
+};
+
+function getDouyinSearchDeviceId(){
+  const key='dubai_douyin_device_id_v1';
+  try{
+    const existing=localStorage.getItem(key)||'';
+    if(/^\\d{1,19}$/.test(existing)) return existing;
+    const random=new Uint32Array(1);
+    if(window.crypto&&typeof window.crypto.getRandomValues==='function') window.crypto.getRandomValues(random);
+    else random[0]=Math.floor(Math.random()*0xffffffff);
+    const value=`${Math.floor(Date.now()/1000)}${String(random[0]%1000000).padStart(6,'0')}`;
+    localStorage.setItem(key,value);
+    return value;
+  }catch(_){ return `${Math.floor(Date.now()/1000)}000001`; }
+}
+
+function isSafeDouyinSearchLink(value){
+  try{
+    const url=new URL(String(value||''));
+    const host=url.hostname.toLowerCase();
+    return url.protocol==='https:'&&['douyin.com','iesdouyin.com'].some(domain=>host===domain||host.endsWith('.'+domain));
+  }catch(_){ return false; }
+}
+
+function formatDouyinSearchDate(value){
+  const seconds=Number(value);
+  if(!Number.isFinite(seconds)||seconds<=0) return 'Data não informada';
+  try{ return new Intl.DateTimeFormat('pt-BR',{dateStyle:'medium'}).format(new Date(seconds*1000)); }
+  catch(_){ return new Date(seconds*1000).toLocaleDateString('pt-BR'); }
+}
+
+async function copyDouyinSearchLink(value){
+  const text=String(value||'');
+  if(!text) return;
+  try{
+    if(navigator.clipboard&&typeof navigator.clipboard.writeText==='function'){
+      await navigator.clipboard.writeText(text);
+      toast('📋 Link copiado!');
+      return;
+    }
+  }catch(_){}
+  try{
+    const area=document.createElement('textarea');
+    area.value=text;
+    area.style.position='fixed';
+    area.style.opacity='0';
+    document.body.appendChild(area);
+    area.select();
+    const copied=document.execCommand('copy');
+    area.remove();
+    if(copied) toast('📋 Link copiado!');
+    else throw new Error('clipboard unavailable');
+  }catch(_){ toast('Não foi possível copiar o link neste navegador.','warn'); }
+}
+
+function renderDouyinSearchResults(videos,{append=false}={}){
+  const container=document.getElementById('douyinTrendResults');
+  if(!container) return;
+  if(!append) container.innerHTML='';
+  if(!Array.isArray(videos)||!videos.length){
+    if(!append) container.innerHTML='<div class="hint" style="padding:12px;border:1px dashed #475569;border-radius:10px">Nenhum vídeo foi retornado para essa busca. Experimente outra palavra-chave.</div>';
+    return;
+  }
+  videos.forEach(video=>{
+    const card=document.createElement('article');
+    card.setAttribute('role','listitem');
+    card.style.cssText='display:flex;gap:12px;align-items:flex-start;padding:12px;border:1px solid #334155;border-radius:12px;background:#0b1020;min-width:0';
+    if(video.cover){
+      try{
+        const coverUrl=new URL(String(video.cover));
+        if(coverUrl.protocol==='https:'&&/(^|\\.)douyinpic\\.com$|(^|\\.)douyincdn\\.com$/i.test(coverUrl.hostname)){
+          const image=document.createElement('img');
+          image.src=coverUrl.href;
+          image.alt='';
+          image.loading='lazy';
+          image.referrerPolicy='no-referrer';
+          image.style.cssText='width:118px;height:82px;flex:0 0 118px;object-fit:cover;border-radius:8px;background:#05070d';
+          card.appendChild(image);
+        }
+      }catch(_){}
+    }
+    const content=document.createElement('div');
+    content.style.cssText='min-width:0;flex:1';
+    const title=document.createElement('div');
+    title.textContent=String(video.title||'Vídeo sem título');
+    title.style.cssText='font-size:14px;font-weight:800;color:#f8fafc;white-space:pre-wrap;overflow-wrap:anywhere';
+    const stats=document.createElement('div');
+    const likes=Number.isFinite(Number(video.likes))?new Intl.NumberFormat('pt-BR').format(Number(video.likes)):'—';
+    stats.textContent=`@${String(video.creator||'criador desconhecido')} · ❤️ ${likes} curtidas · ${formatDouyinSearchDate(video.createdAt)}`;
+    stats.className='hint';
+    stats.style.marginTop='5px';
+    content.append(title,stats);
+    const actions=document.createElement('div');
+    actions.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-top:9px';
+    if(isSafeDouyinSearchLink(video.url)){
+      const open=document.createElement('a');
+      open.href=video.url;
+      open.target='_blank';
+      open.rel='noopener noreferrer';
+      open.textContent='↗ Abrir no Douyin';
+      open.className='ghost';
+      open.style.cssText='display:inline-block;padding:7px 10px;text-decoration:none;font-size:11.5px';
+      actions.appendChild(open);
+      const copy=document.createElement('button');
+      copy.type='button';
+      copy.className='ghost';
+      copy.textContent='📋 Copiar link';
+      copy.style.cssText='padding:7px 10px;font-size:11.5px';
+      copy.addEventListener('click',()=>copyDouyinSearchLink(video.url));
+      actions.appendChild(copy);
+    }
+    content.appendChild(actions);
+    card.appendChild(content);
+    container.appendChild(card);
+  });
+}
+
+async function searchDouyinTrends(loadMore=false){
+  const keywordInput=document.getElementById('douyinTrendKeyword');
+  const searchButton=document.getElementById('douyinTrendSearchBtn');
+  const moreButton=document.getElementById('douyinTrendLoadMoreBtn');
+  const results=document.getElementById('douyinTrendResults');
+  if(!keywordInput||douyinTrendSearchState.loading) return;
+  const keyword=loadMore?douyinTrendSearchState.keyword:String(keywordInput.value||'').trim();
+  if(!keyword){
+    showStatus('douyinTrendSearchStatus','Digite um tema ou palavra-chave para buscar no Douyin.','warn');
+    keywordInput.focus();
+    return;
+  }
+  if(!loadMore){
+    douyinTrendSearchState={keyword,sortType:Number(document.getElementById('douyinTrendSort')?.value||1),publishTime:Number(document.getElementById('douyinTrendPeriod')?.value||7),cursor:'0',searchId:'',hasMore:false,loading:false};
+    if(results) results.innerHTML='';
+  }
+  if(loadMore&&!douyinTrendSearchState.hasMore) return;
+  douyinTrendSearchState.loading=true;
+  if(searchButton) searchButton.disabled=true;
+  if(moreButton){ moreButton.disabled=true; moreButton.textContent='⏳ Buscando...'; }
+  showStatus('douyinTrendSearchStatus',loadMore?'⏳ Carregando mais inspirações do Douyin...':'⏳ Consultando a busca oficial do Douyin...','info');
+  try{
+    const response=await fetch('/api/clips',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        action:'douyin_search',
+        keyword:douyinTrendSearchState.keyword,
+        sortType:douyinTrendSearchState.sortType,
+        publishTime:douyinTrendSearchState.publishTime,
+        count:10,
+        cursor:loadMore?douyinTrendSearchState.cursor:'0',
+        searchId:loadMore?douyinTrendSearchState.searchId:'',
+        deviceId:getDouyinSearchDeviceId()
+      })
+    });
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok||!data.ok){
+      const error=new Error(data.error||`A busca falhou (HTTP ${response.status}).`);
+      error.code=data.code||'';
+      throw error;
+    }
+    const videos=Array.isArray(data.videos)?data.videos:[];
+    renderDouyinSearchResults(videos,{append:loadMore});
+    douyinTrendSearchState.cursor=String(data.cursor||'0');
+    douyinTrendSearchState.searchId=String(data.searchId||'');
+    douyinTrendSearchState.hasMore=Boolean(data.hasMore&&douyinTrendSearchState.searchId);
+    if(moreButton) moreButton.classList.toggle('hidden',!douyinTrendSearchState.hasMore);
+    showStatus('douyinTrendSearchStatus',videos.length
+      ? `✅ ${videos.length} resultado${videos.length===1?'':'s'} carregado${videos.length===1?'':'s'}. Abra no Douyin para pesquisar; os vídeos não são baixados por este painel.`
+      : 'Busca concluída, sem resultados nesta página. Experimente outra palavra-chave.','success');
+  }catch(error){
+    const message=error&&error.message||'Falha ao consultar o Douyin.';
+    showStatus('douyinTrendSearchStatus','❌ '+message,'error');
+    if(error&&error.code==='DOUYIN_SEARCH_NOT_CONFIGURED'){
+      const setup=document.querySelector('#douyinTrendDiscoveryCard details');
+      if(setup) setup.open=true;
+    }
+    if(!loadMore&&results) results.innerHTML='';
+    if(moreButton&&!loadMore) moreButton.classList.add('hidden');
+  }finally{
+    douyinTrendSearchState.loading=false;
+    if(searchButton) searchButton.disabled=false;
+    if(moreButton){ moreButton.disabled=false; moreButton.textContent='＋ Carregar mais resultados'; }
   }
 }
 
@@ -4416,6 +4689,7 @@ function renderDubSocialPackage(metadata, statusText){
   if(statusEl) statusEl.textContent = statusText || (normalized.fallback
     ? 'Sugestão local criada a partir do conteúdo; a IA de texto não respondeu.'
     : `Sugestão gerada com ${normalized.provider}.`);
+  updateDubReviewQueueSaveButton();
   return true;
 }
 
@@ -4461,6 +4735,269 @@ function copyDubSocialPackage(){
   toast('🔥 Tema e hashtags copiados!');
 }
 
+const DUB_REVIEW_DB_NAME='dubai-local-review-queue-v1';
+const DUB_REVIEW_DB_STORE='items';
+const DUB_REVIEW_QUEUE_MAX_ITEMS=10;
+const DUB_REVIEW_QUEUE_MAX_VIDEO_BYTES=200*1024*1024;
+const DUB_REVIEW_QUEUE_MAX_TOTAL_BYTES=500*1024*1024;
+let dubReviewQueueObjectUrls=new Map();
+
+function openDubReviewQueueDb(){
+  if(!window.indexedDB) return Promise.reject(new Error('Este navegador não oferece IndexedDB para guardar a fila. Baixe o vídeo em vez de salvá-lo na fila.'));
+  return new Promise((resolve,reject)=>{
+    let request;
+    try{ request=window.indexedDB.open(DUB_REVIEW_DB_NAME,1); }
+    catch(error){ reject(error); return; }
+    request.onupgradeneeded=()=>{
+      const db=request.result;
+      if(!db.objectStoreNames.contains(DUB_REVIEW_DB_STORE)) db.createObjectStore(DUB_REVIEW_DB_STORE,{keyPath:'id'});
+    };
+    request.onsuccess=()=>resolve(request.result);
+    request.onerror=()=>reject(request.error||new Error('Não foi possível abrir o armazenamento local da fila.'));
+    request.onblocked=()=>reject(new Error('O armazenamento da fila está ocupado por outra aba. Feche abas antigas do DubAI PRO e tente novamente.'));
+  });
+}
+
+async function runDubReviewQueueTransaction(mode,operation){
+  const db=await openDubReviewQueueDb();
+  return new Promise((resolve,reject)=>{
+    let result;
+    let settled=false;
+    const finishError=error=>{
+      if(settled) return;
+      settled=true;
+      try{ db.close(); }catch(_){}
+      reject(error||new Error('Falha ao acessar a fila local.'));
+    };
+    let transaction;
+    try{
+      transaction=db.transaction(DUB_REVIEW_DB_STORE,mode);
+      const request=operation(transaction.objectStore(DUB_REVIEW_DB_STORE));
+      if(request){
+        request.onsuccess=()=>{ result=request.result; };
+        request.onerror=()=>finishError(request.error);
+      }
+    }catch(error){ finishError(error); return; }
+    transaction.oncomplete=()=>{
+      if(settled) return;
+      settled=true;
+      try{ db.close(); }catch(_){}
+      resolve(result);
+    };
+    transaction.onerror=()=>finishError(transaction.error);
+    transaction.onabort=()=>finishError(transaction.error||new Error('A gravação na fila foi cancelada.'));
+  });
+}
+
+function getDubReviewQueueItems(){
+  return runDubReviewQueueTransaction('readonly',store=>store.getAll());
+}
+function putDubReviewQueueItem(item){
+  return runDubReviewQueueTransaction('readwrite',store=>store.put(item));
+}
+function deleteDubReviewQueueItem(id){
+  return runDubReviewQueueTransaction('readwrite',store=>store.delete(id));
+}
+function updateDubReviewQueueSaveButton(){
+  const button=document.getElementById('addDubToReviewQueueBtn');
+  const rights=document.getElementById('dubReviewRightsConfirmed');
+  if(button) button.disabled=!(lastDubSocialMetadata&&rights&&rights.checked)||button.dataset.busy==='1';
+}
+
+function makeDubReviewQueueId(){
+  try{ if(window.crypto&&typeof window.crypto.randomUUID==='function') return window.crypto.randomUUID(); }catch(_){}
+  return `dub-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,10)}`;
+}
+
+function makeDubReviewQueueCard(item){
+  const card=document.createElement('article');
+  card.style.cssText='padding:13px;border:1px solid #4c1d95;border-radius:14px;background:linear-gradient(145deg,#17152b,#0b1020)';
+  const heading=document.createElement('div');
+  heading.style.cssText='display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap;margin-bottom:10px';
+  const name=document.createElement('div');
+  name.textContent=`📹 ${String(item.fileName||'Vídeo dublado')}`;
+  name.style.cssText='font-weight:900;color:#f8fafc;overflow-wrap:anywhere';
+  const date=document.createElement('div');
+  date.className='hint';
+  date.textContent=new Date(item.createdAt||Date.now()).toLocaleString('pt-BR');
+  heading.append(name,date);
+  card.appendChild(heading);
+
+  const video=document.createElement('video');
+  video.controls=true;
+  video.playsInline=true;
+  video.preload='metadata';
+  video.style.cssText='display:block;width:100%;max-height:420px;border-radius:10px;background:#000;margin-bottom:12px';
+  try{
+    const sourceBlob=item.blob instanceof Blob?item.blob:new Blob([item.blob],{type:item.mimeType||'video/mp4'});
+    const objectUrl=URL.createObjectURL(sourceBlob);
+    dubReviewQueueObjectUrls.set(item.id,objectUrl);
+    video.src=objectUrl;
+    card.appendChild(video);
+  }catch(_){
+    const error=document.createElement('div');
+    error.className='hint';
+    error.textContent='Não foi possível pré-visualizar este arquivo. Tente baixá-lo.';
+    card.appendChild(error);
+  }
+
+  const titleLabel=document.createElement('label');
+  titleLabel.textContent='Título / tema';
+  titleLabel.style.marginTop='0';
+  const titleInput=document.createElement('input');
+  titleInput.type='text';
+  titleInput.maxLength=150;
+  titleInput.value=String(item.title||'');
+  titleInput.style.width='100%';
+  const captionLabel=document.createElement('label');
+  captionLabel.textContent='Legenda';
+  captionLabel.style.marginTop='10px';
+  const captionInput=document.createElement('textarea');
+  captionInput.rows=3;
+  captionInput.maxLength=2200;
+  captionInput.value=String(item.description||'');
+  captionInput.style.cssText='width:100%;resize:vertical;line-height:1.5';
+  const tagsLabel=document.createElement('label');
+  tagsLabel.textContent='Hashtags';
+  tagsLabel.style.marginTop='10px';
+  const tagsInput=document.createElement('input');
+  tagsInput.type='text';
+  tagsInput.maxLength=500;
+  tagsInput.value=Array.isArray(item.hashtags)?item.hashtags.join(' '):String(item.hashtags||'');
+  tagsInput.style.width='100%';
+  card.append(titleLabel,titleInput,captionLabel,captionInput,tagsLabel,tagsInput);
+
+  const actions=document.createElement('div');
+  actions.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-top:12px';
+  const saveButton=document.createElement('button');
+  saveButton.type='button';
+  saveButton.className='primary';
+  saveButton.textContent='💾 Salvar ajustes';
+  saveButton.addEventListener('click',async()=>{
+    saveButton.disabled=true;
+    try{
+      item.title=String(titleInput.value||'').trim().slice(0,150);
+      item.description=String(captionInput.value||'').trim().slice(0,2200);
+      item.hashtags=normalizeClientDubHashtags(tagsInput.value);
+      await putDubReviewQueueItem(item);
+      showStatus('dubReviewQueueStatus','✅ Ajustes salvos nesta fila local.','success');
+    }catch(error){ showStatus('dubReviewQueueStatus','❌ '+(error.message||'Não foi possível salvar os ajustes.'),'error'); }
+    finally{ saveButton.disabled=false; }
+  });
+  const copyButton=document.createElement('button');
+  copyButton.type='button';
+  copyButton.className='ghost';
+  copyButton.textContent='📋 Copiar título, legenda e hashtags';
+  copyButton.addEventListener('click',()=>{
+    const tags=normalizeClientDubHashtags(tagsInput.value).join(' ');
+    copyText([titleInput.value.trim(),captionInput.value.trim(),tags].filter(Boolean).join('\n\n'));
+  });
+  const downloadButton=document.createElement('button');
+  downloadButton.type='button';
+  downloadButton.className='ghost';
+  downloadButton.textContent='⬇️ Baixar vídeo';
+  downloadButton.addEventListener('click',()=>{
+    const sourceBlob=item.blob instanceof Blob?item.blob:new Blob([item.blob],{type:item.mimeType||'video/mp4'});
+    triggerBlobDownload(sourceBlob,item.fileName||'video-dublado.mp4');
+  });
+  const deleteButton=document.createElement('button');
+  deleteButton.type='button';
+  deleteButton.className='ghost';
+  deleteButton.textContent='🗑️ Remover';
+  deleteButton.style.color='#fca5a5';
+  deleteButton.addEventListener('click',async()=>{
+    if(!window.confirm('Remover este vídeo e os metadados da fila local?')) return;
+    deleteButton.disabled=true;
+    try{
+      await deleteDubReviewQueueItem(item.id);
+      const objectUrl=dubReviewQueueObjectUrls.get(item.id);
+      if(objectUrl) URL.revokeObjectURL(objectUrl);
+      dubReviewQueueObjectUrls.delete(item.id);
+      await renderDubReviewQueue();
+      showStatus('dubReviewQueueStatus','🗑️ Item removido da fila local.','success');
+    }catch(error){
+      showStatus('dubReviewQueueStatus','❌ '+(error.message||'Não foi possível remover o item.'),'error');
+      deleteButton.disabled=false;
+    }
+  });
+  actions.append(saveButton,copyButton,downloadButton,deleteButton);
+  card.appendChild(actions);
+  return card;
+}
+
+async function renderDubReviewQueue(){
+  const container=document.getElementById('dubReviewQueueList');
+  const empty=document.getElementById('dubReviewQueueEmpty');
+  const count=document.getElementById('dubReviewQueueCount');
+  if(!container) return;
+  try{
+    const items=await getDubReviewQueueItems();
+    for(const objectUrl of dubReviewQueueObjectUrls.values()) URL.revokeObjectURL(objectUrl);
+    dubReviewQueueObjectUrls.clear();
+    container.innerHTML='';
+    const sorted=(Array.isArray(items)?items:[]).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+    if(count) count.textContent=String(sorted.length);
+    if(empty) empty.classList.toggle('hidden',sorted.length>0);
+    sorted.forEach(item=>container.appendChild(makeDubReviewQueueCard(item)));
+    const status=document.getElementById('dubReviewQueueStatus');
+    if(status&&sorted.length) status.textContent='';
+  }catch(error){
+    if(count) count.textContent='0';
+    if(empty) empty.classList.remove('hidden');
+    container.innerHTML='';
+    showStatus('dubReviewQueueStatus','⚠️ '+(error.message||'A fila local não está disponível neste navegador.'),'warn');
+  }
+}
+
+async function addDubToReviewQueue(){
+  const button=document.getElementById('addDubToReviewQueueBtn');
+  const rights=document.getElementById('dubReviewRightsConfirmed');
+  if(!lastDubSocialMetadata){ toast('Aguarde o título e as hashtags ficarem prontos.','warn'); return; }
+  if(!rights||!rights.checked){ toast('Confirme que você tem autorização para reutilizar este vídeo.','warn'); if(rights) rights.focus(); return; }
+  if(button){ button.disabled=true; button.dataset.busy='1'; button.textContent='⏳ Preparando vídeo para a fila...'; }
+  try{
+    const items=await getDubReviewQueueItems();
+    if(items.length>=DUB_REVIEW_QUEUE_MAX_ITEMS) throw new Error(`A fila local aceita até ${DUB_REVIEW_QUEUE_MAX_ITEMS} vídeos. Remova um item ou baixe os arquivos antes de continuar.`);
+    let blob=lastDubVideoBlob;
+    if(!blob){
+      showStatus('dubStatus','📼 Gerando o vídeo final para salvar na fila local de revisão...','info');
+      blob=await downloadDubVideo({silentExport:true});
+    }
+    if(!(blob instanceof Blob)||!blob.size) throw new Error('Não consegui gerar o vídeo final. Verifique se o arquivo carregado é um vídeo e tente novamente.');
+    if(blob.size>DUB_REVIEW_QUEUE_MAX_VIDEO_BYTES) throw new Error('Este vídeo passa de 200 MB e pode exceder o espaço disponível no navegador. Baixe-o no dispositivo e revise-o fora da fila.');
+    const queueBytes=items.reduce((sum,item)=>sum+(Number(item.size)||(item.blob&&Number(item.blob.size))||0),0);
+    if(queueBytes+blob.size>DUB_REVIEW_QUEUE_MAX_TOTAL_BYTES) throw new Error('A fila chegou ao limite local de 500 MB. Baixe ou remova vídeos antigos antes de adicionar outro.');
+    const currentName=String(lastDubVideoFilename||'video-dublado.mp4').replace(/[^a-zA-Z0-9._-]/g,'-').slice(0,120);
+    const item={
+      id:makeDubReviewQueueId(),
+      createdAt:new Date().toISOString(),
+      fileName:currentName,
+      mimeType:blob.type||'video/mp4',
+      size:blob.size,
+      blob,
+      title:String(lastDubSocialMetadata.topic||'').trim().slice(0,150),
+      description:String(lastDubSocialMetadata.description||'').trim().slice(0,2200),
+      hashtags:[...lastDubSocialMetadata.hashtags],
+      sourceFileName:String(currentDubFile&&currentDubFile.name||'').slice(0,160),
+      rightsConfirmedAt:new Date().toISOString()
+    };
+    await putDubReviewQueueItem(item);
+    showStatus('dubStatus','✅ Vídeo dublado e metadados adicionados à fila local. Nada foi enviado ao TikTok.','success');
+    toast('📋 Adicionado à fila de revisão!');
+    if(rights) rights.checked=false;
+    updateDubReviewQueueSaveButton();
+    await renderDubReviewQueue();
+    openTab('review-queue',document.getElementById('tab-review-queue'));
+  }catch(error){
+    const message=error&&error.message||'Não foi possível salvar na fila de revisão.';
+    showStatus('dubStatus','❌ '+message,'error');
+    toast(message,'error');
+  }finally{
+    if(button){ button.dataset.busy=''; button.textContent='📌 Adicionar vídeo e metadados à fila de revisão'; }
+    updateDubReviewQueueSaveButton();
+  }
+}
+
 async function dubVideo(){
   const file = currentDubFile || $('#videoFile').files[0];
   const language = $('#language').value;
@@ -4479,6 +5016,9 @@ async function dubVideo(){
 
   dubSocialRequestSeq++;
   lastDubSocialMetadata = null;
+  const reviewRightsCheckbox=document.getElementById('dubReviewRightsConfirmed');
+  if(reviewRightsCheckbox) reviewRightsCheckbox.checked=false;
+  updateDubReviewQueueSaveButton();
   const previousSocialCard = document.getElementById('dubSocialPackage');
   if(previousSocialCard) previousSocialCard.classList.add('hidden');
   stopPreviewDubBgMusic();
@@ -13581,6 +14121,7 @@ function downloadSelectedOpusClipSrt(){
 initAvatarPresets();
 checkHealth();
 loadProjects();
+renderDubReviewQueue();
 if('speechSynthesis' in window) speechSynthesis.getVoices();
 setTimeout(checkHealth, 2000);
 (function checkOpusUrlParams(){
