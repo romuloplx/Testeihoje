@@ -142,7 +142,7 @@ async function dubWithOpenAI({ audioBase64, language, dubVoice, targetLanguage =
   }
 }
 
-const TTS_VOICES = { onyx: 'onyx', nova: 'nova', alloy: 'alloy', echo: 'echo', fable: 'fable', shimmer: 'shimmer', ash: 'ash', coral: 'coral', sage: 'sage' };
+const TTS_VOICES = { onyx: 'onyx', nova: 'nova', alloy: 'alloy', echo: 'echo', fable: 'fable', shimmer: 'shimmer', ash: 'ash', coral: 'coral', sage: 'sage', ballad: 'ballad', verse: 'verse', marin: 'marin', cedar: 'cedar' };
 
 function mockCreateFull({ prompt, duration, style, voice }) {
   const m = mockScript({ prompt, duration, style, voice });

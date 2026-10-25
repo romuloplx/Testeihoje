@@ -1,8 +1,10 @@
 // Lógica de IA compartilhada pelas funções serverless
 
+// Catálogo built-in da API de voz OpenAI; Marin e Cedar são opções recomendadas de alta qualidade.
 const TTS_VOICES = {
   onyx: 'onyx', nova: 'nova', alloy: 'alloy', echo: 'echo', fable: 'fable',
-  shimmer: 'shimmer', ash: 'ash', coral: 'coral', sage: 'sage'
+  shimmer: 'shimmer', ash: 'ash', coral: 'coral', sage: 'sage',
+  ballad: 'ballad', verse: 'verse', marin: 'marin', cedar: 'cedar'
 };
 
 function mockScript({ prompt, duration, style, voice }) {
@@ -2252,7 +2254,11 @@ function pcmToMp3(pcmBuf) {
     return Buffer.concat(chunks);
   } catch (e) { return null; }
 }
-const GEM_TTS_VOICES = { onyx: 'Charon', nova: 'Aoede', alloy: 'Kore', echo: 'Puck', fable: 'Fenrir', shimmer: 'Leda', ash: 'Orus', coral: 'Zephyr', sage: 'Enceladus' };
+const GEM_TTS_VOICES = {
+  onyx: 'Charon', nova: 'Aoede', alloy: 'Kore', echo: 'Puck', fable: 'Fenrir',
+  shimmer: 'Leda', ash: 'Orus', coral: 'Zephyr', sage: 'Enceladus',
+  ballad: 'Despina', verse: 'Iapetus', marin: 'Achernar', cedar: 'Gacrux'
+};
 const GEM_VOICE_STYLE = {
   onyx: 'com voz masculina grave de cinema, quente, pausada, respiração humana natural e presença marcante',
   nova: 'com voz feminina brasileira calorosa, simpática, entonação viva de conversa real e naturalidade absoluta',
@@ -2262,7 +2268,11 @@ const GEM_VOICE_STYLE = {
   shimmer: 'com voz feminina jovem, doce, expressiva e entonação humana autêntica',
   ash: 'com voz masculina firme, confiante, articulada e timbre humano encorpado',
   coral: 'com voz feminina vibrante, carismática, sorridente e cheia de vida',
-  sage: 'com voz calma de documentário, aveludada, reflexiva e perfeitamente humana'
+  sage: 'com voz calma de documentário, aveludada, reflexiva e perfeitamente humana',
+  ballad: 'com voz suave, musical e expressiva, com cadência natural',
+  verse: 'com voz versátil, clara e narrativa, com ritmo humano fluido',
+  marin: 'com voz feminina natural, acolhedora e expressiva',
+  cedar: 'com voz masculina natural, encorpada e acolhedora'
 };
 function buildGeminiTtsBody({ text, voice = 'onyx', lang = 'pt-BR', exactTextOnly = false } = {}) {
   const cleanText = exactTextOnly
@@ -2717,7 +2727,11 @@ const EDGE_VOICE_PRESETS = {
   fable:   { voice: 'en-US-BrianMultilingualNeural',    rate: '+2%', pitch: '+0Hz', label: 'Brian HD Narrador' },
   sage:    { voice: 'en-US-EmmaMultilingualNeural',     rate: '+1%', pitch: '+0Hz', label: 'Emma HD Documentário' },
   ash:     { voice: 'fr-FR-RemyMultilingualNeural',     rate: '+2%', pitch: '-1Hz', label: 'Remy HD Firme' },
-  alloy:   { voice: 'fr-FR-VivienneMultilingualNeural', rate: '+2%', pitch: '+0Hz', label: 'Vivienne HD Estúdio' }
+  alloy:   { voice: 'fr-FR-VivienneMultilingualNeural', rate: '+2%', pitch: '+0Hz', label: 'Vivienne HD Estúdio' },
+  ballad:  { voice: 'pt-BR-BrendaNeural',               rate: '+1%', pitch: '+0Hz', label: 'Brenda Neural' },
+  verse:   { voice: 'pt-BR-HumbertoNeural',             rate: '+2%', pitch: '+0Hz', label: 'Humberto Neural' },
+  marin:   { voice: 'pt-BR-GiovannaNeural',             rate: '+2%', pitch: '+1Hz', label: 'Giovanna Neural' },
+  cedar:   { voice: 'pt-BR-NicolauNeural',              rate: '+1%', pitch: '-1Hz', label: 'Nicolau Neural' }
 };
 
 // Modulação dramática de emoção para que os personagens atuem de verdade (nunca robótico!)
@@ -2768,7 +2782,7 @@ async function edgeNeuralTTS({ text, voice = 'onyx', lang = 'pt-BR' }) {
   const { MsEdgeTTS, OUTPUT_FORMAT } = require('msedge-tts');
   const locale = TTS_LANGS[lang] || 'pt-BR';
   const preset = EDGE_VOICE_PRESETS[voice] || EDGE_VOICE_PRESETS.onyx;
-  const isFemale = ['nova', 'shimmer', 'coral', 'sage', 'alloy'].includes(voice);
+  const isFemale = ['nova', 'shimmer', 'coral', 'sage', 'alloy', 'ballad', 'marin'].includes(voice);
 
   // Timbre, tom e velocidade 100% travados do começo ao fim do vídeo para que o dublador seja sempre o mesmo!
   const finalRate = preset.rate || '+2%';
@@ -2874,6 +2888,13 @@ function buildOpenAITtsOptions({ model, text, voice = 'onyx', exactTextOnly = fa
   return options;
 }
 
+const LEGACY_OPENAI_TTS_VOICES = new Set(['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer']);
+function openAITtsModelsForVoice(voice) {
+  return LEGACY_OPENAI_TTS_VOICES.has(voice)
+    ? ['gpt-4o-mini-tts', 'tts-1-hd', 'tts-1']
+    : ['gpt-4o-mini-tts'];
+}
+
 // Na dublagem estrita, use apenas serviços que recebem texto e voz selecionada diretamente.
 // Se esses serviços falharem, é preferível falhar claramente a trocar silenciosamente de voz.
 async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR', emotion = '', exactTextOnly = false } = {}, testProviders = null) {
@@ -2883,9 +2904,13 @@ async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR', emotion =
   // Injeção interna para testes unitários; as rotas HTTP não encaminham dados do usuário aqui.
   if (testProviders && typeof testProviders === 'object') {
     const attempts = [];
+    const edgeAttempt = ['neural-hd', testProviders.edge];
+    const openAiAttempt = ['openai/mock', testProviders.openai];
+    const preferredAttempts = LEGACY_OPENAI_TTS_VOICES.has(voice)
+      ? [edgeAttempt, openAiAttempt]
+      : [openAiAttempt, edgeAttempt];
     const injected = [
-      ['neural-hd', testProviders.edge],
-      ['openai/mock', testProviders.openai],
+      ...preferredAttempts,
       ['gemini-tts', testProviders.gemini],
       ['unorouter-tts', testProviders.unorouter],
       ['google-translate-tts', testProviders.google],
@@ -2900,14 +2925,16 @@ async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR', emotion =
     return runTtsProviderChain(attempts);
   }
 
-  const attempts = [
-    { name: 'neural-hd', run: () => edgeNeuralTTS({ text: cleanText, voice, lang, emotion }) }
-  ];
+  const attempts = [];
+  const openAiFirst = !LEGACY_OPENAI_TTS_VOICES.has(voice);
+  const edgeAttempt = { name: 'neural-hd', run: () => edgeNeuralTTS({ text: cleanText, voice, lang, emotion }) };
+  if (!openAiFirst) attempts.push(edgeAttempt);
 
+  // Vozes modernas da API (incluindo Marin/Cedar) tentam OpenAI primeiro para preservar o timbre nativo.
   // OpenAI oficial só entra quando há uma chave própria (não a chave do Unorouter).
   if (canUseOfficialOpenAI()) {
     // O texto e a voz escolhida vão em campos separados; na dublagem, omitimos instruções faláveis.
-    const openAiTtsModels = ['gpt-4o-mini-tts', 'tts-1-hd', 'tts-1'];
+    const openAiTtsModels = openAITtsModelsForVoice(voice);
     for (const model of openAiTtsModels) {
       attempts.push({
         name: 'openai/' + model,
@@ -2926,6 +2953,7 @@ async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR', emotion =
       });
     }
   }
+  if (openAiFirst) attempts.push(edgeAttempt);
 
   // Em dublagem estrita, Gemini TTS recebe somente a transcrição literal como texto de entrada;
   // a voz selecionada vai separada em speechConfig, sem instruções que possam ser faladas.
@@ -4730,7 +4758,7 @@ module.exports = {
   generateWithOpenAI, generateCreateFull, generateSceneImage, hasOpenRouterImageApiKey, lookupIceAndFireCharacters, generateCreateSceneVideo, startCreateSceneVideo, pollCreateSceneVideo, consumeCreateSceneVideoRequest, dubWithOpenAI, enhanceScript, generateDubSocialMetadata,
   generateAvatarPortrait, generateAvatarScript, generateAvatarVideo, detectAvatarFaceLandmarks,
   transcribeClipSegment, analyzeViralClips, extractYoutubeVideoId, fetchYoutubeVideoInfoAndStream, fetchVideoStreamChunk, fetchYoutubeClipMp4Segment,
-  chatWithFallback, adaptGemBodyForModel, buildGeminiTtsBody, buildOpenAITtsOptions, geminiGenerateTried, cleanDubTranslationText, ttsWithFallback, runTtsProviderChain, isEdgeTtsHandshakeFailure,
+  chatWithFallback, adaptGemBodyForModel, buildGeminiTtsBody, buildOpenAITtsOptions, openAITtsModelsForVoice, geminiGenerateTried, cleanDubTranslationText, ttsWithFallback, runTtsProviderChain, isEdgeTtsHandshakeFailure,
   chatViaPollinations, ttsGoogle, ttsStreamElements,
   probeOpenAI, fullPipelineProbe, candidatesProbe, unorouterProbe, unorouterVideoProbe, getBody, send
 };
