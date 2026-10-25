@@ -1320,7 +1320,7 @@ async function dubWithOpenAI({ audioBase64, audioMime = 'audio/wav', language, d
     }
     if (current) parts.push(current);
 
-    // Voz com fallback automático (Edge Neural HD → OpenAI → Gemini → Unorouter → Google → StreamElements para inglês)
+    // Voz estrita: Edge Neural HD → OpenAI → Gemini TTS literal → Unorouter; nunca troca para uma voz fixa.
     const audioParts = [];
     const usedProviders = new Set();
     for (const part of parts) {
@@ -1969,8 +1969,15 @@ function gemHeaders() {
   return { 'Content-Type': 'application/json', 'x-goog-api-key': String(process.env.GEMINI_API_KEY || '').trim() };
 }
 
-// Adapta automaticamente o body quando o modelo escolhido é Gemma 3 (14.400 req/dia grátis!)
+// Adapta o payload de TTS novo Gemini 3.8 e o formato de prompt para Gemma 3.
 function adaptGemBodyForModel(body, model) {
+  if (/^gemini-3\.8-.*-tts/i.test(model)) {
+    const clone = JSON.parse(JSON.stringify(body));
+    const speechConfig = clone.generationConfig && clone.generationConfig.speechConfig;
+    const prebuilt = speechConfig && speechConfig.voiceConfig && speechConfig.voiceConfig.prebuiltVoiceConfig;
+    if (prebuilt && prebuilt.voiceName) speechConfig.voiceConfig = { voice: prebuilt.voiceName };
+    return clone;
+  }
   if (!/^gemma-/i.test(model)) return body;
   const clone = JSON.parse(JSON.stringify(body));
   let prefix = '';
@@ -2044,6 +2051,9 @@ async function geminiGenerateTried({ body, timeout = 20000, kind = 'chat' }) {
   if (kind === 'tts') {
     const discTts = discovered.filter(id => /tts/i.test(id) && !_gemDead404.has(id));
     candidates = [
+      ...discTts.filter(id => /^gemini-3\.8-.*-tts/i.test(id)),
+      'gemini-3.8-flash-tts',
+      'gemini-3.8-flash-lite-tts',
       _gemBest.tts,
       'gemini-3.1-flash-tts-preview',
       ...discTts.filter(id => /3\.1|3-/i.test(id)),
@@ -2134,8 +2144,14 @@ async function geminiGenerateTried({ body, timeout = 20000, kind = 'chat' }) {
       delete _gemModelCooldown[model];
       return j;
     } catch (e) {
-      if (e.status === 401 || e.status === 403 || (e.status === 400 && /API_KEY_INVALID|API key not valid/i.test(e.message))) {
+      if (e.status === 401 || (e.status === 403 && kind !== 'tts') || (e.status === 400 && /API_KEY_INVALID|API key not valid/i.test(e.message))) {
         throw e;
+      }
+      if (e.status === 403 && kind === 'tts') {
+        // A chave pode ter acesso a outros modelos TTS; não aborta toda a cadeia por um modelo negado.
+        _gemUnsupported.add(`${kind}:${model}`);
+        errs.push(model + ': sem acesso (HTTP 403)');
+        continue;
       }
       // 404 = modelo aposentado: memoriza para nunca mais tentar e NÃO gasta tentativa!
       if (e.status === 404) {
@@ -2211,9 +2227,8 @@ async function geminiImage(prompt, timeout = 12000) {
   return null;
 }
 
-// --- TTS via Gemini (o que faltava na cadeia de voz) ---
-// O Gemini devolve PCM 24kHz; convertemos pra MP3 (lamejs) pra caber junto
-// com os demais provedores de voz.
+// --- TTS via Gemini ---
+// Gemini pode devolver PCM, WAV ou MP3; convertemos PCM para MP3 quando o encoder estiver disponível.
 let _lameMod = undefined;
 async function _loadLame() {
   if (_lameMod === undefined) {
@@ -2249,45 +2264,56 @@ const GEM_VOICE_STYLE = {
   coral: 'com voz feminina vibrante, carismática, sorridente e cheia de vida',
   sage: 'com voz calma de documentário, aveludada, reflexiva e perfeitamente humana'
 };
-async function geminiTTS(text, voice = 'onyx', timeout = 20000, lang = 'pt-BR') {
-  if (!process.env.GEMINI_API_KEY) return null;
-  await _loadLame();
+function buildGeminiTtsBody({ text, voice = 'onyx', lang = 'pt-BR', exactTextOnly = false } = {}) {
+  const cleanText = exactTextOnly
+    ? String(text || '').replace(/\s{2,}/g, ' ').trim().slice(0, 4000)
+    : String(text || '').replace(/\*\*|__|\[.*?\]/g, '').replace(/\s{2,}/g, ' ').trim().slice(0, 4000).replace(/"/g, "'");
   const voiceName = GEM_TTS_VOICES[voice] || 'Aoede';
-  const cleanText = String(text || '')
-    .replace(/\*\*|__|\[.*?\]/g, '')
-    .replace(/\s{2,}/g, ' ')
-    .trim()
-    .slice(0, 4000)
-    .replace(/"/g, "'");
   const isPt = /^pt/i.test(lang || 'pt-BR');
   const styleHint = GEM_VOICE_STYLE[voice] || GEM_VOICE_STYLE.nova;
-  const directorPrompt = isPt
-    ? `Fale em português brasileiro nativo ${styleHint}, sem jamais soar robótico: "${cleanText}"`
-    : `Speak naturally like a real human studio actor with authentic emotion and breathing (${lang}): "${cleanText}"`;
+  const spokenText = exactTextOnly
+    ? cleanText
+    : (isPt
+      ? `Fale em português brasileiro nativo ${styleHint}, sem jamais soar robótico: "${cleanText}"`
+      : `Speak naturally like a real human studio actor with authentic emotion and breathing (${lang}): "${cleanText}"`);
 
-  const body = {
-    contents: [{ parts: [{ text: directorPrompt }] }],
+  return {
+    contents: [{ role: 'user', parts: [{ text: spokenText }] }],
     generationConfig: {
       maxOutputTokens: 8192,
       responseModalities: ['AUDIO'],
       speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } }
     }
   };
+}
+
+async function geminiTTS(text, voice = 'onyx', timeout = 20000, lang = 'pt-BR', exactTextOnly = false) {
+  if (!process.env.GEMINI_API_KEY) return null;
+  await _loadLame();
+  const body = buildGeminiTtsBody({ text, voice, lang, exactTextOnly });
   const j = await geminiGenerateTried({ body, timeout, kind: 'tts' });
   const parts = (j && j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts) || [];
   for (const p of parts) {
     if (p.inlineData && p.inlineData.data) {
-      const pcm = Buffer.from(p.inlineData.data, 'base64');
-      if (pcm.length < 1000) continue;
-      const mp3 = pcmToMp3(pcm);
-      if (mp3 && mp3.length > 500) return { buffer: mp3, provider: 'gemini/' + (_gemBestModel || 'tts') };
-      const wav = wrapPcmAsWav(pcm, 24000);
-      return { buffer: wav, provider: 'gemini/' + (_gemBestModel || 'tts') + '(wav)' };
+      const audio = Buffer.from(p.inlineData.data, 'base64');
+      if (audio.length < 1000) continue;
+      const mimeType = String(p.inlineData.mimeType || '').toLowerCase();
+      const isWav = audio.length > 44 && audio.subarray(0, 4).toString('ascii') === 'RIFF' && audio.subarray(8, 12).toString('ascii') === 'WAVE';
+      if (isWav) {
+        return { buffer: audio, provider: `gemini/${_gemBest.tts || _gemBestModel || 'tts'}(wav)` };
+      }
+      if (/audio\/(?:mpeg|mp3)/i.test(mimeType) || audio.subarray(0, 3).toString('ascii') === 'ID3') {
+        return { buffer: audio, provider: `gemini/${_gemBest.tts || _gemBestModel || 'tts'}` };
+      }
+      const mp3 = pcmToMp3(audio);
+      if (mp3 && mp3.length > 500) return { buffer: mp3, provider: `gemini/${_gemBest.tts || _gemBestModel || 'tts'}` };
+      const wav = wrapPcmAsWav(audio, 24000);
+      return { buffer: wav, provider: `gemini/${_gemBest.tts || _gemBestModel || 'tts'}(wav)` };
     }
   }
   const summary = parts.map(p => Object.keys(p).join('+') + (p.inlineData ? ':' + (p.inlineData.mimeType || '?') : '')).join(', ');
   const raw = JSON.stringify(j || {}).slice(0, 280);
-  return { error: `sem áudio (modelo ${_gemBestModel || '?'}, lame=${!!_lameMod}, parts: ${summary || 'nenhuma'}) raw: ${raw}` };
+  return { error: `sem áudio (modelo ${_gemBest.tts || _gemBestModel || '?'}, lame=${!!_lameMod}, parts: ${summary || 'nenhuma'}) raw: ${raw}` };
 }
 
 // PCM mono L16 LE → WAV (fallback quando o encoder MP3 não carrega)
@@ -2642,7 +2668,7 @@ async function unorouterTTS({ text, voice = 'onyx' }) {
           signal: AbortSignal.timeout(25000)
         });
         if (!response.ok) {
-          const detail = (await response.text().catch(() => '')).slice(0, 120);
+          const detail = (await response.text().catch(() => '')).slice(0, 240);
           if (response.status === 401) {
             _deadUniKeys.add(key);
             errors.push(`${model}: HTTP 401`);
@@ -2653,7 +2679,11 @@ async function unorouterTTS({ text, voice = 'onyx' }) {
             errors.push(`${model}: HTTP 429 (limite temporário)`);
             break;
           }
-          errors.push(`${model}: HTTP ${response.status}${detail ? ' ' + detail : ''}`);
+          if (response.status === 403 && /no access to model/i.test(detail)) {
+            errors.push(`${model}: token sem acesso (HTTP 403)`);
+            continue;
+          }
+          errors.push(`${model}: HTTP ${response.status}${detail ? ' ' + detail.slice(0, 90) : ''}`);
           continue;
         }
         const contentType = response.headers && response.headers.get('content-type') || '';
@@ -2862,7 +2892,7 @@ async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR', emotion =
       ['streamelements-tts', testProviders.streamElements]
     ];
     for (const [name, provider] of injected) {
-      if (exactTextOnly && ['gemini-tts', 'google-translate-tts', 'streamelements-tts'].includes(name)) continue;
+      if (exactTextOnly && ['google-translate-tts', 'streamelements-tts'].includes(name)) continue;
       if (typeof provider === 'function') {
         attempts.push({ name, run: () => provider({ text: cleanText, voice, lang, emotion }) });
       }
@@ -2897,13 +2927,13 @@ async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR', emotion =
     }
   }
 
-  // O Gemini recebe instruções de direção junto ao texto e pode verbalizar esse prefácio.
-  // Em dublagem estrita, só usamos provedores que recebem o texto exato como entrada TTS.
-  if (process.env.GEMINI_API_KEY && !exactTextOnly) {
+  // Em dublagem estrita, Gemini TTS recebe somente a transcrição literal como texto de entrada;
+  // a voz selecionada vai separada em speechConfig, sem instruções que possam ser faladas.
+  if (process.env.GEMINI_API_KEY) {
     attempts.push({
       name: 'gemini-tts',
       run: async () => {
-        const result = await geminiTTS(cleanText, voice, 20000, lang);
+        const result = await geminiTTS(cleanText, voice, 20000, lang, exactTextOnly);
         if (!result || result.error) throw new Error(result && result.error || 'sem áudio Gemini');
         return result;
       }
@@ -4700,7 +4730,7 @@ module.exports = {
   generateWithOpenAI, generateCreateFull, generateSceneImage, hasOpenRouterImageApiKey, lookupIceAndFireCharacters, generateCreateSceneVideo, startCreateSceneVideo, pollCreateSceneVideo, consumeCreateSceneVideoRequest, dubWithOpenAI, enhanceScript, generateDubSocialMetadata,
   generateAvatarPortrait, generateAvatarScript, generateAvatarVideo, detectAvatarFaceLandmarks,
   transcribeClipSegment, analyzeViralClips, extractYoutubeVideoId, fetchYoutubeVideoInfoAndStream, fetchVideoStreamChunk, fetchYoutubeClipMp4Segment,
-  chatWithFallback, buildOpenAITtsOptions, cleanDubTranslationText, ttsWithFallback, runTtsProviderChain, isEdgeTtsHandshakeFailure,
+  chatWithFallback, adaptGemBodyForModel, buildGeminiTtsBody, buildOpenAITtsOptions, geminiGenerateTried, cleanDubTranslationText, ttsWithFallback, runTtsProviderChain, isEdgeTtsHandshakeFailure,
   chatViaPollinations, ttsGoogle, ttsStreamElements,
   probeOpenAI, fullPipelineProbe, candidatesProbe, unorouterProbe, unorouterVideoProbe, getBody, send
 };
