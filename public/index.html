@@ -115,6 +115,8 @@ video{width:100%;border-radius:12px;margin-top:12px;background:black}
 .progress-wrap.show{display:block}
 .progress-bar{height:8px;background:#222239;border-radius:999px;overflow:hidden;border:1px solid var(--border)}
 .progress-fill{height:100%;width:0%;background:linear-gradient(90deg,#7c3aed,#06b6d4);transition:width .4s}
+@keyframes douyinDownloadPulse{from{transform:translateX(-105%)}to{transform:translateX(300%)}}
+#douyinDownloadProgressFill.indeterminate{width:36%;animation:douyinDownloadPulse 1.35s ease-in-out infinite alternate}
 .progress-steps{display:flex;justify-content:space-between;margin-top:8px;gap:4px}
 .progress-steps span{font-size:10px;color:var(--muted);text-align:center;flex:1}
 .progress-steps span.active{color:#a78bfa;font-weight:700}
@@ -1112,7 +1114,8 @@ input[type="range"]{
 
           <button type="button" id="dubMainDownloadBtn" onclick="downloadDubVideo()" style="width:100%;padding:15px 18px;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;color:#042f2e;background:linear-gradient(135deg,#34d399,#10b981,#06b6d4);box-shadow:0 8px 26px rgba(16,185,129,.35)">⬇️ GERAR E BAIXAR VÍDEO DUBLADO LISO (.MP4 GALERIA)</button>
           <button type="button" onclick="sendPlayingVideoToOpusClip('dub')" style="width:100%;padding:12px 16px;border:1.5px solid #22c55e;border-radius:12px;font-size:13.5px;font-weight:900;cursor:pointer;color:#bbf7d0;background:linear-gradient(135deg,#052e16,#064e3b)">✂️ Pegar Melhores Partes Deste Vídeo, Cortar &amp; Botar Legendas (OpusClip IA)</button>
-          <button type="button" onclick="shareToGallery('dub')" style="width:100%;padding:12px 16px;border:1.5px solid #38bdf8;border-radius:12px;font-size:14px;font-weight:800;cursor:pointer;color:#e0f2fe;background:#0f172a">📲 Salvar direto na Galeria / Enviar (Celular, WhatsApp, Reels)</button>
+          <button type="button" id="shareDubToTikTokBtn" onclick="shareDubToTikTok()" style="width:100%;padding:12px 16px;border:1.5px solid #38bdf8;border-radius:12px;font-size:14px;font-weight:800;cursor:pointer;color:#e0f2fe;background:#0f172a">📲 Compartilhar vídeo dublado → escolher TikTok</button>
+          <div class="hint" style="margin-top:-5px">Abre a folha de compartilhamento do celular. Escolha TikTok e confirme a postagem no app; o DubAI PRO não publica automaticamente.</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="primary" type="button" onclick="playDubbed()" style="padding:9px 14px">▶️ Assistir vídeo sincronizado agora (instantâneo)</button>
             <a id="dubDownload" class="ghost" download="dublagem-completa.wav" style="padding:9px 14px;text-decoration:none">🎙️ Baixar áudio dublado (.WAV)</a>
@@ -1636,8 +1639,28 @@ input[type="range"]{
 </section>
 
 
-<!-- YOUTUBE VIDEO DOWNLOADER -->
+<!-- VIDEO DOWNLOADER -->
 <section id="youtube-download" class="hidden">
+  <div id="douyinDownloadCard" class="card" style="background:linear-gradient(145deg,#102623,#101324);border:1px solid #22c55e77">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+      <h2 style="margin:0">🇨🇳 Douyin (TikTok China) → Dublar</h2>
+      <span class="kbd" style="background:#052e16;border-color:#22c55e;color:#bbf7d0">DOWNLOAD + ENVIO DIRETO</span>
+    </div>
+    <p style="margin-top:10px">Cole o link do Douyin. O vídeo será baixado e aberto automaticamente na aba <b>Dublar</b>, sem precisar salvar e enviar o arquivo de novo.</p>
+    <label for="douyinDownloadUrl">🔗 Link do vídeo Douyin</label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <input type="url" id="douyinDownloadUrl" autocomplete="url" placeholder="https://v.douyin.com/... ou https://www.douyin.com/video/..." onkeydown="if(event.key==='Enter'){event.preventDefault();downloadDouyinAndOpenDub();}" style="flex:1;min-width:220px;padding:12px 14px;border-radius:10px;border:1px solid #334155;background:#080b16;color:#fff;font-size:14px">
+      <button class="primary" type="button" id="douyinDownloadBtn" onclick="downloadDouyinAndOpenDub()" style="padding:11px 16px;white-space:nowrap;background:linear-gradient(135deg,#16a34a,#059669)">⚡ Baixar e abrir no Dublador</button>
+      <a href="https://brasil-downloader.vercel.app/" class="ghost" target="_blank" rel="noopener noreferrer" aria-label="Abrir Brasil Downloader em uma nova aba (serviço externo)" style="display:inline-block;text-decoration:none;white-space:nowrap">↗ Abrir Brasil Downloader (externo)</a>
+    </div>
+    <div class="progress-wrap" id="douyinDownloadProgress" aria-live="polite">
+      <div class="progress-bar"><div class="progress-fill" id="douyinDownloadProgressFill"></div></div>
+      <div id="douyinDownloadProgressText" class="hint" style="margin-top:6px">Conectando ao Douyin...</div>
+    </div>
+    <div class="status" id="douyinDownloadStatus" role="status" aria-live="polite"></div>
+    <div class="hint" style="margin-top:10px">O download usa o extrator yt-dlp no servidor. Em navegadores compatíveis, o arquivo é gravado temporariamente sem ocupar toda a memória do celular; em outros, a transferência direta é limitada a 150 MB. Use apenas vídeos que você criou ou tem autorização para salvar. O compartilhamento posterior abre a folha do celular: você escolhe TikTok e confirma a postagem no app; nada é publicado automaticamente.</div>
+  </div>
+
   <div class="card" style="background:linear-gradient(150deg,#171a31,#101324);border:1px solid #3a3d5a">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
       <h2 style="margin:0">⬇️ Baixar vídeo do YouTube</h2>
@@ -1675,7 +1698,6 @@ input[type="range"]{
         </select>
       </div>
       <button class="primary" type="button" id="youtubeDownloadBtn" onclick="startYoutubeDownload()" disabled style="padding:12px 18px;min-width:190px;background:linear-gradient(135deg,#16a34a,#059669)">⬇️ 3. Baixar MP4</button>
-      <a href="https://brasil-downloader.vercel.app/" class="ghost" target="_blank" rel="noopener noreferrer" aria-label="Abrir Brasil Downloader em uma nova aba (serviço externo)" style="display:inline-block;text-decoration:none;white-space:nowrap">↗ Abrir Brasil Downloader (externo)</a>
     </div>
 
     <div class="progress-wrap" id="youtubeDownloadProgress" aria-live="polite">
@@ -1791,6 +1813,188 @@ function parseYoutubeDownloadInput(raw){
   }
   if(!/^[A-Za-z0-9_-]{11}$/.test(videoId)) throw new Error('Use um link válido de vídeo do YouTube (watch, youtu.be, Shorts ou live).');
   return { videoId, watchUrl:`https://www.youtube.com/watch?v=${videoId}` };
+}
+
+const DOUYIN_MEMORY_FALLBACK_MAX_BYTES = 150 * 1024 * 1024;
+let currentDouyinTempFileHandle = null;
+
+function parseDouyinDownloadInput(raw){
+  let value=String(raw||'').trim();
+  if(!value) throw new Error('Cole o link do vídeo do Douyin.');
+  if(value.length>2048 || Array.from(value).some(ch=>ch.charCodeAt(0)<=32) || value.includes(String.fromCharCode(92))) throw new Error('O link do Douyin é inválido ou longo demais.');
+  const lowerValue=value.toLowerCase();
+  if(!lowerValue.startsWith('https://') && !lowerValue.startsWith('http://')) value='https://'+value;
+  let parsed;
+  try{ parsed=new URL(value); }catch(_){ throw new Error('O link informado não é válido.'); }
+  if(parsed.protocol!=='https:' && parsed.protocol!=='http:') throw new Error('Use um link HTTPS do Douyin.');
+  if(parsed.username || parsed.password || (parsed.port && !['80','443'].includes(parsed.port))) throw new Error('O link informado não é válido.');
+  const host=parsed.hostname.toLowerCase();
+  const allowed=['douyin.com','iesdouyin.com'].some(domain=>host===domain || host.endsWith('.'+domain));
+  if(!allowed) throw new Error('Use um link do Douyin (douyin.com, v.douyin.com ou iesdouyin.com).');
+  parsed.protocol='https:';
+  parsed.port='';
+  parsed.hash='';
+  return parsed.toString();
+}
+
+function douyinDownloadFilename(url){
+  const parsed=new URL(url);
+  const segments=parsed.pathname.split('/').filter(Boolean);
+  const markerIndex=segments.findIndex(part=>['video','note'].includes(part.toLowerCase()));
+  const candidate=markerIndex>=0?segments[markerIndex+1]:'';
+  const videoId=candidate && candidate.length>=8 && Array.from(candidate).every(ch=>ch>='0' && ch<='9')?candidate:'';
+  return `douyin-${videoId||'video'}.mp4`;
+}
+
+function setDouyinDownloadProgress(receivedBytes,totalBytes){
+  const wrap=document.getElementById('douyinDownloadProgress');
+  const fill=document.getElementById('douyinDownloadProgressFill');
+  const text=document.getElementById('douyinDownloadProgressText');
+  if(!wrap || !fill || !text) return;
+  wrap.classList.add('show');
+  fill.classList.remove('indeterminate');
+  if(totalBytes>0){
+    const pct=Math.max(1,Math.min(99,Math.round(receivedBytes/totalBytes*100)));
+    fill.style.width=pct+'%';
+  }else{
+    fill.classList.add('indeterminate');
+    fill.style.width='36%';
+  }
+  text.textContent=totalBytes>0
+    ? `Baixando ${fmtHumanBytes(receivedBytes)} de ${fmtHumanBytes(totalBytes)}...`
+    : `Baixando ${fmtHumanBytes(receivedBytes)}...`;
+}
+
+async function createDouyinDownloadTarget(filename){
+  if(navigator.storage && typeof navigator.storage.getDirectory==='function'){
+    let handle=null;
+    try{
+      const root=await navigator.storage.getDirectory();
+      handle=await root.getFileHandle(`douyin-import-${Date.now()}-${Math.random().toString(36).slice(2,7)}.mp4`,{create:true});
+      const writable=await handle.createWritable();
+      return {kind:'opfs',handle,writable};
+    }catch(error){
+      if(handle && typeof handle.remove==='function') await handle.remove().catch(()=>{});
+    }
+  }
+  return {kind:'memory',filename,chunks:[]};
+}
+
+async function readDouyinDownloadError(response){
+  const raw=await response.text().catch(()=> '');
+  try{
+    const payload=JSON.parse(raw);
+    return payload.error || payload.message || `O servidor respondeu HTTP ${response.status}.`;
+  }catch(_){
+    return raw.slice(0,240) || `O servidor respondeu HTTP ${response.status}.`;
+  }
+}
+
+async function downloadDouyinAndOpenDub(){
+  const input=document.getElementById('douyinDownloadUrl');
+  const button=document.getElementById('douyinDownloadBtn');
+  const fill=document.getElementById('douyinDownloadProgressFill');
+  const wrap=document.getElementById('douyinDownloadProgress');
+  if(!input || !button) return;
+  let videoUrl;
+  try{ videoUrl=parseDouyinDownloadInput(input.value); }
+  catch(error){ showStatus('douyinDownloadStatus','❌ '+error.message,'error'); input.focus(); return; }
+
+  const originalButtonText=button.textContent;
+  let target=null, reader=null, response=null;
+  let streamStarted=false;
+  button.disabled=true;
+  button.textContent='⏳ Baixando e preparando...';
+  if(wrap) wrap.classList.add('show');
+  if(fill){ fill.classList.remove('indeterminate'); fill.style.width='4%'; }
+  setDouyinDownloadProgress(0,0);
+  showStatus('douyinDownloadStatus','🔎 Resolvendo link Douyin e iniciando o download seguro...','info');
+
+  try{
+    response=await fetch('/api/clips',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'douyin_download',url:videoUrl})
+    });
+    if(!response.ok) throw new Error(await readDouyinDownloadError(response));
+    const contentType=String(response.headers.get('content-type')||'').toLowerCase();
+    if(contentType.includes('application/json') || contentType.includes('text/html')){
+      throw new Error(await readDouyinDownloadError(response));
+    }
+
+    const filename=douyinDownloadFilename(videoUrl);
+    const expectedBytes=Number(response.headers.get('content-length'))||0;
+    target=await createDouyinDownloadTarget(filename);
+    if(target.kind==='memory' && expectedBytes>DOUYIN_MEMORY_FALLBACK_MAX_BYTES){
+      throw new Error('Este navegador não oferece armazenamento temporário e o vídeo passa de 150 MB. Baixe o arquivo e envie-o manualmente na aba Dublar.');
+    }
+
+    let receivedBytes=0, lastPaint=0;
+    if(response.body && typeof response.body.getReader==='function'){
+      reader=response.body.getReader();
+      while(true){
+        const part=await reader.read();
+        if(part.done) break;
+        const chunk=part.value;
+        receivedBytes+=chunk.byteLength;
+        if(target.kind==='memory' && receivedBytes>DOUYIN_MEMORY_FALLBACK_MAX_BYTES){
+          await reader.cancel().catch(()=>{});
+          throw new Error('O vídeo passa de 150 MB e este navegador não permite gravá-lo temporariamente. Use o downloader externo e carregue o arquivo na aba Dublar.');
+        }
+        if(target.kind==='opfs') await target.writable.write(chunk);
+        else target.chunks.push(chunk);
+        const now=Date.now();
+        if(now-lastPaint>220){ setDouyinDownloadProgress(receivedBytes,expectedBytes); lastPaint=now; }
+      }
+    }else{
+      const blob=await response.blob();
+      receivedBytes=blob.size;
+      if(target.kind==='memory' && receivedBytes>DOUYIN_MEMORY_FALLBACK_MAX_BYTES){
+        throw new Error('O vídeo passa de 150 MB e este navegador não permite gravá-lo temporariamente. Use o downloader externo e carregue o arquivo na aba Dublar.');
+      }
+      if(target.kind==='opfs') await target.writable.write(blob);
+      else target.chunks.push(blob);
+    }
+    streamStarted=true;
+    if(target.kind==='opfs'){
+      await target.writable.close();
+      const storedFile=await target.handle.getFile();
+      var videoFile=new File([storedFile],filename,{type:'video/mp4',lastModified:Date.now()});
+    }else{
+      var videoFile=new File(target.chunks,filename,{type:'video/mp4',lastModified:Date.now()});
+    }
+    if(!videoFile.size) throw new Error('O Douyin retornou um arquivo vazio. Confira o link e tente de novo.');
+    setDouyinDownloadProgress(receivedBytes,expectedBytes||receivedBytes);
+    if(fill){ fill.classList.remove('indeterminate'); fill.style.width='100%'; }
+    const previousHandle=currentDouyinTempFileHandle;
+    currentDouyinTempFileHandle=target.kind==='opfs'?target.handle:null;
+    try{
+      const fileInput=document.getElementById('videoFile');
+      const transfer=new DataTransfer();
+      transfer.items.add(videoFile);
+      fileInput.files=transfer.files;
+    }catch(_){ /* currentDubFile recebe o File diretamente mesmo sem DataTransfer */ }
+    const sourceLanguage=document.getElementById('language');
+    if(sourceLanguage) sourceLanguage.value='zh';
+    openTab('dub',document.getElementById('tab-dub'));
+    previewVideo(videoFile);
+    showStatus('dubStatus','✅ Vídeo do Douyin carregado no Dublador. Idioma original definido como chinês; você pode alterá-lo antes de dublar.','success');
+    showStatus('douyinDownloadStatus',`✅ ${filename} baixado e enviado direto para a aba Dublar (${fmtHumanBytes(videoFile.size)}).`,'success');
+    toast('🇨🇳 Vídeo do Douyin pronto para dublar!');
+    if(previousHandle && previousHandle!==currentDouyinTempFileHandle && typeof previousHandle.remove==='function') previousHandle.remove().catch(()=>{});
+  }catch(error){
+    if(reader && !streamStarted) await reader.cancel().catch(()=>{});
+    if(target && target.writable && !streamStarted && typeof target.writable.abort==='function') await target.writable.abort().catch(()=>{});
+    if(target && target.handle && typeof target.handle.remove==='function') await target.handle.remove().catch(()=>{});
+    const message=error && error.message || 'Falha ao baixar o vídeo do Douyin.';
+    showStatus('douyinDownloadStatus','❌ '+message,'error');
+    toast(message,'error');
+  }finally{
+    button.disabled=false;
+    button.textContent=originalButtonText;
+    if(fill) fill.classList.remove('indeterminate');
+    if(wrap) setTimeout(()=>wrap.classList.remove('show'),2200);
+  }
 }
 
 function readYoutubeJsonObjectAfter(text, markerIndex){
@@ -4652,6 +4856,50 @@ async function shareToGallery(kind){
   }
   triggerBlobDownload(blob, filename);
   toast('⬇️ Download direto iniciado: ' + filename);
+}
+
+async function shareDubToTikTok(){
+  let blob=lastDubVideoBlob;
+  if(!blob){
+    showStatus('dubStatus','⏳ Gerando o MP4 final. Quando terminar, toque novamente em “Compartilhar vídeo dublado” para escolher TikTok.','info');
+    blob=await downloadDubVideo({silentExport:true});
+    if(!blob){
+      showStatus('dubStatus','❌ Não consegui gerar o vídeo final. Confira se a dublagem foi concluída e tente novamente.','error');
+      return;
+    }
+    showStatus('dubStatus','✅ MP4 pronto. Toque novamente em “Compartilhar vídeo dublado” para abrir o menu do celular e escolher TikTok.','success');
+    toast('✅ Vídeo pronto — toque novamente para compartilhar com TikTok.');
+    return;
+  }
+
+  const filename=lastDubVideoFilename || 'video-dublado.mp4';
+  const mime=blob.type && blob.type.includes('webm')?'video/webm':'video/mp4';
+  const file=new File([blob],filename,{type:mime});
+  let canShareFile=false;
+  if(typeof navigator.share==='function'){
+    try{ canShareFile=typeof navigator.canShare!=='function' || navigator.canShare({files:[file]}); }
+    catch(_){ canShareFile=false; }
+  }
+  if(canShareFile){
+    try{
+      await navigator.share({
+        files:[file],
+        title:'Vídeo dublado',
+        text:'Vídeo dublado no DubAI PRO. Escolha TikTok para continuar e confirme a publicação no app.'
+      });
+      showStatus('dubStatus','📲 Compartilhamento concluído. Se escolheu TikTok, revise o vídeo e confirme a postagem no próprio app.','success');
+      return;
+    }catch(error){
+      if(error && error.name==='AbortError') return;
+      console.warn('[share] O navegador não conseguiu abrir a folha de compartilhamento:',error && error.message || error);
+    }
+  }
+
+  triggerBlobDownload(blob,filename);
+  const uploadTab=window.open('https://www.tiktok.com/upload','_blank','noopener,noreferrer');
+  showStatus('dubStatus',uploadTab
+    ? '⬇️ Este navegador não compartilha arquivos diretamente. O MP4 foi baixado e abrimos o TikTok; carregue o arquivo e confirme a postagem.'
+    : '⬇️ Este navegador não compartilha arquivos diretamente. O MP4 foi baixado; abra TikTok → + → Carregar vídeo e confirme a postagem.','warn');
 }
 
 function pickRecorderMime(){

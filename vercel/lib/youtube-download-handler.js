@@ -153,7 +153,15 @@ async function handleFormats(req, res, bodyOverride) {
   }
 }
 
-function streamYtDlpProcess(child, res, controller, timeout, filename) {
+function streamYtDlpProcess(child, res, controller, timeout, filename, options = {}) {
+  const logPrefix = options.logPrefix || '[youtube-download]';
+  const timeoutCode = options.timeoutCode || 'YOUTUBE_TIMEOUT';
+  const timeoutMessage = options.timeoutMessage || 'A solicitação excedeu o tempo limite.';
+  const emptyCode = options.emptyCode || 'EMPTY_VIDEO_STREAM';
+  const emptyMessage = options.emptyMessage || 'O yt-dlp não retornou dados de vídeo.';
+  const streamCode = options.streamCode || 'YTDLP_STREAM_FAILED';
+  const streamMessage = options.streamMessage || 'Não foi possível iniciar o stream deste vídeo. Tente outra qualidade.';
+
   return new Promise(resolve => {
     let started = false;
     let settled = false;
@@ -193,11 +201,13 @@ function streamYtDlpProcess(child, res, controller, timeout, filename) {
         return;
       }
       if (!started) {
-        if (code === 0 && outputBytes === 0) {
-          sendJson(res, 502, { error: 'O yt-dlp não retornou dados de vídeo.', code: 'EMPTY_VIDEO_STREAM' });
+        if (controller.signal.aborted) {
+          sendJson(res, 504, { error: timeoutMessage, code: timeoutCode });
+        } else if (code === 0 && outputBytes === 0) {
+          sendJson(res, 502, { error: emptyMessage, code: emptyCode });
         } else {
-          console.error('[youtube-download] yt-dlp stream error:', error && error.message || stderr || `exit ${code}`);
-          sendJson(res, 502, { error: 'Não foi possível iniciar o stream deste vídeo. Tente outra qualidade.', code: 'YTDLP_STREAM_FAILED' });
+          console.error(`${logPrefix} yt-dlp stream error:`, error && error.message || stderr || `exit ${code}`);
+          sendJson(res, 502, { error: streamMessage, code: streamCode });
         }
       } else if (code === 0) {
         res.end();
@@ -358,4 +368,4 @@ async function handleDownload(req, res) {
   if (stream) stream.once('close', () => clearTimeout(timeout));
 }
 
-module.exports = { handleFormats, handleDownload };
+module.exports = { handleFormats, handleDownload, streamYtDlpProcess };
