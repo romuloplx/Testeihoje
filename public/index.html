@@ -869,7 +869,10 @@ input[type="range"]{
 
     <div id="dubFileMeta" class="hidden" style="margin-top:12px;padding:11px 13px;border-radius:11px;background:#0e1726;border:1px solid #1e3a8a;font-size:12.5px;line-height:1.6;color:#dbeafe"></div>
 
-    <video id="preview" controls playsinline hidden style="width:100%;max-height:440px;margin-top:12px;border-radius:10px;background:#000"></video>
+    <div id="dubPreviewFrame" style="display:none;position:relative;max-width:100%;margin:12px auto 0;overflow:hidden;border-radius:10px;background:#000;line-height:0">
+      <video id="preview" controls playsinline hidden style="display:block;width:100%;height:100%;max-height:none;margin:0;border-radius:10px;background:#000;object-fit:fill"></video>
+      <img id="dubLogoDragOverlay" class="hidden" alt="Logo arrastável sobre o vídeo" draggable="false" ondragstart="event.preventDefault()" onpointerdown="startDubLogoDrag(event)" onpointermove="moveDubLogoDrag(event)" onpointerup="endDubLogoDrag(event)" onpointercancel="endDubLogoDrag(event)" style="position:absolute;left:0;top:0;display:block;object-fit:contain;z-index:5;cursor:grab;touch-action:none;user-select:none;-webkit-user-drag:none;filter:drop-shadow(0 2px 6px rgba(0,0,0,.65))">
+    </div>
     <div id="dubQuickOpusBar" class="hidden" style="margin-top:8px">
       <button type="button" onclick="sendPlayingVideoToOpusClip('dub')" style="width:100%;padding:11px 14px;border:1.5px solid #22c55e;border-radius:11px;font-size:13px;font-weight:900;cursor:pointer;color:#bbf7d0;background:linear-gradient(135deg,#052e16,#064e3b)">✂️ Pegar Melhores Partes Deste Vídeo Reproduzindo, Cortar &amp; Botar Legendas (OpusClip IA)</button>
     </div>
@@ -1001,12 +1004,13 @@ input[type="range"]{
           </div>
         </div>
         <div style="flex:1;min-width:155px">
-          <label for="dubLogoPosition" style="margin-top:0">Posição no quadro</label>
+          <label for="dubLogoPosition" style="margin-top:0">Posição</label>
           <select id="dubLogoPosition" onchange="onDubLogoSettingsChange()">
             <option value="bottom-right" selected>↘️ Inferior direito</option>
             <option value="bottom-left">↙️ Inferior esquerdo</option>
             <option value="top-right">↗️ Superior direito</option>
             <option value="top-left">↖️ Superior esquerdo</option>
+            <option value="custom">🖐 Personalizada — arrastar na prévia</option>
           </select>
         </div>
         <div style="flex:1;min-width:150px">
@@ -1021,7 +1025,7 @@ input[type="range"]{
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:9px">
         <img id="dubLogoPreview" class="hidden" alt="Prévia da logo enviada" style="width:56px;height:56px;object-fit:contain;padding:4px;border-radius:9px;background:#070b14;border:1px solid #475569">
         <button class="ghost hidden" type="button" id="dubLogoRemoveBtn" onclick="removeDubLogo()" style="padding:7px 10px;border-color:#f8717188;color:#fecaca">✕ Remover logo</button>
-        <span class="hint" style="margin:0">Mantém a proporção original e respeita as margens. Formatos: PNG, JPG ou WebP (até 20 MB). A logo aparece no vídeo final, não no áudio nem na prévia original.</span>
+        <span class="hint" style="margin:0">Arraste a logo por cima da prévia do vídeo para colocar exatamente onde quiser (no celular, toque e arraste). Mantém a proporção. PNG, JPG ou WebP até 20 MB; a posição será gravada no vídeo final.</span>
       </div>
     </div>
 
@@ -2604,6 +2608,9 @@ function previewVideo(overrideFile){
   previewUrl = URL.createObjectURL(file); // Zero cópia em RAM — funciona até com arquivos de 2GB+!
   const isAudio = file.type.startsWith('audio/') || /\.(mp3|wav|m4a|ogg|flac|aac)$/i.test(file.name);
   const v = $('#preview'), a = $('#audioPreview');
+  const previewFrame = document.getElementById('dubPreviewFrame');
+  const logoOverlay = document.getElementById('dubLogoDragOverlay');
+  if(logoOverlay) logoOverlay.classList.add('hidden');
   v.muted = false;
   v.playbackRate = 1;
   const metaBox = document.getElementById('dubFileMeta');
@@ -2634,16 +2641,23 @@ function previewVideo(overrideFile){
 
   if(isAudio){
     v.hidden=true; v.src='';
+    if(previewFrame) previewFrame.style.display = 'none';
+    updateDubLogoOverlay();
     const qBar = document.getElementById('dubQuickOpusBar');
     if(qBar) qBar.classList.add('hidden');
     a.src=previewUrl; a.hidden=false;
     a.onloadedmetadata = () => updateInspector(a.duration, 0, 0);
   }else{
     a.hidden=true; a.src='';
-    v.src=previewUrl; v.hidden=false;
+    if(previewFrame) previewFrame.style.display = 'block';
+    v.hidden=false;
+    v.onloadedmetadata = () => {
+      updateInspector(v.duration, v.videoWidth, v.videoHeight);
+      updateDubVideoPreviewLayout();
+    };
+    v.src=previewUrl;
     const qBar = document.getElementById('dubQuickOpusBar');
     if(qBar) qBar.classList.remove('hidden');
-    v.onloadedmetadata = () => updateInspector(v.duration, v.videoWidth, v.videoHeight);
   }
   toast('📎 Arquivo carregado: ' + file.name + ' (' + fmtHumanBytes(file.size) + ')');
 }
@@ -2823,6 +2837,9 @@ let dubLogoObjectUrl = null;
 let dubLogoPendingUrl = null;
 let dubLogoLoadSeq = 0;
 let dubLogoConfigVersion = 0;
+let dubLogoPositionX = 0.78;
+let dubLogoPositionY = 0.72;
+let dubLogoDragState = null;
 
 function invalidateDubVideoExport(){
   const exported = document.getElementById('dubExportedVideo');
@@ -2842,6 +2859,129 @@ function invalidateDubVideoExport(){
   return true;
 }
 
+function getDubLogoRenderMetrics(frameWidth, frameHeight, image = dubLogoImage, requestedSize = null){
+  const sourceW = image && (image.naturalWidth || image.width) || 0;
+  const sourceH = image && (image.naturalHeight || image.height) || 0;
+  if(!sourceW || !sourceH || !frameWidth || !frameHeight) return null;
+  const sizeInput = requestedSize == null
+    ? Number((document.getElementById('dubLogoSize')||{}).value || 18)
+    : Number(requestedSize);
+  const sizePct = Math.max(8, Math.min(30, Number.isFinite(sizeInput) ? sizeInput : 18));
+  const scale = Math.min((frameWidth * sizePct / 100) / sourceW, (frameHeight * 0.24) / sourceH);
+  if(!Number.isFinite(scale) || scale <= 0) return null;
+  const width = sourceW * scale;
+  const height = sourceH * scale;
+  const inset = Math.min(
+    Math.round(Math.min(frameWidth, frameHeight) * 0.035),
+    Math.max(0, (Math.min(frameWidth, frameHeight) - Math.min(width, height)) / 2)
+  );
+  return { width, height, inset };
+}
+
+function updateDubVideoPreviewLayout(){
+  const frame = document.getElementById('dubPreviewFrame');
+  const video = document.getElementById('preview');
+  if(!frame || !video || video.hidden || !video.videoWidth || !video.videoHeight){
+    if(frame && video && video.hidden) frame.style.display = 'none';
+    updateDubLogoOverlay();
+    return;
+  }
+  const hostWidth = frame.parentElement ? frame.parentElement.clientWidth : 0;
+  if(!hostWidth) return;
+  const scale = Math.min(hostWidth / video.videoWidth, 440 / video.videoHeight);
+  const width = Math.max(2, video.videoWidth * scale);
+  const height = Math.max(2, video.videoHeight * scale);
+  frame.style.display = 'block';
+  frame.style.width = `${width}px`;
+  frame.style.height = `${height}px`;
+  frame.style.maxWidth = '100%';
+  video.style.width = '100%';
+  video.style.height = '100%';
+  video.style.maxHeight = 'none';
+  video.style.marginTop = '0';
+  video.style.objectFit = 'fill';
+  updateDubLogoOverlay();
+}
+
+function updateDubLogoOverlay(){
+  const overlay = document.getElementById('dubLogoDragOverlay');
+  const frame = document.getElementById('dubPreviewFrame');
+  const video = document.getElementById('preview');
+  if(!overlay || !frame || !video || !dubLogoImage || video.hidden || !video.videoWidth || !video.videoHeight){
+    if(overlay) overlay.classList.add('hidden');
+    return;
+  }
+  const rect = frame.getBoundingClientRect();
+  if(!rect.width || !rect.height){ overlay.classList.add('hidden'); return; }
+  const metrics = getDubLogoRenderMetrics(rect.width, rect.height, dubLogoImage);
+  if(!metrics){ overlay.classList.add('hidden'); return; }
+
+  const position = (document.getElementById('dubLogoPosition')||{}).value || 'bottom-right';
+  if(position !== 'custom'){
+    const left = position.endsWith('left');
+    const top = position.startsWith('top');
+    const x = left ? metrics.inset : rect.width - metrics.width - metrics.inset;
+    const y = top ? metrics.inset : rect.height - metrics.height - metrics.inset;
+    dubLogoPositionX = Math.max(0, x) / rect.width;
+    dubLogoPositionY = Math.max(0, y) / rect.height;
+  }
+
+  const x = Math.max(0, Math.min(rect.width - metrics.width, dubLogoPositionX * rect.width));
+  const y = Math.max(0, Math.min(rect.height - metrics.height, dubLogoPositionY * rect.height));
+  dubLogoPositionX = x / rect.width;
+  dubLogoPositionY = y / rect.height;
+  if(dubLogoObjectUrl && overlay.getAttribute('src') !== dubLogoObjectUrl) overlay.src = dubLogoObjectUrl;
+  overlay.style.left = `${x}px`;
+  overlay.style.top = `${y}px`;
+  overlay.style.width = `${metrics.width}px`;
+  overlay.style.height = `${metrics.height}px`;
+  overlay.style.opacity = String(Math.max(20, Math.min(100, Number((document.getElementById('dubLogoOpacity')||{}).value || 90))) / 100);
+  overlay.classList.remove('hidden');
+}
+
+function startDubLogoDrag(event){
+  const overlay = event && event.currentTarget;
+  if(!dubLogoImage || !overlay || (event.pointerType === 'mouse' && event.button !== 0)) return;
+  event.preventDefault();
+  const rect = overlay.getBoundingClientRect();
+  dubLogoDragState = {
+    pointerId: event.pointerId,
+    offsetX: event.clientX - rect.left,
+    offsetY: event.clientY - rect.top
+  };
+  const position = document.getElementById('dubLogoPosition');
+  if(position) position.value = 'custom';
+  try{ if(overlay.setPointerCapture) overlay.setPointerCapture(event.pointerId); }catch(_){}
+  overlay.style.cursor = 'grabbing';
+}
+
+function moveDubLogoDrag(event){
+  if(!dubLogoDragState || !event || event.pointerId !== dubLogoDragState.pointerId) return;
+  event.preventDefault();
+  const overlay = event.currentTarget;
+  const frame = document.getElementById('dubPreviewFrame');
+  if(!overlay || !frame) return;
+  const frameRect = frame.getBoundingClientRect();
+  const logoRect = overlay.getBoundingClientRect();
+  if(!frameRect.width || !frameRect.height) return;
+  const x = Math.max(0, Math.min(frameRect.width - logoRect.width, event.clientX - frameRect.left - dubLogoDragState.offsetX));
+  const y = Math.max(0, Math.min(frameRect.height - logoRect.height, event.clientY - frameRect.top - dubLogoDragState.offsetY));
+  dubLogoPositionX = x / frameRect.width;
+  dubLogoPositionY = y / frameRect.height;
+  overlay.style.left = `${x}px`;
+  overlay.style.top = `${y}px`;
+}
+
+function endDubLogoDrag(event){
+  if(!dubLogoDragState || (event && event.pointerId !== dubLogoDragState.pointerId)) return;
+  const overlay = event && event.currentTarget;
+  const pointerId = dubLogoDragState.pointerId;
+  dubLogoDragState = null;
+  try{ if(overlay && overlay.hasPointerCapture && overlay.hasPointerCapture(pointerId)) overlay.releasePointerCapture(pointerId); }catch(_){}
+  if(overlay) overlay.style.cursor = 'grab';
+  onDubLogoSettingsChange();
+}
+
 function updateDubLogoLabels(){
   const size = document.getElementById('dubLogoSize');
   const opacity = document.getElementById('dubLogoOpacity');
@@ -2849,15 +2989,19 @@ function updateDubLogoLabels(){
   const opacityLabel = document.getElementById('dubLogoOpacityLabel');
   if(sizeLabel && size) sizeLabel.textContent = `${size.value}%`;
   if(opacityLabel && opacity) opacityLabel.textContent = `${opacity.value}%`;
+  updateDubLogoOverlay();
 }
 
 function onDubLogoSettingsChange(){
   updateDubLogoLabels();
+  updateDubLogoOverlay();
   dubLogoConfigVersion++;
   if(invalidateDubVideoExport()){
     showStatus('dubStatus','ℹ️ Ajustes da logo alterados. Gere o vídeo novamente para aplicar.','info');
   }
 }
+
+window.addEventListener('resize', updateDubVideoPreviewLayout, { passive: true });
 
 function onSelectDubLogo(input){
   const file = input && input.files && input.files[0];
@@ -2885,9 +3029,11 @@ function onSelectDubLogo(input){
   dubLogoImage = null;
 
   const preview = document.getElementById('dubLogoPreview');
+  const overlay = document.getElementById('dubLogoDragOverlay');
   const removeBtn = document.getElementById('dubLogoRemoveBtn');
   const info = document.getElementById('dubLogoInfo');
   if(preview){ preview.removeAttribute('src'); preview.classList.add('hidden'); }
+  if(overlay){ overlay.removeAttribute('src'); overlay.classList.add('hidden'); }
   if(removeBtn) removeBtn.classList.add('hidden');
   if(info) info.textContent = `⏳ Carregando ${file.name}...`;
 
@@ -2904,8 +3050,9 @@ function onSelectDubLogo(input){
     if(info) info.textContent = `✅ ${file.name} • ${image.naturalWidth} × ${image.naturalHeight}px`;
     if(input) input.value = '';
     dubLogoConfigVersion++;
+    updateDubLogoOverlay();
     invalidateDubVideoExport();
-    toast('🏷️ Logo carregada. Ela será gravada no vídeo ao exportar.');
+    toast('🏷️ Logo carregada. Arraste-a na prévia para escolher a posição.');
   };
   image.onerror = () => {
     if(loadSeq !== dubLogoLoadSeq){ try{ URL.revokeObjectURL(objectUrl); }catch(_){} return; }
@@ -2928,10 +3075,12 @@ function removeDubLogo(){
   dubLogoImage = null;
   const input = document.getElementById('dubLogoFile');
   const preview = document.getElementById('dubLogoPreview');
+  const overlay = document.getElementById('dubLogoDragOverlay');
   const removeBtn = document.getElementById('dubLogoRemoveBtn');
   const info = document.getElementById('dubLogoInfo');
   if(input) input.value = '';
   if(preview){ preview.removeAttribute('src'); preview.classList.add('hidden'); }
+  if(overlay){ overlay.removeAttribute('src'); overlay.classList.add('hidden'); }
   if(removeBtn) removeBtn.classList.add('hidden');
   if(info) info.textContent = 'Nenhuma logo selecionada. PNG transparente é recomendado.';
   if(invalidateDubVideoExport()){
@@ -2942,24 +3091,27 @@ function removeDubLogo(){
 
 function drawDubLogo(ctx, image, settings = {}){
   if(!ctx || !image) return;
-  const sourceW = image.naturalWidth || image.width || 0;
-  const sourceH = image.naturalHeight || image.height || 0;
   const cw = ctx.canvas.width, ch = ctx.canvas.height;
-  if(!sourceW || !sourceH || !cw || !ch) return;
-
-  const requestedSize = Number(settings.sizePct);
-  const sizePct = Math.max(8, Math.min(30, Number.isFinite(requestedSize) ? requestedSize : 18));
+  if(!cw || !ch) return;
+  const metrics = getDubLogoRenderMetrics(cw, ch, image, settings.sizePct);
+  if(!metrics) return;
+  const { width: w, height: h, inset } = metrics;
   const requestedOpacity = Number(settings.opacityPct);
   const opacity = Math.max(20, Math.min(100, Number.isFinite(requestedOpacity) ? requestedOpacity : 90)) / 100;
-  const scale = Math.min((cw * sizePct / 100) / sourceW, (ch * 0.24) / sourceH);
-  if(!Number.isFinite(scale) || scale <= 0) return;
-  const w = sourceW * scale, h = sourceH * scale;
-  const inset = Math.min(Math.round(Math.min(cw, ch) * 0.035), Math.max(0, (Math.min(cw, ch) - Math.min(w, h)) / 2));
   const position = settings.position || 'bottom-right';
-  const left = position.endsWith('left');
-  const top = position.startsWith('top');
-  const x = left ? inset : Math.max(0, cw - w - inset);
-  const y = top ? inset : Math.max(0, ch - h - inset);
+  let x, y;
+  if(position === 'custom'){
+    const requestedX = Number(settings.xFraction), requestedY = Number(settings.yFraction);
+    const xFraction = Number.isFinite(requestedX) ? requestedX : 0.78;
+    const yFraction = Number.isFinite(requestedY) ? requestedY : 0.72;
+    x = Math.max(0, Math.min(cw - w, xFraction * cw));
+    y = Math.max(0, Math.min(ch - h, yFraction * ch));
+  }else{
+    const left = position.endsWith('left');
+    const top = position.startsWith('top');
+    x = left ? inset : Math.max(0, cw - w - inset);
+    y = top ? inset : Math.max(0, ch - h - inset);
+  }
 
   ctx.save();
   try{
@@ -6354,6 +6506,8 @@ async function downloadDubVideo(opts = {}){
     const dubLogoForExport = dubLogoImage;
     const dubLogoSettings = {
       position: (document.getElementById('dubLogoPosition')||{}).value || 'bottom-right',
+      xFraction: dubLogoPositionX,
+      yFraction: dubLogoPositionY,
       sizePct: Number((document.getElementById('dubLogoSize')||{}).value || 18),
       opacityPct: Number((document.getElementById('dubLogoOpacity')||{}).value || 90)
     };
