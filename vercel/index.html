@@ -1668,13 +1668,18 @@ input[type="range"]{
 <section id="social-download" class="hidden">
   <div id="videoDownloadCard" class="card" style="background:linear-gradient(145deg,#102623,#101324);border:1px solid #22c55e77">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-      <h2 style="margin:0">🌐 Baixar vídeo · TikTok, Douyin e YouTube</h2>
+      <h2 style="margin:0">🌐 Baixar vídeos por plataforma</h2>
       <span class="kbd" style="background:#052e16;border-color:#22c55e;color:#bbf7d0">DOWNLOAD MP4</span>
     </div>
-    <p style="margin-top:10px">Cole o link de um vídeo seu ou autorizado. O servidor usa yt-dlp (a mesma base técnica do YTDLnis) para preparar um MP4 e enviá-lo ao navegador para download.</p>
-    <label for="videoDownloadUrl">🔗 Link do TikTok, Douyin ou YouTube (vídeo próprio/autorizado)</label>
+    <p style="margin-top:10px">Escolha uma plataforma abaixo para manter os downloads separados. TikTok, TikTok China (Douyin) e YouTube têm opções próprias; o site usa yt-dlp no backend e não incorpora o app Android YTDLnis.</p>
+    <div role="group" aria-label="Escolha a plataforma para baixar" style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">
+      <button type="button" class="ghost video-platform-option" data-platform="youtube" aria-pressed="true" onclick="setVideoDownloadPlatform('youtube',this)">▶️ YouTube · yt-dlp / YTDLnis</button>
+      <button type="button" class="ghost video-platform-option" data-platform="tiktok" aria-pressed="false" onclick="setVideoDownloadPlatform('tiktok',this)">🎵 TikTok</button>
+      <button type="button" class="ghost video-platform-option" data-platform="douyin" aria-pressed="false" onclick="setVideoDownloadPlatform('douyin',this)">🇨🇳 TikTok China · Douyin</button>
+    </div>
+    <label for="videoDownloadUrl" id="videoDownloadLabel">🔗 Link do YouTube (vídeo próprio/autorizado)</label>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <input type="url" id="videoDownloadUrl" autocomplete="url" placeholder="https://www.tiktok.com/@.../video/... · https://v.douyin.com/... · https://youtu.be/..." onkeydown="if(event.key==='Enter'){event.preventDefault();downloadSocialVideo();}" style="flex:1;min-width:220px;padding:12px 14px;border-radius:10px;border:1px solid #334155;background:#080b16;color:#fff;font-size:14px">
+      <input type="url" id="videoDownloadUrl" autocomplete="url" placeholder="https://youtu.be/... ou https://www.youtube.com/watch?v=..." onkeydown="if(event.key==='Enter'){event.preventDefault();downloadSocialVideo();}" style="flex:1;min-width:220px;padding:12px 14px;border-radius:10px;border:1px solid #334155;background:#080b16;color:#fff;font-size:14px">
       <button class="primary" type="button" id="videoDownloadBtn" onclick="downloadSocialVideo()" style="padding:11px 16px;white-space:nowrap;background:linear-gradient(135deg,#16a34a,#059669)">⬇️ Baixar MP4</button>
       <a href="https://brasil-downloader.vercel.app/" class="ghost" target="_blank" rel="noopener noreferrer" aria-label="Abrir Brasil Downloader em uma nova aba (serviço externo)" style="display:inline-block;text-decoration:none;white-space:nowrap">↗ Brasil Downloader (externo)</a>
     </div>
@@ -1687,7 +1692,7 @@ input[type="range"]{
       <div id="videoDownloadProgressText" class="hint" style="margin-top:6px">Conectando à plataforma...</div>
     </div>
     <div class="status" id="videoDownloadStatus" role="status" aria-live="polite"></div>
-    <div class="hint" style="margin-top:10px">Downloads disponíveis para links suportados do TikTok, Douyin e YouTube. O serviço não contorna vídeos privados ou protegidos; use apenas conteúdo próprio ou autorizado. A velocidade e disponibilidade dependem da plataforma. O Brasil Downloader é um serviço externo, aberto em outra aba e fora do controle deste site.</div>
+    <div class="hint" style="margin-top:10px">A seleção limita o link à plataforma escolhida: YouTube (yt-dlp, mesma base técnica usada pelo app YTDLnis), TikTok ou TikTok China (Douyin). O serviço não contorna vídeos privados ou protegidos; use apenas conteúdo próprio ou autorizado. A velocidade e disponibilidade dependem da plataforma. O Brasil Downloader é um serviço externo, aberto em outra aba e fora do controle deste site.</div>
   </div>
 
 
@@ -1773,9 +1778,33 @@ function openTab(id, button){
 const VIDEO_MEMORY_FALLBACK_MAX_BYTES = 150 * 1024 * 1024;
 let currentVideoTempFileHandle = null;
 
-function parseSupportedVideoInput(raw){
+let videoDownloadPlatform='youtube';
+const VIDEO_PLATFORM_CONFIG={
+  youtube:{label:'🔗 Link do YouTube (vídeo próprio/autorizado)',placeholder:'https://youtu.be/... ou https://www.youtube.com/watch?v=...',hosts:['youtube.com','youtube-nocookie.com','youtu.be']},
+  tiktok:{label:'🔗 Link do TikTok (vídeo próprio/autorizado)',placeholder:'https://www.tiktok.com/@.../video/...',hosts:['tiktok.com']},
+  douyin:{label:'🔗 Link do TikTok China · Douyin (vídeo próprio/autorizado)',placeholder:'https://v.douyin.com/... ou https://www.douyin.com/video/...',hosts:['douyin.com','iesdouyin.com']}
+};
+function setVideoDownloadPlatform(platform,button){
+  if(!VIDEO_PLATFORM_CONFIG[platform]) return;
+  videoDownloadPlatform=platform;
+  const config=VIDEO_PLATFORM_CONFIG[platform];
+  const label=document.getElementById('videoDownloadLabel');
+  const input=document.getElementById('videoDownloadUrl');
+  if(label) label.textContent=config.label;
+  if(input){ input.placeholder=config.placeholder; input.value=''; }
+  document.querySelectorAll('.video-platform-option').forEach(option=>{
+    const selected=option===button || option.dataset.platform===platform;
+    option.setAttribute('aria-pressed',String(selected));
+    option.classList.toggle('primary',selected);
+  });
+  showStatus('videoDownloadStatus','', 'info');
+}
+
+function parseSupportedVideoInput(raw,platform=videoDownloadPlatform){
   let value=String(raw||'').trim();
-  if(!value) throw new Error('Cole o link do TikTok, Douyin ou YouTube.');
+  const config=VIDEO_PLATFORM_CONFIG[platform];
+  if(!config) throw new Error('Escolha uma plataforma válida.');
+  if(!value) throw new Error(`Cole o link de ${platform==='douyin'?'TikTok China (Douyin)':platform==='tiktok'?'TikTok':'YouTube'}.`);
   if(value.length>2048 || Array.from(value).some(ch=>ch.charCodeAt(0)<=32) || value.includes(String.fromCharCode(92))) throw new Error('O link é inválido ou longo demais.');
   const lowerValue=value.toLowerCase();
   if(!lowerValue.startsWith('https://') && !lowerValue.startsWith('http://')) value='https://'+value;
@@ -1784,8 +1813,8 @@ function parseSupportedVideoInput(raw){
   if(parsed.protocol!=='https:' && parsed.protocol!=='http:') throw new Error('Use um link HTTPS válido.')
   if(parsed.username || parsed.password || (parsed.port && !['80','443'].includes(parsed.port))) throw new Error('O link informado não é válido.');
   const host=parsed.hostname.toLowerCase();
-  const allowed=['douyin.com','iesdouyin.com','tiktok.com','youtube.com','youtube-nocookie.com','youtu.be'].some(domain=>host===domain || host.endsWith('.'+domain));
-  if(!allowed) throw new Error('Use um link do TikTok, Douyin ou YouTube.');
+  const allowed=config.hosts.some(domain=>host===domain || host.endsWith('.'+domain));
+  if(!allowed) throw new Error(`Este link não é da plataforma selecionada (${platform==='douyin'?'TikTok China · Douyin':platform==='tiktok'?'TikTok':'YouTube'}).`);
   parsed.protocol='https:';
   parsed.port='';
   parsed.hash='';
