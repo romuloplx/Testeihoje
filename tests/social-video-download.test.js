@@ -90,6 +90,8 @@ test('offers web MP4 downloads for TikTok, Douyin, and YouTube on both HTML copi
     assert.match(downloaderSection, /id="videoDownloadUrl"/);
     assert.match(downloaderSection, /onclick="downloadSocialVideo\(\)"/);
     assert.match(downloaderSection, /TikTok, Douyin e YouTube/);
+    assert.match(downloaderSection, /href="https:\/\/brasil-downloader\.vercel\.app\/"[^>]*target="_blank"[^>]*rel="noopener noreferrer"/);
+    assert.match(downloaderSection, /serviço externo, aberto em outra aba/);
     assert.match(html, /function downloadSocialVideo\(\)[\s\S]*action:'video_download'[\s\S]*URL\.createObjectURL\(videoFile\)[\s\S]*downloadLink\.click\(\)/);
     assert.doesNotMatch(html, /searchDouyinTrends|douyin_search|APIFY_API_TOKEN/);
   }
