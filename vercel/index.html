@@ -988,7 +988,11 @@ input[type="range"]{
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px">
         <button class="ghost" type="button" onclick="document.getElementById('dubCustomMusicFile').click()" style="font-size:12px;padding:6px 11px;border-color:#38bdf866;color:#bae6fd">📂 Escolher música do celular / PC</button>
         <input type="file" id="dubCustomMusicFile" accept="audio/*,.mp3,.wav,.m4a,.ogg,.aac,.flac,.webm" onchange="onPickCustomDubMusic(this)" style="display:none">
-        <span id="dubCustomMusicInfo" class="hint" style="margin:0">💡 Na fala da dublagem o fundo desce suavemente para não atrapalhar nenhuma palavra, e preenche as pausas naturalmente.</span>
+        <label for="dubRemoveMusicVocals" style="display:flex;align-items:center;gap:7px;margin:0;padding:7px 9px;border:1px solid #7c3aed88;border-radius:9px;background:#17112b;color:#e9d5ff;font-size:12px">
+          <input type="checkbox" id="dubRemoveMusicVocals" checked style="accent-color:#a78bfa">
+          🎤 Tentar remover voz da música enviada
+        </label>
+        <span id="dubCustomMusicInfo" class="hint" style="margin:0;flex-basis:100%">💡 A remoção funciona melhor em áudio estéreo com a voz no centro; mono não pode ser separado. O fundo abaixa durante a dublagem e preenche as pausas.</span>
       </div>
     </div>
 
@@ -3364,6 +3368,13 @@ function getStudioMusicLoop24k(style){
   return DUB_BG_LOOP_CACHE[style];
 }
 
+function removeCenteredDubVocals(left,right){
+  const length=Math.min(left.length,right.length);
+  const instrumental=new Float32Array(length);
+  for(let i=0;i<length;i++) instrumental[i]=(left[i]-right[i])*0.5;
+  return instrumental;
+}
+
 async function onPickCustomDubMusic(input){
   const f = input && input.files && input.files[0];
   if(!f) return;
@@ -3375,10 +3386,17 @@ async function onPickCustomDubMusic(input){
     const ctx = new AC();
     const ab = await ctx.decodeAudioData(arr);
     await ctx.close().catch(()=>{});
-    const mono = new Float32Array(ab.length);
-    for(let ch = 0; ch < ab.numberOfChannels; ch++){
-      const cd = ab.getChannelData(ch);
-      for(let i = 0; i < ab.length; i++) mono[i] += cd[i] / ab.numberOfChannels;
+    const removeVocals=!!document.getElementById('dubRemoveMusicVocals')?.checked;
+    let mono;
+    if(removeVocals){
+      if(ab.numberOfChannels<2) throw new Error('Este arquivo é mono. Para tentar tirar a voz, escolha uma música estéreo.');
+      mono=removeCenteredDubVocals(ab.getChannelData(0),ab.getChannelData(1));
+    }else{
+      mono = new Float32Array(ab.length);
+      for(let ch = 0; ch < ab.numberOfChannels; ch++){
+        const cd = ab.getChannelData(ch);
+        for(let i = 0; i < ab.length; i++) mono[i] += cd[i] / ab.numberOfChannels;
+      }
     }
     const resampled = ab.sampleRate === 24000
       ? mono
@@ -3388,14 +3406,14 @@ async function onPickCustomDubMusic(input){
     dubCustomMusic24k = finalizeSeamlessMusicLoop24k(resampled, mainLen, cross, 2600);
     dubCustomMusicName = f.name;
     onChangeDubBgMusicStyle('custom', 'file');
-    if(infoEl) infoEl.innerHTML = `✅ <b>Música ativa:</b> ${esc(f.name)} (${fmtClockSec(mainLen / 24000)}) — ajustada com loop suave e auto-ducking!`;
+    if(infoEl) infoEl.innerHTML = `✅ <b>Música ativa:</b> ${esc(f.name)} (${fmtClockSec(mainLen / 24000)}) — ${removeVocals?'voz central reduzida (karaokê)':'voz mantida'}; loop suave e auto-ducking ativos.`;
     toast(`🎵 Música "${f.name}" carregada para o fundo!`);
     if(lastDubChunksTimeline && lastDubChunksTimeline.length > 0){
       remixDubBackgroundInstant();
     }
   }catch(err){
-    if(infoEl) infoEl.textContent = '❌ Não foi possível ler esse arquivo de áudio. Tente MP3, M4A ou WAV.';
-    toast('Erro ao ler música: ' + (err.message || err), 'error');
+    if(infoEl) infoEl.textContent = '❌ ' + (err.message || 'Não foi possível ler esse arquivo. Tente MP3, M4A ou WAV.');
+    toast('Erro ao carregar música: ' + (err.message || err), 'error');
   }
 }
 
