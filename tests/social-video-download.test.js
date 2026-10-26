@@ -89,7 +89,10 @@ test('offers web MP4 downloads for TikTok, Douyin, and YouTube on both HTML copi
     const downloaderSection = html.slice(downloaderStart, downloaderEnd);
     assert.match(downloaderSection, /id="videoDownloadUrl"/);
     assert.match(downloaderSection, /onclick="downloadSocialVideo\(\)"/);
-    assert.match(downloaderSection, /TikTok, Douyin e YouTube/);
+    assert.match(downloaderSection, /data-platform="social"[^>]*onclick="setVideoDownloadPlatform\('social',this\)">🎵 TikTok \+ 🇨🇳 TikTok China \(Douyin\)/);
+    assert.match(downloaderSection, /data-platform="youtube"[^>]*onclick="setVideoDownloadPlatform\('youtube',this\)">▶️ YouTube/);
+    assert.match(html, /social:\{label:[\s\S]*hosts:\['tiktok\.com','douyin\.com','iesdouyin\.com'\]\}/);
+    assert.match(html, /function parseSupportedVideoInput\(raw,platform=videoDownloadPlatform\)[\s\S]*config\.hosts\.some/);
     assert.match(downloaderSection, /href="https:\/\/brasil-downloader\.vercel\.app\/"[^>]*target="_blank"[^>]*rel="noopener noreferrer"/);
     assert.match(downloaderSection, /serviço externo, aberto em outra aba/);
     assert.match(html, /function downloadSocialVideo\(\)[\s\S]*action:'video_download'[\s\S]*URL\.createObjectURL\(videoFile\)[\s\S]*downloadLink\.click\(\)/);

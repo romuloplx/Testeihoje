@@ -988,7 +988,11 @@ input[type="range"]{
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px">
         <button class="ghost" type="button" onclick="document.getElementById('dubCustomMusicFile').click()" style="font-size:12px;padding:6px 11px;border-color:#38bdf866;color:#bae6fd">📂 Escolher música do celular / PC</button>
         <input type="file" id="dubCustomMusicFile" accept="audio/*,.mp3,.wav,.m4a,.ogg,.aac,.flac,.webm" onchange="onPickCustomDubMusic(this)" style="display:none">
-        <span id="dubCustomMusicInfo" class="hint" style="margin:0">💡 Na fala da dublagem o fundo desce suavemente para não atrapalhar nenhuma palavra, e preenche as pausas naturalmente.</span>
+        <label for="dubRemoveMusicVocals" style="display:flex;align-items:center;gap:7px;margin:0;padding:7px 9px;border:1px solid #7c3aed88;border-radius:9px;background:#17112b;color:#e9d5ff;font-size:12px">
+          <input type="checkbox" id="dubRemoveMusicVocals" checked style="accent-color:#a78bfa">
+          🎤 Tentar remover voz da música enviada
+        </label>
+        <span id="dubCustomMusicInfo" class="hint" style="margin:0;flex-basis:100%">💡 A remoção funciona melhor em áudio estéreo com a voz no centro; mono não pode ser separado. O fundo abaixa durante a dublagem e preenche as pausas.</span>
       </div>
     </div>
 
@@ -1668,13 +1672,17 @@ input[type="range"]{
 <section id="social-download" class="hidden">
   <div id="videoDownloadCard" class="card" style="background:linear-gradient(145deg,#102623,#101324);border:1px solid #22c55e77">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-      <h2 style="margin:0">🌐 Baixar vídeo · TikTok, Douyin e YouTube</h2>
+      <h2 style="margin:0">🌐 Baixar vídeos por plataforma</h2>
       <span class="kbd" style="background:#052e16;border-color:#22c55e;color:#bbf7d0">DOWNLOAD MP4</span>
     </div>
-    <p style="margin-top:10px">Cole o link de um vídeo seu ou autorizado. O servidor usa yt-dlp (a mesma base técnica do YTDLnis) para preparar um MP4 e enviá-lo ao navegador para download.</p>
-    <label for="videoDownloadUrl">🔗 Link do TikTok, Douyin ou YouTube (vídeo próprio/autorizado)</label>
+    <p style="margin-top:10px">Escolha uma das duas áreas: TikTok e TikTok China (Douyin) compartilham o mesmo campo; YouTube fica separado. O YouTube é processado no backend com yt-dlp, a mesma base técnica usada pelo YTDLnis; o app Android em si não é embutido no site.</p>
+    <div role="group" aria-label="Escolha a área de download" style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">
+      <button type="button" class="ghost video-platform-option" data-platform="social" aria-pressed="false" onclick="setVideoDownloadPlatform('social',this)">🎵 TikTok + 🇨🇳 TikTok China (Douyin)</button>
+      <button type="button" class="ghost video-platform-option primary" data-platform="youtube" aria-pressed="true" onclick="setVideoDownloadPlatform('youtube',this)">▶️ YouTube · yt-dlp (base do YTDLnis)</button>
+    </div>
+    <label for="videoDownloadUrl" id="videoDownloadLabel">🔗 Link do YouTube (vídeo próprio/autorizado)</label>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <input type="url" id="videoDownloadUrl" autocomplete="url" placeholder="https://www.tiktok.com/@.../video/... · https://v.douyin.com/... · https://youtu.be/..." onkeydown="if(event.key==='Enter'){event.preventDefault();downloadSocialVideo();}" style="flex:1;min-width:220px;padding:12px 14px;border-radius:10px;border:1px solid #334155;background:#080b16;color:#fff;font-size:14px">
+      <input type="url" id="videoDownloadUrl" autocomplete="url" placeholder="https://youtu.be/... ou https://www.youtube.com/watch?v=..." onkeydown="if(event.key==='Enter'){event.preventDefault();downloadSocialVideo();}" style="flex:1;min-width:220px;padding:12px 14px;border-radius:10px;border:1px solid #334155;background:#080b16;color:#fff;font-size:14px">
       <button class="primary" type="button" id="videoDownloadBtn" onclick="downloadSocialVideo()" style="padding:11px 16px;white-space:nowrap;background:linear-gradient(135deg,#16a34a,#059669)">⬇️ Baixar MP4</button>
       <a href="https://brasil-downloader.vercel.app/" class="ghost" target="_blank" rel="noopener noreferrer" aria-label="Abrir Brasil Downloader em uma nova aba (serviço externo)" style="display:inline-block;text-decoration:none;white-space:nowrap">↗ Brasil Downloader (externo)</a>
     </div>
@@ -1687,7 +1695,7 @@ input[type="range"]{
       <div id="videoDownloadProgressText" class="hint" style="margin-top:6px">Conectando à plataforma...</div>
     </div>
     <div class="status" id="videoDownloadStatus" role="status" aria-live="polite"></div>
-    <div class="hint" style="margin-top:10px">Downloads disponíveis para links suportados do TikTok, Douyin e YouTube. O serviço não contorna vídeos privados ou protegidos; use apenas conteúdo próprio ou autorizado. A velocidade e disponibilidade dependem da plataforma. O Brasil Downloader é um serviço externo, aberto em outra aba e fora do controle deste site.</div>
+    <div class="hint" style="margin-top:10px">TikTok e Douyin aceitam links de qualquer uma dessas duas plataformas na mesma área; YouTube tem área e validação próprias, usando yt-dlp no backend (base técnica também usada pelo YTDLnis Android). O serviço não contorna vídeos privados ou protegidos; use apenas conteúdo próprio ou autorizado. A velocidade e disponibilidade dependem da plataforma. O Brasil Downloader é um serviço externo, aberto em outra aba e fora do controle deste site.</div>
   </div>
 
 
@@ -1773,9 +1781,32 @@ function openTab(id, button){
 const VIDEO_MEMORY_FALLBACK_MAX_BYTES = 150 * 1024 * 1024;
 let currentVideoTempFileHandle = null;
 
-function parseSupportedVideoInput(raw){
+let videoDownloadPlatform='youtube';
+const VIDEO_PLATFORM_CONFIG={
+  youtube:{label:'🔗 Link do YouTube (vídeo próprio/autorizado)',placeholder:'https://youtu.be/... ou https://www.youtube.com/watch?v=...',hosts:['youtube.com','youtube-nocookie.com','youtu.be']},
+  social:{label:'🔗 Link do TikTok ou TikTok China · Douyin (vídeo próprio/autorizado)',placeholder:'https://www.tiktok.com/@.../video/... ou https://v.douyin.com/...',hosts:['tiktok.com','douyin.com','iesdouyin.com']}
+};
+function setVideoDownloadPlatform(platform,button){
+  if(!VIDEO_PLATFORM_CONFIG[platform]) return;
+  videoDownloadPlatform=platform;
+  const config=VIDEO_PLATFORM_CONFIG[platform];
+  const label=document.getElementById('videoDownloadLabel');
+  const input=document.getElementById('videoDownloadUrl');
+  if(label) label.textContent=config.label;
+  if(input){ input.placeholder=config.placeholder; input.value=''; }
+  document.querySelectorAll('.video-platform-option').forEach(option=>{
+    const selected=option===button || option.dataset.platform===platform;
+    option.setAttribute('aria-pressed',String(selected));
+    option.classList.toggle('primary',selected);
+  });
+  showStatus('videoDownloadStatus','', 'info');
+}
+
+function parseSupportedVideoInput(raw,platform=videoDownloadPlatform){
   let value=String(raw||'').trim();
-  if(!value) throw new Error('Cole o link do TikTok, Douyin ou YouTube.');
+  const config=VIDEO_PLATFORM_CONFIG[platform];
+  if(!config) throw new Error('Escolha uma plataforma válida.');
+  if(!value) throw new Error(`Cole o link de ${platform==='social'?'TikTok ou TikTok China (Douyin)':'YouTube'}.`);
   if(value.length>2048 || Array.from(value).some(ch=>ch.charCodeAt(0)<=32) || value.includes(String.fromCharCode(92))) throw new Error('O link é inválido ou longo demais.');
   const lowerValue=value.toLowerCase();
   if(!lowerValue.startsWith('https://') && !lowerValue.startsWith('http://')) value='https://'+value;
@@ -1784,8 +1815,8 @@ function parseSupportedVideoInput(raw){
   if(parsed.protocol!=='https:' && parsed.protocol!=='http:') throw new Error('Use um link HTTPS válido.')
   if(parsed.username || parsed.password || (parsed.port && !['80','443'].includes(parsed.port))) throw new Error('O link informado não é válido.');
   const host=parsed.hostname.toLowerCase();
-  const allowed=['douyin.com','iesdouyin.com','tiktok.com','youtube.com','youtube-nocookie.com','youtu.be'].some(domain=>host===domain || host.endsWith('.'+domain));
-  if(!allowed) throw new Error('Use um link do TikTok, Douyin ou YouTube.');
+  const allowed=config.hosts.some(domain=>host===domain || host.endsWith('.'+domain));
+  if(!allowed) throw new Error(`Este link não é da área selecionada (${platform==='social'?'TikTok / TikTok China (Douyin)':'YouTube'}).`);
   parsed.protocol='https:';
   parsed.port='';
   parsed.hash='';
@@ -3337,6 +3368,13 @@ function getStudioMusicLoop24k(style){
   return DUB_BG_LOOP_CACHE[style];
 }
 
+function removeCenteredDubVocals(left,right){
+  const length=Math.min(left.length,right.length);
+  const instrumental=new Float32Array(length);
+  for(let i=0;i<length;i++) instrumental[i]=(left[i]-right[i])*0.5;
+  return instrumental;
+}
+
 async function onPickCustomDubMusic(input){
   const f = input && input.files && input.files[0];
   if(!f) return;
@@ -3348,10 +3386,17 @@ async function onPickCustomDubMusic(input){
     const ctx = new AC();
     const ab = await ctx.decodeAudioData(arr);
     await ctx.close().catch(()=>{});
-    const mono = new Float32Array(ab.length);
-    for(let ch = 0; ch < ab.numberOfChannels; ch++){
-      const cd = ab.getChannelData(ch);
-      for(let i = 0; i < ab.length; i++) mono[i] += cd[i] / ab.numberOfChannels;
+    const removeVocals=!!document.getElementById('dubRemoveMusicVocals')?.checked;
+    let mono;
+    if(removeVocals){
+      if(ab.numberOfChannels<2) throw new Error('Este arquivo é mono. Para tentar tirar a voz, escolha uma música estéreo.');
+      mono=removeCenteredDubVocals(ab.getChannelData(0),ab.getChannelData(1));
+    }else{
+      mono = new Float32Array(ab.length);
+      for(let ch = 0; ch < ab.numberOfChannels; ch++){
+        const cd = ab.getChannelData(ch);
+        for(let i = 0; i < ab.length; i++) mono[i] += cd[i] / ab.numberOfChannels;
+      }
     }
     const resampled = ab.sampleRate === 24000
       ? mono
@@ -3361,14 +3406,14 @@ async function onPickCustomDubMusic(input){
     dubCustomMusic24k = finalizeSeamlessMusicLoop24k(resampled, mainLen, cross, 2600);
     dubCustomMusicName = f.name;
     onChangeDubBgMusicStyle('custom', 'file');
-    if(infoEl) infoEl.innerHTML = `✅ <b>Música ativa:</b> ${esc(f.name)} (${fmtClockSec(mainLen / 24000)}) — ajustada com loop suave e auto-ducking!`;
+    if(infoEl) infoEl.innerHTML = `✅ <b>Música ativa:</b> ${esc(f.name)} (${fmtClockSec(mainLen / 24000)}) — ${removeVocals?'voz central reduzida (karaokê)':'voz mantida'}; loop suave e auto-ducking ativos.`;
     toast(`🎵 Música "${f.name}" carregada para o fundo!`);
     if(lastDubChunksTimeline && lastDubChunksTimeline.length > 0){
       remixDubBackgroundInstant();
     }
   }catch(err){
-    if(infoEl) infoEl.textContent = '❌ Não foi possível ler esse arquivo de áudio. Tente MP3, M4A ou WAV.';
-    toast('Erro ao ler música: ' + (err.message || err), 'error');
+    if(infoEl) infoEl.textContent = '❌ ' + (err.message || 'Não foi possível ler esse arquivo. Tente MP3, M4A ou WAV.');
+    toast('Erro ao carregar música: ' + (err.message || err), 'error');
   }
 }
 
