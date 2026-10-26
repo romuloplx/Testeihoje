@@ -1671,11 +1671,10 @@ input[type="range"]{
       <h2 style="margin:0">🌐 Baixar vídeos por plataforma</h2>
       <span class="kbd" style="background:#052e16;border-color:#22c55e;color:#bbf7d0">DOWNLOAD MP4</span>
     </div>
-    <p style="margin-top:10px">Escolha uma plataforma abaixo para manter os downloads separados. TikTok, TikTok China (Douyin) e YouTube têm opções próprias; o site usa yt-dlp no backend e não incorpora o app Android YTDLnis.</p>
-    <div role="group" aria-label="Escolha a plataforma para baixar" style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">
-      <button type="button" class="ghost video-platform-option" data-platform="youtube" aria-pressed="true" onclick="setVideoDownloadPlatform('youtube',this)">▶️ YouTube · yt-dlp / YTDLnis</button>
-      <button type="button" class="ghost video-platform-option" data-platform="tiktok" aria-pressed="false" onclick="setVideoDownloadPlatform('tiktok',this)">🎵 TikTok</button>
-      <button type="button" class="ghost video-platform-option" data-platform="douyin" aria-pressed="false" onclick="setVideoDownloadPlatform('douyin',this)">🇨🇳 TikTok China · Douyin</button>
+    <p style="margin-top:10px">Escolha uma das duas áreas: TikTok e TikTok China (Douyin) compartilham o mesmo campo; YouTube fica separado. O YouTube é processado no backend com yt-dlp, a mesma base técnica usada pelo YTDLnis; o app Android em si não é embutido no site.</p>
+    <div role="group" aria-label="Escolha a área de download" style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">
+      <button type="button" class="ghost video-platform-option" data-platform="social" aria-pressed="false" onclick="setVideoDownloadPlatform('social',this)">🎵 TikTok + 🇨🇳 TikTok China (Douyin)</button>
+      <button type="button" class="ghost video-platform-option primary" data-platform="youtube" aria-pressed="true" onclick="setVideoDownloadPlatform('youtube',this)">▶️ YouTube · yt-dlp (base do YTDLnis)</button>
     </div>
     <label for="videoDownloadUrl" id="videoDownloadLabel">🔗 Link do YouTube (vídeo próprio/autorizado)</label>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -1692,7 +1691,7 @@ input[type="range"]{
       <div id="videoDownloadProgressText" class="hint" style="margin-top:6px">Conectando à plataforma...</div>
     </div>
     <div class="status" id="videoDownloadStatus" role="status" aria-live="polite"></div>
-    <div class="hint" style="margin-top:10px">A seleção limita o link à plataforma escolhida: YouTube (yt-dlp, mesma base técnica usada pelo app YTDLnis), TikTok ou TikTok China (Douyin). O serviço não contorna vídeos privados ou protegidos; use apenas conteúdo próprio ou autorizado. A velocidade e disponibilidade dependem da plataforma. O Brasil Downloader é um serviço externo, aberto em outra aba e fora do controle deste site.</div>
+    <div class="hint" style="margin-top:10px">TikTok e Douyin aceitam links de qualquer uma dessas duas plataformas na mesma área; YouTube tem área e validação próprias, usando yt-dlp no backend (base técnica também usada pelo YTDLnis Android). O serviço não contorna vídeos privados ou protegidos; use apenas conteúdo próprio ou autorizado. A velocidade e disponibilidade dependem da plataforma. O Brasil Downloader é um serviço externo, aberto em outra aba e fora do controle deste site.</div>
   </div>
 
 
@@ -1781,8 +1780,7 @@ let currentVideoTempFileHandle = null;
 let videoDownloadPlatform='youtube';
 const VIDEO_PLATFORM_CONFIG={
   youtube:{label:'🔗 Link do YouTube (vídeo próprio/autorizado)',placeholder:'https://youtu.be/... ou https://www.youtube.com/watch?v=...',hosts:['youtube.com','youtube-nocookie.com','youtu.be']},
-  tiktok:{label:'🔗 Link do TikTok (vídeo próprio/autorizado)',placeholder:'https://www.tiktok.com/@.../video/...',hosts:['tiktok.com']},
-  douyin:{label:'🔗 Link do TikTok China · Douyin (vídeo próprio/autorizado)',placeholder:'https://v.douyin.com/... ou https://www.douyin.com/video/...',hosts:['douyin.com','iesdouyin.com']}
+  social:{label:'🔗 Link do TikTok ou TikTok China · Douyin (vídeo próprio/autorizado)',placeholder:'https://www.tiktok.com/@.../video/... ou https://v.douyin.com/...',hosts:['tiktok.com','douyin.com','iesdouyin.com']}
 };
 function setVideoDownloadPlatform(platform,button){
   if(!VIDEO_PLATFORM_CONFIG[platform]) return;
@@ -1804,7 +1802,7 @@ function parseSupportedVideoInput(raw,platform=videoDownloadPlatform){
   let value=String(raw||'').trim();
   const config=VIDEO_PLATFORM_CONFIG[platform];
   if(!config) throw new Error('Escolha uma plataforma válida.');
-  if(!value) throw new Error(`Cole o link de ${platform==='douyin'?'TikTok China (Douyin)':platform==='tiktok'?'TikTok':'YouTube'}.`);
+  if(!value) throw new Error(`Cole o link de ${platform==='social'?'TikTok ou TikTok China (Douyin)':'YouTube'}.`);
   if(value.length>2048 || Array.from(value).some(ch=>ch.charCodeAt(0)<=32) || value.includes(String.fromCharCode(92))) throw new Error('O link é inválido ou longo demais.');
   const lowerValue=value.toLowerCase();
   if(!lowerValue.startsWith('https://') && !lowerValue.startsWith('http://')) value='https://'+value;
@@ -1814,7 +1812,7 @@ function parseSupportedVideoInput(raw,platform=videoDownloadPlatform){
   if(parsed.username || parsed.password || (parsed.port && !['80','443'].includes(parsed.port))) throw new Error('O link informado não é válido.');
   const host=parsed.hostname.toLowerCase();
   const allowed=config.hosts.some(domain=>host===domain || host.endsWith('.'+domain));
-  if(!allowed) throw new Error(`Este link não é da plataforma selecionada (${platform==='douyin'?'TikTok China · Douyin':platform==='tiktok'?'TikTok':'YouTube'}).`);
+  if(!allowed) throw new Error(`Este link não é da área selecionada (${platform==='social'?'TikTok / TikTok China (Douyin)':'YouTube'}).`);
   parsed.protocol='https:';
   parsed.port='';
   parsed.hash='';

@@ -11,8 +11,8 @@ test('removes the separate YouTube video-download tab and endpoint', () => {
     assert.doesNotMatch(html, /tab-youtube-download|id="youtube-download"|Baixar vídeo do YouTube/);
     assert.match(html, /id="tab-social-download"/);
     assert.match(html, /data-platform="youtube"[^>]*setVideoDownloadPlatform\('youtube',this\)/);
-    assert.match(html, /data-platform="tiktok"[^>]*setVideoDownloadPlatform\('tiktok',this\)/);
-    assert.match(html, /data-platform="douyin"[^>]*setVideoDownloadPlatform\('douyin',this\)/);
+    assert.match(html, /data-platform="social"[^>]*setVideoDownloadPlatform\('social',this\)/);
+    assert.match(html, /YTDLnis Android/);
   }
   const route = fs.readFileSync(path.join(__dirname, '../vercel/api/clips.js'), 'utf8');
   assert.doesNotMatch(route, /action === 'youtube_formats'|action === 'youtube_download'/);
