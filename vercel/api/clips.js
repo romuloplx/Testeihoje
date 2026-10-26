@@ -1,5 +1,5 @@
 const { transcribeClipSegment, analyzeViralClips, fetchYoutubeVideoInfoAndStream, fetchVideoStreamChunk, fetchYoutubeClipMp4Segment, getBody, send } = require('./lib/ai');
-const { handleDouyinDownload } = require('../lib/douyin-download-handler');
+const { handleSupportedVideoDownload } = require('../lib/social-video-download-handler');
 
 module.exports = async (req, res) => {
   try {
@@ -10,7 +10,7 @@ module.exports = async (req, res) => {
     const body = await getBody(req);
     const action = String(body.action || 'analyze_clips');
 
-    if (action === 'douyin_download') return await handleDouyinDownload(req, res, body.url);
+    if (action === 'video_download' || action === 'douyin_download') return await handleSupportedVideoDownload(req, res, body.url);
 
     if (action === 'fetch_url') {
       const out = await fetchYoutubeVideoInfoAndStream({

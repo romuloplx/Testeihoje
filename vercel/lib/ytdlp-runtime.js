@@ -151,10 +151,10 @@ async function spawnYoutubeMp4DownloadWithYtDlp(videoId, formatId) {
   ]);
 }
 
-async function spawnDouyinMp4DownloadWithYtDlp(videoUrl, signal) {
+async function spawnSupportedVideoDownloadWithYtDlp(videoUrl, signal) {
   const { spawnYtDlp } = await getYtDlpModule();
   if (signal && signal.aborted) {
-    throw signal.reason || Object.assign(new Error('O download do Douyin foi cancelado.'), {
+    throw signal.reason || Object.assign(new Error('O download foi cancelado.'), {
       name: 'AbortError',
       code: 'ABORT_ERR'
     });
@@ -169,7 +169,7 @@ async function spawnDouyinMp4DownloadWithYtDlp(videoUrl, signal) {
     '--quiet',
     '--no-cache-dir',
     '--socket-timeout',
-    '20',
+    '30',
     '--format',
     'best[ext=mp4][vcodec!=none][acodec!=none]/best[ext=mp4]',
     '--output',
@@ -178,8 +178,11 @@ async function spawnDouyinMp4DownloadWithYtDlp(videoUrl, signal) {
   ]);
 }
 
+const spawnDouyinMp4DownloadWithYtDlp = spawnSupportedVideoDownloadWithYtDlp;
+
 module.exports = {
   getYoutubeVideoInfoWithYtDlp,
   spawnYoutubeMp4DownloadWithYtDlp,
-  spawnDouyinMp4DownloadWithYtDlp
+  spawnDouyinMp4DownloadWithYtDlp,
+  spawnSupportedVideoDownloadWithYtDlp
 };
