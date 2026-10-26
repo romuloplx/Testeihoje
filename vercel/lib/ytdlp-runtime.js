@@ -151,7 +151,38 @@ async function spawnYoutubeMp4DownloadWithYtDlp(videoId, formatId) {
   ]);
 }
 
+async function spawnSupportedVideoDownloadWithYtDlp(videoUrl, signal) {
+  const { spawnYtDlp } = await getYtDlpModule();
+  if (signal && signal.aborted) {
+    throw signal.reason || Object.assign(new Error('O download foi cancelado.'), {
+      name: 'AbortError',
+      code: 'ABORT_ERR'
+    });
+  }
+
+  return spawnYtDlp([
+    '--no-warnings',
+    '--js-runtimes',
+    `node:${process.execPath}`,
+    '--no-playlist',
+    '--no-progress',
+    '--quiet',
+    '--no-cache-dir',
+    '--socket-timeout',
+    '30',
+    '--format',
+    'best[ext=mp4][vcodec!=none][acodec!=none]/best[ext=mp4]',
+    '--output',
+    '-',
+    videoUrl
+  ]);
+}
+
+const spawnDouyinMp4DownloadWithYtDlp = spawnSupportedVideoDownloadWithYtDlp;
+
 module.exports = {
   getYoutubeVideoInfoWithYtDlp,
-  spawnYoutubeMp4DownloadWithYtDlp
+  spawnYoutubeMp4DownloadWithYtDlp,
+  spawnDouyinMp4DownloadWithYtDlp,
+  spawnSupportedVideoDownloadWithYtDlp
 };

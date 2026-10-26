@@ -11,6 +11,8 @@ Baseado no código original enviado, agora com **backend funcional**, armazename
 - **🌍 Dublar vídeo** — upload de vídeo/áudio → transcrição + tradução PT-BR + dublagem simulada (estrutura pronta para Whisper/TTS)
 - **📁 Projetos** — listagem, expandir, copiar, ouvir com `speechSynthesis`, baixar .txt, excluir, persistência em `data/projects.json`
 - **🔊 TTS** — endpoint `/api/tts` (usa OpenAI TTS quando há chave, senão usa voz do navegador)
+- **⬇️ Baixar vídeos** — usa yt-dlp no servidor para baixar MP4 de links suportados do TikTok, Douyin e YouTube, para conteúdo próprio ou autorizado (com confirmação do usuário). Referência: [YTDLnis](https://github.com/deniscerri/ytdlnis) é um app Android separado que também usa yt-dlp; seu código Kotlin não é incorporado ao site.
+- **📋 Fila de revisão** — guarda vídeos dublados e metadados no IndexedDB local do navegador; não publica nem envia arquivos ao TikTok
 
 ## 🚀 Como rodar
 
@@ -46,6 +48,7 @@ cp .env.example .env
 | DELETE | `/api/projects/:id` | remove |
 | POST | `/api/dub` | `multipart` `video` + `language` + `dubVoice` |
 | POST | `/api/tts` | `{text,voice}` → mp3 ou instrução browser |
+| POST | `/api/clips` | `{action:"video_download",url}` → stream MP4 suportado do TikTok, Douyin ou YouTube (links públicos; vídeo próprio ou autorizado) |
 
 Projetos salvos em `data/projects.json` + uploads em `uploads/`.
 
@@ -53,7 +56,7 @@ Projetos salvos em `data/projects.json` + uploads em `uploads/`.
 
 `public/index.html` — código original evoluído:
 
-- Tabs Criar/Dublar/Projetos
+- Tabs Criar/Dublar/Projetos/Fila de revisão/Baixar vídeos
 - Progress bar com etapas, status colorido, toasts
 - Preview de vídeo/áudio
 - Cards com thumbnail, tags, detalhes colapsáveis

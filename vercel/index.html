@@ -115,6 +115,8 @@ video{width:100%;border-radius:12px;margin-top:12px;background:black}
 .progress-wrap.show{display:block}
 .progress-bar{height:8px;background:#222239;border-radius:999px;overflow:hidden;border:1px solid var(--border)}
 .progress-fill{height:100%;width:0%;background:linear-gradient(90deg,#7c3aed,#06b6d4);transition:width .4s}
+@keyframes videoDownloadPulse{from{transform:translateX(-105%)}to{transform:translateX(300%)}}
+#videoDownloadProgressFill.indeterminate{width:36%;animation:videoDownloadPulse 1.35s ease-in-out infinite alternate}
 .progress-steps{display:flex;justify-content:space-between;margin-top:8px;gap:4px}
 .progress-steps span{font-size:10px;color:var(--muted);text-align:center;flex:1}
 .progress-steps span.active{color:#a78bfa;font-weight:700}
@@ -445,7 +447,8 @@ input[type="range"]{
   <button id="tab-avatar" onclick="openTab('avatar',this)">🗣️ Avatar <span class="kbd" style="margin-left:4px;background:#3b0764;border-color:#7c3aed;color:#e9d5ff">NOVO</span></button>
   <button id="tab-dub" onclick="openTab('dub',this)">🌍 Dublar</button>
   <button id="tab-projects" onclick="openTab('projects',this)">📁 Projetos <span id="projCount" class="kbd" style="margin-left:4px">0</span></button>
-  <button id="tab-youtube-download" onclick="openTab('youtube-download',this)">⬇️ Baixar vídeo</button>
+  <button id="tab-review-queue" onclick="openTab('review-queue',this)">📋 Fila de revisão <span id="dubReviewQueueCount" class="kbd" style="margin-left:4px">0</span></button>
+  <button id="tab-social-download" onclick="openTab('social-download',this)">⬇️ Baixar vídeos</button>
 </div>
 
 <!-- CREATE -->
@@ -1075,10 +1078,19 @@ input[type="range"]{
             <div id="dubSocialHashtags" style="margin-top:3px;color:#bae6fd;font-size:13px;line-height:1.6;overflow-wrap:anywhere"></div>
           </div>
           <button class="ghost" type="button" onclick="copyDubSocialPackage()" style="border-color:#f59e0b88;color:#fde68a">📋 Copiar tema, legenda e hashtags</button>
+          <label for="dubReviewRightsConfirmed" style="display:flex;align-items:flex-start;gap:9px;margin-top:10px;padding:9px 10px;border:1px solid #64748b66;border-radius:9px;color:#e2e8f0;line-height:1.45">
+            <input type="checkbox" id="dubReviewRightsConfirmed" onchange="updateDubReviewQueueSaveButton()" style="margin-top:3px;accent-color:#a78bfa">
+            <span>Confirmo que sou o autor do vídeo ou tenho autorização para dublar e reutilizar o conteúdo.</span>
+          </label>
+          <button class="ghost" type="button" id="addDubToReviewQueueBtn" onclick="addDubToReviewQueue()" disabled style="margin-top:8px;border-color:#8b5cf6;color:#ddd6fe">📌 Adicionar vídeo e metadados à fila de revisão</button>
+          <div class="hint" style="margin-top:7px">A fila é salva somente neste navegador; nenhuma publicação ou envio ao TikTok acontece nesta etapa.</div>
           <div class="hint" style="margin-top:7px">Sugestões baseadas na transcrição/tradução; ajudam na descoberta, mas não garantem viralização.</div>
         </div>
         <div id="dubPlayerWrap" class="hidden" style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px">
-          <video id="dubSyncVideo" controls playsinline class="hidden" style="width:100%;max-height:460px;border-radius:10px;background:#000"></video>
+          <div id="dubSyncPreviewFrame" class="hidden" style="position:relative;width:100%;max-height:460px;overflow:hidden;border-radius:10px;background:#000;line-height:0">
+            <video id="dubSyncVideo" controls playsinline class="hidden" style="display:block;width:100%;max-height:460px;border-radius:10px;background:#000"></video>
+            <img id="dubSyncLogoOverlay" class="hidden" alt="" aria-hidden="true" draggable="false" style="position:absolute;left:0;top:0;display:block;object-fit:contain;z-index:5;pointer-events:none;user-select:none;-webkit-user-drag:none;filter:drop-shadow(0 2px 6px rgba(0,0,0,.65))">
+          </div>
           <audio id="dubAudio" controls style="width:100%"></audio>
           <video id="dubExportedVideo" controls playsinline class="hidden" style="width:100%;max-height:460px;border-radius:10px;background:#000"></video>
 
@@ -1109,7 +1121,8 @@ input[type="range"]{
 
           <button type="button" id="dubMainDownloadBtn" onclick="downloadDubVideo()" style="width:100%;padding:15px 18px;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;color:#042f2e;background:linear-gradient(135deg,#34d399,#10b981,#06b6d4);box-shadow:0 8px 26px rgba(16,185,129,.35)">⬇️ GERAR E BAIXAR VÍDEO DUBLADO LISO (.MP4 GALERIA)</button>
           <button type="button" onclick="sendPlayingVideoToOpusClip('dub')" style="width:100%;padding:12px 16px;border:1.5px solid #22c55e;border-radius:12px;font-size:13.5px;font-weight:900;cursor:pointer;color:#bbf7d0;background:linear-gradient(135deg,#052e16,#064e3b)">✂️ Pegar Melhores Partes Deste Vídeo, Cortar &amp; Botar Legendas (OpusClip IA)</button>
-          <button type="button" onclick="shareToGallery('dub')" style="width:100%;padding:12px 16px;border:1.5px solid #38bdf8;border-radius:12px;font-size:14px;font-weight:800;cursor:pointer;color:#e0f2fe;background:#0f172a">📲 Salvar direto na Galeria / Enviar (Celular, WhatsApp, Reels)</button>
+          <button type="button" id="shareDubToTikTokBtn" onclick="shareDubToTikTok()" style="width:100%;padding:12px 16px;border:1.5px solid #38bdf8;border-radius:12px;font-size:14px;font-weight:800;cursor:pointer;color:#e0f2fe;background:#0f172a">📲 Compartilhar vídeo dublado → escolher TikTok</button>
+          <div class="hint" style="margin-top:-5px">Abre a folha de compartilhamento do celular. Escolha TikTok e confirme a postagem no app; o DubAI PRO não publica automaticamente.</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="primary" type="button" onclick="playDubbed()" style="padding:9px 14px">▶️ Assistir vídeo sincronizado agora (instantâneo)</button>
             <a id="dubDownload" class="ghost" download="dublagem-completa.wav" style="padding:9px 14px;text-decoration:none">🎙️ Baixar áudio dublado (.WAV)</a>
@@ -1632,63 +1645,51 @@ input[type="range"]{
   </div>
 </section>
 
-
-<!-- YOUTUBE VIDEO DOWNLOADER -->
-<section id="youtube-download" class="hidden">
-  <div class="card" style="background:linear-gradient(150deg,#171a31,#101324);border:1px solid #3a3d5a">
+<!-- LOCAL DUB REVIEW QUEUE -->
+<section id="review-queue" class="hidden">
+  <div class="card" style="background:linear-gradient(145deg,#1b1834,#101324);border:1px solid #8b5cf677">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-      <h2 style="margin:0">⬇️ Baixar vídeo do YouTube</h2>
-      <span class="kbd" style="background:#052e16;border-color:#22c55e;color:#bbf7d0">MP4</span>
+      <h2 style="margin:0">📋 Fila local de revisão</h2>
+      <span class="kbd" style="background:#2e1065;border-color:#8b5cf6;color:#ede9fe">SEM PUBLICAÇÃO AUTOMÁTICA</span>
     </div>
-    <p style="margin-top:10px">Cole o link, consulte os formatos MP4 e baixe pelo navegador. O site prioriza yt-dlp no servidor e mantém um resolvedor alternativo quando necessário.</p>
-    <div role="list" aria-label="Etapas do download" style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">
-      <span role="listitem" class="kbd">1 · Cole o link</span>
-      <span role="listitem" class="kbd">2 · Escolha MP4 e qualidade</span>
-      <span role="listitem" class="kbd">3 · Baixe em Downloads</span>
-    </div>
-
-    <label for="youtubeDownloadUrl">🔗 1. Link do vídeo</label>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <input type="url" id="youtubeDownloadUrl" autocomplete="url"
-             placeholder="https://www.youtube.com/watch?v=..."
-             onkeydown="if(event.key==='Enter'){event.preventDefault();inspectYoutubeDownload();}"
-             style="flex:1;min-width:220px;padding:12px 14px;border-radius:10px;border:1px solid #334155;background:#080b16;color:#fff;font-size:14px" />
-      <button class="primary" type="button" id="youtubeInspectBtn" onclick="inspectYoutubeDownload()" style="padding:11px 16px;white-space:nowrap">🔎 Buscar formatos MP4</button>
-    </div>
-
-    <div id="youtubeDownloadVideoCard" class="hidden" style="display:flex;align-items:center;gap:12px;margin-top:14px;padding:11px;border:1px solid #334155;border-radius:12px;background:#0b1020">
-      <img id="youtubeDownloadThumb" alt="Miniatura do vídeo" style="width:112px;height:64px;object-fit:cover;border-radius:8px;background:#05070d">
-      <div style="min-width:0;flex:1">
-        <div id="youtubeDownloadTitle" style="font-size:14px;font-weight:800;color:#f8fafc;overflow-wrap:anywhere"></div>
-        <div id="youtubeDownloadMeta" class="hint" style="margin-top:4px"></div>
-      </div>
-    </div>
-
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:end">
-      <div style="flex:1;min-width:220px">
-        <label for="youtubeDownloadFormat" style="margin-top:0">2. Qualidade MP4</label>
-        <select id="youtubeDownloadFormat" disabled style="width:100%">
-          <option value="">Primeiro busque um vídeo</option>
-        </select>
-      </div>
-      <button class="primary" type="button" id="youtubeDownloadBtn" onclick="startYoutubeDownload()" disabled style="padding:12px 18px;min-width:190px;background:linear-gradient(135deg,#16a34a,#059669)">⬇️ 3. Baixar MP4</button>
-      <a href="https://v41.www-y2mate.com/convert/" class="ghost" target="_blank" rel="noopener noreferrer" aria-label="Abrir Y2Mate em uma nova aba (serviço externo)" style="display:inline-block;text-decoration:none;white-space:nowrap">↗ Abrir Y2Mate (externo)</a>
-    </div>
-
-    <div class="progress-wrap" id="youtubeDownloadProgress" aria-live="polite">
-      <div class="progress-bar"><div class="progress-fill" id="youtubeDownloadProgressFill"></div></div>
-      <div id="youtubeDownloadProgressText" class="hint" style="margin-top:6px">Preparando download...</div>
-    </div>
-    <div class="status" id="youtubeDownloadStatus" role="status" aria-live="polite"></div>
-    <a id="youtubeDownloadFallbackLink" class="ghost hidden" target="_blank" rel="noopener noreferrer" style="display:inline-block;margin-top:8px;text-decoration:none"></a>
-
-    <div class="hint" style="margin-top:12px">
-      Este site usa <a href="https://github.com/yt-dlp/yt-dlp" target="_blank" rel="noopener noreferrer" style="color:#93c5fd">yt-dlp</a> no servidor. O comando <b>winget</b> do exemplo é exclusivo do Windows; no Android, não precisa instalar esse executável para usar o site.
-      Baixe somente vídeos que você criou ou tem autorização para salvar. A disponibilidade e a qualidade dependem do vídeo e das restrições do YouTube.
-      No Android, o Chrome normalmente salva o MP4 em <b>Downloads</b>; o site não pode gravar diretamente em DCIM/Galeria. Se a Galeria não listar o arquivo, mova-o para Movies usando o app Arquivos.
-      O atalho Y2Mate abre um serviço externo em nova aba; o link colado acima não é enviado automaticamente.
+    <p style="margin-top:10px">Os vídeos dublados que você salvar aqui ficam neste navegador para assistir, revisar e ajustar título/legenda/hashtags. Esta etapa não conecta nem envia nada ao TikTok.</p>
+    <div class="hint" style="padding:10px 12px;border:1px solid #64748b55;border-radius:10px;background:#0b1020">Os arquivos ficam armazenados localmente no IndexedDB deste dispositivo. Limpar os dados do navegador pode apagar a fila; baixe uma cópia dos vídeos importantes.</div>
+    <div class="status" id="dubReviewQueueStatus" role="status" aria-live="polite"></div>
+    <div id="dubReviewQueueList" style="display:grid;gap:12px;margin-top:12px"></div>
+    <div class="empty hidden" id="dubReviewQueueEmpty" style="margin-top:12px">
+      <div class="empty-ico">🗂️</div>
+      <div style="font-weight:800">Sua fila está vazia</div>
+      <p style="margin:6px 0 0">Depois de dublar um vídeo, gere as sugestões de título/hashtags e toque em <b>Adicionar à fila de revisão</b>.</p>
     </div>
   </div>
+</section>
+
+<!-- VIDEO DOWNLOADER -->
+<section id="social-download" class="hidden">
+  <div id="videoDownloadCard" class="card" style="background:linear-gradient(145deg,#102623,#101324);border:1px solid #22c55e77">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+      <h2 style="margin:0">🌐 Baixar vídeo · TikTok, Douyin e YouTube</h2>
+      <span class="kbd" style="background:#052e16;border-color:#22c55e;color:#bbf7d0">DOWNLOAD MP4</span>
+    </div>
+    <p style="margin-top:10px">Cole o link de um vídeo seu ou autorizado. O servidor usa yt-dlp (a mesma base técnica do YTDLnis) para preparar um MP4 e enviá-lo ao navegador para download.</p>
+    <label for="videoDownloadUrl">🔗 Link do TikTok, Douyin ou YouTube (vídeo próprio/autorizado)</label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <input type="url" id="videoDownloadUrl" autocomplete="url" placeholder="https://www.tiktok.com/@.../video/... · https://v.douyin.com/... · https://youtu.be/..." onkeydown="if(event.key==='Enter'){event.preventDefault();downloadSocialVideo();}" style="flex:1;min-width:220px;padding:12px 14px;border-radius:10px;border:1px solid #334155;background:#080b16;color:#fff;font-size:14px">
+      <button class="primary" type="button" id="videoDownloadBtn" onclick="downloadSocialVideo()" style="padding:11px 16px;white-space:nowrap;background:linear-gradient(135deg,#16a34a,#059669)">⬇️ Baixar MP4</button>
+    </div>
+    <label for="videoRightsConfirmed" style="display:flex;align-items:flex-start;gap:9px;margin-top:10px;padding:10px 12px;border:1px solid #22c55e55;border-radius:10px;background:#071b12;color:#d1fae5;line-height:1.5">
+      <input type="checkbox" id="videoRightsConfirmed" style="margin-top:3px;accent-color:#22c55e">
+      <span>Confirmo que sou o autor ou tenho autorização para baixar e reutilizar este vídeo.</span>
+    </label>
+    <div class="progress-wrap" id="videoDownloadProgress" aria-live="polite">
+      <div class="progress-bar"><div class="progress-fill" id="videoDownloadProgressFill"></div></div>
+      <div id="videoDownloadProgressText" class="hint" style="margin-top:6px">Conectando à plataforma...</div>
+    </div>
+    <div class="status" id="videoDownloadStatus" role="status" aria-live="polite"></div>
+    <div class="hint" style="margin-top:10px">Downloads disponíveis para links suportados do TikTok, Douyin e YouTube. O serviço não contorna vídeos privados ou protegidos; use apenas conteúdo próprio ou autorizado. A velocidade e disponibilidade dependem da plataforma.</div>
+  </div>
+
+
 </section>
 
 </main>
@@ -1700,9 +1701,6 @@ input[type="range"]{
 const $ = s => document.querySelector(s);
 let previewUrl=null;
 let currentProjects=[];
-let youtubeDownloadOptions=[];
-let youtubeDownloadInfo=null;
-let youtubeDownloadRequestId=0;
 
 function toast(msg, type='ok'){
   const el=$('#toast');
@@ -1760,6 +1758,7 @@ function openTab(id, button){
   const targetBtn = button || document.getElementById('tab-'+id);
   if(targetBtn) targetBtn.classList.add('active');
   if(id==='projects') loadProjects();
+  if(id==='review-queue' && typeof renderDubReviewQueue==='function') void renderDubReviewQueue();
   if(id==='avatar'){
     if(!avatarLiveState.playing) avatarLiveState.clickPulseUntil = performance.now() + 1800;
     ensureAvatarLoop();
@@ -1770,558 +1769,193 @@ function openTab(id, button){
   window.scrollTo({top:0, behavior:'smooth'});
 }
 
-function parseYoutubeDownloadInput(raw){
+const VIDEO_MEMORY_FALLBACK_MAX_BYTES = 150 * 1024 * 1024;
+let currentVideoTempFileHandle = null;
+
+function parseSupportedVideoInput(raw){
   let value=String(raw||'').trim();
-  if(!value) throw new Error('Cole o link do vídeo do YouTube.');
-  if(!/^https?:\/\//i.test(value)) value='https://'+value;
+  if(!value) throw new Error('Cole o link do TikTok, Douyin ou YouTube.');
+  if(value.length>2048 || Array.from(value).some(ch=>ch.charCodeAt(0)<=32) || value.includes(String.fromCharCode(92))) throw new Error('O link é inválido ou longo demais.');
+  const lowerValue=value.toLowerCase();
+  if(!lowerValue.startsWith('https://') && !lowerValue.startsWith('http://')) value='https://'+value;
   let parsed;
   try{ parsed=new URL(value); }catch(_){ throw new Error('O link informado não é válido.'); }
-  const host=parsed.hostname.toLowerCase().replace(/^www\./,'');
-  let videoId='';
-  if(host==='youtu.be') videoId=parsed.pathname.split('/').filter(Boolean)[0]||'';
-  else if(host==='youtube.com'||host.endsWith('.youtube.com')||host==='youtube-nocookie.com'||host.endsWith('.youtube-nocookie.com')){
-    videoId=parsed.searchParams.get('v')||'';
-    if(!videoId){
-      const pathMatch=parsed.pathname.match(/^\/(?:shorts|embed|live|v)\/([A-Za-z0-9_-]{11})(?:\/|$)/i);
-      if(pathMatch) videoId=pathMatch[1];
-    }
-  }
-  if(!/^[A-Za-z0-9_-]{11}$/.test(videoId)) throw new Error('Use um link válido de vídeo do YouTube (watch, youtu.be, Shorts ou live).');
-  return { videoId, watchUrl:`https://www.youtube.com/watch?v=${videoId}` };
+  if(parsed.protocol!=='https:' && parsed.protocol!=='http:') throw new Error('Use um link HTTPS válido.')
+  if(parsed.username || parsed.password || (parsed.port && !['80','443'].includes(parsed.port))) throw new Error('O link informado não é válido.');
+  const host=parsed.hostname.toLowerCase();
+  const allowed=['douyin.com','iesdouyin.com','tiktok.com','youtube.com','youtube-nocookie.com','youtu.be'].some(domain=>host===domain || host.endsWith('.'+domain));
+  if(!allowed) throw new Error('Use um link do TikTok, Douyin ou YouTube.');
+  parsed.protocol='https:';
+  parsed.port='';
+  parsed.hash='';
+  return parsed.toString();
 }
 
-function readYoutubeJsonObjectAfter(text, markerIndex){
-  const start=text.indexOf('{',markerIndex);
-  if(start<0) return null;
-  let depth=0, inString=false, escaped=false;
-  for(let i=start;i<text.length;i++){
-    const ch=text[i];
-    if(inString){
-      if(escaped){ escaped=false; continue; }
-      if(ch==='\\'){ escaped=true; continue; }
-      if(ch==='"'){ inString=false; continue; }
-      continue;
-    }
-    if(ch==='"'){ inString=true; continue; }
-    if(ch==='{') depth++;
-    else if(ch==='}' && --depth===0) return text.slice(start,i+1);
-  }
-  return null;
+function videoDownloadFilename(url){
+  const parsed=new URL(url);
+  const segments=parsed.pathname.split('/').filter(Boolean);
+  const markerIndex=segments.findIndex(part=>['video','note','shorts','embed'].includes(part.toLowerCase()));
+  const candidate=markerIndex>=0?segments[markerIndex+1]:'';
+  const host=parsed.hostname.toLowerCase();
+  const platform=host.includes('tiktok')?'tiktok':host==='youtu.be'||host.includes('youtube')?'youtube':'douyin';
+  const videoId=(candidate && /^[A-Za-z0-9_-]{6,}$/.test(candidate))?candidate:(platform==='youtube'?parsed.searchParams.get('v')||(host==='youtu.be'?segments[0]||'':''):'');
+  return `${platform}-${videoId && /^[A-Za-z0-9_-]{6,}$/.test(videoId)?videoId:'video'}.mp4`;
 }
 
-function normalizeYoutubeFormats(playerResponse, videoId){
-  const details=playerResponse && playerResponse.videoDetails || {};
-  const streaming=playerResponse && playerResponse.streamingData || {};
-  const formats=(streaming.formats||[])
-    .filter(f=>f && f.url && /video\/mp4/i.test(String(f.mimeType||'')) && !f.videoOnly)
-    .map(f=>{
-      const height=Number(f.height)||Number((String(f.qualityLabel||'').match(/\d+/)||[])[0])||0;
-      const qualityLabel=String(f.qualityLabel|| (height ? `${height}p` : 'MP4'));
-      return {
-        url:String(f.url),
-        qualityLabel,
-        height,
-        bitrate:Number(f.bitrate)||0,
-        mimeType:String(f.mimeType||'video/mp4'),
-        contentLength:Number(f.contentLength)||0,
-        itag:Number(f.itag)||0,
-        source:'youtube-player',
-        videoId
-      };
-    });
-  const unique=[];
-  const seen=new Set();
-  for(const f of formats){
-    const key=`${f.itag}|${f.url}`;
-    if(!seen.has(key)){ seen.add(key); unique.push(f); }
-  }
-  unique.sort((a,b)=>b.height-a.height||b.bitrate-a.bitrate);
-  return {
-    title:String(details.title||''),
-    author:String(details.author||''),
-    durationSec:Number(details.lengthSeconds)||0,
-    formats:unique.slice(0,12)
-  };
-}
-
-async function extractYoutubeDownloadDataFromBrowser(videoId){
-  const watchUrl=`https://www.youtube.com/watch?v=${videoId}`;
-  const proxyBuilders=[
-    u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-    u=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
-    u=>`https://api.cors.lol/?url=${encodeURIComponent(u)}`,
-    u=>`https://corsproxy.io/?url=${encodeURIComponent(u)}`,
-    u=>`https://thingproxy.freeboard.io/fetch/${encodeURIComponent(u)}`
-  ];
-  const attempts=await Promise.allSettled(proxyBuilders.map(async makeUrl=>{
-    const response=await fetch(makeUrl(watchUrl),{signal:AbortSignal.timeout(10000)});
-    if(!response.ok) throw new Error(`HTTP ${response.status}`);
-    const html=await response.text();
-    let cursor=0;
-    while((cursor=html.indexOf('ytInitialPlayerResponse',cursor))>=0){
-      const raw=readYoutubeJsonObjectAfter(html,cursor);
-      cursor+=24;
-      if(!raw) continue;
-      try{
-        const parsed=normalizeYoutubeFormats(JSON.parse(raw),videoId);
-        if(parsed.formats.length) return parsed;
-      }catch(_){}
-    }
-    throw new Error('Formatos MP4 não encontrados nesta resposta.');
-  }));
-  for(const attempt of attempts){
-    if(attempt.status==='fulfilled'&&attempt.value&&attempt.value.formats.length) return attempt.value;
-  }
-  return null;
-}
-
-async function extractYoutubeDownloadDataFromMirrors(videoId){
-  const mirrors=['https://inv.nadeko.net','https://yewtu.be','https://inv.tux.pizza','https://iv.melmac.space'];
-  const invResults=await Promise.allSettled(mirrors.map(async base=>{
-    const response=await fetch(`${base}/api/v1/videos/${videoId}`,{signal:AbortSignal.timeout(5500)});
-    if(!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data=await response.json();
-    const formats=(data.formatStreams||[])
-      .filter(f=>f&&f.url&&/mp4/i.test(String(f.type||f.container||'')))
-      .map(f=>{
-        const itag=Number(f.itag)||18;
-        const localUrl=`${base}/latest_version?id=${encodeURIComponent(videoId)}&itag=${itag}&local=true`;
-        const height=Number(f.height)||Number((String(f.quality||'').match(/\d+/)||[])[0])||0;
-        return {url:localUrl,qualityLabel:String(f.quality|| (height?`${height}p`:'MP4')),height,bitrate:0,contentLength:Number(f.size)||0,source:'invidious',videoId};
-      });
-    if(!formats.length) throw new Error('Sem MP4');
-    return {title:String(data.title||''),author:String(data.author||''),durationSec:Number(data.lengthSeconds)||0,formats};
-  }));
-  for(const result of invResults){
-    if(result.status==='fulfilled'&&result.value&&result.value.formats.length) return result.value;
-  }
-
-  const pipedApis=[
-    'https://api.piped.private.coffee/streams/',
-    'https://pipedapi.adminforge.de/streams/',
-    'https://pipedapi.drgns.space/streams/'
-  ];
-  const pipedResults=await Promise.allSettled(pipedApis.map(async base=>{
-    const response=await fetch(base+encodeURIComponent(videoId),{signal:AbortSignal.timeout(5500)});
-    if(!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data=await response.json();
-    const formats=(data.videoStreams||[])
-      .filter(f=>f&&f.url&&!f.videoOnly&&/mp4|mpeg-4/i.test(String(f.format||f.mimeType||'')))
-      .map(f=>{
-        const height=Number(f.height)||Number((String(f.quality||'').match(/\d+/)||[])[0])||0;
-        return {url:String(f.url),qualityLabel:String(f.quality|| (height?`${height}p`:'MP4')),height,bitrate:Number(f.bitrate)||0,contentLength:Number(f.contentLength)||0,source:'piped',videoId};
-      });
-    if(!formats.length) throw new Error('Sem MP4');
-    return {title:String(data.title||''),author:String(data.uploader||data.uploaderName||''),durationSec:Number(data.duration)||0,formats};
-  }));
-  for(const result of pipedResults){
-    if(result.status==='fulfilled'&&result.value&&result.value.formats.length) return result.value;
-  }
-  return null;
-}
-
-async function extractYoutubeDownloadDataFromResolverApi(watchUrl,videoId){
-  const response=await fetch('/api/clips',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({action:'youtube_formats',videoId,url:watchUrl}),
-    signal:AbortSignal.timeout(35000)
-  });
-  const data=await response.json().catch(()=>({}));
-  if(!response.ok||data.error){
-    const error=new Error(data.error||`Resolvedor indisponível (HTTP ${response.status}).`);
-    error.code=data.code||'';
-    throw error;
-  }
-  const formats=(Array.isArray(data.formats)?data.formats:[])
-    .filter(format=>format&&Number(format.itag)>0)
-    .map(format=>({
-      itag:Number(format.itag),
-      qualityLabel:String(format.qualityLabel||'MP4'),
-      height:Number(format.height)||0,
-      bitrate:Number(format.bitrate)||0,
-      contentLength:Number(format.contentLength)||0,
-      source:String(format.source||data.source||'ytdl-core'),
-      videoId,
-      url:''
-    }));
-  if(!formats.length) throw new Error('Este vídeo não ofereceu um formato MP4 compatível.');
-  return {
-    title:String(data.title||''),
-    author:String(data.author||''),
-    durationSec:Number(data.durationSec)||0,
-    source:String(data.source||''),
-    formats
-  };
-}
-
-async function extractYoutubeDownloadDataFromServer(watchUrl,videoId){
-  const response=await fetch('/api/clips',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({action:'fetch_url',url:watchUrl,clipPrompt:'',desiredClipsCount:1}),
-    signal:AbortSignal.timeout(35000)
-  });
-  const data=await response.json().catch(()=>({}));
-  if(!response.ok||data.error) throw new Error(data.error||`Falha do servidor (HTTP ${response.status}).`);
-  const urls=[];
-  if(data.directStreamUrl) urls.push(String(data.directStreamUrl));
-  for(const url of Array.isArray(data.candidateStreamUrls)?data.candidateStreamUrls:[]){
-    if(url&&!urls.includes(String(url))) urls.push(String(url));
-  }
-  const firstChunkBase64=data.directVideoBase64||'';
-  const formats=urls.map((url,index)=>({
-    url,
-    qualityLabel:urls.length===1?'MP4 • melhor disponível':`MP4 • opção ${index+1}`,
-    height:0,
-    bitrate:0,
-    contentLength:Number(data.totalVideoBytes)||0,
-    source:'server',
-    videoId,
-    firstChunkBase64:index===0?firstChunkBase64:'',
-    hasMoreVideoChunks:index===0&&Boolean(data.hasMoreVideoChunks),
-    totalSize:Number(data.totalVideoBytes)||0
-  }));
-  if(!formats.length&&firstChunkBase64&&!data.hasMoreVideoChunks){
-    formats.push({
-      qualityLabel:'MP4 • arquivo recebido',
-      height:0,
-      bitrate:0,
-      contentLength:0,
-      source:'server-blob',
-      videoId,
-      blobBase64:firstChunkBase64,
-      hasMoreVideoChunks:false
-    });
-  }
-  if(!formats.length) throw new Error('O servidor não encontrou um stream de vídeo baixável.');
-  return {
-    title:String(data.title||''),
-    author:String(data.author||''),
-    durationSec:Number(data.durationSec)||0,
-    formats
-  };
-}
-
-function formatYoutubeDownloadBytes(bytes){
-  const n=Number(bytes)||0;
-  if(n<1024) return `${n} B`;
-  if(n<1024*1024) return `${(n/1024).toFixed(1)} KB`;
-  if(n<1024*1024*1024) return `${(n/1024/1024).toFixed(1)} MB`;
-  return `${(n/1024/1024/1024).toFixed(2)} GB`;
-}
-
-function setYoutubeDownloadProgress(loaded,total){
-  const wrap=document.getElementById('youtubeDownloadProgress');
-  const text=document.getElementById('youtubeDownloadProgressText');
-  if(wrap) wrap.classList.add('show');
-  const maxInMemory=300*1024*1024;
-  const pct=total?Math.min(99,Math.round((loaded/total)*100)):Math.min(95,Math.round((loaded/maxInMemory)*90));
-  setProgress('youtubeDownloadProgressFill',pct);
-  if(text) text.textContent=total
-    ? `Baixado ${formatYoutubeDownloadBytes(loaded)} de ${formatYoutubeDownloadBytes(total)} (${pct}%)`
-    : `Baixado ${formatYoutubeDownloadBytes(loaded)}...`;
-}
-
-async function inspectYoutubeDownload(){
-  const input=document.getElementById('youtubeDownloadUrl');
-  const inspectBtn=document.getElementById('youtubeInspectBtn');
-  const downloadBtn=document.getElementById('youtubeDownloadBtn');
-  const select=document.getElementById('youtubeDownloadFormat');
-  const fallback=document.getElementById('youtubeDownloadFallbackLink');
-  const videoCard=document.getElementById('youtubeDownloadVideoCard');
-  const requestId=++youtubeDownloadRequestId;
-  youtubeDownloadOptions=[];
-  youtubeDownloadInfo=null;
-  if(downloadBtn) downloadBtn.disabled=true;
-  if(select){ select.disabled=true; select.innerHTML='<option value="">Buscando formatos...</option>'; }
-  if(videoCard) videoCard.classList.add('hidden');
-  if(fallback) fallback.classList.add('hidden');
-  const progress=document.getElementById('youtubeDownloadProgress');
-  if(progress) progress.classList.remove('show');
-  try{
-    const parsed=parseYoutubeDownloadInput(input&&input.value);
-    if(inspectBtn){ inspectBtn.disabled=true; inspectBtn.textContent='⏳ Buscando...'; }
-    showStatus('youtubeDownloadStatus','🔎 Consultando yt-dlp no servidor (com fallback automático)...','info');
-    let result=null;
-    let resolverError=null;
-    try{ result=await extractYoutubeDownloadDataFromResolverApi(parsed.watchUrl,parsed.videoId); }
-    catch(error){ resolverError=error; }
-    if((!result||!result.formats||!result.formats.length)&&requestId===youtubeDownloadRequestId){
-      showStatus('youtubeDownloadStatus','🔎 Tentando ler os formatos disponíveis no navegador...','info');
-      try{ result=await extractYoutubeDownloadDataFromBrowser(parsed.videoId); }catch(_){}
-    }
-    if((!result||!result.formats||!result.formats.length)&&requestId===youtubeDownloadRequestId){
-      showStatus('youtubeDownloadStatus','🌍 Tentando fontes alternativas de stream...','info');
-      try{ result=await extractYoutubeDownloadDataFromMirrors(parsed.videoId); }catch(_){}
-    }
-    if((!result||!result.formats||!result.formats.length)&&requestId===youtubeDownloadRequestId){
-      showStatus('youtubeDownloadStatus','🌐 Tentando a última rota do servidor...','info');
-      try{ result=await extractYoutubeDownloadDataFromServer(parsed.watchUrl,parsed.videoId); }
-      catch(error){ if(!resolverError) resolverError=error; }
-    }
-    if(requestId!==youtubeDownloadRequestId) return;
-    if(!result||!result.formats||!result.formats.length){
-      throw new Error(resolverError&&resolverError.message||'Este vídeo não disponibilizou um MP4 baixável para o navegador.');
-    }
-    youtubeDownloadInfo={
-      videoId:parsed.videoId,
-      watchUrl:parsed.watchUrl,
-      title:result.title||`Vídeo ${parsed.videoId}`,
-      author:result.author||'',
-      durationSec:Number(result.durationSec)||0,
-      source:String(result.source||'')
-    };
-    youtubeDownloadOptions=result.formats;
-    if(select){
-      select.innerHTML='';
-      youtubeDownloadOptions.forEach((format,index)=>{
-        const option=document.createElement('option');
-        option.value=String(index);
-        const size=format.contentLength?` • ${formatYoutubeDownloadBytes(format.contentLength)}`:'';
-        option.textContent=`${format.qualityLabel||'MP4'}${/mp4/i.test(format.qualityLabel||'')?'':' • MP4'}${size}`;
-        select.appendChild(option);
-      });
-      select.disabled=false;
-    }
-    const title=document.getElementById('youtubeDownloadTitle');
-    const meta=document.getElementById('youtubeDownloadMeta');
-    const thumb=document.getElementById('youtubeDownloadThumb');
-    if(title) title.textContent=youtubeDownloadInfo.title;
-    if(meta){
-      const details=[];
-      if(youtubeDownloadInfo.author) details.push(`Canal: ${youtubeDownloadInfo.author}`);
-      if(youtubeDownloadInfo.durationSec) details.push(`Duração: ${fmtClockSec(youtubeDownloadInfo.durationSec)}`);
-      if(youtubeDownloadInfo.source) details.push(`Servidor: ${youtubeDownloadInfo.source==='yt-dlp'?'yt-dlp':'ytdl-core (fallback)'}`);
-      details.push(`${youtubeDownloadOptions.length} formato(s) MP4`);
-      meta.textContent=details.join(' • ');
-    }
-    if(thumb){ thumb.style.display=''; thumb.src=`https://i.ytimg.com/vi/${parsed.videoId}/hqdefault.jpg`; thumb.onerror=()=>{thumb.style.display='none';}; }
-    if(videoCard) videoCard.classList.remove('hidden');
-    if(downloadBtn) downloadBtn.disabled=false;
-    showStatus('youtubeDownloadStatus','✅ Formatos encontrados. Escolha a qualidade e toque em “3. Baixar MP4”.','success');
-  }catch(error){
-    showStatus('youtubeDownloadStatus','❌ '+(error.message||'Não foi possível consultar este vídeo.'),'error');
-  }finally{
-      if(inspectBtn){ inspectBtn.disabled=false; inspectBtn.textContent='🔎 Buscar formatos MP4'; }
-  }
-}
-
-function sanitizeYoutubeDownloadFilename(value){
-  const safe=String(value||'video-youtube')
-    .normalize('NFKD').replace(/[\u0300-\u036f]/g,'')
-    .replace(/[\\/:*?"<>|\u0000-\u001f]/g,'-')
-    .replace(/\s+/g,' ').trim().slice(0,110);
-  return safe||'video-youtube';
-}
-
-async function writeYoutubeSmallBlob(format,fileHandle,filename){
-  const bytes=b64ToUint8Array(format.blobBase64||format.firstChunkBase64||'');
-  if(!bytes.byteLength) throw new Error('O servidor retornou um arquivo vazio.');
-  const blob=new Blob([bytes],{type:'video/mp4'});
-  if(fileHandle){
-    const writer=await fileHandle.createWritable();
-    await writer.write(bytes);
-    await writer.close();
+function setVideoDownloadProgress(receivedBytes,totalBytes){
+  const wrap=document.getElementById('videoDownloadProgress');
+  const fill=document.getElementById('videoDownloadProgressFill');
+  const text=document.getElementById('videoDownloadProgressText');
+  if(!wrap || !fill || !text) return;
+  wrap.classList.add('show');
+  fill.classList.remove('indeterminate');
+  if(totalBytes>0){
+    const pct=Math.max(1,Math.min(99,Math.round(receivedBytes/totalBytes*100)));
+    fill.style.width=pct+'%';
   }else{
-    triggerBlobDownload(blob,filename);
+    fill.classList.add('indeterminate');
+    fill.style.width='36%';
   }
-  return {size:bytes.byteLength,totalSize:bytes.byteLength};
+  text.textContent=totalBytes>0
+    ? `Baixando ${fmtHumanBytes(receivedBytes)} de ${fmtHumanBytes(totalBytes)}...`
+    : `Baixando ${fmtHumanBytes(receivedBytes)}...`;
 }
 
-async function downloadYoutubeStreamDirect(url,fileHandle,filename){
-  const response=await fetch(url,{mode:'cors',credentials:'omit',signal:AbortSignal.timeout(15*60*1000)});
-  if(!response.ok&&response.status!==206) throw new Error(`Stream recusado (HTTP ${response.status}).`);
-  const mime=String(response.headers.get('content-type')||'').toLowerCase();
-  if(mime.includes('text/html')||mime.includes('application/json')) throw new Error('A origem respondeu uma página, não um arquivo de vídeo.');
-  const contentLength=Number(response.headers.get('content-length'))||0;
-  const contentRange=response.headers.get('content-range')||'';
-  const rangeTotal=Number((contentRange.match(/\/(\d+)$/)||[])[1])||0;
-  const total=response.status===206?(rangeTotal||contentLength||0):(contentLength||rangeTotal||0);
-  const maxBytes=fileHandle?2*1024*1024*1024:300*1024*1024;
-  if(total>maxBytes) throw new Error('O vídeo excede o limite de download direto neste navegador.');
-  let writer=null;
-  const chunks=[];
-  let loaded=0;
+async function createVideoDownloadTarget(filename){
+  if(navigator.storage && typeof navigator.storage.getDirectory==='function'){
+    let handle=null;
+    try{
+      const root=await navigator.storage.getDirectory();
+      handle=await root.getFileHandle(`social-import-${Date.now()}-${Math.random().toString(36).slice(2,7)}.mp4`,{create:true});
+      const writable=await handle.createWritable();
+      return {kind:'opfs',handle,writable};
+    }catch(error){
+      if(handle && typeof handle.remove==='function') await handle.remove().catch(()=>{});
+    }
+  }
+  return {kind:'memory',filename,chunks:[]};
+}
+
+async function readVideoDownloadError(response){
+  const raw=await response.text().catch(()=> '');
   try{
-    if(fileHandle) writer=await fileHandle.createWritable();
-    const reader=response.body&&response.body.getReader?response.body.getReader():null;
-    if(reader){
+    const payload=JSON.parse(raw);
+    return payload.error || payload.message || `O servidor respondeu HTTP ${response.status}.`;
+  }catch(_){
+    return raw.slice(0,240) || `O servidor respondeu HTTP ${response.status}.`;
+  }
+}
+
+async function downloadSocialVideo(){
+  const input=document.getElementById('videoDownloadUrl');
+  const button=document.getElementById('videoDownloadBtn');
+  const fill=document.getElementById('videoDownloadProgressFill');
+  const wrap=document.getElementById('videoDownloadProgress');
+  const rightsConfirmed=document.getElementById('videoRightsConfirmed');
+  if(!input || !button) return;
+  if(!rightsConfirmed || !rightsConfirmed.checked){
+    showStatus('videoDownloadStatus','⚠️ Confirme que você é o autor ou tem autorização para baixar e reutilizar este vídeo.','warn');
+    toast('Confirme os direitos de uso antes de baixar.','warn');
+    if(rightsConfirmed) rightsConfirmed.focus();
+    return;
+  }
+  let videoUrl;
+  try{ videoUrl=parseSupportedVideoInput(input.value); }
+  catch(error){ showStatus('videoDownloadStatus','❌ '+error.message,'error'); input.focus(); return; }
+
+  const originalButtonText=button.textContent;
+  let target=null, reader=null, response=null;
+  let streamStarted=false;
+  button.disabled=true;
+  button.textContent='⏳ Baixando e preparando...';
+  if(wrap) wrap.classList.add('show');
+  if(fill){ fill.classList.remove('indeterminate'); fill.style.width='4%'; }
+  setVideoDownloadProgress(0,0);
+  showStatus('videoDownloadStatus','🔎 Resolvendo o vídeo e iniciando o download...','info');
+
+  try{
+    response=await fetch('/api/clips',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'video_download',url:videoUrl})
+    });
+    if(!response.ok) throw new Error(await readVideoDownloadError(response));
+    const contentType=String(response.headers.get('content-type')||'').toLowerCase();
+    if(contentType.includes('application/json') || contentType.includes('text/html')){
+      throw new Error(await readVideoDownloadError(response));
+    }
+
+    const filename=videoDownloadFilename(videoUrl);
+    const expectedBytes=Number(response.headers.get('content-length'))||0;
+    target=await createVideoDownloadTarget(filename);
+    if(target.kind==='memory' && expectedBytes>VIDEO_MEMORY_FALLBACK_MAX_BYTES){
+      throw new Error('Este navegador não oferece armazenamento temporário e o vídeo passa de 150 MB. Baixe o arquivo e envie-o manualmente na aba Dublar.');
+    }
+
+    let receivedBytes=0, lastPaint=0;
+    if(response.body && typeof response.body.getReader==='function'){
+      reader=response.body.getReader();
       while(true){
         const part=await reader.read();
         if(part.done) break;
-        if(!part.value||!part.value.byteLength) continue;
-        loaded+=part.value.byteLength;
-        if(loaded>maxBytes) throw new Error('O vídeo passou do limite seguro de download deste navegador.');
-        if(writer) await writer.write(part.value); else chunks.push(part.value);
-        setYoutubeDownloadProgress(loaded,total);
-      }
-    }else{
-      const data=new Uint8Array(await response.arrayBuffer());
-      loaded=data.byteLength;
-      if(loaded>maxBytes) throw new Error('O vídeo passou do limite seguro de download deste navegador.');
-      if(writer) await writer.write(data); else chunks.push(data);
-      setYoutubeDownloadProgress(loaded,total);
-    }
-    if(total&&loaded<total) throw new Error('O stream veio incompleto; tentando outra rota de download.');
-    if(!loaded) throw new Error('O stream não retornou dados de vídeo.');
-    if(writer) await writer.close();
-    else triggerBlobDownload(new Blob(chunks,{type:'video/mp4'}),filename);
-    return {size:loaded,totalSize:total||loaded};
-  }catch(error){
-    if(writer){ try{await writer.abort(error);}catch(_){} }
-    throw error;
-  }
-}
-
-async function downloadYoutubeStreamViaProxy(format,fileHandle,filename){
-  const CHUNK_SIZE=3145728;
-  // O proxy faz uma requisição HTTP por parte; limita o fallback a 300 MB.
-  // Quando disponível, o download direto grava em disco e suporta arquivos maiores.
-  const maxBytes=300*1024*1024;
-  const maxChunks=Math.ceil(maxBytes/CHUNK_SIZE);
-  const streamUrl=format.url;
-  if(!streamUrl) throw new Error('Não há URL de stream para usar na rota alternativa.');
-  let writer=null, loaded=0, total=Number(format.totalSize||format.contentLength)||0, hasMore=true;
-  const chunks=[];
-  const append=async bytes=>{
-    if(!bytes||!bytes.byteLength) return;
-    if(loaded+bytes.byteLength>maxBytes) throw new Error('O vídeo excede o limite seguro deste navegador.');
-    if(writer) await writer.write(bytes); else chunks.push(bytes);
-    loaded+=bytes.byteLength;
-    setYoutubeDownloadProgress(loaded,total);
-  };
-  try{
-    if(fileHandle) writer=await fileHandle.createWritable();
-    if(format.firstChunkBase64){
-      await append(b64ToUint8Array(format.firstChunkBase64));
-      if(total&&loaded>=total) hasMore=false;
-    }
-    for(let index=0;hasMore&&index<maxChunks;index++){
-      const response=await fetch('/api/clips',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({
-          action:'stream_chunk',
-          streamUrl,
-          startByte:loaded,
-          endByte:loaded+CHUNK_SIZE-1,
-          ua:navigator.userAgent||undefined
-        }),
-        signal:AbortSignal.timeout(20000)
-      });
-      const data=await response.json().catch(()=>({}));
-      if(!response.ok||data.error) throw new Error(data.error||`Proxy indisponível (HTTP ${response.status}).`);
-      const bytes=data.chunkBase64?b64ToUint8Array(data.chunkBase64):new Uint8Array();
-      if(bytes.byteLength) await append(bytes);
-      if(data.totalSize) total=Number(data.totalSize)||total;
-      hasMore=Boolean(data.hasMore);
-      if(!bytes.byteLength&&hasMore) throw new Error('O proxy não retornou dados do stream.');
-      if(total&&loaded>=total) hasMore=false;
-      if(!hasMore) break;
-    }
-    if(!loaded) throw new Error('A rota alternativa não recebeu dados de vídeo.');
-    if(hasMore||(total&&loaded<total)) throw new Error('O vídeo ultrapassou o limite de download por partes deste navegador.');
-    if(writer) await writer.close();
-    else triggerBlobDownload(new Blob(chunks,{type:'video/mp4'}),filename);
-    return {size:loaded,totalSize:total||loaded};
-  }catch(error){
-    if(writer){ try{await writer.abort(error);}catch(_){} }
-    throw error;
-  }
-}
-
-async function startYoutubeDownload(){
-  const select=document.getElementById('youtubeDownloadFormat');
-  const downloadBtn=document.getElementById('youtubeDownloadBtn');
-  const fallback=document.getElementById('youtubeDownloadFallbackLink');
-  const index=Number(select&&select.value);
-  const format=youtubeDownloadOptions[index];
-  if(!youtubeDownloadInfo||!format){
-    showStatus('youtubeDownloadStatus','🔎 Busque um vídeo e selecione um formato antes de baixar.','warn');
-    return;
-  }
-  if(downloadBtn){downloadBtn.disabled=true;downloadBtn.textContent='⏳ Baixando...';}
-  if(fallback) fallback.classList.add('hidden');
-  const title=sanitizeYoutubeDownloadFilename(youtubeDownloadInfo.title||`video-${youtubeDownloadInfo.videoId}`);
-  const quality=sanitizeYoutubeDownloadFilename(format.qualityLabel||'MP4').replace(/\s+/g,'-');
-  const filename=`${title}-${quality}.mp4`;
-  if(format.source==='ytdl-core'||format.source==='yt-dlp'){
-    try{
-      const engine=format.source==='yt-dlp'?'yt-dlp':'ytdl-core';
-      const downloadUrl=`/api/clips?action=youtube_download&engine=${encodeURIComponent(engine)}&videoId=${encodeURIComponent(youtubeDownloadInfo.videoId)}&itag=${encodeURIComponent(format.itag)}`;
-      const anchor=document.createElement('a');
-      anchor.href=downloadUrl;
-      anchor.download=filename;
-      anchor.rel='noopener';
-      anchor.style.display='none';
-      document.body.appendChild(anchor);
-      anchor.click();
-      setTimeout(()=>anchor.remove(),1000);
-      const progress=document.getElementById('youtubeDownloadProgress');
-      if(progress) progress.classList.remove('show');
-      showStatus('youtubeDownloadStatus','⬇️ O download foi enviado ao navegador. No Android, procure o MP4 em Downloads; se a Galeria não o listar, mova-o para Movies usando o app Arquivos.','success');
-      toast('⬇️ Download enviado para o Chrome. Confira Downloads.');
-    }catch(error){
-      showStatus('youtubeDownloadStatus','❌ Não consegui iniciar o download: '+(error.message||'erro do navegador'),'error');
-    }finally{
-      if(downloadBtn){downloadBtn.disabled=false;downloadBtn.textContent='⬇️ 3. Baixar MP4';}
-    }
-    return;
-  }
-  let fileHandle=null;
-  if(window.isSecureContext&&typeof window.showSaveFilePicker==='function'){
-    try{
-      fileHandle=await window.showSaveFilePicker({
-        suggestedName:filename,
-        types:[{description:'Vídeo MP4',accept:{'video/mp4':['.mp4']}}]
-      });
-    }catch(error){
-      if(error&&error.name==='AbortError'){
-        showStatus('youtubeDownloadStatus','Download cancelado.','warn');
-        if(downloadBtn){downloadBtn.disabled=false;downloadBtn.textContent='⬇️ 3. Baixar MP4';}
-        return;
-      }
-    }
-  }
-  const progress=document.getElementById('youtubeDownloadProgress');
-  if(progress) progress.classList.add('show');
-  setProgress('youtubeDownloadProgressFill',0);
-  const progressText=document.getElementById('youtubeDownloadProgressText');
-  if(progressText) progressText.textContent='Conectando ao stream...';
-  showStatus('youtubeDownloadStatus','📥 Preparando o arquivo de vídeo...','info');
-  let directError=null;
-  try{
-    let result=null;
-    if(format.blobBase64&&!format.hasMoreVideoChunks){
-      result=await writeYoutubeSmallBlob(format,fileHandle,filename);
-    }else{
-      if(format.url){
-        try{
-          result=await downloadYoutubeStreamDirect(format.url,fileHandle,filename);
-        }catch(error){
-          directError=error;
-          showStatus('youtubeDownloadStatus','🌐 O download direto foi bloqueado; tentando receber o vídeo em partes...','info');
+        const chunk=part.value;
+        receivedBytes+=chunk.byteLength;
+        if(target.kind==='memory' && receivedBytes>VIDEO_MEMORY_FALLBACK_MAX_BYTES){
+          await reader.cancel().catch(()=>{});
+          throw new Error('O vídeo passa de 150 MB e este navegador não permite gravá-lo temporariamente. Tente em um navegador com suporte a armazenamento local.');
         }
+        if(target.kind==='opfs') await target.writable.write(chunk);
+        else target.chunks.push(chunk);
+        const now=Date.now();
+        if(now-lastPaint>220){ setVideoDownloadProgress(receivedBytes,expectedBytes); lastPaint=now; }
       }
-      if(!result&&format.url){
-        result=await downloadYoutubeStreamViaProxy(format,fileHandle,filename);
+    }else{
+      const blob=await response.blob();
+      receivedBytes=blob.size;
+      if(target.kind==='memory' && receivedBytes>VIDEO_MEMORY_FALLBACK_MAX_BYTES){
+        throw new Error('O vídeo passa de 150 MB e este navegador não permite gravá-lo temporariamente. Tente em um navegador com suporte a armazenamento local.');
       }
+      if(target.kind==='opfs') await target.writable.write(blob);
+      else target.chunks.push(blob);
     }
-    setProgress('youtubeDownloadProgressFill',100);
-    if(progressText) progressText.textContent=`Download concluído • ${formatYoutubeDownloadBytes(result.size)}`;
-    showStatus('youtubeDownloadStatus',`✅ Download concluído: ${filename}`,'success');
-    toast('⬇️ Vídeo do YouTube baixado.');
+    streamStarted=true;
+    if(target.kind==='opfs'){
+      await target.writable.close();
+      const storedFile=await target.handle.getFile();
+      var videoFile=new File([storedFile],filename,{type:'video/mp4',lastModified:Date.now()});
+    }else{
+      var videoFile=new File(target.chunks,filename,{type:'video/mp4',lastModified:Date.now()});
+    }
+    if(!videoFile.size) throw new Error('A plataforma retornou um arquivo vazio. Confira o link e tente novamente.');
+    setVideoDownloadProgress(receivedBytes,expectedBytes||receivedBytes);
+    if(fill){ fill.classList.remove('indeterminate'); fill.style.width='100%'; }
+    const objectUrl=URL.createObjectURL(videoFile);
+    const downloadLink=document.createElement('a');
+    downloadLink.href=objectUrl;
+    downloadLink.download=filename;
+    downloadLink.rel='noopener';
+    downloadLink.style.display='none';
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    downloadLink.remove();
+    showStatus('videoDownloadStatus',`✅ Download iniciado: ${filename} (${fmtHumanBytes(videoFile.size)}). Confira a pasta Downloads do dispositivo.`,'success');
+    toast('⬇️ MP4 enviado para Downloads!');
+    setTimeout(()=>URL.revokeObjectURL(objectUrl),60000);
+    if(target.kind==='opfs' && target.handle && typeof target.handle.remove==='function'){
+      setTimeout(()=>target.handle.remove().catch(()=>{}),60000);
+    }
   }catch(error){
-    const message=error.message||'Não foi possível baixar este vídeo.';
-    if(fallback&&format.url){
-      fallback.href=format.url;
-      fallback.classList.remove('hidden');
-      fallback.textContent='↗ Abrir stream MP4 em nova aba';
-    }
-    showStatus('youtubeDownloadStatus',`❌ ${message}${directError?' (o acesso direto e o proxy também falharam)':''} Se o vídeo for seu ou você tiver permissão, tente outra qualidade ou use o link direto abaixo.`,'error');
+    if(reader && !streamStarted) await reader.cancel().catch(()=>{});
+    if(target && target.writable && !streamStarted && typeof target.writable.abort==='function') await target.writable.abort().catch(()=>{});
+    if(target && target.handle && typeof target.handle.remove==='function') await target.handle.remove().catch(()=>{});
+    const message=error && error.message || 'Falha ao baixar o vídeo.';
+    showStatus('videoDownloadStatus','❌ '+message,'error');
+    toast(message,'error');
   }finally{
-    if(downloadBtn){downloadBtn.disabled=false;downloadBtn.textContent='⬇️ 3. Baixar MP4';}
+    button.disabled=false;
+    button.textContent=originalButtonText;
+    if(fill) fill.classList.remove('indeterminate');
+    if(wrap) setTimeout(()=>wrap.classList.remove('show'),2200);
   }
 }
 
@@ -2857,6 +2491,13 @@ function invalidateDubVideoExport(){
   }
   const btn = document.getElementById('dubMainDownloadBtn');
   if(btn) btn.textContent = '⬇️ GERAR E BAIXAR VÍDEO DUBLADO LISO (.MP4 GALERIA)';
+  const syncVideo = document.getElementById('dubSyncVideo');
+  const syncFrame = document.getElementById('dubSyncPreviewFrame');
+  if(syncVideo && syncVideo.src && dubAudioURL){
+    syncVideo.classList.remove('hidden');
+    if(syncFrame) syncFrame.classList.remove('hidden');
+    updateDubResultPreviewLayout();
+  }
   return true;
 }
 
@@ -2885,10 +2526,11 @@ function updateDubVideoPreviewLayout(){
   if(!frame || !video || video.hidden || !video.videoWidth || !video.videoHeight){
     if(frame && video && video.hidden) frame.style.display = 'none';
     updateDubLogoOverlay();
+    updateDubResultPreviewLayout();
     return;
   }
   const hostWidth = frame.parentElement ? frame.parentElement.clientWidth : 0;
-  if(!hostWidth) return;
+  if(!hostWidth){ updateDubResultPreviewLayout(); return; }
   const scale = Math.min(hostWidth / video.videoWidth, 440 / video.videoHeight);
   const width = Math.max(2, video.videoWidth * scale);
   const height = Math.max(2, video.videoHeight * scale);
@@ -2902,6 +2544,7 @@ function updateDubVideoPreviewLayout(){
   video.style.marginTop = '0';
   video.style.objectFit = 'fill';
   updateDubLogoOverlay();
+  updateDubResultPreviewLayout();
 }
 
 function updateDubLogoOverlay(){
@@ -2934,6 +2577,69 @@ function updateDubLogoOverlay(){
   if(dubLogoObjectUrl && overlay.getAttribute('src') !== dubLogoObjectUrl) overlay.src = dubLogoObjectUrl;
   overlay.style.left = `${x}px`;
   overlay.style.top = `${y}px`;
+  overlay.style.width = `${metrics.width}px`;
+  overlay.style.height = `${metrics.height}px`;
+  overlay.style.opacity = String(Math.max(20, Math.min(100, Number((document.getElementById('dubLogoOpacity')||{}).value || 90))) / 100);
+  overlay.classList.remove('hidden');
+}
+
+function updateDubResultPreviewLayout(){
+  const frame = document.getElementById('dubSyncPreviewFrame');
+  const video = document.getElementById('dubSyncVideo');
+  if(!frame || !video || video.classList.contains('hidden') || !video.videoWidth || !video.videoHeight){
+    updateDubResultLogoOverlay();
+    return;
+  }
+  const hostWidth = frame.parentElement ? frame.parentElement.clientWidth : 0;
+  if(!hostWidth){ updateDubResultLogoOverlay(); return; }
+  const scale = Math.min(hostWidth / video.videoWidth, 460 / video.videoHeight);
+  const width = Math.max(2, video.videoWidth * scale);
+  const height = Math.max(2, video.videoHeight * scale);
+  frame.style.display = 'block';
+  frame.style.width = `${width}px`;
+  frame.style.height = `${height}px`;
+  frame.style.maxWidth = '100%';
+  video.style.display = 'block';
+  video.style.width = '100%';
+  video.style.height = '100%';
+  video.style.maxHeight = 'none';
+  video.style.marginTop = '0';
+  video.style.objectFit = 'fill';
+  updateDubResultLogoOverlay();
+}
+
+function updateDubResultLogoOverlay(){
+  const overlay = document.getElementById('dubSyncLogoOverlay');
+  const frame = document.getElementById('dubSyncPreviewFrame');
+  const video = document.getElementById('dubSyncVideo');
+  if(!overlay || !frame || !video || !dubLogoImage || video.classList.contains('hidden') || !video.videoWidth || !video.videoHeight){
+    if(overlay) overlay.classList.add('hidden');
+    return;
+  }
+  const frameRect = frame.getBoundingClientRect();
+  const videoRect = video.getBoundingClientRect();
+  if(!frameRect.width || !frameRect.height || !videoRect.width || !videoRect.height){
+    overlay.classList.add('hidden');
+    return;
+  }
+  const metrics = getDubLogoRenderMetrics(videoRect.width, videoRect.height, dubLogoImage);
+  if(!metrics){ overlay.classList.add('hidden'); return; }
+
+  const position = (document.getElementById('dubLogoPosition')||{}).value || 'bottom-right';
+  if(position !== 'custom'){
+    const left = position.endsWith('left');
+    const top = position.startsWith('top');
+    const x = left ? metrics.inset : videoRect.width - metrics.width - metrics.inset;
+    const y = top ? metrics.inset : videoRect.height - metrics.height - metrics.inset;
+    dubLogoPositionX = Math.max(0, x) / videoRect.width;
+    dubLogoPositionY = Math.max(0, y) / videoRect.height;
+  }
+
+  const x = Math.max(0, Math.min(videoRect.width - metrics.width, dubLogoPositionX * videoRect.width));
+  const y = Math.max(0, Math.min(videoRect.height - metrics.height, dubLogoPositionY * videoRect.height));
+  if(dubLogoObjectUrl && overlay.getAttribute('src') !== dubLogoObjectUrl) overlay.src = dubLogoObjectUrl;
+  overlay.style.left = `${videoRect.left - frameRect.left + x}px`;
+  overlay.style.top = `${videoRect.top - frameRect.top + y}px`;
   overlay.style.width = `${metrics.width}px`;
   overlay.style.height = `${metrics.height}px`;
   overlay.style.opacity = String(Math.max(20, Math.min(100, Number((document.getElementById('dubLogoOpacity')||{}).value || 90))) / 100);
@@ -2991,6 +2697,7 @@ function updateDubLogoLabels(){
   if(sizeLabel && size) sizeLabel.textContent = `${size.value}%`;
   if(opacityLabel && opacity) opacityLabel.textContent = `${opacity.value}%`;
   updateDubLogoOverlay();
+  updateDubResultLogoOverlay();
 }
 
 function onDubLogoSettingsChange(){
@@ -3003,6 +2710,12 @@ function onDubLogoSettingsChange(){
 }
 
 window.addEventListener('resize', updateDubVideoPreviewLayout, { passive: true });
+const dubSyncVideoLogoEvents = document.getElementById('dubSyncVideo');
+if(dubSyncVideoLogoEvents){
+  dubSyncVideoLogoEvents.addEventListener('loadedmetadata', updateDubResultPreviewLayout);
+  dubSyncVideoLogoEvents.addEventListener('loadeddata', updateDubResultPreviewLayout);
+  dubSyncVideoLogoEvents.addEventListener('resize', updateDubResultPreviewLayout);
+}
 
 function onSelectDubLogo(input){
   const file = input && input.files && input.files[0];
@@ -3031,10 +2744,12 @@ function onSelectDubLogo(input){
 
   const preview = document.getElementById('dubLogoPreview');
   const overlay = document.getElementById('dubLogoDragOverlay');
+  const resultOverlay = document.getElementById('dubSyncLogoOverlay');
   const removeBtn = document.getElementById('dubLogoRemoveBtn');
   const info = document.getElementById('dubLogoInfo');
   if(preview){ preview.removeAttribute('src'); preview.classList.add('hidden'); }
   if(overlay){ overlay.removeAttribute('src'); overlay.classList.add('hidden'); }
+  if(resultOverlay){ resultOverlay.removeAttribute('src'); resultOverlay.classList.add('hidden'); }
   if(removeBtn) removeBtn.classList.add('hidden');
   if(info) info.textContent = `⏳ Carregando ${file.name}...`;
 
@@ -3053,6 +2768,7 @@ function onSelectDubLogo(input){
     dubLogoConfigVersion++;
     updateDubLogoOverlay();
     invalidateDubVideoExport();
+    updateDubResultLogoOverlay();
     toast('🏷️ Logo carregada. Arraste-a na prévia para escolher a posição.');
   };
   image.onerror = () => {
@@ -3077,13 +2793,16 @@ function removeDubLogo(){
   const input = document.getElementById('dubLogoFile');
   const preview = document.getElementById('dubLogoPreview');
   const overlay = document.getElementById('dubLogoDragOverlay');
+  const resultOverlay = document.getElementById('dubSyncLogoOverlay');
   const removeBtn = document.getElementById('dubLogoRemoveBtn');
   const info = document.getElementById('dubLogoInfo');
   if(input) input.value = '';
   if(preview){ preview.removeAttribute('src'); preview.classList.add('hidden'); }
   if(overlay){ overlay.removeAttribute('src'); overlay.classList.add('hidden'); }
+  if(resultOverlay){ resultOverlay.removeAttribute('src'); resultOverlay.classList.add('hidden'); }
   if(removeBtn) removeBtn.classList.add('hidden');
   if(info) info.textContent = 'Nenhuma logo selecionada. PNG transparente é recomendado.';
+  updateDubResultLogoOverlay();
   if(invalidateDubVideoExport()){
     showStatus('dubStatus','ℹ️ Logo removida. Gere o vídeo novamente para exportar sem ela.','info');
   }
@@ -3706,6 +3425,13 @@ function remixDubBackgroundInstant(){
   lastDubVideoBlob = null; // Garante que o próximo download .MP4 já grave o novo som de fundo!
   const expVid = document.getElementById('dubExportedVideo');
   if(expVid) expVid.classList.add('hidden');
+  const syncVideo = document.getElementById('dubSyncVideo');
+  const syncFrame = document.getElementById('dubSyncPreviewFrame');
+  if(syncVideo && syncVideo.src){
+    syncVideo.classList.remove('hidden');
+    if(syncFrame) syncFrame.classList.remove('hidden');
+    requestAnimationFrame(updateDubResultPreviewLayout);
+  }
 
   const aud = document.getElementById('dubAudio');
   const prevTime = aud ? (aud.currentTime || 0) : 0;
@@ -4117,6 +3843,7 @@ function renderDubSocialPackage(metadata, statusText){
   if(statusEl) statusEl.textContent = statusText || (normalized.fallback
     ? 'Sugestão local criada a partir do conteúdo; a IA de texto não respondeu.'
     : `Sugestão gerada com ${normalized.provider}.`);
+  updateDubReviewQueueSaveButton();
   return true;
 }
 
@@ -4162,6 +3889,269 @@ function copyDubSocialPackage(){
   toast('🔥 Tema e hashtags copiados!');
 }
 
+const DUB_REVIEW_DB_NAME='dubai-local-review-queue-v1';
+const DUB_REVIEW_DB_STORE='items';
+const DUB_REVIEW_QUEUE_MAX_ITEMS=10;
+const DUB_REVIEW_QUEUE_MAX_VIDEO_BYTES=200*1024*1024;
+const DUB_REVIEW_QUEUE_MAX_TOTAL_BYTES=500*1024*1024;
+let dubReviewQueueObjectUrls=new Map();
+
+function openDubReviewQueueDb(){
+  if(!window.indexedDB) return Promise.reject(new Error('Este navegador não oferece IndexedDB para guardar a fila. Baixe o vídeo em vez de salvá-lo na fila.'));
+  return new Promise((resolve,reject)=>{
+    let request;
+    try{ request=window.indexedDB.open(DUB_REVIEW_DB_NAME,1); }
+    catch(error){ reject(error); return; }
+    request.onupgradeneeded=()=>{
+      const db=request.result;
+      if(!db.objectStoreNames.contains(DUB_REVIEW_DB_STORE)) db.createObjectStore(DUB_REVIEW_DB_STORE,{keyPath:'id'});
+    };
+    request.onsuccess=()=>resolve(request.result);
+    request.onerror=()=>reject(request.error||new Error('Não foi possível abrir o armazenamento local da fila.'));
+    request.onblocked=()=>reject(new Error('O armazenamento da fila está ocupado por outra aba. Feche abas antigas do DubAI PRO e tente novamente.'));
+  });
+}
+
+async function runDubReviewQueueTransaction(mode,operation){
+  const db=await openDubReviewQueueDb();
+  return new Promise((resolve,reject)=>{
+    let result;
+    let settled=false;
+    const finishError=error=>{
+      if(settled) return;
+      settled=true;
+      try{ db.close(); }catch(_){}
+      reject(error||new Error('Falha ao acessar a fila local.'));
+    };
+    let transaction;
+    try{
+      transaction=db.transaction(DUB_REVIEW_DB_STORE,mode);
+      const request=operation(transaction.objectStore(DUB_REVIEW_DB_STORE));
+      if(request){
+        request.onsuccess=()=>{ result=request.result; };
+        request.onerror=()=>finishError(request.error);
+      }
+    }catch(error){ finishError(error); return; }
+    transaction.oncomplete=()=>{
+      if(settled) return;
+      settled=true;
+      try{ db.close(); }catch(_){}
+      resolve(result);
+    };
+    transaction.onerror=()=>finishError(transaction.error);
+    transaction.onabort=()=>finishError(transaction.error||new Error('A gravação na fila foi cancelada.'));
+  });
+}
+
+function getDubReviewQueueItems(){
+  return runDubReviewQueueTransaction('readonly',store=>store.getAll());
+}
+function putDubReviewQueueItem(item){
+  return runDubReviewQueueTransaction('readwrite',store=>store.put(item));
+}
+function deleteDubReviewQueueItem(id){
+  return runDubReviewQueueTransaction('readwrite',store=>store.delete(id));
+}
+function updateDubReviewQueueSaveButton(){
+  const button=document.getElementById('addDubToReviewQueueBtn');
+  const rights=document.getElementById('dubReviewRightsConfirmed');
+  if(button) button.disabled=!(lastDubSocialMetadata&&rights&&rights.checked)||button.dataset.busy==='1';
+}
+
+function makeDubReviewQueueId(){
+  try{ if(window.crypto&&typeof window.crypto.randomUUID==='function') return window.crypto.randomUUID(); }catch(_){}
+  return `dub-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,10)}`;
+}
+
+function makeDubReviewQueueCard(item){
+  const card=document.createElement('article');
+  card.style.cssText='padding:13px;border:1px solid #4c1d95;border-radius:14px;background:linear-gradient(145deg,#17152b,#0b1020)';
+  const heading=document.createElement('div');
+  heading.style.cssText='display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap;margin-bottom:10px';
+  const name=document.createElement('div');
+  name.textContent=`📹 ${String(item.fileName||'Vídeo dublado')}`;
+  name.style.cssText='font-weight:900;color:#f8fafc;overflow-wrap:anywhere';
+  const date=document.createElement('div');
+  date.className='hint';
+  date.textContent=new Date(item.createdAt||Date.now()).toLocaleString('pt-BR');
+  heading.append(name,date);
+  card.appendChild(heading);
+
+  const video=document.createElement('video');
+  video.controls=true;
+  video.playsInline=true;
+  video.preload='metadata';
+  video.style.cssText='display:block;width:100%;max-height:420px;border-radius:10px;background:#000;margin-bottom:12px';
+  try{
+    const sourceBlob=item.blob instanceof Blob?item.blob:new Blob([item.blob],{type:item.mimeType||'video/mp4'});
+    const objectUrl=URL.createObjectURL(sourceBlob);
+    dubReviewQueueObjectUrls.set(item.id,objectUrl);
+    video.src=objectUrl;
+    card.appendChild(video);
+  }catch(_){
+    const error=document.createElement('div');
+    error.className='hint';
+    error.textContent='Não foi possível pré-visualizar este arquivo. Tente baixá-lo.';
+    card.appendChild(error);
+  }
+
+  const titleLabel=document.createElement('label');
+  titleLabel.textContent='Título / tema';
+  titleLabel.style.marginTop='0';
+  const titleInput=document.createElement('input');
+  titleInput.type='text';
+  titleInput.maxLength=150;
+  titleInput.value=String(item.title||'');
+  titleInput.style.width='100%';
+  const captionLabel=document.createElement('label');
+  captionLabel.textContent='Legenda';
+  captionLabel.style.marginTop='10px';
+  const captionInput=document.createElement('textarea');
+  captionInput.rows=3;
+  captionInput.maxLength=2200;
+  captionInput.value=String(item.description||'');
+  captionInput.style.cssText='width:100%;resize:vertical;line-height:1.5';
+  const tagsLabel=document.createElement('label');
+  tagsLabel.textContent='Hashtags';
+  tagsLabel.style.marginTop='10px';
+  const tagsInput=document.createElement('input');
+  tagsInput.type='text';
+  tagsInput.maxLength=500;
+  tagsInput.value=Array.isArray(item.hashtags)?item.hashtags.join(' '):String(item.hashtags||'');
+  tagsInput.style.width='100%';
+  card.append(titleLabel,titleInput,captionLabel,captionInput,tagsLabel,tagsInput);
+
+  const actions=document.createElement('div');
+  actions.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-top:12px';
+  const saveButton=document.createElement('button');
+  saveButton.type='button';
+  saveButton.className='primary';
+  saveButton.textContent='💾 Salvar ajustes';
+  saveButton.addEventListener('click',async()=>{
+    saveButton.disabled=true;
+    try{
+      item.title=String(titleInput.value||'').trim().slice(0,150);
+      item.description=String(captionInput.value||'').trim().slice(0,2200);
+      item.hashtags=normalizeClientDubHashtags(tagsInput.value);
+      await putDubReviewQueueItem(item);
+      showStatus('dubReviewQueueStatus','✅ Ajustes salvos nesta fila local.','success');
+    }catch(error){ showStatus('dubReviewQueueStatus','❌ '+(error.message||'Não foi possível salvar os ajustes.'),'error'); }
+    finally{ saveButton.disabled=false; }
+  });
+  const copyButton=document.createElement('button');
+  copyButton.type='button';
+  copyButton.className='ghost';
+  copyButton.textContent='📋 Copiar título, legenda e hashtags';
+  copyButton.addEventListener('click',()=>{
+    const tags=normalizeClientDubHashtags(tagsInput.value).join(' ');
+    copyText([titleInput.value.trim(),captionInput.value.trim(),tags].filter(Boolean).join('\n\n'));
+  });
+  const downloadButton=document.createElement('button');
+  downloadButton.type='button';
+  downloadButton.className='ghost';
+  downloadButton.textContent='⬇️ Baixar vídeo';
+  downloadButton.addEventListener('click',()=>{
+    const sourceBlob=item.blob instanceof Blob?item.blob:new Blob([item.blob],{type:item.mimeType||'video/mp4'});
+    triggerBlobDownload(sourceBlob,item.fileName||'video-dublado.mp4');
+  });
+  const deleteButton=document.createElement('button');
+  deleteButton.type='button';
+  deleteButton.className='ghost';
+  deleteButton.textContent='🗑️ Remover';
+  deleteButton.style.color='#fca5a5';
+  deleteButton.addEventListener('click',async()=>{
+    if(!window.confirm('Remover este vídeo e os metadados da fila local?')) return;
+    deleteButton.disabled=true;
+    try{
+      await deleteDubReviewQueueItem(item.id);
+      const objectUrl=dubReviewQueueObjectUrls.get(item.id);
+      if(objectUrl) URL.revokeObjectURL(objectUrl);
+      dubReviewQueueObjectUrls.delete(item.id);
+      await renderDubReviewQueue();
+      showStatus('dubReviewQueueStatus','🗑️ Item removido da fila local.','success');
+    }catch(error){
+      showStatus('dubReviewQueueStatus','❌ '+(error.message||'Não foi possível remover o item.'),'error');
+      deleteButton.disabled=false;
+    }
+  });
+  actions.append(saveButton,copyButton,downloadButton,deleteButton);
+  card.appendChild(actions);
+  return card;
+}
+
+async function renderDubReviewQueue(){
+  const container=document.getElementById('dubReviewQueueList');
+  const empty=document.getElementById('dubReviewQueueEmpty');
+  const count=document.getElementById('dubReviewQueueCount');
+  if(!container) return;
+  try{
+    const items=await getDubReviewQueueItems();
+    for(const objectUrl of dubReviewQueueObjectUrls.values()) URL.revokeObjectURL(objectUrl);
+    dubReviewQueueObjectUrls.clear();
+    container.innerHTML='';
+    const sorted=(Array.isArray(items)?items:[]).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+    if(count) count.textContent=String(sorted.length);
+    if(empty) empty.classList.toggle('hidden',sorted.length>0);
+    sorted.forEach(item=>container.appendChild(makeDubReviewQueueCard(item)));
+    const status=document.getElementById('dubReviewQueueStatus');
+    if(status&&sorted.length) status.textContent='';
+  }catch(error){
+    if(count) count.textContent='0';
+    if(empty) empty.classList.remove('hidden');
+    container.innerHTML='';
+    showStatus('dubReviewQueueStatus','⚠️ '+(error.message||'A fila local não está disponível neste navegador.'),'warn');
+  }
+}
+
+async function addDubToReviewQueue(){
+  const button=document.getElementById('addDubToReviewQueueBtn');
+  const rights=document.getElementById('dubReviewRightsConfirmed');
+  if(!lastDubSocialMetadata){ toast('Aguarde o título e as hashtags ficarem prontos.','warn'); return; }
+  if(!rights||!rights.checked){ toast('Confirme que você tem autorização para reutilizar este vídeo.','warn'); if(rights) rights.focus(); return; }
+  if(button){ button.disabled=true; button.dataset.busy='1'; button.textContent='⏳ Preparando vídeo para a fila...'; }
+  try{
+    const items=await getDubReviewQueueItems();
+    if(items.length>=DUB_REVIEW_QUEUE_MAX_ITEMS) throw new Error(`A fila local aceita até ${DUB_REVIEW_QUEUE_MAX_ITEMS} vídeos. Remova um item ou baixe os arquivos antes de continuar.`);
+    let blob=lastDubVideoBlob;
+    if(!blob){
+      showStatus('dubStatus','📼 Gerando o vídeo final para salvar na fila local de revisão...','info');
+      blob=await downloadDubVideo({silentExport:true});
+    }
+    if(!(blob instanceof Blob)||!blob.size) throw new Error('Não consegui gerar o vídeo final. Verifique se o arquivo carregado é um vídeo e tente novamente.');
+    if(blob.size>DUB_REVIEW_QUEUE_MAX_VIDEO_BYTES) throw new Error('Este vídeo passa de 200 MB e pode exceder o espaço disponível no navegador. Baixe-o no dispositivo e revise-o fora da fila.');
+    const queueBytes=items.reduce((sum,item)=>sum+(Number(item.size)||(item.blob&&Number(item.blob.size))||0),0);
+    if(queueBytes+blob.size>DUB_REVIEW_QUEUE_MAX_TOTAL_BYTES) throw new Error('A fila chegou ao limite local de 500 MB. Baixe ou remova vídeos antigos antes de adicionar outro.');
+    const currentName=String(lastDubVideoFilename||'video-dublado.mp4').replace(/[^a-zA-Z0-9._-]/g,'-').slice(0,120);
+    const item={
+      id:makeDubReviewQueueId(),
+      createdAt:new Date().toISOString(),
+      fileName:currentName,
+      mimeType:blob.type||'video/mp4',
+      size:blob.size,
+      blob,
+      title:String(lastDubSocialMetadata.topic||'').trim().slice(0,150),
+      description:String(lastDubSocialMetadata.description||'').trim().slice(0,2200),
+      hashtags:[...lastDubSocialMetadata.hashtags],
+      sourceFileName:String(currentDubFile&&currentDubFile.name||'').slice(0,160),
+      rightsConfirmedAt:new Date().toISOString()
+    };
+    await putDubReviewQueueItem(item);
+    showStatus('dubStatus','✅ Vídeo dublado e metadados adicionados à fila local. Nada foi enviado ao TikTok.','success');
+    toast('📋 Adicionado à fila de revisão!');
+    if(rights) rights.checked=false;
+    updateDubReviewQueueSaveButton();
+    await renderDubReviewQueue();
+    openTab('review-queue',document.getElementById('tab-review-queue'));
+  }catch(error){
+    const message=error&&error.message||'Não foi possível salvar na fila de revisão.';
+    showStatus('dubStatus','❌ '+message,'error');
+    toast(message,'error');
+  }finally{
+    if(button){ button.dataset.busy=''; button.textContent='📌 Adicionar vídeo e metadados à fila de revisão'; }
+    updateDubReviewQueueSaveButton();
+  }
+}
+
 async function dubVideo(){
   const file = currentDubFile || $('#videoFile').files[0];
   const language = $('#language').value;
@@ -4180,10 +4170,14 @@ async function dubVideo(){
 
   dubSocialRequestSeq++;
   lastDubSocialMetadata = null;
+  const reviewRightsCheckbox=document.getElementById('dubReviewRightsConfirmed');
+  if(reviewRightsCheckbox) reviewRightsCheckbox.checked=false;
+  updateDubReviewQueueSaveButton();
   const previousSocialCard = document.getElementById('dubSocialPackage');
   if(previousSocialCard) previousSocialCard.classList.add('hidden');
   stopPreviewDubBgMusic();
   stopDubRequested = false;
+  invalidateDubVideoExport();
   lastDubVideoBlob = null;
   btn.disabled = true; btn.textContent = '⏳ Dublando arquivo...';
   if(stopBtn) stopBtn.classList.remove('hidden');
@@ -4352,13 +4346,17 @@ async function dubVideo(){
       // Configura o player de vídeo sincronizado direto dentro do card de resultado (zero engasgo e zero delay!)
       const vTop = document.getElementById('preview');
       const vRes = document.getElementById('dubSyncVideo');
+      const vResFrame = document.getElementById('dubSyncPreviewFrame');
       if(vTop && !vTop.hidden && vTop.src && vRes){
         vRes.src = vTop.src;
         vRes.muted = true;
         vRes.playbackRate = 1;
         vRes.classList.remove('hidden');
-      } else if(vRes){
-        vRes.classList.add('hidden');
+        if(vResFrame) vResFrame.classList.remove('hidden');
+        requestAnimationFrame(updateDubResultPreviewLayout);
+      } else {
+        if(vRes) vRes.classList.add('hidden');
+        if(vResFrame) vResFrame.classList.add('hidden');
       }
 
       const dlLink = document.getElementById('dubDownload');
@@ -4552,6 +4550,50 @@ async function shareToGallery(kind){
   }
   triggerBlobDownload(blob, filename);
   toast('⬇️ Download direto iniciado: ' + filename);
+}
+
+async function shareDubToTikTok(){
+  let blob=lastDubVideoBlob;
+  if(!blob){
+    showStatus('dubStatus','⏳ Gerando o MP4 final. Quando terminar, toque novamente em “Compartilhar vídeo dublado” para escolher TikTok.','info');
+    blob=await downloadDubVideo({silentExport:true});
+    if(!blob){
+      showStatus('dubStatus','❌ Não consegui gerar o vídeo final. Confira se a dublagem foi concluída e tente novamente.','error');
+      return;
+    }
+    showStatus('dubStatus','✅ MP4 pronto. Toque novamente em “Compartilhar vídeo dublado” para abrir o menu do celular e escolher TikTok.','success');
+    toast('✅ Vídeo pronto — toque novamente para compartilhar com TikTok.');
+    return;
+  }
+
+  const filename=lastDubVideoFilename || 'video-dublado.mp4';
+  const mime=blob.type && blob.type.includes('webm')?'video/webm':'video/mp4';
+  const file=new File([blob],filename,{type:mime});
+  let canShareFile=false;
+  if(typeof navigator.share==='function'){
+    try{ canShareFile=typeof navigator.canShare!=='function' || navigator.canShare({files:[file]}); }
+    catch(_){ canShareFile=false; }
+  }
+  if(canShareFile){
+    try{
+      await navigator.share({
+        files:[file],
+        title:'Vídeo dublado',
+        text:'Vídeo dublado no DubAI PRO. Escolha TikTok para continuar e confirme a publicação no app.'
+      });
+      showStatus('dubStatus','📲 Compartilhamento concluído. Se escolheu TikTok, revise o vídeo e confirme a postagem no próprio app.','success');
+      return;
+    }catch(error){
+      if(error && error.name==='AbortError') return;
+      console.warn('[share] O navegador não conseguiu abrir a folha de compartilhamento:',error && error.message || error);
+    }
+  }
+
+  triggerBlobDownload(blob,filename);
+  const uploadTab=window.open('https://www.tiktok.com/upload','_blank','noopener,noreferrer');
+  showStatus('dubStatus',uploadTab
+    ? '⬇️ Este navegador não compartilha arquivos diretamente. O MP4 foi baixado e abrimos o TikTok; carregue o arquivo e confirme a postagem.'
+    : '⬇️ Este navegador não compartilha arquivos diretamente. O MP4 foi baixado; abra TikTok → + → Carregar vídeo e confirme a postagem.','warn');
 }
 
 function pickRecorderMime(){
@@ -6436,6 +6478,11 @@ function downloadSceneImages(){
 
 async function downloadDubVideo(opts = {}){
   const silentExport = !!(opts && opts.silentExport);
+  if(dubLogoPendingUrl && !dubLogoImage){
+    showStatus('dubStatus','⏳ Aguarde a logo terminar de carregar antes de gerar o vídeo final.','warn');
+    toast('⏳ A logo ainda está carregando. Tente gerar o vídeo novamente em instantes.','warn');
+    return null;
+  }
   // Se já foi exportado nesta sessão, baixa instantaneamente sem regravar!
   if(lastDubVideoBlob){
     if(!silentExport){
@@ -6533,7 +6580,7 @@ async function downloadDubVideo(opts = {}){
       ctx.fillRect(0, 0, cw, ch);
       try{ ctx.drawImage(exportVid, 0, 0, cw, ch); }catch(e){}
       if(dubLogoForExport){
-        try{ drawDubLogo(ctx, dubLogoForExport, dubLogoSettings); }catch(e){}
+        drawDubLogo(ctx, dubLogoForExport, dubLogoSettings);
       }
 
       if(subCues.length){
@@ -6600,6 +6647,10 @@ async function downloadDubVideo(opts = {}){
       expV.src = URL.createObjectURL(blob);
       expV.classList.remove('hidden');
       if(vRes) vRes.classList.add('hidden');
+      const syncFrame = document.getElementById('dubSyncPreviewFrame');
+      if(syncFrame) syncFrame.classList.add('hidden');
+      const syncLogoOverlay = document.getElementById('dubSyncLogoOverlay');
+      if(syncLogoOverlay) syncLogoOverlay.classList.add('hidden');
     }
     bindSmoothDubSync();
     if(!silentExport){
@@ -13224,6 +13275,7 @@ function downloadSelectedOpusClipSrt(){
 initAvatarPresets();
 checkHealth();
 loadProjects();
+renderDubReviewQueue();
 if('speechSynthesis' in window) speechSynthesis.getVoices();
 setTimeout(checkHealth, 2000);
 (function checkOpusUrlParams(){

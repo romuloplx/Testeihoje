@@ -1,18 +1,16 @@
 const { transcribeClipSegment, analyzeViralClips, fetchYoutubeVideoInfoAndStream, fetchVideoStreamChunk, fetchYoutubeClipMp4Segment, getBody, send } = require('./lib/ai');
-const { handleFormats: handleYoutubeDownloadFormats, handleDownload: handleYoutubeDownload } = require('../lib/youtube-download-handler');
+const { handleSupportedVideoDownload } = require('../lib/social-video-download-handler');
 
 module.exports = async (req, res) => {
   try {
     if (req.method === 'GET') {
-      const action = new URL(req.url, 'https://dubai-pro.invalid').searchParams.get('action');
-      if (action === 'youtube_download') return await handleYoutubeDownload(req, res);
       return send(res, 405, { error: 'Método GET não permitido para esta rota.' });
     }
     if (req.method !== 'POST') return send(res, 405, { error: 'Método não permitido. Use POST.' });
     const body = await getBody(req);
     const action = String(body.action || 'analyze_clips');
 
-    if (action === 'youtube_formats') return await handleYoutubeDownloadFormats(req, res, body);
+    if (action === 'video_download' || action === 'douyin_download') return await handleSupportedVideoDownload(req, res, body.url);
 
     if (action === 'fetch_url') {
       const out = await fetchYoutubeVideoInfoAndStream({
