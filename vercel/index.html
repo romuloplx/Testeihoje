@@ -952,7 +952,9 @@ input[type="range"]{
         <select id="dubBgMix">
           <option value="mute" selected>🔇 Reproduzir só a dublagem (recomendado)</option>
           <option value="duck">🔉 Manter som original suave (a voz original pode ser ouvida)</option>
+          <option value="duck-no-vocals">🎼 Manter instrumental original, reduzindo a voz</option>
         </select>
+        <div class="hint" style="margin-top:5px">A redução tenta cancelar vozes centralizadas em áudio estéreo. Pode sobrar voz ou remover instrumentos; não funciona em áudio mono.</div>
       </div>
       <div>
         <label>Legendas traduzidas no vídeo</label>
@@ -2964,7 +2966,7 @@ function probeMediaDuration(file){
 }
 
 // Extrator Streaming Zero-RAM para vídeos GIGANTES (>95MB, ex: 300MB, 800MB, 1.5GB+) ou containers especiais (.MOV/.MKV)
-async function extractSingleChunkStreaming(mediaEl, startSec, endSec){
+async function extractSingleChunkStreaming(mediaEl, startSec, endSec, includeBackgroundSide = false){
   const dur = Math.max(0.4, endSec - startSec);
   // iOS/Safari costuma gravar áudio em MP4; Chromium geralmente prefere WebM/Opus.
   const mimeCandidates = ['audio/mp4;codecs=mp4a.40.2', 'audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'video/webm;codecs=vp8,opus'];
@@ -3021,18 +3023,48 @@ async function extractSingleChunkStreaming(mediaEl, startSec, endSec){
   await stopped;
   const blob = new Blob(chunks, { type: recMime.split(';')[0] });
   const arr = new Uint8Array(await blob.arrayBuffer());
+  let backgroundSideMono12k = null;
+  if(includeBackgroundSide){
+    try{
+      const AC = window.AudioContext || window.webkitAudioContext;
+      const decodeCtx = new AC();
+      const decoded = await decodeCtx.decodeAudioData(arr.buffer.slice(arr.byteOffset, arr.byteOffset + arr.byteLength));
+      backgroundSideMono12k = getCenterCancelledMono12k(decoded);
+      await decodeCtx.close().catch(()=>{});
+    }catch(error){ console.warn('Não foi possível preparar a redução vocal do áudio original deste trecho:', error); }
+  }
   return {
     base64: bytesToBase64(arr),
     audioMime: recMime.startsWith('video/') ? 'audio/webm' : recMime.split(';')[0],
-    seconds: dur
+    seconds: dur,
+    backgroundSideMono12k
   };
 }
 
+function getCenterCancelledMono12k(audioBuffer){
+  if(!audioBuffer || audioBuffer.numberOfChannels < 2) return null;
+  const left = audioBuffer.getChannelData(0), right = audioBuffer.getChannelData(1);
+  const sampleRate = 12000;
+  const length = Math.max(1, Math.floor(audioBuffer.duration * sampleRate));
+  const output = new Float32Array(length);
+  for(let i = 0; i < length; i++){
+    const pos = i * audioBuffer.sampleRate / sampleRate;
+    const idx = Math.floor(pos), frac = pos - idx;
+    if(idx >= left.length) break;
+    const l = left[idx] * (1 - frac) + (left[idx + 1] || 0) * frac;
+    const r = right[idx] * (1 - frac) + (right[idx + 1] || 0) * frac;
+    output[i] = (l - r) * 0.5;
+  }
+  return output;
+}
+
 // Prepara plano inteligente de extração para vídeos PEQUENOS (1s) e GRANDES (horas / GBs)
-async function prepareAudioExtractionPlan(file, rangeStart, rangeEnd, onMsg){
+async function prepareAudioExtractionPlan(file, rangeStart, rangeEnd, onMsg, includeBackgroundSide = false){
   const msg = typeof onMsg === 'function' ? onMsg : ()=>{};
   let useStreaming = file.size > HEAVY_FILE_BYTES;
   let mono12k = null;
+  let backgroundSideMono12k = null;
+  const backgroundSideChunks = [];
   let totalFileDuration = 0;
   const TARGET_SR = 12000;
 
@@ -3044,6 +3076,7 @@ async function prepareAudioExtractionPlan(file, rangeStart, rangeEnd, onMsg){
       const buf = await file.arrayBuffer();
       const decoded = await ac.decodeAudioData(buf);
       totalFileDuration = decoded.duration;
+      if(includeBackgroundSide) backgroundSideMono12k = getCenterCancelledMono12k(decoded);
       const off = new OfflineAudioContext(1, Math.max(1, Math.ceil(decoded.duration * TARGET_SR)), TARGET_SR);
       const src = off.createBufferSource();
       src.buffer = decoded;
@@ -3090,6 +3123,18 @@ async function prepareAudioExtractionPlan(file, rangeStart, rangeEnd, onMsg){
     mono12k,
     sampleRate: TARGET_SR,
     useStreaming,
+    getBackgroundSideMono12k(){
+      if(backgroundSideMono12k) return backgroundSideMono12k;
+      if(!backgroundSideChunks.length || backgroundSideChunks.length !== windows.length) return null;
+      const full = new Float32Array(Math.ceil(totalFileDuration * TARGET_SR));
+      for(const segment of backgroundSideChunks){
+        const offset = Math.max(0, Math.floor(segment.startSec * TARGET_SR));
+        if(offset < full.length) full.set(segment.samples.subarray(0, full.length - offset), offset);
+      }
+      backgroundSideMono12k = full;
+      backgroundSideChunks.length = 0;
+      return backgroundSideMono12k;
+    },
     async getChunkPayload(idx){
       const w = windows[idx];
       if(mono12k){
@@ -3099,7 +3144,9 @@ async function prepareAudioExtractionPlan(file, rangeStart, rangeEnd, onMsg){
         const wav = encodeWavMono(slice, TARGET_SR);
         return { base64: bytesToBase64(wav), audioMime: 'audio/wav', pcmSlice: slice, sampleRate: TARGET_SR, seconds: slice.length / TARGET_SR };
       }
-      return await extractSingleChunkStreaming(streamEl, w.startSec, w.endSec);
+      const extracted = await extractSingleChunkStreaming(streamEl, w.startSec, w.endSec, includeBackgroundSide);
+      if(extracted.backgroundSideMono12k) backgroundSideChunks.push({ startSec: w.startSec, samples: extracted.backgroundSideMono12k });
+      return extracted;
     },
     cleanup(){
       if(streamEl){ try{ streamEl.pause(); streamEl.src = ''; }catch(e){} }
@@ -3201,6 +3248,7 @@ const DUB_BG_LOOP_CACHE = {};
 let dubCustomMusic24k = null;
 let dubCustomMusicName = '';
 let lastDubOrigMono12k = null;
+let lastDubOrigSideMono12k = null;
 let lastDubMusicTimeline = null;
 let dubBgPreviewState = null;
 
@@ -3591,6 +3639,7 @@ function remixDubBackgroundInstant(){
     chunkOutputs: lastDubChunksTimeline,
     totalDurationSec: lastDubTotalDuration,
     origMono12k: lastDubOrigMono12k,
+    origSideMono12k: lastDubOrigSideMono12k,
     bgMixMode,
     musicTimeline: lastDubMusicTimeline,
     bgMusicStyle,
@@ -3693,7 +3742,7 @@ function detectOrigSpeechStartOffset(origMono12k, chunkStartSec, chunkEndSec){
 }
 
 // Monta o Áudio Master 24kHz sincronizado do segundo 0:00 até o fim do vídeo (com timbre humano 100% preservado!)
-function assembleDubbedMasterAudio({ chunkOutputs, totalDurationSec, origMono12k, bgMixMode = 'mute', bgMusicStyle = null, bgMusicVol = null, musicTimeline = null }){
+function assembleDubbedMasterAudio({ chunkOutputs, totalDurationSec, origMono12k, origSideMono12k = null, bgMixMode = 'mute', bgMusicStyle = null, bgMusicVol = null, musicTimeline = null }){
   const SR = 24000;
   const totalSamples = Math.max(SR, Math.ceil(totalDurationSec * SR));
   const AC = window.AudioContext || window.webkitAudioContext;
@@ -3753,7 +3802,8 @@ function assembleDubbedMasterAudio({ chunkOutputs, totalDurationSec, origMono12k
   }
 
   // Mixa som ambiente original + Trilha/Som de Fundo Leve com Sidechain Auto-Ducking de Estúdio!
-  const hasOrigDuck = (bgMixMode === 'duck' && origMono12k && origMono12k.length > 0);
+  const originalBackground = bgMixMode === 'duck-no-vocals' ? origSideMono12k : origMono12k;
+  const hasOrigDuck = ((bgMixMode === 'duck' || bgMixMode === 'duck-no-vocals') && originalBackground && originalBackground.length > 0);
   const fadeInSamples = Math.min(Math.floor(SR * 1.2), Math.floor(totalSamples * 0.15));
   const fadeOutSamples = Math.min(Math.floor(SR * 1.5), Math.floor(totalSamples * 0.18));
   let origGainSmooth = 0.14;
@@ -3767,9 +3817,9 @@ function assembleDubbedMasterAudio({ chunkOutputs, totalDurationSec, origMono12k
       origGainSmooth += (targetOrig - origGainSmooth) * 0.0008;
       const srcPos = i * 0.5; // 12kHz -> 24kHz
       const idx = Math.floor(srcPos);
-      if(idx < origMono12k.length){
+      if(idx < originalBackground.length){
         const frac = srcPos - idx;
-        const origSample = origMono12k[idx] * (1 - frac) + (origMono12k[idx + 1] || 0) * frac;
+        const origSample = originalBackground[idx] * (1 - frac) + (originalBackground[idx + 1] || 0) * frac;
         add += origSample * origGainSmooth;
       }
     }
@@ -4556,6 +4606,7 @@ async function dubVideo(options={}){
 
   dubSocialRequestSeq++;
   lastDubSocialMetadata = null;
+  lastDubOrigSideMono12k = null;
   const reviewRightsCheckbox=document.getElementById('dubReviewRightsConfirmed');
   if(reviewRightsCheckbox) reviewRightsCheckbox.checked=false;
   updateDubReviewQueueSaveButton();
@@ -4573,11 +4624,16 @@ async function dubVideo(options={}){
   setStep(['d1','d2','d3','d4'], 0);
 
   let plan = null;
+  let backgroundSideMono12k = null;
   try{
     const trimStart = rangeMode === 'trim' ? parseTimeInput(document.getElementById('dubTrimStart').value, 0) : 0;
     const trimEnd = rangeMode === 'trim' ? parseTimeInput(document.getElementById('dubTrimEnd').value, 0) : 0;
 
-    plan = await prepareAudioExtractionPlan(file, trimStart, trimEnd, m => showStatus('dubStatus', m, 'info'));
+    plan = await prepareAudioExtractionPlan(file, trimStart, trimEnd, m => showStatus('dubStatus', m, 'info'), bgMixMode === 'duck-no-vocals');
+    if(bgMixMode === 'duck-no-vocals' && !plan.useStreaming){
+      backgroundSideMono12k = plan.getBackgroundSideMono12k();
+      if(!backgroundSideMono12k) throw new Error('Não foi possível reduzir a voz original: o arquivo precisa ter duas faixas estéreo. Áudio mono não permite essa redução.');
+    }
     let quickMusicTimeline=null;
     let quickSoundDesignPromise=null;
     let quickSoundDesignProvider='';
@@ -4617,6 +4673,9 @@ async function dubVideo(options={}){
       showStatus('dubStatus', `🎧 ${partLabel} • Extraindo áudio e transcrevendo fala...`, 'info');
 
       const chunkAudio = await plan.getChunkPayload(i);
+      if(bgMixMode === 'duck-no-vocals' && plan.useStreaming && !chunkAudio.backgroundSideMono12k){
+        throw new Error('Não foi possível separar o áudio original em estéreo neste trecho. A voz pode permanecer; não dá para aplicar a redução em mono.');
+      }
 
       setStep(['d1','d2','d3','d4'], 2);
       showStatus('dubStatus', `🌍 ${partLabel} • Traduzindo para ${targetLanguage} e gerando voz (${dubVoice})...`, 'info');
@@ -4736,8 +4795,13 @@ async function dubVideo(options={}){
       if(quickMusicTimeline && quickMusicTimeline.length) onChangeDubBgMusicStyle(quickMusicTimeline[0].style||'soft_piano','quick');
       if(soundDesign && soundDesign.fallback) console.info('Direção musical visual indisponível; usando análise de áudio local.');
     }
+    if(bgMixMode === 'duck-no-vocals' && plan.useStreaming){
+      backgroundSideMono12k = plan.getBackgroundSideMono12k();
+      if(!backgroundSideMono12k) throw new Error('Não foi possível reduzir a voz original: o arquivo precisa ter áudio estéreo. Áudio mono não permite essa redução.');
+    }
     lastDubChunksTimeline = chunkOutputs;
     lastDubOrigMono12k = plan.mono12k ? new Float32Array(plan.mono12k) : null;
+    lastDubOrigSideMono12k = backgroundSideMono12k || null;
     lastDubMusicTimeline = quickMusicTimeline;
     lastDubTotalDuration = Math.max(plan.totalFileDuration, plan.effEnd);
 
@@ -4752,6 +4816,7 @@ async function dubVideo(options={}){
         chunkOutputs,
         totalDurationSec: lastDubTotalDuration,
         origMono12k: plan.mono12k,
+        origSideMono12k: backgroundSideMono12k,
         bgMixMode,
         musicTimeline: quickMusicTimeline
       });
