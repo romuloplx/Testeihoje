@@ -1337,7 +1337,7 @@ async function dubWithOpenAI({ audioBase64, audioMime = 'audio/wav', language, d
       silent: false,
       transcription: originalText,
       translation: translatedText,
-      dubInfo: `Dublagem em ${targetLanguage} • Transcrição: ${whisperInfo || 'IA'} • Tradução: ${tr.provider || 'IA'} • Voz: ${dubVoice} (${[...usedProviders].join(', ')})`,
+      dubInfo: `Dublagem em ${targetLanguage} • Transcrição: ${whisperInfo || 'IA'} • Tradução: ${tr.provider || 'IA'} • Voz: ${dubVoice} (${[...usedProviders].join(', ')})${[...usedProviders].some(p => String(p).includes('google-translate-tts-fallback')) ? ' • ⚠️ Provedores da voz escolhida indisponíveis; foi usada a voz padrão do Google.' : ''}`,
       audioMp3Base64: merged.buffer.toString('base64'),
       audioMime: merged.audioMime
     };
@@ -3024,11 +3024,11 @@ async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR', emotion =
       ...preferredAttempts,
       ['gemini-tts', testProviders.gemini],
       ['unorouter-tts', testProviders.unorouter],
-      ['google-translate-tts', testProviders.google],
+      [exactTextOnly ? 'google-translate-tts-fallback' : 'google-translate-tts', testProviders.google],
       ['streamelements-tts', testProviders.streamElements]
     ];
     for (const [name, provider] of injected) {
-      if (exactTextOnly && ['google-translate-tts', 'streamelements-tts'].includes(name)) continue;
+      if (exactTextOnly && name === 'streamelements-tts') continue;
       if (typeof provider === 'function') {
         attempts.push({ name, run: () => provider({ text: cleanText, voice, lang, emotion }) });
       }
@@ -3083,16 +3083,16 @@ async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR', emotion =
     attempts.push({ name: 'unorouter-tts', run: () => unorouterTTS({ text: cleanText, voice }) });
   }
 
-  // Google Translate TTS usa uma voz fixa por idioma e não consegue respeitar a voz escolhida.
-  if (!exactTextOnly) {
-    attempts.push({
-      name: 'google-translate-tts',
-      run: async () => ({
-        buffer: await ttsGoogle({ text: cleanText, lang: String(lang || 'pt-BR').split(/[-_]/)[0].toLowerCase() }),
-        provider: 'google-translate-tts'
-      })
-    });
-  }
+  // Último recurso: Google Translate TTS mantém o texto literal, mas usa uma voz padrão.
+  // Mantemos esse fallback também na dublagem estrita para não perder o trabalho do usuário;
+  // o provedor fica explícito no resultado para informar que a voz selecionada não foi preservada.
+  attempts.push({
+    name: exactTextOnly ? 'google-translate-tts-fallback' : 'google-translate-tts',
+    run: async () => ({
+      buffer: await ttsGoogle({ text: cleanText, lang: String(lang || 'pt-BR').split(/[-_]/)[0].toLowerCase() }),
+      provider: exactTextOnly ? 'google-translate-tts-fallback-default-voice' : 'google-translate-tts'
+    })
+  });
 
   if (!exactTextOnly && /^en(?:[-_]|$)/i.test(String(lang || ''))) {
     const streamVoice = ['nova', 'shimmer', 'coral', 'sage', 'alloy'].includes(voice) ? 'Amy' : 'Brian';

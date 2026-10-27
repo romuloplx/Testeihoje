@@ -207,7 +207,7 @@ test('strict dubbing falls through to Unorouter only when exact Gemini TTS also 
   assert.strictEqual(result.buffer, audio);
 });
 
-test('strict dubbing does not silently switch to a fixed Google voice when selected-voice providers fail', async () => {
+test('strict dubbing uses Google only as a transparent last-resort fixed-voice fallback', async () => {
   const called = [];
   const result = await ttsWithFallback(
     { text: 'Texto para dublar.', voice: 'sage', lang: 'pt-BR', exactTextOnly: true },
@@ -217,8 +217,9 @@ test('strict dubbing does not silently switch to a fixed Google voice when selec
     }
   );
 
-  assert.deepEqual(called, ['edge']);
-  assert.match(result.error, /neural-hd: indisponível/);
+  assert.deepEqual(called, ['edge', 'google']);
+  assert.equal(result.provider, 'google-translate-tts-fallback');
+  assert.ok(result.buffer.length > 250);
 });
 
 test('ttsWithFallback proceeds to Unorouter when Edge and Gemini both fail', async () => {
