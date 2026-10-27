@@ -38,6 +38,17 @@ cp .env.example .env
 - Sem `OPENAI_API_KEY` → modo **MOCK** (perfeito para demo, não gasta créditos)
 - Com `OPENAI_API_KEY` → usa **GPT-4o** para roteiros e pode usar Whisper/TTS
 
+### MoneyPrinterTurbo (opcional)
+
+O botão **Gerar vídeo com MoneyPrinterTurbo** encaminha o roteiro para uma instância externa; o DubAI PRO não hospeda o renderizador Python/FFmpeg. Configure no backend:
+
+```env
+MONEYPRINTERTURBO_URL=https://seu-servidor-moneyprinter
+MONEYPRINTERTURBO_API_KEY=sua-chave-opcional
+```
+
+A instância precisa expor `/api/v1/videos` e `/api/v1/tasks/{task_id}`. Use uma URL HTTPS privada e configure a chave no upstream. A chave fica apenas no servidor; renderização depende das integrações e provedores da instância remota.
+
 ## 📡 API
 
 | Método | Rota | Descrição |

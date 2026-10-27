@@ -634,6 +634,8 @@ input[type="range"]{
           <button class="ghost" onclick="openTab('projects')">📁 Ver nos projetos</button>
         </div>
         <button class="primary" id="buildVideoBtn" onclick="buildCreateVideo()" style="width:100%;margin-top:12px">🎬 Renderizar / Atualizar Vídeo Conectado</button>
+        <button class="ghost" id="moneyPrinterBtn" onclick="createWithMoneyPrinterTurbo()" style="width:100%;margin-top:8px;border-color:#f59e0b;color:#fde68a">🖨️ Gerar vídeo com MoneyPrinterTurbo (instância externa)</button>
+        <div class="hint" style="margin-top:5px">Renderização no servidor externo; configure MONEYPRINTERTURBO_URL (e opcionalmente MONEYPRINTERTURBO_API_KEY) no backend.</div>
         <div id="videoBuildProgress" class="hidden" style="margin-top:10px">
           <div class="progress-bar"><div class="progress-fill" id="videoBuildFill" style="width:0%"></div></div>
           <div id="videoBuildMsg" class="hint" style="margin-top:6px"></div>
@@ -2389,6 +2391,42 @@ async function createAndBuildVideo(){
   } finally {
     if(mainBtn){ mainBtn.disabled = false; mainBtn.textContent = '🎬 Criar História & Vídeo Completo (Personagens + Cenários Vivos)'; }
   }
+}
+
+async function createWithMoneyPrinterTurbo(){
+  const button = document.getElementById('moneyPrinterBtn');
+  const script = String(document.getElementById('createScript')?.innerText || '').trim();
+  if (!script) return showStatus('createStatus', '⚠️ Gere um roteiro primeiro.', 'warn');
+  button.disabled = true;
+  try {
+    showStatus('createStatus', '🖨️ Enviando roteiro ao MoneyPrinterTurbo...', 'info');
+    const start = await fetch('/api/create', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ action:'moneyprinter-create', subject: currentCreateData?.title || document.getElementById('prompt')?.value || 'Vídeo DubAI PRO', script, aspect: document.getElementById('createFormat')?.value }) });
+    const started = await start.json();
+    if (!start.ok) throw new Error(started.error || 'Não foi possível iniciar a renderização.');
+    const taskId = started?.data?.task_id || started?.task_id;
+    if (!taskId) throw new Error('Resposta sem identificador de tarefa do MoneyPrinterTurbo.');
+    showStatus('createStatus', '⏳ Renderizando no MoneyPrinterTurbo…', 'info');
+    for (let i=0; i<180; i++) {
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      const response = await fetch('/api/create', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'moneyprinter-status', taskId}) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Falha ao consultar a tarefa.');
+      const task = result?.data || result;
+      if (Number(task.state) === 1) {
+        const url = (task.combined_videos || task.videos || [])[0];
+        if (!url) throw new Error('A tarefa concluiu, mas não retornou link de vídeo.');
+        const video = document.getElementById('createdVideo'); video.src = url;
+        document.getElementById('createdVideoDl').href = url;
+        document.getElementById('createdVideoWrap').classList.remove('hidden');
+        showStatus('createStatus', '✅ Vídeo pronto pelo MoneyPrinterTurbo!', 'success');
+        return;
+      }
+      if (Number(task.state) === -1) throw new Error(task.error || 'MoneyPrinterTurbo não conseguiu gerar o vídeo.');
+      showStatus('createStatus', `⏳ MoneyPrinterTurbo renderizando… ${Number(task.progress)||0}%`, 'info');
+    }
+    throw new Error('A renderização excedeu 15 minutos. Consulte a tarefa no MoneyPrinterTurbo.');
+  } catch (error) { showStatus('createStatus', `⚠️ ${error.message}`, 'warn'); }
+  finally { button.disabled = false; }
 }
 
 // --- Create ---
