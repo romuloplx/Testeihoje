@@ -24,8 +24,13 @@ test('quick dubbing runs subtitle/title/music steps and automatically exports af
   assert.match(html, /id="dubQuickModeBtn" onclick="startQuickDubbing\(\)"/);
   assert.match(html, /setValue\('dubBurnSubs','yes'\)/);
   assert.match(html, /analyzeQuickDubMusicTimeline\(plan\.mono12k/);
+  assert.match(html, /requestQuickDubSoundDesign\(file,duration,quickMusicTimeline\)/);
+  assert.match(html, /action:'sound-design'/);
+  assert.match(html, /id="dubSoundPlan"/);
+  assert.match(html, /renderDubSoundPlan\(quickMode\?quickMusicTimeline:null/);
   assert.match(html, /musicTimeline: quickMusicTimeline/);
-  assert.match(html, /trilha instrumental que acompanha o vídeo/);
+  assert.match(html, /quadros do vídeo e o áudio/);
+  assert.match(html, /Os quadros são enviados ao provedor multimodal disponível/);
   assert.match(html, /const socialMetadataPromise=generateDubSocialPackage/);
   assert.match(html, /if\(quickMode\) await socialMetadataPromise/);
   assert.match(html, /const exported=await downloadDubVideo\(\)/);
@@ -41,6 +46,25 @@ test('quick music reader handles short or silent input safely with a soft genera
   assert.equal(short.confidence, 'baixa');
   const silent = context.analyze(new Float32Array(24000));
   assert.equal(silent.style, 'soft_piano');
+});
+
+test('quick dubbing keeps an audio-only fallback timeline for long or unsupported media', () => {
+  const helper = html.match(/function makeQuickDubFallbackMoments\(totalDurationSec,segmentSec=12\)\{[\s\S]*?\n\}/);
+  assert.ok(helper, 'fallback timeline builder should exist');
+  const context = vm.createContext({ Math });
+  vm.runInContext(`${helper[0]};globalThis.build=makeQuickDubFallbackMoments;`, context);
+  const moments = context.build(25, 12);
+  assert.equal(moments.length, 3);
+  assert.equal(moments[0].endSec, 12);
+  assert.equal(moments[2].endSec, 25);
+  assert.ok(moments.every(moment => moment.style === 'soft_piano'));
+});
+
+test('quick dubbing captures a small set of frames and sends them to the sound-design API', () => {
+  assert.match(html, /async function captureQuickDubVideoFrames\(file,totalDurationSec,maxFrames=6\)/);
+  assert.match(html, /canvas\.toDataURL\('image\/jpeg',0\.48\)/);
+  assert.match(html, /frames,moments:audioMoments/);
+  assert.match(html, /AI scene sound-design fallback/);
 });
 
 test('quick dubbing creates moment-by-moment music cues and handles a short ending', () => {

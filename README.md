@@ -8,7 +8,7 @@ Baseado no código original enviado, agora com **backend funcional**, armazename
 ## ✨ O que funciona
 
 - **🎬 Criar vídeo com IA** — prompt → roteiro completo com cenas e timestamps (mock local realista + GPT-4o se `OPENAI_API_KEY` definido)
-- **🌍 Dublagem rápida** — um toque para transcrever, traduzir para PT-BR, gerar a voz, queimar legendas sincronizadas, exportar o vídeo e sugerir título/legenda/hashtags para revisão. Analisa características gerais do áudio de referência e escolhe um estilo para uma trilha instrumental procedural; não copia nem clona a gravação original.
+- **🌍 Dublagem rápida** — um toque para transcrever, traduzir para PT-BR, gerar a voz, queimar legendas sincronizadas, exportar o vídeo e sugerir título/legenda/hashtags para revisão. Para vídeos, a direção musical multimodal envia até 6 quadros reduzidos ao Gemini (com fallback para OpenAI/Unorouter) e combina o contexto visual com a energia do áudio por trechos para escolher estilos instrumentais originais com transições suaves. Quadros só são usados nesse pedido e não são persistidos pelo endpoint; o provedor pode aplicar seus próprios termos e cotas. Sem análise visual disponível, usa o perfil local do áudio; arquivos somente de áudio mantêm essa alternativa. As trilhas são sintetizadas a partir dos arranjos procedurais existentes, não são gravações clonadas nem músicas comerciais.
 - **📁 Projetos** — listagem, expandir, copiar, ouvir com `speechSynthesis`, baixar .txt, excluir, persistência em `data/projects.json`
 - **🔊 TTS** — endpoint `/api/tts` (usa OpenAI TTS quando há chave, senão usa voz do navegador)
 - **⬇️ Baixar vídeos** — usa yt-dlp no servidor para baixar MP4 de links suportados do TikTok, Douyin e YouTube, para conteúdo próprio ou autorizado (com confirmação do usuário); também oferece o [Brasil Downloader](https://brasil-downloader.vercel.app/) como serviço externo. Referência: [YTDLnis](https://github.com/deniscerri/ytdlnis) é um app Android separado que também usa yt-dlp; seu código Kotlin não é incorporado ao site.
@@ -47,7 +47,7 @@ cp .env.example .env
 | GET | `/api/projects` | lista projetos |
 | GET | `/api/projects/:id` | detalhe |
 | DELETE | `/api/projects/:id` | remove |
-| POST | `/api/dub` | `multipart` `video` + `language` + `dubVoice` |
+| POST | `/api/dub` | Dublagem (`fileName`, áudio, idioma e voz); ações JSON `social-metadata` e `sound-design` para direção musical multimodal |
 | POST | `/api/tts` | `{text,voice}` → mp3 ou instrução browser |
 | POST | `/api/clips` | `{action:"video_download",url}` → stream MP4 suportado do TikTok, Douyin ou YouTube (links públicos; vídeo próprio ou autorizado) |
 

@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { generateDubSocialMetadata } = require('../vercel/api/lib/ai');
+const { generateDubSocialMetadata, analyzeDubSoundDesign, sanitizeDubSoundTimeline } = require('../vercel/api/lib/ai');
 
 const html = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
 
@@ -164,4 +164,54 @@ test('browser renders the server-generated share pack as soon as dubbing finishe
   assert.equal(elements.get('dubSocialHashtags').textContent, '#mistério #viral #shorts #reels');
   assert.match(elements.get('dubSocialStatus').textContent, /mock-model/);
   assert.equal(elements.get('dubSocialPackage').classList.hidden, false);
+});
+
+test('visual sound director falls back to the analyzed audio profile when no video frames are available', async () => {
+  const result = await analyzeDubSoundDesign({
+    durationSec: 24,
+    moments: [
+      { startSec: 0, endSec: 12, style: 'cinema_warm', label: 'energia alta' },
+      { startSec: 12, endSec: 24, style: 'mystery_deep', label: 'dramático' }
+    ],
+    frames: []
+  });
+  assert.equal(result.fallback, true);
+  assert.equal(result.provider, 'local-audio-analysis');
+  assert.deepEqual(JSON.parse(JSON.stringify(result.moments.map(moment => moment.style))), ['cinema_warm', 'mystery_deep']);
+});
+
+test('sound director restricts AI responses to known music styles and safe time ranges', () => {
+  const result = sanitizeDubSoundTimeline([
+    { startSec: 0, endSec: 8, style: 'soft_piano', label: 'sereno' },
+    { startSec: 8, endSec: 16, style: 'mystery_deep', label: 'tenso' }
+  ], [
+    { style: 'made_up_track', reason: '<script>alert(1)</script>' },
+    { style: 'inspiring_acoustic', reason: 'Cena de superação' }
+  ]);
+  assert.equal(result[0].style, 'soft_piano');
+  assert.equal(result[0].startSec, 0);
+  assert.doesNotMatch(result[0].reason, /[<>]/);
+  assert.equal(result[1].style, 'inspiring_acoustic');
+  assert.equal(result[1].endSec, 16);
+});
+
+test('Vercel dubbing route dispatches multimodal sound design as a separate action', async () => {
+  const aiPath = require.resolve('../vercel/api/lib/ai');
+  const routePath = require.resolve('../vercel/api/dub');
+  const ai = require(aiPath);
+  const original = ai.analyzeDubSoundDesign;
+  let received;
+  ai.analyzeDubSoundDesign = async input => { received = input; return { moments: [{ startSec: 0, endSec: 10, style: 'cinema_warm', reason: 'Ação visual' }], provider: 'mock-vision', fallback: false }; };
+  delete require.cache[routePath];
+  const handler = require(routePath);
+  const res = { headers: {}, statusCode: 0, setHeader(name, value) { this.headers[name.toLowerCase()] = value; }, end(body) { this.body = body; } };
+  try {
+    await handler({ method: 'POST', body: { action: 'sound-design', durationSec: 10, frames: [{ timeSec: 4, mime: 'image/jpeg', imageBase64: 'a'.repeat(140) }], moments: [{ startSec: 0, endSec: 10 }] } }, res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(received.frames[0].timeSec, 4);
+    assert.equal(JSON.parse(res.body).provider, 'mock-vision');
+  } finally {
+    ai.analyzeDubSoundDesign = original;
+    delete require.cache[routePath];
+  }
 });

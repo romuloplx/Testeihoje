@@ -1060,7 +1060,7 @@ input[type="range"]{
 
     <div style="margin-top:14px;padding:13px;border:1px solid #22c55e88;border-radius:13px;background:linear-gradient(135deg,#08251d,#10172c)">
       <button type="button" id="dubQuickModeBtn" onclick="startQuickDubbing()" style="width:100%;padding:14px 16px;border:0;border-radius:11px;background:linear-gradient(135deg,#16a34a,#0e7490);color:#fff;font-size:15px;font-weight:900;cursor:pointer">⚡ DUBLAGEM RÁPIDA — fazer tudo automaticamente</button>
-      <div class="hint" style="margin:8px 2px 0">Duble em português, gere legendas sincronizadas e sugestões de publicação. O áudio é analisado em trechos: uma trilha instrumental original muda de clima e intensidade conforme cada momento, com volume reduzido durante a fala. Ao concluir, o vídeo é exportado automaticamente. Requer internet.</div>
+      <div class="hint" style="margin:8px 2px 0">Duble em português, gere legendas sincronizadas e sugestões de publicação. A IA analisa até 6 quadros do vídeo e o áudio por trechos para escolher uma trilha instrumental que acompanha cada momento; a música baixa durante a fala. Os quadros são enviados ao provedor multimodal disponível para análise. Se a IA visual estiver indisponível, o perfil local do áudio mantém o fluxo funcionando. Ao concluir, o vídeo é exportado automaticamente. Requer internet.</div>
     </div>
     <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
       <button class="primary" id="dubBtn" onclick="dubVideo()" style="flex:1;min-width:240px">🎙️ Dublar Vídeo Completo Agora (Pequeno ou Grande)</button>
@@ -1104,6 +1104,11 @@ input[type="range"]{
           <button class="ghost" type="button" id="addDubToReviewQueueBtn" onclick="addDubToReviewQueue()" disabled style="margin-top:8px;border-color:#8b5cf6;color:#ddd6fe">📌 Adicionar vídeo e metadados à fila de revisão</button>
           <div class="hint" style="margin-top:7px">A fila é salva somente neste navegador; nenhuma publicação ou envio ao TikTok acontece nesta etapa.</div>
           <div class="hint" style="margin-top:7px">Sugestões baseadas na transcrição/tradução; ajudam na descoberta, mas não garantem viralização.</div>
+        </div>
+        <div id="dubSoundPlan" class="hidden" style="margin:0 0 12px;padding:12px 13px;border:1px solid #38bdf866;border-radius:12px;background:linear-gradient(135deg,#0b1c2c,#11162a)" aria-live="polite">
+          <div style="font-weight:900;font-size:13px;color:#bae6fd">🎼 Direção musical por momento</div>
+          <div id="dubSoundProvider" class="hint" style="margin:4px 0 8px"></div>
+          <div id="dubSoundMoments" style="display:grid;gap:5px"></div>
         </div>
         <div id="dubPlayerWrap" class="hidden" style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px">
           <div id="dubSyncPreviewFrame" class="hidden" style="position:relative;width:100%;max-height:460px;overflow:hidden;border-radius:10px;background:#000;line-height:0">
@@ -4273,13 +4278,113 @@ function analyzeQuickDubMusic(samples,sampleRate=12000){
 }
 
 // Divide a trilha de referência em momentos para criar uma música que acompanha a energia ao longo do vídeo.
+async function captureQuickDubVideoFrames(file,totalDurationSec,maxFrames=6){
+  if(!file || file.type.startsWith('audio/') || /\.(mp3|wav|m4a|ogg|flac|aac)$/i.test(file.name)) return [];
+  const video=document.createElement('video');
+  const url=URL.createObjectURL(file);
+  const frames=[];
+  video.muted=true;
+  video.playsInline=true;
+  video.preload='auto';
+  video.src=url;
+  try{
+    await new Promise(resolve=>{
+      let settled=false;
+      const finish=()=>{ if(settled)return; settled=true; resolve(); };
+      video.addEventListener('loadedmetadata',finish,{once:true});
+      video.addEventListener('error',finish,{once:true});
+      setTimeout(finish,3500);
+    });
+    if(!video.videoWidth || !video.videoHeight) return [];
+    const duration=Math.min(Number(totalDurationSec)||video.duration||0,video.duration||Number(totalDurationSec)||0);
+    if(!duration) return [];
+    const count=Math.max(1,Math.min(maxFrames,Math.ceil(duration/18)));
+    const canvas=document.createElement('canvas');
+    const scale=Math.min(1,320/video.videoWidth,240/video.videoHeight);
+    canvas.width=Math.max(1,Math.round(video.videoWidth*scale));
+    canvas.height=Math.max(1,Math.round(video.videoHeight*scale));
+    const ctx=canvas.getContext('2d',{alpha:false});
+    for(let i=0;i<count;i++){
+      const timeSec=Math.min(duration-0.08,Math.max(0.02,((i+0.5)/count)*duration));
+      await new Promise(resolve=>{
+        let settled=false;
+        const finish=()=>{if(settled)return;settled=true;clearTimeout(timer);video.removeEventListener('seeked',finish);resolve();};
+        const timer=setTimeout(finish,1800);
+        video.addEventListener('seeked',finish,{once:true});
+        try{video.currentTime=timeSec;if(Math.abs(video.currentTime-timeSec)<0.03)finish();}catch(_){finish();}
+      });
+      try{
+        if(video.readyState<2) continue;
+        ctx.drawImage(video,0,0,canvas.width,canvas.height);
+        const data=canvas.toDataURL('image/jpeg',0.48).split(',')[1]||'';
+        if(data.length>100) frames.push({timeSec,mime:'image/jpeg',imageBase64:data});
+      }catch(_){break;}
+    }
+    return frames;
+  }finally{
+    try{video.pause();video.removeAttribute('src');video.load();}catch(_){}
+    URL.revokeObjectURL(url);
+  }
+}
+
+async function requestQuickDubSoundDesign(file,totalDurationSec,audioMoments){
+  try{
+    const frames=await captureQuickDubVideoFrames(file,totalDurationSec,6);
+    if(!frames.length) return {moments:audioMoments,provider:'local-audio-analysis',fallback:true};
+    const response=await fetch('/api/dub',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'sound-design',durationSec:totalDurationSec,frames,moments:audioMoments})
+    });
+    const result=await response.json().catch(()=>({}));
+    if(response.ok && Array.isArray(result.moments) && result.moments.length){
+      return {moments:result.moments,provider:result.provider||'multimodal-ai',fallback:!!result.fallback};
+    }
+  }catch(error){console.warn('AI scene sound-design fallback:',error);}
+  return {moments:audioMoments,provider:'local-audio-analysis',fallback:true};
+}
+
+function renderDubSoundPlan(moments,provider,fallback){
+  const panel=document.getElementById('dubSoundPlan');
+  const providerEl=document.getElementById('dubSoundProvider');
+  const list=document.getElementById('dubSoundMoments');
+  if(!panel||!providerEl||!list) return;
+  list.replaceChildren();
+  if(!Array.isArray(moments)||!moments.length){panel.classList.add('hidden');return;}
+  const styleNames={soft_piano:'Piano suave',cinema_warm:'Cinema emocional',inspiring_acoustic:'Acústico inspirador',lofi_velvet:'Lo-fi aconchegante',mystery_deep:'Mistério profundo',zen_nature:'Natureza serena'};
+  providerEl.textContent=`Análise: ${provider||'perfil local do áudio'}${fallback?' • modo alternativo local':''} • transições suaves e música reduzida durante a fala.`;
+  for(const moment of moments.slice(0,24)){
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;gap:8px;align-items:flex-start;padding:6px 8px;border-radius:8px;background:#070d18;color:#dbeafe;font-size:11.5px;line-height:1.4';
+    const time=document.createElement('b');
+    time.style.cssText='flex:0 0 auto;color:#7dd3fc';
+    time.textContent=`${fmtClockSec(moment.startSec)}–${fmtClockSec(moment.endSec)}`;
+    const description=document.createElement('span');
+    const style=styleNames[moment.style]||'Trilha suave';
+    description.textContent=`${style}${moment.reason?` — ${moment.reason}`:''}`;
+    row.append(time,description);
+    list.appendChild(row);
+  }
+  panel.classList.remove('hidden');
+}
+
+function makeQuickDubFallbackMoments(totalDurationSec,segmentSec=12){
+  const duration=Math.max(0,Number(totalDurationSec)||0);
+  const timeline=[];
+  const step=Math.max(segmentSec,duration/24);
+  for(let startSec=0;startSec<duration;startSec+=step){
+    timeline.push({startSec,endSec:Math.min(duration,startSec+step),style:'soft_piano',label:'perfil visual em análise'});
+  }
+  return timeline;
+}
+
 function analyzeQuickDubMusicTimeline(samples,sampleRate=12000,totalDurationSec=0,segmentSec=12){
-  if(!samples || !samples.length) return [];
+  if(!samples || !samples.length) return makeQuickDubFallbackMoments(totalDurationSec,segmentSec);
   const duration=Math.min(totalDurationSec || samples.length/sampleRate,samples.length/sampleRate);
   const timeline=[];
+  const step=Math.max(segmentSec,duration/24);
   let fallbackStyle='soft_piano';
-  for(let startSec=0;startSec<duration;startSec+=segmentSec){
-    const endSec=Math.min(duration,startSec+segmentSec);
+  for(let startSec=0;startSec<duration;startSec+=step){
+    const endSec=Math.min(duration,startSec+step);
     const start=Math.floor(startSec*sampleRate),end=Math.min(samples.length,Math.ceil(endSec*sampleRate));
     const sample=samples.subarray(start,end);
     const profile=analyzeQuickDubMusic(sample,sampleRate);
@@ -4356,17 +4461,25 @@ async function dubVideo(options={}){
 
     plan = await prepareAudioExtractionPlan(file, trimStart, trimEnd, m => showStatus('dubStatus', m, 'info'));
     let quickMusicTimeline=null;
+    let quickSoundDesignPromise=null;
+    let quickSoundDesignProvider='';
+    let quickSoundDesignFallback=false;
     if(quickMode){
       const selectedMusic=(document.getElementById('dubBgMusicStyle')||{}).value||'soft_piano';
-      if(selectedMusic!=='custom' && plan.mono12k){
-        quickMusicTimeline=analyzeQuickDubMusicTimeline(plan.mono12k,12000,plan.effEnd-plan.effStart);
-        const moods=[...new Set(quickMusicTimeline.map(moment=>moment.label))].slice(0,3).join(', ')||'calmo e suave';
-        const firstStyle=quickMusicTimeline[0]?.style||'soft_piano';
-        onChangeDubBgMusicStyle(firstStyle,'quick');
-        showStatus('dubStatus',`🎼 Analisando a energia do áudio em ${quickMusicTimeline.length} momentos e criando uma trilha instrumental que acompanha o vídeo (${moods})…`,'info');
+      if(selectedMusic!=='custom'){
+        const duration=plan.effEnd-plan.effStart;
+        quickMusicTimeline=plan.mono12k
+          ? analyzeQuickDubMusicTimeline(plan.mono12k,12000,duration)
+          : makeQuickDubFallbackMoments(duration);
+        const moods=[...new Set(quickMusicTimeline.map(moment=>moment.label))].slice(0,3).join(', ')||'clima visual';
+        onChangeDubBgMusicStyle(quickMusicTimeline[0]?.style||'soft_piano','quick');
+        showStatus('dubStatus',`🎬 Analisando quadros do vídeo e o áudio em ${quickMusicTimeline.length} momentos para escolher a trilha (${moods})…`,'info');
+        quickSoundDesignPromise=requestQuickDubSoundDesign(file,duration,quickMusicTimeline);
       }else{
         quickMusicTimeline=null;
-        showStatus('dubStatus','🎼 Usando sua música selecionada como fundo, com volume reduzido automaticamente durante a fala…','info');
+        quickSoundDesignProvider='música selecionada pelo usuário';
+        quickSoundDesignFallback=false;
+        showStatus('dubStatus','🎼 Mantendo sua música selecionada como fundo e reduzindo o volume durante a fala…','info');
       }
     }
     const totalChunks = plan.windows.length;
@@ -4496,6 +4609,15 @@ async function dubVideo(options={}){
     showStatus('dubStatus', '🎛️ Sincronizando todos os blocos de áudio na linha do tempo do vídeo...', 'info');
 
     const anyRealVoice = chunkOutputs.some(c => c.hasRealAudio);
+    if(quickSoundDesignPromise){
+      showStatus('dubStatus','🎼 Aplicando a direção musical multimodal aos momentos do vídeo…','info');
+      const soundDesign=await quickSoundDesignPromise;
+      quickSoundDesignProvider=String(soundDesign && soundDesign.provider || 'análise local');
+      quickSoundDesignFallback=!!(soundDesign && soundDesign.fallback);
+      if(soundDesign && Array.isArray(soundDesign.moments) && soundDesign.moments.length) quickMusicTimeline=soundDesign.moments;
+      if(quickMusicTimeline && quickMusicTimeline.length) onChangeDubBgMusicStyle(quickMusicTimeline[0].style||'soft_piano','quick');
+      if(soundDesign && soundDesign.fallback) console.info('Direção musical visual indisponível; usando análise de áudio local.');
+    }
     lastDubChunksTimeline = chunkOutputs;
     lastDubOrigMono12k = plan.mono12k ? new Float32Array(plan.mono12k) : null;
     lastDubMusicTimeline = quickMusicTimeline;
@@ -4564,6 +4686,7 @@ async function dubVideo(options={}){
     const fullOriginalTranscript = chunkOutputs.map(c => c.transcription).filter(Boolean).join(' ');
     $('#dubScript').textContent = transcriptSummary;
     $('#dubResult').classList.remove('hidden');
+    renderDubSoundPlan(quickMode?quickMusicTimeline:null,quickSoundDesignProvider,quickSoundDesignFallback);
     const socialMetadataPromise=generateDubSocialPackage({ translation: fullTranslation, originalTranscript: fullOriginalTranscript, fileName: file.name, targetLanguage });
     if(quickMode) await socialMetadataPromise;
 
@@ -4588,7 +4711,7 @@ async function dubVideo(options={}){
 
     setProgress('dubProgressFill', 100);
     showStatus('dubStatus', quickMode
-      ? `✅ Dublagem, legendas e sugestões de título prontas. Exportando o arquivo final automaticamente…`
+      ? `✅ Dublagem, legendas e sugestões de título prontas. Trilha dirigida por ${quickSoundDesignProvider||'análise de áudio local'}${quickSoundDesignFallback?' (fallback local)':''}. Exportando o arquivo final automaticamente…`
       : `✅ Vídeo dublado com sucesso do início ao fim (${chunkOutputs.length} ${chunkOutputs.length > 1 ? 'blocos' : 'bloco'} • ${fmtClockSec(lastDubTotalDuration)})! Dê Play no vídeo sincronizado abaixo ou clique no botão verde para baixar.`, 'success');
     toast(quickMode?'⚡ Dublagem rápida pronta; finalizando o vídeo…':'✅ Dublagem pronta! Clique para assistir ou baixar o vídeo!');
     if(quickMode && anyRealVoice){
