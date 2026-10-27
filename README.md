@@ -8,11 +8,12 @@ Baseado no código original enviado, agora com **backend funcional**, armazename
 ## ✨ O que funciona
 
 - **🎬 Criar vídeo com IA** — prompt → roteiro completo com cenas e timestamps (mock local realista + GPT-4o se `OPENAI_API_KEY` definido)
-- **🌍 Dublar vídeo** — upload de vídeo/áudio → transcrição + tradução PT-BR + dublagem simulada (estrutura pronta para Whisper/TTS)
+- **🌍 Dublagem rápida** — um toque para transcrever, traduzir para PT-BR, gerar a voz, queimar legendas sincronizadas, exportar o vídeo e sugerir título/legenda/hashtags para revisão. Analisa características gerais do áudio de referência e escolhe um estilo para uma trilha instrumental procedural; não copia nem clona a gravação original.
 - **📁 Projetos** — listagem, expandir, copiar, ouvir com `speechSynthesis`, baixar .txt, excluir, persistência em `data/projects.json`
 - **🔊 TTS** — endpoint `/api/tts` (usa OpenAI TTS quando há chave, senão usa voz do navegador)
 - **⬇️ Baixar vídeos** — usa yt-dlp no servidor para baixar MP4 de links suportados do TikTok, Douyin e YouTube, para conteúdo próprio ou autorizado (com confirmação do usuário); também oferece o [Brasil Downloader](https://brasil-downloader.vercel.app/) como serviço externo. Referência: [YTDLnis](https://github.com/deniscerri/ytdlnis) é um app Android separado que também usa yt-dlp; seu código Kotlin não é incorporado ao site.
 - **📋 Fila de revisão** — guarda vídeos dublados e metadados no IndexedDB local do navegador; não publica nem envia arquivos ao TikTok
+- **📲 App instalável (PWA)** — instala pela opção “Instalar app” em navegadores compatíveis ou “Adicionar à Tela de Início” no iOS. O shell abre instalado, mas IA, dublagem e exportação precisam de internet.
 
 ## 🚀 Como rodar
 

@@ -64,7 +64,7 @@ test('dubbed-video preview shows the selected logo and the downloaded export kee
     assert.match(previewSource, /dubLogoPositionX \* videoRect\.width/);
     assert.match(previewSource, /dubLogoPositionY \* videoRect\.height/);
 
-    const dubStart = html.indexOf('async function dubVideo(){');
+    const dubStart = html.indexOf('async function dubVideo(options={}){');
     const dubEnd = html.indexOf('\n// --- Vozes + montagem de vídeo', dubStart);
     assert.ok(dubStart >= 0 && dubEnd > dubStart, 'dubbing pipeline source should be present');
     const dubSource = html.slice(dubStart, dubEnd);
