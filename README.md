@@ -33,7 +33,6 @@ Copie `.env.example` para `.env`:
 ```bash
 cp .env.example .env
 # edite OPENAI_API_KEY se quiser IA real
-# configure FREETTS_API_KEY para habilitar FreeTTS como provedor de voz humana
 ```
 
 - Sem `OPENAI_API_KEY` → modo **MOCK** (perfeito para demo, não gasta créditos)

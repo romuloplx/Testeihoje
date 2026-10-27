@@ -34,8 +34,7 @@ test('all Create, Avatar, and Dubbing voice selectors expose the full API catalo
   for (const file of ['public/index.html', 'vercel/index.html']) {
     const html = fs.readFileSync(path.join(root, file), 'utf8');
     for (const id of ['voice', 'avatarVoice', 'dubVoice']) {
-      const options = optionsFor(html, id).filter(value => !value.startsWith('freetts:'));
-      assert.deepEqual(options.sort(), [...allOpenAiVoices].sort(), `${file} #${id}`);
+      assert.deepEqual(optionsFor(html, id).sort(), [...allOpenAiVoices].sort(), `${file} #${id}`);
     }
     assert.match(html, /value="marin">⭐ Marin — OpenAI \(recomendada\)/);
     assert.match(html, /value="cedar">⭐ Cedar — OpenAI \(recomendada\)/);

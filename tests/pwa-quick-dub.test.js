@@ -30,14 +30,6 @@ test('quick dubbing keeps captions, social metadata, and automatic video export 
   assert.doesNotMatch(html, /quickSoundDesignPromise|analyzeQuickDubMusicTimeline|downloadDubBackgroundAudio/);
 });
 
-test('dubbing exposes direct FreeTTS neural voice choices with a real Portuguese default', () => {
-  assert.match(html, /value="freetts:pt-BR-FranciscaNeural" selected/);
-  assert.match(html, /value="freetts:pt-BR-AntonioNeural"/);
-  assert.match(html, /value="freetts:pt-BR-BrendaNeural"/);
-  assert.match(html, /value="freetts:pt-BR-HumbertoNeural"/);
-  assert.match(html, /value="freetts:en-US-JennyNeural"/);
-});
-
 test('avatar thumbnails are lazy-loaded on demand at reduced resolution to avoid blocking mobile startup', () => {
   assert.match(html, /if\(id==='avatar'\)\{\s*initAvatarPresets\(\);/);
   assert.match(html, /buildStudioAvatarCanvas\(p, null, 224\)/);
