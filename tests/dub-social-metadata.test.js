@@ -99,7 +99,7 @@ test('Dublagem silences the source audio by default and makes it an explicit opt
   assert.match(mixOptions, /<option value="duck-no-vocals">🎼 Manter instrumental original, reduzindo a voz/);
   assert.match(html, /function assembleDubbedMasterAudio\(\{[^}]+origSideMono12k = null[^}]+bgMixMode = 'mute'/s);
   assert.match(html, /const originalBackground = bgMixMode === 'duck-no-vocals' \? origSideMono12k : origMono12k/);
-  assert.match(html, /Áudio mono não permite essa redução/);
+  assert.match(html, /A dublagem continuará com o áudio original sem redução de voz/);
 });
 
 test('Dublagem displays the generated topic, caption and hashtags with a one-tap copy action', () => {

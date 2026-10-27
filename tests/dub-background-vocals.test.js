@@ -12,7 +12,8 @@ test('center-cancel option keeps original stereo instrumental at dubbing mix tim
   assert.ok(html.includes('<option value="duck-no-vocals">🎼 Manter instrumental original, reduzindo a voz</option>'));
   assert.match(html, /function getCenterCancelledMono12k\(audioBuffer\)/);
   assert.match(html, /backgroundSideMono12k = getCenterCancelledMono12k\(decoded\)/);
-  assert.match(html, /A voz pode permanecer; não dá para aplicar a redução em mono/);
+  assert.match(html, /A dublagem continuará com o áudio original sem redução de voz/);
+  assert.match(html, /bgMixMode = 'duck'/);
 
   const helper = html.match(/function getCenterCancelledMono12k\(audioBuffer\)\{[\s\S]*?\n\}/);
   const context = vm.createContext({ Float32Array, Math });
