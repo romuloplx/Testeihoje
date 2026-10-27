@@ -107,6 +107,8 @@ test('Dublagem displays the generated topic, caption and hashtags with a one-tap
   assert.match(html, /id="dubSocialHashtags"/);
   assert.match(html, /const socialMetadataPromise=generateDubSocialPackage\(\{ translation: fullTranslation/);
   assert.match(html, /onclick="copyDubSocialPackage\(\)"/);
+  assert.match(html, /id="regenerateDubSocialBtn" onclick="regenerateDubSocialPackage\(\)"/);
+  assert.match(html, /async function regenerateDubSocialPackage\(\)[\s\S]*generateDubSocialPackage\(lastDubSocialInput\)/);
   assert.match(server, /body\.action === 'social-metadata'/);
 });
 

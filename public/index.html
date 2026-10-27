@@ -1098,7 +1098,10 @@ input[type="range"]{
             <div style="font-size:10.5px;font-weight:900;color:#fbbf24;letter-spacing:.05em">HASHTAGS</div>
             <div id="dubSocialHashtags" style="margin-top:3px;color:#bae6fd;font-size:13px;line-height:1.6;overflow-wrap:anywhere"></div>
           </div>
-          <button class="ghost" type="button" onclick="copyDubSocialPackage()" style="border-color:#f59e0b88;color:#fde68a">📋 Copiar tema, legenda e hashtags</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="ghost" type="button" id="regenerateDubSocialBtn" onclick="regenerateDubSocialPackage()" style="border-color:#f59e0b88;color:#fde68a">🔄 Gerar outro</button>
+            <button class="ghost" type="button" onclick="copyDubSocialPackage()" style="border-color:#f59e0b88;color:#fde68a">📋 Copiar tema, legenda e hashtags</button>
+          </div>
           <label for="dubReviewRightsConfirmed" style="display:flex;align-items:flex-start;gap:9px;margin-top:10px;padding:9px 10px;border:1px solid #64748b66;border-radius:9px;color:#e2e8f0;line-height:1.45">
             <input type="checkbox" id="dubReviewRightsConfirmed" onchange="updateDubReviewQueueSaveButton()" style="margin-top:3px;accent-color:#a78bfa">
             <span>Confirmo que sou o autor do vídeo ou tenho autorização para dublar e reutilizar o conteúdo.</span>
@@ -3921,6 +3924,7 @@ function downloadDubSRT(){
 }
 
 let dubSocialRequestSeq = 0;
+let lastDubSocialInput = null;
 let lastDubSocialMetadata = null;
 
 function normalizeClientDubHashtags(value){
@@ -3982,10 +3986,14 @@ function renderDubSocialPackage(metadata, statusText){
 }
 
 async function generateDubSocialPackage({ translation = '', originalTranscript = '', fileName = '', targetLanguage = 'pt-BR' } = {}){
+  const input = { translation, originalTranscript, fileName, targetLanguage };
+  lastDubSocialInput = input;
   const requestId = ++dubSocialRequestSeq;
   const card = document.getElementById('dubSocialPackage');
   const statusEl = document.getElementById('dubSocialStatus');
+  const regenerateButton = document.getElementById('regenerateDubSocialBtn');
   if(card) card.classList.remove('hidden');
+  if(regenerateButton){ regenerateButton.disabled = true; regenerateButton.textContent = '⏳ Gerando…'; }
   if(statusEl) statusEl.textContent = '⚡ Criando um tema/título e hashtags com base no conteúdo da dublagem…';
   try{
     const requestOptions = {
@@ -4009,7 +4017,17 @@ async function generateDubSocialPackage({ translation = '', originalTranscript =
     if(requestId !== dubSocialRequestSeq) return;
     const fallback = buildClientDubSocialFallback({ translation, originalTranscript, fileName, targetLanguage });
     renderDubSocialPackage(fallback, 'A IA de texto não respondeu; estas sugestões locais foram montadas com base no conteúdo.');
+  }finally{
+    if(requestId === dubSocialRequestSeq && regenerateButton){
+      regenerateButton.disabled = false;
+      regenerateButton.textContent = '🔄 Gerar outro';
+    }
   }
+}
+
+async function regenerateDubSocialPackage(){
+  if(!lastDubSocialInput){ toast('Gere a dublagem primeiro para criar novas sugestões.','warn'); return; }
+  await generateDubSocialPackage(lastDubSocialInput);
 }
 
 function copyDubSocialPackage(){
