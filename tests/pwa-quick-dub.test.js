@@ -30,6 +30,13 @@ test('quick dubbing keeps captions, social metadata, and automatic video export 
   assert.doesNotMatch(html, /quickSoundDesignPromise|analyzeQuickDubMusicTimeline|downloadDubBackgroundAudio/);
 });
 
+test('avatar thumbnails are lazy-loaded on demand at reduced resolution to avoid blocking mobile startup', () => {
+  assert.match(html, /if\(id==='avatar'\)\{\s*initAvatarPresets\(\);/);
+  assert.match(html, /buildStudioAvatarCanvas\(p, null, 224\)/);
+  assert.match(html, /requestIdleCallback\(renderBatch, \{ timeout: 160 \}\)/);
+  assert.doesNotMatch(html, /\/\/ Init\s*initAvatarPresets\(\);/);
+});
+
 test('PWA assets and page copies are present in both deployment roots', () => {
   const fs = require('node:fs');
   for (const rel of ['manifest.webmanifest', 'sw.js', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-512-maskable.png']) {
