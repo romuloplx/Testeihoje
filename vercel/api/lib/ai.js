@@ -1568,6 +1568,7 @@ const _deadUniKeys = new Set();
 const _uniKeyCooldown = {};
 const _uniModelCooldown = {};
 let _lastUniProbeCache = null;
+let _uniTtsCatalogCache = { models: [], expiresAt: 0 };
 
 // Modelos principais do Multi-IA Router (Unorouter — 265+ IAs integradas), ordenados pelos melhores para Criar Histórias & Personagens
 const UNI_CHAT_MODELS = [
@@ -2770,16 +2771,36 @@ async function ttsStreamElementsChunks({ text, voice = 'Brian' }) {
   return Buffer.concat(buffers);
 }
 
+async function getUnorouterTtsCatalog(key) {
+  if (_uniTtsCatalogCache.expiresAt > Date.now()) return _uniTtsCatalogCache.models;
+  const response = await fetch(uniBase() + '/models', {
+    headers: uniHeaders(key),
+    signal: AbortSignal.timeout(10000)
+  });
+  if (!response.ok) {
+    const detail = (await response.text().catch(() => '')).slice(0, 120);
+    throw new Error(`catálogo Unorouter HTTP ${response.status}${detail ? ': ' + detail : ''}`);
+  }
+  const data = await response.json();
+  const ids = (Array.isArray(data.data) ? data.data : []).map(model => model && model.id).filter(Boolean);
+  const models = uniTtsModels(ids);
+  _uniTtsCatalogCache = { models, expiresAt: Date.now() + 5 * 60 * 1000 };
+  return models;
+}
+
 async function unorouterTTS({ text, voice = 'onyx' }) {
   const keys = allValidUniKeys().filter(key => Date.now() >= (_uniKeyCooldown[key] || 0));
   if (!keys.length) throw new Error('sem chave Unorouter disponível');
   const input = String(text || '').trim().slice(0, 4096);
   if (!input) throw new Error('texto vazio');
   const voiceName = TTS_VOICES[voice] || 'alloy';
-  const models = [...new Set([...UNI_TTS_MODELS, 'tts-1'])];
   const errors = [];
 
   for (const key of keys) {
+    let discoveredModels = [];
+    try { discoveredModels = await getUnorouterTtsCatalog(key); }
+    catch (error) { errors.push(String(error && error.message || error).slice(0, 160)); }
+    const models = [...new Set([...discoveredModels, ...UNI_TTS_MODELS, 'tts-1'])];
     for (const model of models) {
       try {
         const response = await fetch(uniBase() + '/audio/speech', {
@@ -4870,7 +4891,7 @@ module.exports = {
   generateWithOpenAI, generateCreateFull, generateSceneImage, hasOpenRouterImageApiKey, lookupIceAndFireCharacters, generateCreateSceneVideo, startCreateSceneVideo, pollCreateSceneVideo, consumeCreateSceneVideoRequest, dubWithOpenAI, enhanceScript, generateDubSocialMetadata, analyzeDubSoundDesign, sanitizeDubSoundTimeline,
   generateAvatarPortrait, generateAvatarScript, generateAvatarVideo, detectAvatarFaceLandmarks,
   transcribeClipSegment, analyzeViralClips, extractYoutubeVideoId, fetchYoutubeVideoInfoAndStream, fetchVideoStreamChunk, fetchYoutubeClipMp4Segment,
-  chatWithFallback, adaptGemBodyForModel, buildGeminiTtsBody, buildOpenAITtsOptions, openAITtsModelsForVoice, geminiGenerateTried, cleanDubTranslationText, ttsWithFallback, runTtsProviderChain, isEdgeTtsHandshakeFailure,
+  chatWithFallback, adaptGemBodyForModel, buildGeminiTtsBody, buildOpenAITtsOptions, openAITtsModelsForVoice, geminiGenerateTried, cleanDubTranslationText, ttsWithFallback, runTtsProviderChain, isEdgeTtsHandshakeFailure, unorouterTTS, getUnorouterTtsCatalog,
   chatViaPollinations, ttsGoogle, ttsStreamElements,
   probeOpenAI, fullPipelineProbe, candidatesProbe, unorouterProbe, unorouterVideoProbe, getBody, send
 };
