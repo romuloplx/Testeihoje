@@ -2926,7 +2926,7 @@ async function extractSingleChunkStreaming(mediaEl, startSec, endSec, includeBac
   }
 
   const chunks = [];
-  const rec = new MediaRecorder(audioOnly, { mimeType: recMime, audioBitsPerSecond: 32000 });
+  const rec = new MediaRecorder(audioOnly, { mimeType: recMime, audioBitsPerSecond: 128000 });
   rec.ondataavailable = e => { if(e.data && e.data.size) chunks.push(e.data); };
   const stopped = new Promise(r => rec.onstop = r);
 
@@ -2954,21 +2954,40 @@ async function extractSingleChunkStreaming(mediaEl, startSec, endSec, includeBac
   const blob = new Blob(chunks, { type: recMime.split(';')[0] });
   const arr = new Uint8Array(await blob.arrayBuffer());
   let backgroundSideMono12k = null;
+  let originalMono12k = null;
   if(includeBackgroundSide){
     try{
       const AC = window.AudioContext || window.webkitAudioContext;
       const decodeCtx = new AC();
       const decoded = await decodeCtx.decodeAudioData(arr.buffer.slice(arr.byteOffset, arr.byteOffset + arr.byteLength));
       backgroundSideMono12k = getCenterCancelledMono12k(decoded);
+      originalMono12k = getDownmixedMono12k(decoded);
       await decodeCtx.close().catch(()=>{});
-    }catch(error){ console.warn('Não foi possível preparar a redução vocal do áudio original deste trecho:', error); }
+    }catch(error){ console.warn('Não foi possível preparar a separação estéreo deste trecho:', error); }
   }
   return {
     base64: bytesToBase64(arr),
     audioMime: recMime.startsWith('video/') ? 'audio/webm' : recMime.split(';')[0],
     seconds: dur,
-    backgroundSideMono12k
+    backgroundSideMono12k,
+    originalMono12k
   };
+}
+
+function getDownmixedMono12k(audioBuffer){
+  if(!audioBuffer || !audioBuffer.numberOfChannels) return null;
+  const sampleRate = 12000;
+  const length = Math.max(1, Math.floor(audioBuffer.duration * sampleRate));
+  const output = new Float32Array(length);
+  const channels = Array.from({ length: audioBuffer.numberOfChannels }, (_, index) => audioBuffer.getChannelData(index));
+  for(let i = 0; i < length; i++){
+    const pos = i * audioBuffer.sampleRate / sampleRate;
+    const idx = Math.floor(pos), frac = pos - idx;
+    let sum = 0;
+    for(const channel of channels) sum += (channel[idx] || 0) * (1 - frac) + (channel[idx + 1] || 0) * frac;
+    output[i] = sum / channels.length;
+  }
+  return output;
 }
 
 function getCenterCancelledMono12k(audioBuffer){
@@ -2995,6 +3014,8 @@ async function prepareAudioExtractionPlan(file, rangeStart, rangeEnd, onMsg, inc
   let mono12k = null;
   let backgroundSideMono12k = null;
   const backgroundSideChunks = [];
+  const originalMonoChunks = [];
+  let originalMono12k = null;
   let totalFileDuration = 0;
   const TARGET_SR = 12000;
 
@@ -3065,6 +3086,19 @@ async function prepareAudioExtractionPlan(file, rangeStart, rangeEnd, onMsg, inc
       backgroundSideChunks.length = 0;
       return backgroundSideMono12k;
     },
+    getOriginalMono12k(){
+      if(mono12k) return mono12k;
+      if(originalMono12k) return originalMono12k;
+      if(!originalMonoChunks.length || originalMonoChunks.length !== windows.length) return null;
+      const full = new Float32Array(Math.ceil(totalFileDuration * TARGET_SR));
+      for(const segment of originalMonoChunks){
+        const offset = Math.max(0, Math.floor(segment.startSec * TARGET_SR));
+        if(offset < full.length) full.set(segment.samples.subarray(0, full.length - offset), offset);
+      }
+      originalMono12k = full;
+      originalMonoChunks.length = 0;
+      return originalMono12k;
+    },
     async getChunkPayload(idx){
       const w = windows[idx];
       if(mono12k){
@@ -3076,6 +3110,7 @@ async function prepareAudioExtractionPlan(file, rangeStart, rangeEnd, onMsg, inc
       }
       const extracted = await extractSingleChunkStreaming(streamEl, w.startSec, w.endSec, includeBackgroundSide);
       if(extracted.backgroundSideMono12k) backgroundSideChunks.push({ startSec: w.startSec, samples: extracted.backgroundSideMono12k });
+      if(extracted.originalMono12k) originalMonoChunks.push({ startSec: w.startSec, samples: extracted.originalMono12k });
       return extracted;
     },
     cleanup(){
@@ -4038,7 +4073,7 @@ async function dubVideo(options={}){
       const master = assembleDubbedMasterAudio({
         chunkOutputs,
         totalDurationSec: lastDubTotalDuration,
-        origMono12k: plan.mono12k,
+        origMono12k: plan.mono12k || plan.getOriginalMono12k(),
         origSideMono12k: backgroundSideMono12k,
         bgMixMode,
       });
