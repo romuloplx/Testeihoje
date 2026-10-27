@@ -3846,7 +3846,7 @@ async function dubVideo(options={}){
   const language = $('#language').value;
   const dubVoice = $('#dubVoice').value;
   const targetLanguage = $('#targetLanguage').value;
-  const bgMixMode = (document.getElementById('dubBgMix')||{}).value || 'mute';
+  let bgMixMode = (document.getElementById('dubBgMix')||{}).value || 'mute';
   const rangeMode = (document.getElementById('dubRangeMode')||{}).value || 'full';
   const btn = $('#dubBtn');
   const stopBtn = document.getElementById('dubStopBtn');
@@ -3883,7 +3883,10 @@ async function dubVideo(options={}){
     plan = await prepareAudioExtractionPlan(file, trimStart, trimEnd, m => showStatus('dubStatus', m, 'info'), bgMixMode === 'duck-no-vocals');
     if(bgMixMode === 'duck-no-vocals' && !plan.useStreaming){
       backgroundSideMono12k = plan.getBackgroundSideMono12k();
-      if(!backgroundSideMono12k) throw new Error('Não foi possível reduzir a voz original: o arquivo precisa ter duas faixas estéreo. Áudio mono não permite essa redução.');
+      if(!backgroundSideMono12k){
+        bgMixMode = 'duck';
+        showStatus('dubStatus','⚠️ Não foi possível separar o canal central deste áudio. A dublagem continuará com o áudio original sem redução de voz.','warn');
+      }
     }
     const totalChunks = plan.windows.length;
     const chunkOutputs = [];
@@ -3903,7 +3906,7 @@ async function dubVideo(options={}){
 
       const chunkAudio = await plan.getChunkPayload(i);
       if(bgMixMode === 'duck-no-vocals' && plan.useStreaming && !chunkAudio.backgroundSideMono12k){
-        throw new Error('Não foi possível separar o áudio original em estéreo neste trecho. A voz pode permanecer; não dá para aplicar a redução em mono.');
+        // Alguns navegadores entregam o stream capturado em mono; a decisão de fallback ocorre após os blocos.
       }
 
       setStep(['d1','d2','d3','d4'], 2);
@@ -4017,7 +4020,10 @@ async function dubVideo(options={}){
     const anyRealVoice = chunkOutputs.some(c => c.hasRealAudio);
     if(bgMixMode === 'duck-no-vocals' && plan.useStreaming){
       backgroundSideMono12k = plan.getBackgroundSideMono12k();
-      if(!backgroundSideMono12k) throw new Error('Não foi possível reduzir a voz original: o arquivo precisa ter áudio estéreo. Áudio mono não permite essa redução.');
+      if(!backgroundSideMono12k){
+        bgMixMode = 'duck';
+        showStatus('dubStatus','⚠️ Este navegador não preservou o estéreo no trecho capturado. A dublagem continuará com o áudio original sem redução de voz.','warn');
+      }
     }
     lastDubChunksTimeline = chunkOutputs;
     lastDubTotalDuration = Math.max(plan.totalFileDuration, plan.effEnd);
