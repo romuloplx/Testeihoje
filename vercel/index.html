@@ -1060,7 +1060,7 @@ input[type="range"]{
 
     <div style="margin-top:14px;padding:13px;border:1px solid #22c55e88;border-radius:13px;background:linear-gradient(135deg,#08251d,#10172c)">
       <button type="button" id="dubQuickModeBtn" onclick="startQuickDubbing()" style="width:100%;padding:14px 16px;border:0;border-radius:11px;background:linear-gradient(135deg,#16a34a,#0e7490);color:#fff;font-size:15px;font-weight:900;cursor:pointer">⚡ DUBLAGEM RÁPIDA — fazer tudo automaticamente</button>
-      <div class="hint" style="margin:8px 2px 0">Duble em português, gere vídeo com legendas sincronizadas, título/legenda/hashtags para revisar e uma trilha instrumental nova escolhida pelo clima do áudio. Ao concluir, o vídeo é exportado automaticamente. Requer internet.</div>
+      <div class="hint" style="margin:8px 2px 0">Duble em português, gere legendas sincronizadas e sugestões de publicação. O áudio é analisado em trechos: uma trilha instrumental original muda de clima e intensidade conforme cada momento, com volume reduzido durante a fala. Ao concluir, o vídeo é exportado automaticamente. Requer internet.</div>
     </div>
     <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
       <button class="primary" id="dubBtn" onclick="dubVideo()" style="flex:1;min-width:240px">🎙️ Dublar Vídeo Completo Agora (Pequeno ou Grande)</button>
@@ -3154,6 +3154,7 @@ const DUB_BG_LOOP_CACHE = {};
 let dubCustomMusic24k = null;
 let dubCustomMusicName = '';
 let lastDubOrigMono12k = null;
+let lastDubMusicTimeline = null;
 let dubBgPreviewState = null;
 
 function formatBgVolLabel(pct){
@@ -3483,6 +3484,7 @@ function remixDubBackgroundInstant(){
     totalDurationSec: lastDubTotalDuration,
     origMono12k: lastDubOrigMono12k,
     bgMixMode,
+    musicTimeline: lastDubMusicTimeline,
     bgMusicStyle,
     bgMusicVol
   });
@@ -3583,7 +3585,7 @@ function detectOrigSpeechStartOffset(origMono12k, chunkStartSec, chunkEndSec){
 }
 
 // Monta o Áudio Master 24kHz sincronizado do segundo 0:00 até o fim do vídeo (com timbre humano 100% preservado!)
-function assembleDubbedMasterAudio({ chunkOutputs, totalDurationSec, origMono12k, bgMixMode = 'mute', bgMusicStyle = null, bgMusicVol = null }){
+function assembleDubbedMasterAudio({ chunkOutputs, totalDurationSec, origMono12k, bgMixMode = 'mute', bgMusicStyle = null, bgMusicVol = null, musicTimeline = null }){
   const SR = 24000;
   const totalSamples = Math.max(SR, Math.ceil(totalDurationSec * SR));
   const AC = window.AudioContext || window.webkitAudioContext;
@@ -3599,6 +3601,9 @@ function assembleDubbedMasterAudio({ chunkOutputs, totalDurationSec, origMono12k
     ? bgMusicVol
     : (Number((document.getElementById('dubBgMusicVol')||{}).value ?? 12) / 100);
   const musicLoop = chosenVol > 0.001 ? getStudioMusicLoop24k(chosenStyle) : null;
+  const adaptiveMusic = chosenVol > 0.001 && Array.isArray(musicTimeline) && musicTimeline.length > 0 && chosenStyle !== 'custom'
+    ? musicTimeline.map(segment => ({ ...segment, loop: getStudioMusicLoop24k(segment.style) })).filter(segment => segment.loop)
+    : null;
 
   for(let i = 0; i < chunkOutputs.length; i++){
     const seg = chunkOutputs[i];
@@ -3645,6 +3650,7 @@ function assembleDubbedMasterAudio({ chunkOutputs, totalDurationSec, origMono12k
   const fadeOutSamples = Math.min(Math.floor(SR * 1.5), Math.floor(totalSamples * 0.18));
   let origGainSmooth = 0.14;
   let musicDuckSmooth = speechMask[0] ? 0.52 : 1.0;
+  let musicSegmentIndex = 0;
 
   for(let i = 0; i < totalSamples; i++){
     let add = 0;
@@ -3659,15 +3665,34 @@ function assembleDubbedMasterAudio({ chunkOutputs, totalDurationSec, origMono12k
         add += origSample * origGainSmooth;
       }
     }
-    if(musicLoop && musicLoop.length > 0){
-      // Sidechain suave: desce p/ 52% em ~80ms quando há voz; sobe suavemente p/ 100% em ~420ms nas pausas!
+    const timelineSegment = adaptiveMusic && adaptiveMusic.length
+      ? adaptiveMusic[Math.min(musicSegmentIndex, adaptiveMusic.length - 1)]
+      : null;
+    if(timelineSegment && i / SR >= timelineSegment.endSec && musicSegmentIndex < adaptiveMusic.length - 1) musicSegmentIndex++;
+    const activeSegment = timelineSegment && adaptiveMusic ? adaptiveMusic[Math.min(musicSegmentIndex, adaptiveMusic.length - 1)] : null;
+    if((activeSegment && activeSegment.loop.length) || (musicLoop && musicLoop.length > 0)){
+      // Alterna o arranjo por momento com transição cruzada; sidechain reduz a música sob a fala.
       const targetDuck = speechMask[i] ? 0.52 : 1.0;
       const coeff = speechMask[i] ? 0.00095 : 0.00018;
       musicDuckSmooth += (targetDuck - musicDuckSmooth) * coeff;
       let masterFade = 1;
       if(fadeInSamples > 0 && i < fadeInSamples) masterFade = i / fadeInSamples;
       else if(fadeOutSamples > 0 && i > totalSamples - fadeOutSamples) masterFade = (totalSamples - i) / fadeOutSamples;
-      add += musicLoop[i % musicLoop.length] * (chosenVol * 1.25) * musicDuckSmooth * masterFade;
+      let musicSample = musicLoop ? musicLoop[i % musicLoop.length] : 0;
+      if(activeSegment){
+        const segLoop = activeSegment.loop;
+        const localTime = Math.max(0, i / SR - activeSegment.startSec);
+        musicSample = segLoop[Math.floor(localTime * SR) % segLoop.length];
+        const previousSegment = adaptiveMusic[Math.max(0, musicSegmentIndex - 1)];
+        const fadeSec = 1.6;
+        if(musicSegmentIndex > 0 && localTime < fadeSec && previousSegment && previousSegment.loop){
+          const blend = Math.max(0, Math.min(1, localTime / fadeSec));
+          const priorTime = Math.max(0, i / SR - previousSegment.startSec);
+          const prior = previousSegment.loop[Math.floor(priorTime * SR) % previousSegment.loop.length];
+          musicSample = prior * (1 - blend) + musicSample * blend;
+        }
+      }
+      add += musicSample * (chosenVol * 1.25) * musicDuckSmooth * masterFade;
     }
     master[i] = Math.max(-0.98, Math.min(0.98, master[i] + add));
   }
@@ -4247,6 +4272,23 @@ function analyzeQuickDubMusic(samples,sampleRate=12000){
   return {style,label,confidence:frames>200?'estimada':'baixa',energy:mean,brightness};
 }
 
+// Divide a trilha de referência em momentos para criar uma música que acompanha a energia ao longo do vídeo.
+function analyzeQuickDubMusicTimeline(samples,sampleRate=12000,totalDurationSec=0,segmentSec=12){
+  if(!samples || !samples.length) return [];
+  const duration=Math.min(totalDurationSec || samples.length/sampleRate,samples.length/sampleRate);
+  const timeline=[];
+  let fallbackStyle='soft_piano';
+  for(let startSec=0;startSec<duration;startSec+=segmentSec){
+    const endSec=Math.min(duration,startSec+segmentSec);
+    const start=Math.floor(startSec*sampleRate),end=Math.min(samples.length,Math.ceil(endSec*sampleRate));
+    const sample=samples.subarray(start,end);
+    const profile=analyzeQuickDubMusic(sample,sampleRate);
+    if(sample.length>=sampleRate*2) fallbackStyle=profile.style;
+    timeline.push({startSec,endSec,style:sample.length>=sampleRate*2?profile.style:fallbackStyle,label:profile.label||'calmo e suave'});
+  }
+  return timeline;
+}
+
 async function startQuickDubbing(){
   const file=currentDubFile || document.getElementById('videoFile')?.files?.[0];
   if(!file){
@@ -4313,12 +4355,19 @@ async function dubVideo(options={}){
     const trimEnd = rangeMode === 'trim' ? parseTimeInput(document.getElementById('dubTrimEnd').value, 0) : 0;
 
     plan = await prepareAudioExtractionPlan(file, trimStart, trimEnd, m => showStatus('dubStatus', m, 'info'));
+    let quickMusicTimeline=null;
     if(quickMode){
       const selectedMusic=(document.getElementById('dubBgMusicStyle')||{}).value||'soft_piano';
-      const reference=selectedMusic==='custom'&&dubCustomMusic24k?dubCustomMusic24k:plan.mono12k;
-      const profile=analyzeQuickDubMusic(reference,selectedMusic==='custom'&&dubCustomMusic24k?24000:12000);
-      onChangeDubBgMusicStyle(profile.style,'quick');
-      showStatus('dubStatus',`🎼 Analisando o áudio de referência (${profile.label}) e criando uma trilha instrumental nova para a dublagem…`,'info');
+      if(selectedMusic!=='custom' && plan.mono12k){
+        quickMusicTimeline=analyzeQuickDubMusicTimeline(plan.mono12k,12000,plan.effEnd-plan.effStart);
+        const moods=[...new Set(quickMusicTimeline.map(moment=>moment.label))].slice(0,3).join(', ')||'calmo e suave';
+        const firstStyle=quickMusicTimeline[0]?.style||'soft_piano';
+        onChangeDubBgMusicStyle(firstStyle,'quick');
+        showStatus('dubStatus',`🎼 Analisando a energia do áudio em ${quickMusicTimeline.length} momentos e criando uma trilha instrumental que acompanha o vídeo (${moods})…`,'info');
+      }else{
+        quickMusicTimeline=null;
+        showStatus('dubStatus','🎼 Usando sua música selecionada como fundo, com volume reduzido automaticamente durante a fala…','info');
+      }
     }
     const totalChunks = plan.windows.length;
     const chunkOutputs = [];
@@ -4449,6 +4498,7 @@ async function dubVideo(options={}){
     const anyRealVoice = chunkOutputs.some(c => c.hasRealAudio);
     lastDubChunksTimeline = chunkOutputs;
     lastDubOrigMono12k = plan.mono12k ? new Float32Array(plan.mono12k) : null;
+    lastDubMusicTimeline = quickMusicTimeline;
     lastDubTotalDuration = Math.max(plan.totalFileDuration, plan.effEnd);
 
     if(dubAudioURL){ URL.revokeObjectURL(dubAudioURL); dubAudioURL = null; }
@@ -4462,7 +4512,8 @@ async function dubVideo(options={}){
         chunkOutputs,
         totalDurationSec: lastDubTotalDuration,
         origMono12k: plan.mono12k,
-        bgMixMode
+        bgMixMode,
+        musicTimeline: quickMusicTimeline
       });
       lastDubMasterBuffer = master.audioBuffer;
       lastDubAudioBlob = master.wavBlob;
