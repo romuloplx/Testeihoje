@@ -1155,6 +1155,7 @@ input[type="range"]{
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="primary" type="button" onclick="playDubbed()" style="padding:9px 14px">▶️ Assistir vídeo sincronizado agora (instantâneo)</button>
             <a id="dubDownload" class="ghost" download="dublagem-completa.wav" style="padding:9px 14px;text-decoration:none">🎙️ Baixar áudio dublado (.WAV)</a>
+            <button class="ghost" type="button" onclick="downloadDubBackgroundAudio()">🎼 Baixar áudio de fundo (.WAV)</button>
             <button class="ghost" type="button" onclick="downloadDubSRT()">📜 Baixar legendas traduzidas (.SRT)</button>
           </div>
         </div>
@@ -3518,6 +3519,67 @@ function togglePreviewDubBgMusic(){
 }
 
 // Re-mixa instantaneamente (<0.15s em RAM) a dublagem já pronta sem precisar chamar IA de novo!
+function downloadDubBackgroundAudio(){
+  if(!lastDubChunksTimeline || !lastDubChunksTimeline.length || !lastDubTotalDuration){
+    toast('Faça a dublagem primeiro para gerar o áudio de fundo.','warn');
+    return;
+  }
+  const selectedStyle = (document.getElementById('dubPostBgStyle') || document.getElementById('dubBgMusicStyle') || {}).value || 'soft_piano';
+  if(selectedStyle === 'none'){
+    toast('Selecione um som de fundo antes de baixar.','warn');
+    return;
+  }
+  const duration = lastDubTotalDuration;
+  const sampleRate = 24000;
+  const length = Math.max(sampleRate, Math.ceil(duration * sampleRate));
+  const music = new Float32Array(length);
+  const timeline = selectedStyle !== 'custom' && Array.isArray(lastDubMusicTimeline) && lastDubMusicTimeline.length
+    ? lastDubMusicTimeline.map(segment => ({ ...segment, loop: getStudioMusicLoop24k(segment.style) })).filter(segment => segment.loop && segment.loop.length)
+    : [];
+  const singleLoop = timeline.length ? null : getStudioMusicLoop24k(selectedStyle);
+  if(!timeline.length && (!singleLoop || !singleLoop.length)){
+    toast(selectedStyle === 'custom' ? 'Escolha/carregue uma música personalizada antes de baixar.' : 'Não foi possível preparar o áudio de fundo.','warn');
+    return;
+  }
+  let index = 0;
+  const crossfade = Math.floor(sampleRate * 1.6);
+  const fadeIn = Math.floor(sampleRate * 1.2);
+  const fadeOut = Math.floor(sampleRate * 1.5);
+  for(let i = 0; i < length; i++){
+    const time = i / sampleRate;
+    while(timeline.length && index < timeline.length - 1 && time >= Number(timeline[index].endSec || 0)) index++;
+    const active = timeline.length ? timeline[index] : null;
+    const loop = active ? active.loop : singleLoop;
+    const localTime = active ? Math.max(0, time - Number(active.startSec || 0)) : time;
+    let value = loop[Math.floor(localTime * sampleRate) % loop.length];
+    if(active && index > 0 && localTime < 1.6){
+      const previous = timeline[index - 1];
+      const previousTime = Math.max(0, time - Number(previous.startSec || 0));
+      const mix = Math.max(0, Math.min(1, localTime / 1.6));
+      value = previous.loop[Math.floor(previousTime * sampleRate) % previous.loop.length] * (1 - mix) + value * mix;
+    }
+    const fade = fadeIn && i < fadeIn ? i / fadeIn : fadeOut && i > length - fadeOut ? (length - i) / fadeOut : 1;
+    music[i] = value * fade;
+  }
+  let peak = 0;
+  for(const sample of music) peak = Math.max(peak, Math.abs(sample));
+  if(peak > 0.00001){
+    const gain = 0.82 / peak;
+    for(let i = 0; i < music.length; i++) music[i] *= gain;
+  }
+  const blob = new Blob([encodeWavMono(music, sampleRate)], { type:'audio/wav' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  const fileBase = (document.getElementById('dubDownload')?.download || 'dublagem.wav').replace(/-dublado.*$/i, '').replace(/\.wav$/i, '') || 'dublagem';
+  link.href = url;
+  link.download = `${fileBase}-audio-de-fundo.wav`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  toast('🎼 Áudio de fundo baixado em WAV.');
+}
+
 function remixDubBackgroundInstant(){
   if(!lastDubChunksTimeline || !lastDubChunksTimeline.length || !lastDubTotalDuration) return;
   stopPreviewDubBgMusic();
