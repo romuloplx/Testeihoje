@@ -1727,6 +1727,7 @@ function openTab(id, button){
   if(id==='projects') loadProjects();
   if(id==='review-queue' && typeof renderDubReviewQueue==='function') void renderDubReviewQueue();
   if(id==='avatar'){
+    initAvatarPresets();
     if(!avatarLiveState.playing) avatarLiveState.clickPulseUntil = performance.now() + 1800;
     ensureAvatarLoop();
   }
@@ -6660,8 +6661,8 @@ let avatarLiveState = { playing:false, audioCtx:null, sourceNode:null, profile:n
 let avatarCreatedVideoURL = null, avatarCreatedAudioURL = null, lastAvatarThumbDataUrl = '';
 let avatarExtraBullets = [];
 
-function buildStudioAvatarCanvas(p, targetCanvas){
-  const S = AVATAR_SIZE;
+function buildStudioAvatarCanvas(p, targetCanvas, size = AVATAR_SIZE){
+  const S = size;
   const c = targetCanvas || document.createElement('canvas');
   c.width = S; c.height = S;
   const g = c.getContext('2d');
@@ -6893,21 +6894,34 @@ function buildStudioAvatarCanvas(p, targetCanvas){
   return c;
 }
 
+let avatarPresetsInitStarted = false;
 function initAvatarPresets(){
   const grid = document.getElementById('avatarPresetGrid');
-  if(!grid) return;
+  if(!grid || avatarPresetsInitStarted) return;
+  avatarPresetsInitStarted = true;
   grid.innerHTML = '';
-  AVATAR_PRESETS.forEach((p, idx) => {
-    const c = buildStudioAvatarCanvas(p);
-    const thumb = c.toDataURL('image/jpeg', 0.86);
-    p._thumb = thumb;
-    const div = document.createElement('div');
-    div.className = 'avatar-item' + (idx === 0 ? ' active' : '');
-    div.id = 'av-card-' + p.id;
-    div.onclick = () => selectStudioAvatar(p.id);
-    div.innerHTML = `<img src="${thumb}" alt="${p.name}"><div class="av-name">${p.name}</div><div class="av-role">${p.role}</div>`;
-    grid.appendChild(div);
-  });
+  let idx = 0;
+  const renderBatch = deadline => {
+    const startedAt = performance.now();
+    while(idx < AVATAR_PRESETS.length && (idx === 0 || performance.now() - startedAt < 8) && (!deadline || deadline.timeRemaining() > 1 || idx === 0)){
+      const p = AVATAR_PRESETS[idx];
+      const c = buildStudioAvatarCanvas(p, null, 224);
+      const thumb = c.toDataURL('image/jpeg', 0.72);
+      p._thumb = thumb;
+      const div = document.createElement('div');
+      div.className = 'avatar-item' + (idx === 0 ? ' active' : '');
+      div.id = 'av-card-' + p.id;
+      div.onclick = () => selectStudioAvatar(p.id);
+      div.innerHTML = `<img src="${thumb}" alt="${p.name}" loading="lazy"><div class="av-name">${p.name}</div><div class="av-role">${p.role}</div>`;
+      grid.appendChild(div);
+      idx++;
+    }
+    if(idx < AVATAR_PRESETS.length){
+      if('requestIdleCallback' in window) requestIdleCallback(renderBatch, { timeout: 160 });
+      else setTimeout(() => renderBatch(null), 24);
+    }
+  };
+  renderBatch(null);
   selectStudioAvatar('clara', true);
 }
 
@@ -13083,7 +13097,6 @@ if('serviceWorker' in navigator && (location.protocol==='https:' || location.hos
 }
 
 // Init
-initAvatarPresets();
 checkHealth();
 loadProjects();
 renderDubReviewQueue();
