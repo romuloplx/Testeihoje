@@ -96,8 +96,10 @@ test('Dublagem silences the source audio by default and makes it an explicit opt
   const mixOptions = html.match(/<select id="dubBgMix">([\s\S]*?)<\/select>/)?.[1] || '';
   assert.match(mixOptions, /<option value="mute" selected>/);
   assert.match(mixOptions, /<option value="duck">/);
-  assert.match(html, /function assembleDubbedMasterAudio\(\{[^}]+bgMixMode = 'mute'/s);
-  assert.match(html, /const hasOrigDuck = \(bgMixMode === 'duck'/);
+  assert.match(mixOptions, /<option value="duck-no-vocals">🎼 Manter instrumental original, reduzindo a voz/);
+  assert.match(html, /function assembleDubbedMasterAudio\(\{[^}]+origSideMono12k = null[^}]+bgMixMode = 'mute'/s);
+  assert.match(html, /const originalBackground = bgMixMode === 'duck-no-vocals' \? origSideMono12k : origMono12k/);
+  assert.match(html, /Áudio mono não permite essa redução/);
 });
 
 test('Dublagem displays the generated topic, caption and hashtags with a one-tap copy action', () => {
