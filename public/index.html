@@ -3135,6 +3135,31 @@ function resampleChannelLinear(input, outLength){
   return out;
 }
 
+// Remove apenas o silêncio nas extremidades do áudio sintetizado, preservando uma margem para evitar cortar fonemas.
+function stripVoiceEdgeSilence(samples, sr){
+  if(!samples || !samples.length || !sr) return samples;
+  let peak = 0;
+  for(let i = 0; i < samples.length; i++) peak = Math.max(peak, Math.abs(samples[i]));
+  if(peak < 1e-5) return samples;
+  const threshold = Math.max(0.0015, peak * 0.018);
+  const windowSize = Math.max(1, Math.floor(sr * 0.01));
+  const padding = Math.floor(sr * 0.035);
+  let first = -1, last = -1;
+  for(let start = 0; start < samples.length; start += windowSize){
+    const end = Math.min(samples.length, start + windowSize);
+    let squareSum = 0;
+    for(let i = start; i < end; i++) squareSum += samples[i] * samples[i];
+    if(Math.sqrt(squareSum / (end - start)) >= threshold){
+      if(first < 0) first = start;
+      last = end;
+    }
+  }
+  if(first < 0 || last <= first) return samples;
+  const start = Math.max(0, first - padding);
+  const end = Math.min(samples.length, last + padding);
+  return end - start >= Math.floor(sr * 0.08) ? samples.subarray(start, end) : samples;
+}
+
 // Encurta pausas longas de respiração sem encostar em uma única sílaba falada (preserva 100% o timbre humano!)
 function trimBreathSilences(samples, sr){
   if(!samples || samples.length < sr * 0.4) return samples;

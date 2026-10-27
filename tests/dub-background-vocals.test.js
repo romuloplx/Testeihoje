@@ -27,6 +27,21 @@ test('center-cancel option keeps original stereo instrumental at dubbing mix tim
   assert.equal(context.reduce({ ...stereoBuffer, numberOfChannels: 1 }), null);
 });
 
+test('voice edge silence trimming is defined and preserves speech with a safety margin', () => {
+  const helper = html.match(/function stripVoiceEdgeSilence\(samples, sr\)\{[\s\S]*?\n\}/)?.[0];
+  assert.ok(helper, 'stripVoiceEdgeSilence should be available to the master audio assembler');
+  const context = vm.createContext({ Float32Array, Math });
+  vm.runInContext(`${helper};globalThis.strip=stripVoiceEdgeSilence;`, context);
+  const samples = new Float32Array(500);
+  samples.fill(0.1, 100, 300);
+  const trimmed = context.strip(samples, 1000);
+  assert.ok(trimmed.length < samples.length);
+  assert.ok(trimmed.length > 200, 'the safety margin should protect the speech onset and ending');
+  assert.equal(trimmed[0], 0);
+  assert.equal(trimmed[trimmed.length - 1], 0);
+  assert.equal(context.strip(new Float32Array(100), 1000).length, 100);
+});
+
 test('Dublar removed the separate synthetic/custom music panel', () => {
   assert.doesNotMatch(html, /Som \/ Música de Fundo Leve \(Auto-Ducking Inteligente\)/);
   assert.doesNotMatch(html, /dubBgMusicStyle|dubBgMusicVol|dubPostBgStyle|dubCustomMusicFile|dubRemoveMusicVocals/);
