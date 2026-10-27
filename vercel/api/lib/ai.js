@@ -3017,9 +3017,21 @@ const FREETTS_VOICES = {
   'it-IT': { female: 'it-IT-ElsaNeural', male: 'it-IT-DiegoNeural' },
   'ja-JP': { female: 'ja-JP-NanamiNeural', male: 'ja-JP-KeitaNeural' }
 };
+const FREETTS_DIRECT_VOICE_IDS = new Set([
+  'pt-BR-FranciscaNeural', 'pt-BR-AntonioNeural', 'pt-BR-BrendaNeural', 'pt-BR-HumbertoNeural',
+  'en-US-JennyNeural', 'en-US-GuyNeural', 'en-US-AvaNeural', 'en-US-AndrewNeural', 'en-US-BrianNeural', 'en-US-EmmaNeural',
+  'es-MX-DaliaNeural', 'es-MX-JorgeNeural', 'fr-FR-DeniseNeural', 'fr-FR-HenriNeural',
+  'de-DE-KatjaNeural', 'de-DE-ConradNeural', 'it-IT-ElsaNeural', 'it-IT-DiegoNeural',
+  'ja-JP-NanamiNeural', 'ja-JP-KeitaNeural'
+]);
 const FEMALE_TTS_VOICES = new Set(['nova', 'shimmer', 'coral', 'sage', 'alloy', 'ballad', 'marin']);
 
 function freeTtsVoiceId(lang = 'pt-BR', voice = 'onyx') {
+  const explicitId = String(voice || '').startsWith('freetts:') ? String(voice).slice('freetts:'.length) : '';
+  if (explicitId) {
+    if (!FREETTS_DIRECT_VOICE_IDS.has(explicitId)) throw new Error('Voz FreeTTS não reconhecida');
+    return explicitId;
+  }
   const key = TTS_LANGS[String(lang)] || TTS_LANGS[String(lang).split(/[-_]/)[0]];
   const locale = key || 'pt-BR';
   const catalog = FREETTS_VOICES[locale] || FREETTS_VOICES['pt-BR'];
@@ -3055,6 +3067,16 @@ async function freeTts({ text, voice = 'onyx', lang = 'pt-BR' }) {
 async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR', emotion = '', exactTextOnly = false } = {}, testProviders = null) {
   const cleanText = String(text || '').trim();
   if (!cleanText) return { error: 'texto vazio', errors: ['texto vazio'] };
+
+  // Voz FreeTTS escolhida diretamente: não trocar por outro timbre/provedor em caso de falha.
+  if (String(voice || '').startsWith('freetts:')) {
+    return runTtsProviderChain([{
+      name: 'freetts',
+      run: () => testProviders && typeof testProviders.freetts === 'function'
+        ? testProviders.freetts({ text: cleanText, voice, lang, emotion })
+        : freeTts({ text: cleanText, voice, lang })
+    }]);
+  }
 
   // Injeção interna para testes unitários; as rotas HTTP não encaminham dados do usuário aqui.
   if (testProviders && typeof testProviders === 'object') {
