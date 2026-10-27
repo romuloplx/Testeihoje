@@ -439,6 +439,11 @@ app.post('/api/dub', async (req, res) => {
       const metadata = await require('./vercel/api/lib/ai').generateDubSocialMetadata(body);
       return res.json(metadata);
     }
+    if (body.action === 'sound-design') {
+      const result = await require('./vercel/api/lib/ai').analyzeDubSoundDesign(body);
+      res.set('Cache-Control', 'no-store, private');
+      return res.json(result);
+    }
     const {
       fileName,
       fileSize,
