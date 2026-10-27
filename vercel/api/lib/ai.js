@@ -3008,6 +3008,50 @@ function openAITtsModelsForVoice(voice) {
 
 // Na dublagem estrita, use apenas serviços que recebem texto e voz selecionada diretamente.
 // Se esses serviços falharem, é preferível falhar claramente a trocar silenciosamente de voz.
+const FREETTS_VOICES = {
+  'pt-BR': { female: 'pt-BR-FranciscaNeural', male: 'pt-BR-AntonioNeural' },
+  'en-US': { female: 'en-US-JennyNeural', male: 'en-US-GuyNeural' },
+  'es-MX': { female: 'es-MX-DaliaNeural', male: 'es-MX-JorgeNeural' },
+  'fr-FR': { female: 'fr-FR-DeniseNeural', male: 'fr-FR-HenriNeural' },
+  'de-DE': { female: 'de-DE-KatjaNeural', male: 'de-DE-ConradNeural' },
+  'it-IT': { female: 'it-IT-ElsaNeural', male: 'it-IT-DiegoNeural' },
+  'ja-JP': { female: 'ja-JP-NanamiNeural', male: 'ja-JP-KeitaNeural' }
+};
+const FEMALE_TTS_VOICES = new Set(['nova', 'shimmer', 'coral', 'sage', 'alloy', 'ballad', 'marin']);
+
+function freeTtsVoiceId(lang = 'pt-BR', voice = 'onyx') {
+  const key = TTS_LANGS[String(lang)] || TTS_LANGS[String(lang).split(/[-_]/)[0]];
+  const locale = key || 'pt-BR';
+  const catalog = FREETTS_VOICES[locale] || FREETTS_VOICES['pt-BR'];
+  return catalog[FEMALE_TTS_VOICES.has(voice) ? 'female' : 'male'];
+}
+
+async function freeTts({ text, voice = 'onyx', lang = 'pt-BR' }) {
+  const apiKey = process.env.FREETTS_API_KEY;
+  if (!apiKey) throw new Error('FREETTS_API_KEY não configurada');
+  const response = await fetch('https://freetts.org/api/v1/tts', {
+    method: 'POST',
+    headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, voice: freeTtsVoiceId(lang, voice), output_format: 'mp3' }),
+    signal: AbortSignal.timeout(30000)
+  });
+  if (!response.ok) {
+    const detail = (await response.text()).slice(0, 240);
+    throw new Error(`FreeTTS HTTP ${response.status}${detail ? `: ${detail}` : ''}`);
+  }
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    const data = await response.json();
+    if (data.error || data.message) throw new Error(String(data.error || data.message).slice(0, 240));
+    const encoded = data.audio || data.audio_base64 || data.data;
+    if (typeof encoded !== 'string') throw new Error('FreeTTS retornou JSON sem áudio');
+    return { buffer: Buffer.from(encoded.replace(/^data:audio\/[^;]+;base64,/i, ''), 'base64'), provider: 'freetts' };
+  }
+  const buffer = Buffer.from(await response.arrayBuffer());
+  if (!buffer.length) throw new Error('FreeTTS retornou áudio vazio');
+  return { buffer, provider: 'freetts' };
+}
+
 async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR', emotion = '', exactTextOnly = false } = {}, testProviders = null) {
   const cleanText = String(text || '').trim();
   if (!cleanText) return { error: 'texto vazio', errors: ['texto vazio'] };
@@ -3022,6 +3066,7 @@ async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR', emotion =
       : [openAiAttempt, edgeAttempt];
     const injected = [
       ...preferredAttempts,
+      ['freetts', testProviders.freetts],
       ['gemini-tts', testProviders.gemini],
       ['unorouter-tts', testProviders.unorouter],
       ['google-translate-tts', testProviders.google],
@@ -3037,6 +3082,9 @@ async function ttsWithFallback({ text, voice = 'onyx', lang = 'pt-BR', emotion =
   }
 
   const attempts = [];
+  if (process.env.FREETTS_API_KEY) {
+    attempts.push({ name: 'freetts', run: () => freeTts({ text: cleanText, voice, lang }) });
+  }
   const openAiFirst = !LEGACY_OPENAI_TTS_VOICES.has(voice);
   const edgeAttempt = { name: 'neural-hd', run: () => edgeNeuralTTS({ text: cleanText, voice, lang, emotion }) };
   if (!openAiFirst) attempts.push(edgeAttempt);
@@ -4867,6 +4915,7 @@ async function fetchYoutubeClipMp4Segment({ videoId = '', url = '', startSec = 0
 
 module.exports = {
   TTS_VOICES, mockScript, mockCreateFull, mockDubResult,
+  FREETTS_VOICES, freeTtsVoiceId, freeTts,
   generateWithOpenAI, generateCreateFull, generateSceneImage, hasOpenRouterImageApiKey, lookupIceAndFireCharacters, generateCreateSceneVideo, startCreateSceneVideo, pollCreateSceneVideo, consumeCreateSceneVideoRequest, dubWithOpenAI, enhanceScript, generateDubSocialMetadata, analyzeDubSoundDesign, sanitizeDubSoundTimeline,
   generateAvatarPortrait, generateAvatarScript, generateAvatarVideo, detectAvatarFaceLandmarks,
   transcribeClipSegment, analyzeViralClips, extractYoutubeVideoId, fetchYoutubeVideoInfoAndStream, fetchVideoStreamChunk, fetchYoutubeClipMp4Segment,
