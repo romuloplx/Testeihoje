@@ -30,6 +30,24 @@ module.exports = async (req, res) => {
   try {
     if (req.method !== 'POST') return send(res, 405, { error: 'Método não permitido. Use POST.' });
     const body = await getBody(req);
+    if (body.action === 'moneyprinter-create' || body.action === 'moneyprinter-status') {
+      res.setHeader('Cache-Control', 'no-store, private');
+      const baseUrl = String(process.env.MONEYPRINTERTURBO_URL || '').trim().replace(/\/$/, '');
+      if (!baseUrl) return send(res, 503, { error: 'MoneyPrinterTurbo não configurado. Defina MONEYPRINTERTURBO_URL no servidor.' });
+      const headers = { 'Content-Type': 'application/json' };
+      if (process.env.MONEYPRINTERTURBO_API_KEY) headers['x-api-key'] = process.env.MONEYPRINTERTURBO_API_KEY;
+      try {
+        const taskId = String(body.taskId || '').trim();
+        if (body.action === 'moneyprinter-status' && !/^[a-zA-Z0-9_-]{1,128}$/.test(taskId)) return send(res, 400, { error: 'ID de tarefa inválido.' });
+        const upstream = await fetch(body.action === 'moneyprinter-create' ? `${baseUrl}/api/v1/videos` : `${baseUrl}/api/v1/tasks/${encodeURIComponent(taskId)}`, {
+          method: body.action === 'moneyprinter-create' ? 'POST' : 'GET', headers,
+          ...(body.action === 'moneyprinter-create' ? { body: JSON.stringify({ video_subject: String(body.subject || '').slice(0, 500), video_script: String(body.script || '').slice(0, 8000), video_aspect: ['16:9','9:16','1:1'].includes(body.aspect) ? body.aspect : '9:16', video_source: 'pexels', video_count: 1, subtitle_enabled: true }) } : {})
+        });
+        const result = await upstream.json().catch(() => ({}));
+        if (!upstream.ok) return send(res, upstream.status, { error: result.message || result.error || 'MoneyPrinterTurbo recusou a solicitação.' });
+        return send(res, body.action === 'moneyprinter-create' ? 202 : 200, result);
+      } catch (error) { return send(res, 502, { error: `Não foi possível acessar MoneyPrinterTurbo: ${error.message}` }); }
+    }
     if (body.action === 'character-lookup') {
       try {
         res.setHeader('Cache-Control', 'no-store, private');

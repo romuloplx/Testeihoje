@@ -304,6 +304,26 @@ app.delete('/api/projects/:id', (req, res) => {
 app.post('/api/create', async (req, res) => {
   try {
     const body = req.body || {};
+    if (body.action === 'moneyprinter-create' || body.action === 'moneyprinter-status') {
+      res.set('Cache-Control', 'no-store, private');
+      const baseUrl = String(process.env.MONEYPRINTERTURBO_URL || '').trim().replace(/\/$/, '');
+      if (!baseUrl) return res.status(503).json({ error: 'MoneyPrinterTurbo não configurado. Defina MONEYPRINTERTURBO_URL no servidor.' });
+      const headers = { 'Content-Type': 'application/json' };
+      if (process.env.MONEYPRINTERTURBO_API_KEY) headers['x-api-key'] = process.env.MONEYPRINTERTURBO_API_KEY;
+      try {
+        const taskId = String(body.taskId || '').trim();
+        if (body.action === 'moneyprinter-status' && !/^[a-zA-Z0-9_-]{1,128}$/.test(taskId)) return res.status(400).json({ error: 'ID de tarefa inválido.' });
+        const upstream = await fetch(body.action === 'moneyprinter-create' ? `${baseUrl}/api/v1/videos` : `${baseUrl}/api/v1/tasks/${encodeURIComponent(taskId)}`, {
+          method: body.action === 'moneyprinter-create' ? 'POST' : 'GET', headers,
+          ...(body.action === 'moneyprinter-create' ? { body: JSON.stringify({ video_subject: String(body.subject || '').slice(0, 500), video_script: String(body.script || '').slice(0, 8000), video_aspect: body.aspect === '16:9' ? '16:9' : '9:16', video_source: 'pexels', video_count: 1, subtitle_enabled: true }) } : {})
+        });
+        const data = await upstream.json().catch(() => ({}));
+        if (!upstream.ok) return res.status(upstream.status).json({ error: data.message || data.error || 'MoneyPrinterTurbo recusou a solicitação.' });
+        return res.status(body.action === 'moneyprinter-create' ? 202 : 200).json(data);
+      } catch (error) {
+        return res.status(502).json({ error: `Não foi possível acessar MoneyPrinterTurbo: ${error.message}` });
+      }
+    }
     if (body.action === 'character-lookup') {
       try {
         res.set('Cache-Control', 'no-store, private');
