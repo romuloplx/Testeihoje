@@ -4174,9 +4174,13 @@ async function dubVideo(options={}){
     await loadProjects();
 
     setProgress('dubProgressFill', 100);
-    showStatus('dubStatus', quickMode
+    const usedDefaultVoiceFallback = chunkOutputs.some(c => String(c.dubInfo || '').includes('google-translate-tts-fallback'));
+    const completionMessage = quickMode
       ? '✅ Dublagem e legendas prontas. Exportando o arquivo final automaticamente…'
-      : `✅ Vídeo dublado com sucesso do início ao fim (${chunkOutputs.length} ${chunkOutputs.length > 1 ? 'blocos' : 'bloco'} • ${fmtClockSec(lastDubTotalDuration)})! Dê Play no vídeo sincronizado abaixo ou clique no botão verde para baixar.`, 'success');
+      : `✅ Vídeo dublado com sucesso do início ao fim (${chunkOutputs.length} ${chunkOutputs.length > 1 ? 'blocos' : 'bloco'} • ${fmtClockSec(lastDubTotalDuration)})! Dê Play no vídeo sincronizado abaixo ou clique no botão verde para baixar.`;
+    showStatus('dubStatus', usedDefaultVoiceFallback
+      ? `${completionMessage} ⚠️ A voz neural selecionada estava indisponível; foi usada a voz padrão do Google.`
+      : completionMessage, usedDefaultVoiceFallback ? 'warn' : 'success');
     toast(quickMode?'⚡ Dublagem rápida pronta; finalizando o vídeo…':'✅ Dublagem pronta! Clique para assistir ou baixar o vídeo!');
     if(quickMode && anyRealVoice){
       await new Promise(resolve=>setTimeout(resolve,80));
