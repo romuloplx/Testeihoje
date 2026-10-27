@@ -11,7 +11,7 @@ const html = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8
 
 function loadClientHelpers() {
   const start = html.indexOf('let dubSocialRequestSeq = 0;');
-  const end = html.indexOf('\nasync function dubVideo(){', start);
+  const end = html.indexOf('\nasync function dubVideo(options={}){', start);
   assert.notEqual(start, -1, 'dubbing social helpers should exist');
   assert.notEqual(end, -1, 'social helpers should end before dubVideo');
   const context = vm.createContext({});
@@ -105,7 +105,7 @@ test('Dublagem displays the generated topic, caption and hashtags with a one-tap
   assert.match(html, /id="dubSocialPackage"/);
   assert.match(html, /id="dubSocialTopic"/);
   assert.match(html, /id="dubSocialHashtags"/);
-  assert.match(html, /void generateDubSocialPackage\(\{ translation: fullTranslation/);
+  assert.match(html, /const socialMetadataPromise=generateDubSocialPackage\(\{ translation: fullTranslation/);
   assert.match(html, /onclick="copyDubSocialPackage\(\)"/);
   assert.match(server, /body\.action === 'social-metadata'/);
 });

@@ -2,7 +2,15 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#090914">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="DubAI PRO">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="/icons/icon-180.png">
 <title>DubAI PRO — Estúdio de vídeos com IA</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
@@ -435,7 +443,10 @@ input[type="range"]{
   <div class="logo"><span>⚡</span> DubAI PRO</div>
   <div class="subtitle">Estúdio de vídeos com Inteligência Artificial</div>
   <div class="badge"><i></i> <span id="modeBadge">Carregando...</span> • Backend conectado</div>
-  <button class="ghost" onclick="runDiag()" style="margin-top:8px;padding:6px 14px;font-size:12px">🩺 Testar IA</button>
+  <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:8px">
+    <button class="ghost" id="installAppBtn" type="button" onclick="installDubAIApp()" style="padding:7px 12px;font-size:12px;border-color:#38bdf866;color:#bae6fd">📲 Instalar app</button>
+    <button class="ghost" onclick="runDiag()" style="padding:7px 12px;font-size:12px">🩺 Testar IA</button>
+  </div>
   <div id="diagBox" class="hidden" style="margin:10px auto 0;max-width:520px;background:#0f0f1e;border:1px solid var(--border);border-radius:12px;padding:12px;font-size:12px;text-align:left"></div>
 </header>
 
@@ -1047,6 +1058,10 @@ input[type="range"]{
       </div>
     </div>
 
+    <div style="margin-top:14px;padding:13px;border:1px solid #22c55e88;border-radius:13px;background:linear-gradient(135deg,#08251d,#10172c)">
+      <button type="button" id="dubQuickModeBtn" onclick="startQuickDubbing()" style="width:100%;padding:14px 16px;border:0;border-radius:11px;background:linear-gradient(135deg,#16a34a,#0e7490);color:#fff;font-size:15px;font-weight:900;cursor:pointer">⚡ DUBLAGEM RÁPIDA — fazer tudo automaticamente</button>
+      <div class="hint" style="margin:8px 2px 0">Duble em português, gere vídeo com legendas sincronizadas, título/legenda/hashtags para revisar e uma trilha instrumental nova escolhida pelo clima do áudio. Ao concluir, o vídeo é exportado automaticamente. Requer internet.</div>
+    </div>
     <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
       <button class="primary" id="dubBtn" onclick="dubVideo()" style="flex:1;min-width:240px">🎙️ Dublar Vídeo Completo Agora (Pequeno ou Grande)</button>
       <button class="ghost hidden" type="button" id="dubStopBtn" onclick="requestStopDubbing()" style="border-color:#f59e0b;color:#fde68a">⏹️ Finalizar no ponto atual</button>
@@ -2224,6 +2239,7 @@ function downloadSRT(){
 }
 
 let currentDubFile = null;
+let quickDubPending = false;
 function fmtHumanBytes(bytes){
   if(!bytes || bytes < 1024) return (bytes||0)+' B';
   if(bytes < 1024*1024) return (bytes/1024).toFixed(1)+' KB';
@@ -2327,6 +2343,10 @@ function previewVideo(overrideFile){
     if(qBar) qBar.classList.remove('hidden');
   }
   toast('📎 Arquivo carregado: ' + file.name + ' (' + fmtHumanBytes(file.size) + ')');
+  if(quickDubPending){
+    quickDubPending=false;
+    setTimeout(()=>startQuickDubbing(),250);
+  }
 }
 
 function renderCastPreviewBox(data){
@@ -4198,7 +4218,62 @@ async function addDubToReviewQueue(){
   }
 }
 
-async function dubVideo(){
+function analyzeQuickDubMusic(samples,sampleRate=12000){
+  if(!samples || samples.length<sampleRate*2) return {style:'soft_piano',label:'calmo e suave',confidence:'baixa'};
+  const frameSize=Math.max(120,Math.floor(sampleRate*0.02));
+  const hop=Math.max(60,Math.floor(sampleRate*0.01));
+  const maxSamples=Math.min(samples.length,sampleRate*90);
+  let rmsSum=0,rmsSqSum=0,highSum=0,energySum=0,crossings=0,frames=0;
+  for(let start=0;start+frameSize<maxSamples;start+=hop){
+    let energy=0,high=0,zc=0,prev=samples[start];
+    for(let i=start;i<start+frameSize;i++){
+      const value=samples[i]||0;
+      energy+=value*value;
+      const delta=value-prev; high+=delta*delta;
+      if((value>=0)!==(prev>=0)) zc++;
+      prev=value;
+    }
+    const rms=Math.sqrt(energy/frameSize);
+    rmsSum+=rms; rmsSqSum+=rms*rms; highSum+=high/frameSize; energySum+=energy/frameSize; crossings+=zc/frameSize; frames++;
+  }
+  const mean=rmsSum/Math.max(1,frames);
+  const variation=Math.sqrt(Math.max(0,rmsSqSum/Math.max(1,frames)-mean*mean));
+  const brightness=Math.sqrt(highSum/Math.max(1,energySum));
+  let style='soft_piano',label='calmo e suave';
+  if(mean>0.075 && variation>0.035){ style='cinema_warm'; label='intenso e cinematográfico'; }
+  else if(brightness>0.36 && crossings>0.08){ style='inspiring_acoustic'; label='claro e acústico'; }
+  else if(variation>0.025){ style='mystery_deep'; label='dramático e misterioso'; }
+  else if(brightness>0.18){ style='lofi_velvet'; label='moderno e lo-fi'; }
+  return {style,label,confidence:frames>200?'estimada':'baixa',energy:mean,brightness};
+}
+
+async function startQuickDubbing(){
+  const file=currentDubFile || document.getElementById('videoFile')?.files?.[0];
+  if(!file){
+    quickDubPending=true;
+    showStatus('dubStatus','📂 Escolha um vídeo ou áudio para começar o modo rápido.','info');
+    document.getElementById('videoFile')?.click();
+    return;
+  }
+  quickDubPending=false;
+  const setValue=(id,value)=>{ const el=document.getElementById(id); if(el) el.value=value; };
+  setValue('language','');
+  setValue('targetLanguage','pt-BR');
+  setValue('dubBgMix','mute');
+  setValue('dubBurnSubs','yes');
+  setValue('dubRangeMode','full');
+  setValue('dubBgMusicVol','12');
+  onChangeDubBgVol('12','setup');
+  const button=document.getElementById('dubQuickModeBtn');
+  if(button){ button.disabled=true; button.textContent='⏳ Modo rápido em execução…'; }
+  try{ await dubVideo({quick:true}); }
+  finally{
+    if(button){ button.disabled=false; button.textContent='⚡ DUBLAGEM RÁPIDA — fazer tudo automaticamente'; }
+  }
+}
+
+async function dubVideo(options={}){
+  const quickMode=!!(options && options.quick);
   const file = currentDubFile || $('#videoFile').files[0];
   const language = $('#language').value;
   const dubVoice = $('#dubVoice').value;
@@ -4238,6 +4313,13 @@ async function dubVideo(){
     const trimEnd = rangeMode === 'trim' ? parseTimeInput(document.getElementById('dubTrimEnd').value, 0) : 0;
 
     plan = await prepareAudioExtractionPlan(file, trimStart, trimEnd, m => showStatus('dubStatus', m, 'info'));
+    if(quickMode){
+      const selectedMusic=(document.getElementById('dubBgMusicStyle')||{}).value||'soft_piano';
+      const reference=selectedMusic==='custom'&&dubCustomMusic24k?dubCustomMusic24k:plan.mono12k;
+      const profile=analyzeQuickDubMusic(reference,selectedMusic==='custom'&&dubCustomMusic24k?24000:12000);
+      onChangeDubBgMusicStyle(profile.style,'quick');
+      showStatus('dubStatus',`🎼 Analisando o áudio de referência (${profile.label}) e criando uma trilha instrumental nova para a dublagem…`,'info');
+    }
     const totalChunks = plan.windows.length;
     const chunkOutputs = [];
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -4431,7 +4513,8 @@ async function dubVideo(){
     const fullOriginalTranscript = chunkOutputs.map(c => c.transcription).filter(Boolean).join(' ');
     $('#dubScript').textContent = transcriptSummary;
     $('#dubResult').classList.remove('hidden');
-    void generateDubSocialPackage({ translation: fullTranslation, originalTranscript: fullOriginalTranscript, fileName: file.name, targetLanguage });
+    const socialMetadataPromise=generateDubSocialPackage({ translation: fullTranslation, originalTranscript: fullOriginalTranscript, fileName: file.name, targetLanguage });
+    if(quickMode) await socialMetadataPromise;
 
     saveProject({
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
@@ -4453,8 +4536,15 @@ async function dubVideo(){
     await loadProjects();
 
     setProgress('dubProgressFill', 100);
-    showStatus('dubStatus', `✅ Vídeo dublado com sucesso do início ao fim (${chunkOutputs.length} ${chunkOutputs.length > 1 ? 'blocos' : 'bloco'} • ${fmtClockSec(lastDubTotalDuration)})! Dê Play no vídeo sincronizado abaixo ou clique no botão verde para baixar.`, 'success');
-    toast('✅ Dublagem pronta! Clique para assistir ou baixar o vídeo!');
+    showStatus('dubStatus', quickMode
+      ? `✅ Dublagem, legendas e sugestões de título prontas. Exportando o arquivo final automaticamente…`
+      : `✅ Vídeo dublado com sucesso do início ao fim (${chunkOutputs.length} ${chunkOutputs.length > 1 ? 'blocos' : 'bloco'} • ${fmtClockSec(lastDubTotalDuration)})! Dê Play no vídeo sincronizado abaixo ou clique no botão verde para baixar.`, 'success');
+    toast(quickMode?'⚡ Dublagem rápida pronta; finalizando o vídeo…':'✅ Dublagem pronta! Clique para assistir ou baixar o vídeo!');
+    if(quickMode && anyRealVoice){
+      await new Promise(resolve=>setTimeout(resolve,80));
+      const exported=await downloadDubVideo();
+      if(!exported) showStatus('dubStatus','⚠️ A dublagem está pronta, mas o export automático não terminou. Use o botão verde para gerar o vídeo.','warn');
+    }
     setTimeout(() => document.getElementById('dubResult').scrollIntoView({ behavior:'smooth', block:'center' }), 200);
   }catch(e){
     showStatus('dubStatus','❌ '+e.message,'error');
@@ -13315,6 +13405,39 @@ function downloadSelectedOpusClipSrt(){
   a.download = `opusclip-corte-${clip.rank}.srt`;
   a.click();
   toast('📜 Legendas .SRT sincronizadas baixadas!');
+}
+
+let deferredDubAIInstallPrompt=null;
+window.addEventListener('beforeinstallprompt',event=>{
+  event.preventDefault();
+  deferredDubAIInstallPrompt=event;
+  const button=document.getElementById('installAppBtn');
+  if(button){ button.textContent='📲 Instalar DubAI PRO'; button.style.borderColor='#22c55e'; button.style.color='#bbf7d0'; }
+});
+window.addEventListener('appinstalled',()=>{
+  deferredDubAIInstallPrompt=null;
+  const button=document.getElementById('installAppBtn');
+  if(button){ button.textContent='✅ App instalado'; button.disabled=true; }
+  toast('✅ DubAI PRO instalado no dispositivo!');
+});
+async function installDubAIApp(){
+  if(deferredDubAIInstallPrompt){
+    deferredDubAIInstallPrompt.prompt();
+    await deferredDubAIInstallPrompt.userChoice.catch(()=>null);
+    deferredDubAIInstallPrompt=null;
+    return;
+  }
+  if(window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone){
+    toast('✅ O DubAI PRO já está instalado como app.');
+    return;
+  }
+  const instructions=/iPhone|iPad|iPod/i.test(navigator.userAgent)
+    ? 'No Safari, toque em Compartilhar e escolha “Adicionar à Tela de Início”.'
+    : 'No menu do navegador (⋮), escolha “Instalar app” ou “Adicionar à tela inicial”.';
+  alert(`Para instalar o DubAI PRO:\n\n${instructions}\n\nA instalação requer conexão HTTPS. O app precisa de internet para dublar e gerar os arquivos.`);
+}
+if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost')){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(error=>console.warn('PWA service worker indisponível:',error)));
 }
 
 // Init
