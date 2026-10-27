@@ -1,12 +1,13 @@
 'use strict';
 
-const CACHE_NAME = 'dubai-pro-shell-v1';
+const CACHE_NAME = 'dubai-pro-shell-v2';
 const APP_SHELL = [
   '/',
   '/manifest.webmanifest',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
-  '/icons/icon.svg',
+  '/icons/icon-180.png',
+  '/icons/icon-512-maskable.png',
   '/mp4-muxer.js'
 ];
 

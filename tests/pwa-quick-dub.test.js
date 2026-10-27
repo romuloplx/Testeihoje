@@ -43,7 +43,7 @@ test('quick music reader handles short or silent input safely with a soft genera
 
 test('PWA assets and page copies are present in both deployment roots', () => {
   const fs = require('node:fs');
-  for (const rel of ['manifest.webmanifest', 'sw.js', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png']) {
+  for (const rel of ['manifest.webmanifest', 'sw.js', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-512-maskable.png']) {
     assert.ok(fs.existsSync(path.join(__dirname, '../public', rel)), `public/${rel} exists`);
     assert.ok(fs.existsSync(path.join(__dirname, '../vercel', rel)), `vercel/${rel} exists`);
   }
