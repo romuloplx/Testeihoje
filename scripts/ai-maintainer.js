@@ -7,9 +7,9 @@
 const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 
-const MAX_CONTEXT_CHARS = 24_000;
-const MAX_FILE_CHARS = 8_000;
-const MAX_PATCH_CHARS = 24_000;
+const MAX_CONTEXT_CHARS = 12_000;
+const MAX_FILE_CHARS = 6_000;
+const MAX_PATCH_CHARS = 18_000;
 const ALLOWED = /^(public|vercel\/api|tests)\/[A-Za-z0-9_./-]+\.(?:html|js|css)$/;
 const BLOCKED = /(^|\/)(?:\.env[^/]*|node_modules|\.git|\.github|secrets?)(\/|$)|(?:package(?:-lock)?\.json|vercel\.json)$/i;
 
@@ -75,33 +75,46 @@ async function requestImprovement(context) {
   // use the same unauthenticated text API already present in the application.
   const providers = key
     ? [{ name: 'Unorouter/Cohere', url: `${base}/chat/completions`, models: ['cohere-command-a:free'], headers: { Authorization: `Bearer ${key}`, 'x-api-key': key, 'Content-Type': 'application/json' } }]
-    : [{ name: 'Pollinations', url: 'https://text.pollinations.ai/openai', models: ['openai', 'deepseek', 'mistral', 'llama'], headers: { 'Content-Type': 'application/json' } }];
+    : [{ name: 'Pollinations', url: 'https://text.pollinations.ai/openai', models: ['deepseek', 'mistral', 'llama'], headers: { 'Content-Type': 'application/json' } }];
   const errors = [];
   for (const provider of providers) {
     for (const model of provider.models) {
-      try {
-        const response = await fetch(provider.url, {
-          method: 'POST',
-          headers: { ...provider.headers, 'User-Agent': 'Mozilla/5.0 DubAI-PRO-AI-Maintainer/1.0' },
-          body: JSON.stringify({
-            model,
-            temperature: 0.15,
-            max_tokens: 7000,
-            jsonMode: true,
-            response_format: { type: 'json_object' },
-            messages: [{ role: 'system', content: system }, { role: 'user', content: user }]
-          }),
-          signal: AbortSignal.timeout(90_000)
-        });
-        const raw = await response.text().catch(() => '');
-        let body = {};
-        try { body = JSON.parse(raw); } catch (_) {}
-        if (!response.ok) throw new Error(`HTTP ${response.status}: ${String(body.error?.message || body.message || raw).slice(0, 220)}`);
-        const text = body.choices?.[0]?.message?.content || raw.trim();
-        if (!text) throw new Error('resposta vazia');
-        return parseModelResponse(text);
-      } catch (error) {
-        errors.push(`${provider.name}/${model}: ${String(error.message || error).slice(0, 220)}`);
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const response = await fetch(provider.url, {
+            method: 'POST',
+            headers: { ...provider.headers, 'User-Agent': 'Mozilla/5.0 DubAI-PRO-AI-Maintainer/1.0' },
+            body: JSON.stringify({
+              model,
+              temperature: 0.15,
+              max_tokens: 4000,
+              jsonMode: true,
+              response_format: { type: 'json_object' },
+              messages: [{ role: 'system', content: system }, { role: 'user', content: user }]
+            }),
+            signal: AbortSignal.timeout(45_000)
+          });
+          const raw = await response.text().catch(() => '');
+          let body = {};
+          try { body = JSON.parse(raw); } catch (_) {}
+          if (!response.ok) {
+            const detail = String(body.error?.message || body.message || raw).slice(0, 220);
+            if ((response.status === 402 || response.status === 429 || response.status === 503) && attempt < 2) {
+              const quotaWindow = Number((detail.match(/every (\d+) seconds/i) || [])[1]) || 0;
+              const retryHint = Number((detail.match(/retry after (\d+)/i) || [])[1]) || 2;
+              const waitMs = Math.max(quotaWindow * 1000 + 1500, retryHint * 1000 + 1500);
+              await new Promise(resolve => setTimeout(resolve, Math.min(35_000, waitMs)));
+              continue;
+            }
+            throw new Error(`HTTP ${response.status}: ${detail}`);
+          }
+          const text = body.choices?.[0]?.message?.content || raw.trim();
+          if (!text) throw new Error('resposta vazia');
+          return parseModelResponse(text);
+        } catch (error) {
+          errors.push(`${provider.name}/${model}: ${String(error.message || error).slice(0, 220)}`);
+          break;
+        }
       }
     }
   }
