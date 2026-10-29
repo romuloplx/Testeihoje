@@ -75,7 +75,7 @@ async function requestImprovement(context) {
   // use the same unauthenticated text API already present in the application.
   const providers = key
     ? [{ name: 'Unorouter/Cohere', url: `${base}/chat/completions`, models: ['cohere-command-a:free'], headers: { Authorization: `Bearer ${key}`, 'x-api-key': key, 'Content-Type': 'application/json' } }]
-    : [{ name: 'Pollinations', url: 'https://text.pollinations.ai/openai', models: ['openai-large', 'openai', 'deepseek'], headers: { 'Content-Type': 'application/json' } }];
+    : [{ name: 'Pollinations', url: 'https://text.pollinations.ai/openai', models: ['openai', 'deepseek', 'mistral', 'llama'], headers: { 'Content-Type': 'application/json' } }];
   const errors = [];
   for (const provider of providers) {
     for (const model of provider.models) {
@@ -143,7 +143,9 @@ function applyPatch(patch) {
   if (applyPatch(proposal.patch)) console.log('AI_MAINTENANCE_PATCH_APPLIED=true');
 })().catch(error => {
   const key = String(process.env.UNOROUTER_API_KEY || '').trim();
-  const message = String(error.message || error).replaceAll(key, '[redacted]').slice(0, 1200);
+  let message = String(error.message || error);
+  if (key) message = message.replaceAll(key, '[redacted]');
+  message = message.replace(/[\u0000-\u001f\u007f]+/g, ' ').slice(0, 1000);
   console.error(`AI maintenance stopped safely: ${message}`);
   console.log(`::error title=AI maintainer stopped safely::${message.replace(/[\r\n]/g, ' ')}`);
   const summaryFile = process.env.GITHUB_STEP_SUMMARY;
