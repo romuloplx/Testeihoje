@@ -143,9 +143,8 @@ test('AI maintainer only publishes small tested changes to the fixed preview bra
   assert.match(workflow, /git push origin HEAD:arena\/2cf1868f-testeihoje/);
   assert.doesNotMatch(workflow, /git push origin HEAD:main/);
   assert.match(maintainer, /MAX_PATCH_CHARS/);
-  assert.match(maintainer, /text\.pollinations\.ai\/openai/);
-  assert.match(maintainer, /models: \['deepseek', 'mistral', 'llama'\]/);
-  assert.match(maintainer, /response\.status === 402 \|\| response\.status === 429/);
+  assert.match(maintainer, /ai\.hackclub\.com\/chat\/completions/);
+  assert.match(maintainer, /name: 'HackClub'/);
   assert.match(maintainer, /'apply'/);
   assert.match(maintainer, /'--check'/);
   assert.match(maintainer, /changedLines > 500/);

@@ -74,24 +74,27 @@ async function requestImprovement(context) {
   // Prefer the configured Cohere route; if GitHub Actions has no router secret,
   // use the same unauthenticated text API already present in the application.
   const providers = key
-    ? [{ name: 'Unorouter/Cohere', url: `${base}/chat/completions`, models: ['cohere-command-a:free'], headers: { Authorization: `Bearer ${key}`, 'x-api-key': key, 'Content-Type': 'application/json' } }]
-    : [{ name: 'Pollinations', url: 'https://text.pollinations.ai/openai', models: ['deepseek', 'mistral', 'llama'], headers: { 'Content-Type': 'application/json' } }];
+    ? [{ name: 'Unorouter/Cohere', url: `${base}/chat/completions`, models: ['cohere-command-a:free'], includeModel: true, headers: { Authorization: `Bearer ${key}`, 'x-api-key': key, 'Content-Type': 'application/json' } }]
+    : [{ name: 'HackClub', url: 'https://ai.hackclub.com/chat/completions', models: ['default'], includeModel: false, headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 DubAI-PRO-AI-Maintainer/1.0' } }];
   const errors = [];
   for (const provider of providers) {
     for (const model of provider.models) {
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
+          const payload = {
+            temperature: 0.15,
+            max_tokens: 4000,
+            messages: [{ role: 'system', content: system }, { role: 'user', content: user }]
+          };
+          if (provider.includeModel) payload.model = model;
+          if (provider.includeModel) {
+            payload.jsonMode = true;
+            payload.response_format = { type: 'json_object' };
+          }
           const response = await fetch(provider.url, {
             method: 'POST',
-            headers: { ...provider.headers, 'User-Agent': 'Mozilla/5.0 DubAI-PRO-AI-Maintainer/1.0' },
-            body: JSON.stringify({
-              model,
-              temperature: 0.15,
-              max_tokens: 4000,
-              jsonMode: true,
-              response_format: { type: 'json_object' },
-              messages: [{ role: 'system', content: system }, { role: 'user', content: user }]
-            }),
+            headers: provider.headers,
+            body: JSON.stringify(payload),
             signal: AbortSignal.timeout(45_000)
           });
           const raw = await response.text().catch(() => '');
