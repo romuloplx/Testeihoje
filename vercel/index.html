@@ -605,6 +605,8 @@ input[type="range"]{
     </div>
 
     <button class="primary" id="createFullVideoBtn" onclick="createAndBuildVideo()" style="font-size:15px;padding:15px">🎬 Criar História & Vídeo Completo (Personagens + Cenários Vivos)</button>
+    <button class="ghost" id="nativeShortBtn" type="button" onclick="createShortWithNativePipeline()" style="width:100%;margin-top:8px;border-color:#22d3ee;color:#cffafe">📱 Gerar Short vertical 9:16 (30s) — roteiro, voz e legendas</button>
+    <div class="hint" style="margin:5px 0 8px">Usa o fluxo de criação já integrado ao DubAI PRO; não precisa hospedar o backend do MoneyPrinterTurbo. Os provedores de IA configurados ainda podem consumir créditos.</div>
     <button class="ghost" id="moneyPrinterQuickBtn" type="button" onclick="createWithMoneyPrinterTurboFromPrompt()" style="width:100%;margin-top:8px;border-color:#f59e0b;color:#fde68a">🖨️ Criar direto com MoneyPrinterTurbo (tema → vídeo)</button>
     <div class="hint" style="margin:5px 0 8px">Envia seu tema ao renderizador externo sem gerar roteiro nesta etapa do DubAI PRO. Requer MONEYPRINTERTURBO_URL configurada no servidor; o MoneyPrinterTurbo pode usar os provedores configurados na própria instância.</div>
     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
@@ -2329,6 +2331,37 @@ async function createAndBuildVideo(){
     }
   } finally {
     if(mainBtn){ mainBtn.disabled = false; mainBtn.textContent = '🎬 Criar História & Vídeo Completo (Personagens + Cenários Vivos)'; }
+  }
+}
+
+async function createShortWithNativePipeline(){
+  const prompt = String(document.getElementById('prompt')?.value || '').trim();
+  if (!prompt) return showStatus('createStatus', '⚠️ Descreva o tema do Short primeiro.', 'warn');
+  const format = document.getElementById('createFormat');
+  const duration = document.getElementById('duration');
+  const cinemaMode = document.getElementById('cinemaMode');
+  const aiMotion = document.getElementById('createAiMotion');
+  const shortButton = document.getElementById('nativeShortBtn');
+  const original = {
+    format: format?.value,
+    duration: duration?.value,
+    cinemaMode: cinemaMode?.value,
+    aiMotion: aiMotion?.checked
+  };
+  if (format) format.value = '9:16';
+  if (duration) duration.value = '0.5';
+  if (cinemaMode) cinemaMode.value = 'classic';
+  // O preset usa o renderizador local e evita disparar clipes de vídeo externos por acidente.
+  if (aiMotion) aiMotion.checked = false;
+  if (shortButton) shortButton.disabled = true;
+  try {
+    await createAndBuildVideo();
+  } finally {
+    if (format && original.format) format.value = original.format;
+    if (duration && original.duration) duration.value = original.duration;
+    if (cinemaMode && original.cinemaMode) cinemaMode.value = original.cinemaMode;
+    if (aiMotion) aiMotion.checked = Boolean(original.aiMotion);
+    if (shortButton) shortButton.disabled = false;
   }
 }
 

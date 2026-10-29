@@ -35,6 +35,18 @@ test('MoneyPrinterTurbo is available directly in Create without first generating
   }
 });
 
+test('Create has a Shorts preset that reuses the native renderer without requiring MoneyPrinterTurbo', () => {
+  for (const file of ['../public/index.html', '../vercel/index.html']) {
+    const html = fs.readFileSync(path.join(__dirname, file), 'utf8');
+    assert.match(html, /nativeShortBtn/);
+    assert.match(html, /createShortWithNativePipeline/);
+    assert.match(html, /format\.value = '9:16'/);
+    assert.match(html, /duration\.value = '0\.5'/);
+    assert.match(html, /await createAndBuildVideo\(\)/);
+    assert.match(html, /não precisa hospedar o backend do MoneyPrinterTurbo/);
+  }
+});
+
 test('MoneyPrinterTurbo accepts a topic-only video request and keeps its API key server-side', async () => {
   process.env.MONEYPRINTERTURBO_URL = 'https://mpt.example.test/';
   process.env.MONEYPRINTERTURBO_API_KEY = 'unit-test-mpt-secret';
