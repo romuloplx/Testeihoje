@@ -61,33 +61,47 @@ function parseModelResponse(text) {
 
 async function requestImprovement(context) {
   const key = String(process.env.UNOROUTER_API_KEY || '').trim();
-  if (!key) throw new Error('Configure UNOROUTER_API_KEY como GitHub Actions secret para habilitar a manutenção automática.');
   const base = String(process.env.UNOROUTER_BASE_URL || 'https://api.unorouter.com/v1').replace(/\/+$/, '');
-  const response = await fetch(`${base}/chat/completions`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${key}`, 'x-api-key': key, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'cohere-command-a:free',
-      temperature: 0.15,
-      max_tokens: 7000,
-      messages: [
-        { role: 'system', content: [
-          'Você é o agente de manutenção do DubAI PRO. Faça UMA melhoria pequena, concreta e de baixo risco no código fornecido.',
-          'Não invente dependências, serviços, credenciais, endpoints ou funcionalidades indisponíveis. Preserve comportamento existente e compatibilidade mobile.',
-          'Nunca introduza telemetria pessoal, chamadas externas novas, segredos, credenciais, código ofuscado, eval, scripts de instalação ou mudanças de segurança/autenticação.',
-          'Se não encontrar melhoria segura e comprovável, retorne patch vazio. Não faça reformatação em massa.',
-          'Retorne APENAS JSON: {"summary":"resumo curto em português","patch":"diff unificado git aplicável"}. O diff deve conter apenas arquivos permitidos do contexto.'
-        ].join(' ') },
-        { role: 'user', content: `Repositório DubAI PRO. Branch de destino: ${process.env.TARGET_BRANCH || 'arena/2cf1868f-testeihoje'}.\n\nArquivos disponíveis (trechos):\n${context}` }
-      ]
-    }),
-    signal: AbortSignal.timeout(90_000)
-  });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(`Unorouter respondeu HTTP ${response.status}: ${String(body.error?.message || body.message || '').slice(0, 300)}`);
-  const text = body.choices?.[0]?.message?.content;
-  if (!text) throw new Error('Unorouter retornou uma resposta vazia.');
-  return parseModelResponse(text);
+  const system = [
+    'Você é o agente de manutenção do DubAI PRO. Faça UMA melhoria pequena, concreta e de baixo risco no código fornecido.',
+    'Não invente dependências, serviços, credenciais, endpoints ou funcionalidades indisponíveis. Preserve comportamento existente e compatibilidade mobile.',
+    'Nunca introduza telemetria pessoal, chamadas externas novas, segredos, credenciais, código ofuscado, eval, scripts de instalação ou mudanças de segurança/autenticação.',
+    'Se não encontrar melhoria segura e comprovável, retorne patch vazio. Não faça reformatação em massa.',
+    'Retorne APENAS JSON: {"summary":"resumo curto em português","patch":"diff unificado git aplicável"}. O diff deve conter apenas arquivos permitidos do contexto.'
+  ].join(' ');
+  const user = `Repositório DubAI PRO. Branch de destino: ${process.env.TARGET_BRANCH || 'arena/2cf1868f-testeihoje'}.\n\nArquivos disponíveis (trechos):\n${context}`;
+
+  // Prefer the configured Cohere route; if GitHub Actions has no router secret,
+  // use the same unauthenticated text API already present in the application.
+  const providers = key
+    ? [{ name: 'Unorouter/Cohere', url: `${base}/chat/completions`, models: ['cohere-command-a:free'], headers: { Authorization: `Bearer ${key}`, 'x-api-key': key, 'Content-Type': 'application/json' } }]
+    : [{ name: 'Pollinations', url: 'https://text.pollinations.ai/openai', models: ['openai-large', 'openai', 'deepseek'], headers: { 'Content-Type': 'application/json' } }];
+  const errors = [];
+  for (const provider of providers) {
+    for (const model of provider.models) {
+      try {
+        const response = await fetch(provider.url, {
+          method: 'POST',
+          headers: provider.headers,
+          body: JSON.stringify({
+            model,
+            temperature: 0.15,
+            max_tokens: 7000,
+            messages: [{ role: 'system', content: system }, { role: 'user', content: user }]
+          }),
+          signal: AbortSignal.timeout(90_000)
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${String(body.error?.message || body.message || '').slice(0, 220)}`);
+        const text = body.choices?.[0]?.message?.content || (typeof body === 'string' ? body : '');
+        if (!text) throw new Error('resposta vazia');
+        return parseModelResponse(text);
+      } catch (error) {
+        errors.push(`${provider.name}/${model}: ${String(error.message || error).slice(0, 220)}`);
+      }
+    }
+  }
+  throw new Error(errors.join(' | ') || 'nenhum provedor de IA respondeu');
 }
 
 function applyPatch(patch) {
