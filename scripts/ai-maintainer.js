@@ -7,9 +7,9 @@
 const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 
-const MAX_CONTEXT_CHARS = 105_000;
-const MAX_FILE_CHARS = 18_000;
-const MAX_PATCH_CHARS = 45_000;
+const MAX_CONTEXT_CHARS = 24_000;
+const MAX_FILE_CHARS = 8_000;
+const MAX_PATCH_CHARS = 24_000;
 const ALLOWED = /^(public|vercel\/api|tests)\/[A-Za-z0-9_./-]+\.(?:html|js|css)$/;
 const BLOCKED = /(^|\/)(?:\.env[^/]*|node_modules|\.git|\.github|secrets?)(\/|$)|(?:package(?:-lock)?\.json|vercel\.json)$/i;
 
@@ -67,7 +67,7 @@ async function requestImprovement(context) {
     'Não invente dependências, serviços, credenciais, endpoints ou funcionalidades indisponíveis. Preserve comportamento existente e compatibilidade mobile.',
     'Nunca introduza telemetria pessoal, chamadas externas novas, segredos, credenciais, código ofuscado, eval, scripts de instalação ou mudanças de segurança/autenticação.',
     'Se não encontrar melhoria segura e comprovável, retorne patch vazio. Não faça reformatação em massa.',
-    'Retorne APENAS JSON: {"summary":"resumo curto em português","patch":"diff unificado git aplicável"}. O diff deve conter apenas arquivos permitidos do contexto.'
+          'Retorne APENAS JSON: {"summary":"resumo curto em português","patch":"diff unificado git aplicável"}. O diff deve conter apenas arquivos permitidos do contexto e no máximo 250 linhas.'
   ].join(' ');
   const user = `Repositório DubAI PRO. Branch de destino: ${process.env.TARGET_BRANCH || 'arena/2cf1868f-testeihoje'}.\n\nArquivos disponíveis (trechos):\n${context}`;
 
@@ -145,6 +145,7 @@ function applyPatch(patch) {
   const key = String(process.env.UNOROUTER_API_KEY || '').trim();
   const message = String(error.message || error).replaceAll(key, '[redacted]').slice(0, 1200);
   console.error(`AI maintenance stopped safely: ${message}`);
+  console.log(`::error title=AI maintainer stopped safely::${message.replace(/[\r\n]/g, ' ')}`);
   const summaryFile = process.env.GITHUB_STEP_SUMMARY;
   if (summaryFile) {
     try { fs.appendFileSync(summaryFile, `## AI maintainer stopped safely\n\n${message}\n`); } catch (_) {}
