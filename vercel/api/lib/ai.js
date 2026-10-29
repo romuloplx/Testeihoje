@@ -323,6 +323,14 @@ async function generateWithOpenAI(prompt, duration, style, voice) {
 
 // Cinema Conectado & Histórias com Personagens Vivos (Narrador + Cenários Multi-Plano + Personagens Atuando na Cena)
 async function generateCreateFull({ prompt, duration, style, voice, cinemaMode = 'connected', customCharacters = '', aiModel = 'auto-router' }) {
+  const strictCohere = aiModel === 'cohere-command-a:strict';
+  const runCreateChat = options => strictCohere
+    ? unorouterSmartChat({ ...options, preferredModel: 'cohere-command-a:free', strictPreferred: true })
+    : chatWithFallback({ ...options, preferredModel: aiModel });
+  const createChatWithRetries = (options, retries = 2) => withRetries(
+    () => runCreateChat(options),
+    strictCohere ? 1 : retries
+  );
   const durNum = Math.max(0.5, parseFloat(duration) || 1);
   const styleAnchorMap = {
     realistic: '35mm cinema film photography, photorealistic characters and environment, natural skin texture, dramatic ARRI Alexa lighting, rich color grading',
@@ -388,14 +396,13 @@ async function generateCreateFull({ prompt, duration, style, voice, cinemaMode =
       return !!(p && Array.isArray(p.scenes) && p.scenes.length >= 2);
     };
 
-    const res = await withRetries(() => chatWithFallback({
+    const res = await createChatWithRetries({
       system: cinemaSystem,
       user: cinemaUser,
       json: true,
       maxTokens: 4200,
-      preferredModel: aiModel,
       validator: isValidCinemaStory
-    }), 2);
+    }, 2);
     if (!res.error) {
       const parsed = extractJson(res.text);
       if (parsed && Array.isArray(parsed.scenes) && parsed.scenes.length) {
@@ -484,6 +491,9 @@ async function generateCreateFull({ prompt, duration, style, voice, cinemaMode =
         };
       }
     }
+    if (strictCohere) {
+      return { error: res.error || 'Cohere Command-A não retornou uma história JSON válida.', provider: 'unorouter/cohere-command-a:free' };
+    }
     // Se algum provedor falhou no JSON, usa o construtor dinâmico de história com personagens (nunca perde os personagens!)
     const dynamicFallback = mockCreateFull({ prompt, duration, style, voice, customCharacters });
     return {
@@ -500,7 +510,7 @@ async function generateCreateFull({ prompt, duration, style, voice, cinemaMode =
   // Fase 1: plano (título + SEO + cenas com descrição visual)
   const outlineSystem = 'Você é roteirista de vídeos para YouTube. Responda APENAS JSON válido neste formato: {"title":"título do vídeo","seo":{"title":"título para YouTube (até 70 caracteres)","description":"descrição com hashtags","tags":"tag1, tag2, tag3"},"scenes":[{"title":"título curto da cena","visual":"descrição visual detalhada em inglês para gerar uma imagem da cena"}]}.';
   const outlineUser = `Crie o plano de um vídeo de ${dur} minutos sobre "${prompt}". Estilo visual: ${style}. Exatamente ${nScenes} cenas em ordem cronológica. Idioma: português brasileiro.`;
-  const res = await withRetries(() => chatWithFallback({ system: outlineSystem, user: outlineUser, json: true, maxTokens: 3000 }), 2);
+  const res = await createChatWithRetries({ system: outlineSystem, user: outlineUser, json: true, maxTokens: 3000 }, 2);
   if (res.error) return { error: res.error };
   const outline = extractJson(res.text);
   if (!outline || !Array.isArray(outline.scenes) || !outline.scenes.length) {
@@ -517,13 +527,17 @@ async function generateCreateFull({ prompt, duration, style, voice, cinemaMode =
     const results = await Promise.all(batch.map(async (s, j) => {
       const idx = i + j;
       if (j > 0) await new Promise(r => setTimeout(r, 1200)); // desloca o lote
-      return withRetries(() => chatWithFallback({
+      return createChatWithRetries({
         system: 'Você é um contador de histórias cinematográfico. Escreva APENAS o texto da narração fluida e envolvente, sem título, sem aspas, sem comentários.',
         user: `Vídeo sobre: "${prompt}". Cena ${idx + 1} de ${scenesPlan.length}: "${s.title}" (${s.visual || ''}). Escreva a narração desta cena em português brasileiro, com aproximadamente ${wordsPerScene} palavras, em tom vivo e nunca robótico.`
-      }), 2);
+      }, 2);
     }));
     for (let j = 0; j < results.length; j++) {
       const r = results[j];
+      if (r.error && strictCohere) {
+        fatal = `Narração da cena ${i + j + 1} falhou no Cohere Command-A: ${r.error}`;
+        continue;
+      }
       if (r.error) {
         const retry = await withRetries(() => chatWithFallback({
           system: 'Escreva APENAS a narração da cena, sem comentários.',
@@ -2569,7 +2583,7 @@ async function chatViaHackClub({ system, user, json, validator = null }) {
 }
 
 // Orquestrador Multi-IA do Unorouter: puxa o modelo escolhido ou rotaciona entre as melhores IAs do router
-async function unorouterSmartChat({ system, user, json = false, preferredModel = '', maxTokens = 4500, validator = null }) {
+async function unorouterSmartChat({ system, user, json = false, preferredModel = '', maxTokens = 4500, validator = null, strictPreferred = false }) {
   const uKeys = allValidUniKeys();
   if (!uKeys.length) return { error: 'unorouter: sem UNOROUTER_API_KEY' };
 
@@ -2590,7 +2604,9 @@ async function unorouterSmartChat({ system, user, json = false, preferredModel =
     ...baseList.filter(m => now < (_uniModelCooldown[m] || 0))
   ];
   const cleanPref = String(preferredModel || '').trim();
-  if (cleanPref && cleanPref !== 'auto-router' && cleanPref !== 'gemini-direct') {
+  if (strictPreferred) {
+    orderedModels = cleanPref ? [cleanPref] : [];
+  } else if (cleanPref && cleanPref !== 'auto-router' && cleanPref !== 'gemini-direct') {
     orderedModels = [cleanPref, ...orderedModels.filter(m => m !== cleanPref)];
   }
 

@@ -112,3 +112,16 @@ test('MoneyPrinterTurbo returns a clear configuration error when its server URL 
     restore();
   }
 });
+
+test('Create offers strict Cohere mode and never silently falls back when it is selected', () => {
+  for (const file of ['../public/index.html', '../vercel/index.html']) {
+    const html = fs.readFileSync(path.join(__dirname, file), 'utf8');
+    assert.match(html, /value="cohere-command-a:strict"/);
+  }
+  const ai = fs.readFileSync(path.join(__dirname, '../vercel/api/lib/ai.js'), 'utf8');
+  assert.match(ai, /strictPreferred: true/);
+  assert.match(ai, /orderedModels = cleanPref \? \[cleanPref\] : \[\]/);
+  assert.match(ai, /if \(r\.error && strictCohere\)/);
+  const route = fs.readFileSync(path.join(__dirname, '../vercel/api/create.js'), 'utf8');
+  assert.match(route, /if \(aiModel === 'cohere-command-a:strict'\)/);
+});

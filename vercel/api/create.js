@@ -101,6 +101,9 @@ module.exports = async (req, res) => {
       aiError = gen.error || null;
     } else {
       aiError = (gen && gen.error) || 'provedores ocupados';
+      if (aiModel === 'cohere-command-a:strict') {
+        return send(res, 502, { error: aiError, provider: 'unorouter/cohere-command-a:free' });
+      }
       data = mockCreateFull({ prompt, duration, style, voice, customCharacters });
     }
 
