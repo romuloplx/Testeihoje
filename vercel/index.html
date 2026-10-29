@@ -5817,8 +5817,9 @@ async function fetchSceneImage(promptOrScene, style, w=896, h=504, characterRefe
   try {
     return await backendTask;
   } catch (error) {
-    console.warn('Falha ao gerar imagem da cena:', error && error.message || error);
-    return null;
+    const detail = String(error && error.message || error || 'Falha desconhecida').slice(0, 500);
+    console.error('Falha ao gerar imagem da cena:', detail);
+    throw new Error(`Imagem da cena não disponível: ${detail}`);
   }
 }
 
@@ -6059,7 +6060,10 @@ async function buildCreateVideo(){
       const [mainBmp, actBmp] = await Promise.all([
         fetchSceneImage(s.visual || s.title, style, imgDim.w, imgDim.h, sceneCharacterReferences),
         !useAiMotion && s.actionVisual
-          ? fetchSceneImage(s.actionVisual, style, imgDim.w, imgDim.h, sceneCharacterReferences)
+          ? fetchSceneImage(s.actionVisual, style, imgDim.w, imgDim.h, sceneCharacterReferences).catch(error => {
+              console.warn(`Imagem secundária da cena ${i + 1} indisponível; reutilizando o cenário principal.`, error && error.message || error);
+              return null;
+            })
           : Promise.resolve(null)
       ]);
       if(!mainBmp){
