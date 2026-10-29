@@ -82,7 +82,7 @@ async function requestImprovement(context) {
   // Prefer the configured Cohere route; if GitHub Actions has no router secret,
   // use the same unauthenticated text API already present in the application.
   const providers = key
-    ? [{ name: 'Unorouter/Cohere', url: `${base}/chat/completions`, models: ['cohere-command-a:free'], includeModel: true, headers: { Authorization: `Bearer ${key}`, 'x-api-key': key, 'Content-Type': 'application/json' } }]
+    ? [{ name: 'Unorouter', url: `${base}/chat/completions`, models: ['cohere-command-a:free', 'agnes-2.5-flash:free', 'deepseek-r1-distill-qwen-32b:free', 'gemini-3.1-flash-lite:free'], includeModel: true, headers: { Authorization: `Bearer ${key}`, 'x-api-key': key, 'Content-Type': 'application/json' } }]
     : [{ name: 'Pollinations', url: 'https://text.pollinations.ai/openai', models: [], includeModel: true, headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 DubAI-PRO-AI-Maintainer/1.0' } }];
   if (!key) {
     try {

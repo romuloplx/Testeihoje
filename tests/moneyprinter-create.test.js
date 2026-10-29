@@ -145,6 +145,7 @@ test('AI maintainer only publishes small tested changes to the fixed preview bra
   assert.match(maintainer, /MAX_PATCH_CHARS/);
   assert.match(maintainer, /text\.pollinations\.ai\/models/);
   assert.match(maintainer, /function textModelIds/);
+  assert.match(maintainer, /'cohere-command-a:free', 'agnes-2.5-flash:free', 'deepseek-r1-distill-qwen-32b:free'/);
   assert.match(maintainer, /'apply'/);
   assert.match(maintainer, /'--check'/);
   assert.match(maintainer, /diff --git a\/ARQUIVO b\/ARQUIVO/);
