@@ -1,6 +1,9 @@
 name: AI project maintainer
 
 on:
+  push:
+    branches:
+      - arena/2cf1868f-testeihoje
   workflow_dispatch:
   schedule:
     - cron: '30 12 * * 1' # weekly Monday; scheduled workflows run from the repository default branch

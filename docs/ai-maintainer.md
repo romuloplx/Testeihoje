@@ -6,6 +6,6 @@ This repository includes a deliberately bounded GitHub Actions maintainer. It as
 
 - Add a repository Actions secret named `UNOROUTER_API_KEY`. The key must be set in GitHub Actions secrets; the value stored only in Vercel is not automatically available to GitHub-hosted runners.
 - The workflow needs Actions write permission for repository contents so it can push validated commits to the preview branch.
-- Run it with **Actions → AI project maintainer → Run workflow** to test. Scheduled runs are weekly on Monday at 12:30 UTC, but GitHub only runs scheduled workflows defined on the repository's default branch. Until this workflow is merged into the default branch, only manual dispatch is available.
+- A human push to `arena/2cf1868f-testeihoje` starts one maintenance run automatically. Run it with **Actions → AI project maintainer → Run workflow** to test again. Scheduled runs are weekly on Monday at 12:30 UTC, but GitHub only runs scheduled workflows defined on the repository's default branch. Until this workflow is merged into the default branch, push-triggered/manual runs work, but the weekly schedule does not.
 
 If the API call, patch validation, or tests fail, the workflow stops without publishing the proposed change. A passing test suite is a gate, not a guarantee; inspect the resulting Vercel preview before promoting anything to production.
