@@ -142,6 +142,12 @@ function applyPatch(patch) {
   }
   if (applyPatch(proposal.patch)) console.log('AI_MAINTENANCE_PATCH_APPLIED=true');
 })().catch(error => {
-  console.error(`AI maintenance stopped safely: ${String(error.message || error).slice(0, 800)}`);
+  const key = String(process.env.UNOROUTER_API_KEY || '').trim();
+  const message = String(error.message || error).replaceAll(key, '[redacted]').slice(0, 1200);
+  console.error(`AI maintenance stopped safely: ${message}`);
+  const summaryFile = process.env.GITHUB_STEP_SUMMARY;
+  if (summaryFile) {
+    try { fs.appendFileSync(summaryFile, `## AI maintainer stopped safely\n\n${message}\n`); } catch (_) {}
+  }
   process.exitCode = 1;
 });
