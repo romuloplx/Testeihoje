@@ -75,7 +75,7 @@ async function requestImprovement(context) {
     'Não invente dependências, serviços, credenciais, endpoints ou funcionalidades indisponíveis. Preserve comportamento existente e compatibilidade mobile.',
     'Nunca introduza telemetria pessoal, chamadas externas novas, segredos, credenciais, código ofuscado, eval, scripts de instalação ou mudanças de segurança/autenticação.',
     'Se não encontrar melhoria segura e comprovável, retorne patch vazio. Não faça reformatação em massa.',
-          'Retorne APENAS JSON: {"summary":"resumo curto em português","patch":"diff unificado git aplicável"}. O diff deve conter apenas arquivos permitidos do contexto e no máximo 250 linhas.'
+          'Retorne APENAS JSON: {"summary":"resumo curto em português","patch":"diff unificado git aplicável"}. O campo patch precisa conter cabeçalhos diff --git a/ARQUIVO b/ARQUIVO e hunks @@ padrão, com quebras de linha reais; não escreva instruções no lugar de um diff. Use apenas arquivos permitidos do contexto e no máximo 250 linhas.'
   ].join(' ');
   const user = `Repositório DubAI PRO. Branch de destino: ${process.env.TARGET_BRANCH || 'arena/2cf1868f-testeihoje'}.\n\nArquivos disponíveis (trechos):\n${context}`;
 
@@ -142,11 +142,24 @@ async function requestImprovement(context) {
 function applyPatch(patch) {
   if (!patch.trim()) return false;
   if (patch.length > MAX_PATCH_CHARS) throw new Error('Patch excedeu o limite de tamanho permitido.');
-  if (/\b(?:\.env|\.github|package(?:-lock)?\.json|vercel\.json|node_modules|\.git)\b/i.test(patch)) {
+  let normalized = patch.trim()
+    .replace(/^```(?:diff|patch)?\s*/i, '')
+    .replace(/\s*```\s*$/, '');
+  if (!normalized.includes('\n') && /\\n/.test(normalized)) normalized = normalized.replace(/\\n/g, '\n').replace(/\\t/g, '\t');
+  const diffStart = normalized.search(/(?:^diff --git |^--- a\/)/m);
+  if (diffStart > 0) normalized = normalized.slice(diffStart);
+  if (!/^diff --git |^--- a\//m.test(normalized)) {
+    throw new Error(`A IA não retornou um diff Git padrão. Trecho recebido: ${normalized.slice(0, 240).replace(/[\r\n]+/g, ' ')}`);
+  }
+  if (/\b(?:\.env|\.github|package(?:-lock)?\.json|vercel\.json|node_modules|\.git)\b/i.test(normalized)) {
     throw new Error('Patch tentou alterar configuração, dependências ou credenciais bloqueadas.');
   }
-  execFileSync('git', ['apply', '--check', '--whitespace=error', '-'], { input: patch, stdio: ['pipe', 'pipe', 'pipe'] });
-  execFileSync('git', ['apply', '--whitespace=error', '-'], { input: patch, stdio: ['pipe', 'pipe', 'pipe'] });
+  try {
+    execFileSync('git', ['apply', '--check', '--whitespace=error', '-'], { input: normalized, stdio: ['pipe', 'pipe', 'pipe'] });
+  } catch (error) {
+    throw new Error(`Patch Git inválido: ${String(error.stderr || error.message || error).slice(0, 300)} Trecho: ${normalized.slice(0, 240).replace(/[\r\n]+/g, ' ')}`);
+  }
+  execFileSync('git', ['apply', '--whitespace=error', '-'], { input: normalized, stdio: ['pipe', 'pipe', 'pipe'] });
   const changed = git(['diff', '--name-only']).trim().split('\n').filter(Boolean);
   if (!changed.length || changed.some(file => !ALLOWED.test(file) || BLOCKED.test(file))) {
     git(['checkout', '--', '.']);

@@ -147,6 +147,7 @@ test('AI maintainer only publishes small tested changes to the fixed preview bra
   assert.match(maintainer, /function textModelIds/);
   assert.match(maintainer, /'apply'/);
   assert.match(maintainer, /'--check'/);
+  assert.match(maintainer, /diff --git a\/ARQUIVO b\/ARQUIVO/);
   assert.match(maintainer, /changedLines > 500/);
   assert.match(maintainer, /\.github/);
 });
