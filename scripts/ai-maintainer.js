@@ -82,18 +82,22 @@ async function requestImprovement(context) {
       try {
         const response = await fetch(provider.url, {
           method: 'POST',
-          headers: provider.headers,
+          headers: { ...provider.headers, 'User-Agent': 'Mozilla/5.0 DubAI-PRO-AI-Maintainer/1.0' },
           body: JSON.stringify({
             model,
             temperature: 0.15,
             max_tokens: 7000,
+            jsonMode: true,
+            response_format: { type: 'json_object' },
             messages: [{ role: 'system', content: system }, { role: 'user', content: user }]
           }),
           signal: AbortSignal.timeout(90_000)
         });
-        const body = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(`HTTP ${response.status}: ${String(body.error?.message || body.message || '').slice(0, 220)}`);
-        const text = body.choices?.[0]?.message?.content || (typeof body === 'string' ? body : '');
+        const raw = await response.text().catch(() => '');
+        let body = {};
+        try { body = JSON.parse(raw); } catch (_) {}
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${String(body.error?.message || body.message || raw).slice(0, 220)}`);
+        const text = body.choices?.[0]?.message?.content || raw.trim();
         if (!text) throw new Error('resposta vazia');
         return parseModelResponse(text);
       } catch (error) {

@@ -36,7 +36,7 @@ jobs:
           node-version: 24
       - name: Install project dependencies
         run: npm ci
-      - name: Ask Cohere for one bounded improvement
+      - name: Ask AI for one bounded improvement
         run: node scripts/ai-maintainer.js
       - name: Validate the proposed change
         if: success()
