@@ -94,7 +94,7 @@ async function requestImprovement(context) {
   const errors = [];
   for (const provider of providers) {
     for (const model of provider.models) {
-      for (let attempt = 0; attempt < 3; attempt++) {
+      for (let attempt = 0; attempt < 2; attempt++) {
         try {
           const payload = {
             temperature: 0.15,
@@ -117,11 +117,19 @@ async function requestImprovement(context) {
           try { body = JSON.parse(raw); } catch (_) {}
           if (!response.ok) {
             const detail = String(body.error?.message || body.message || raw).slice(0, 220);
-            if ((response.status === 402 || response.status === 429 || response.status === 503) && attempt < 2) {
-              const quotaWindow = Number((detail.match(/every (\d+) seconds/i) || [])[1]) || 0;
-              const retryHint = Number((detail.match(/retry after (\d+)/i) || [])[1]) || 2;
-              const waitMs = Math.max(quotaWindow * 1000 + 1500, retryHint * 1000 + 1500);
-              await new Promise(resolve => setTimeout(resolve, Math.min(35_000, waitMs)));
+            if ((response.status === 402 || response.status === 429 || response.status === 503) && attempt < 1) {
+              const retryMatch = detail.match(/retry (?:after|in) (\d+)\s*(s|sec|seconds?|m|min|minutes?)?/i);
+              const retryValue = Number((retryMatch || [])[1]) || 0;
+              const retryUnit = String((retryMatch || [])[2] || 's').toLowerCase();
+              const retryHintMs = retryValue * (/^m|min|minute/.test(retryUnit) ? 60_000 : 1000);
+              const windowMatch = detail.match(/every (\d+)\s*(seconds?|minutes?)/i);
+              const quotaWindowMs = windowMatch
+                ? Number(windowMatch[1]) * (/^minute/i.test(windowMatch[2]) ? 60_000 : 1000)
+                : 0;
+              const waitMs = response.status === 503
+                ? Math.max(6000, retryHintMs)
+                : Math.max(2500, retryHintMs + 1500, quotaWindowMs + 1500);
+              await new Promise(resolve => setTimeout(resolve, Math.min(90_000, waitMs)));
               continue;
             }
             throw new Error(`HTTP ${response.status}: ${detail}`);
