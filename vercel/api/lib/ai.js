@@ -772,14 +772,19 @@ async function generateSceneImage({ prompt, style, width = 1024, height = 576, r
         signal: AbortSignal.timeout(8500)
       });
       if (r.ok) {
+        const contentType = String(r.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
         const buf = Buffer.from(await r.arrayBuffer());
-        if (buf.length > 1500) {
+        const isJpeg = buf.length > 1500 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
+        const isPng = buf.length > 1500 && buf.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+        const isWebp = buf.length > 1500 && buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP';
+        if (contentType.startsWith('image/') && (isJpeg || isPng || isWebp)) {
           return {
             imageBase64: buf.toString('base64'),
-            mime: r.headers.get('content-type') || 'image/jpeg',
+            mime: contentType,
             model: `pollinations/${opt.model || 'flux'}-${opt.w}x${opt.h}`
           };
         }
+        errors.push(`pollinations(${opt.model || 'std'}): resposta não é uma imagem válida (${contentType || 'sem content-type'})`);
       } else {
         errors.push(`pollinations(${opt.model || 'std'}): HTTP ${r.status}`);
       }

@@ -125,3 +125,12 @@ test('Create offers strict Cohere mode and never silently falls back when it is 
   const route = fs.readFileSync(path.join(__dirname, '../vercel/api/create.js'), 'utf8');
   assert.match(route, /if \(aiModel === 'cohere-command-a:strict'\)/);
 });
+
+test('Create rejects Pollinations quota/error pages instead of using them as scene images', () => {
+  const ai = fs.readFileSync(path.join(__dirname, '../vercel/api/lib/ai.js'), 'utf8');
+  const html = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
+  assert.match(ai, /contentType\.startsWith\('image\/'\) && \(isJpeg \|\| isPng \|\| isWebp\)/);
+  assert.match(html, /if\(!mainBmp\)/);
+  assert.match(html, /vídeo foi interrompido para evitar incluir uma tela de limite\/erro como cenário/i);
+  assert.doesNotMatch(html, /Promise\.any\(\[backendTask, directTask\]\)/);
+});
