@@ -149,6 +149,9 @@ test('AI maintainer only publishes small tested changes to the fixed preview bra
   assert.match(maintainer, /retry \(\?:after\|in\)/);
   assert.match(maintainer, /quotaWindowMs/);
   assert.match(maintainer, /providerBusy/);
+  assert.match(maintainer, /routerModels/);
+  assert.match(maintainer, /catalog\.ok/);
+  assert.match(maintainer, /:free\$/i);
   assert.match(maintainer, /'apply'/);
   assert.match(maintainer, /'--check'/);
   assert.match(maintainer, /diff --git a\/ARQUIVO b\/ARQUIVO/);

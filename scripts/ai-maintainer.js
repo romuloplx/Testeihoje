@@ -81,8 +81,28 @@ async function requestImprovement(context) {
 
   // Prefer the configured Cohere route; if GitHub Actions has no router secret,
   // use the same unauthenticated text API already present in the application.
+  const staticFreeModels = ['cohere-command-a:free', 'agnes-2.5-flash:free', 'deepseek-r1-distill-qwen-32b:free', 'gemini-3.1-flash-lite:free'];
+  let routerModels = [...staticFreeModels];
+  if (key) {
+    try {
+      const catalog = await fetch(`${base}/models`, {
+        headers: { Authorization: `Bearer ${key}`, 'x-api-key': key },
+        signal: AbortSignal.timeout(12000)
+      });
+      if (catalog.ok) {
+        const data = await catalog.json();
+        const discovered = (Array.isArray(data.data) ? data.data : [])
+          .map(item => String(item && item.id || '').trim())
+          .filter(id => /^[A-Za-z0-9._:/+-]{1,160}$/.test(id) && /:free$/i.test(id)
+            && !/(image|vision|tts|audio|whisper|embedding|video|diffusion|sdxl|flux|veo|kling)/i.test(id));
+        routerModels = [...new Set([...staticFreeModels, ...discovered])].slice(0, 10);
+      }
+    } catch (error) {
+      console.warn(`Unorouter model catalog unavailable; using known free candidates: ${String(error.message || error).slice(0, 120)}`);
+    }
+  }
   const providers = key
-    ? [{ name: 'Unorouter', url: `${base}/chat/completions`, models: ['cohere-command-a:free', 'agnes-2.5-flash:free', 'deepseek-r1-distill-qwen-32b:free', 'gemini-3.1-flash-lite:free'], includeModel: true, headers: { Authorization: `Bearer ${key}`, 'x-api-key': key, 'Content-Type': 'application/json' } }]
+    ? [{ name: 'Unorouter', url: `${base}/chat/completions`, models: routerModels, includeModel: true, headers: { Authorization: `Bearer ${key}`, 'x-api-key': key, 'Content-Type': 'application/json' } }]
     : [{ name: 'Pollinations', url: 'https://text.pollinations.ai/openai', models: [], includeModel: true, headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 DubAI-PRO-AI-Maintainer/1.0' } }];
   if (!key) {
     try {
@@ -117,6 +137,8 @@ async function requestImprovement(context) {
           try { body = JSON.parse(raw); } catch (_) {}
           if (!response.ok) {
             const detail = String(body.error?.message || body.message || raw).slice(0, 220);
+            const providerBusy = response.status === 503 && /all providers.*busy|hit their rate limit/i.test(detail);
+            if (providerBusy) throw new Error(`HTTP ${response.status}: ${detail}`);
             if ((response.status === 402 || response.status === 429 || response.status === 503) && attempt < 1) {
               const retryMatch = detail.match(/retry (?:after|in) (\d+)\s*(s|sec|seconds?|m|min|minutes?)?/i);
               const retryValue = Number((retryMatch || [])[1]) || 0;
@@ -126,12 +148,9 @@ async function requestImprovement(context) {
               const quotaWindowMs = windowMatch
                 ? Number(windowMatch[1]) * (/^minute/i.test(windowMatch[2]) ? 60_000 : 1000)
                 : 0;
-              const providerBusy = response.status === 503 && /all providers.*busy|hit their rate limit/i.test(detail);
-              const waitMs = providerBusy
-                ? Math.max(65_000, retryHintMs)
-                : response.status === 503
-                  ? Math.max(6000, retryHintMs)
-                  : Math.max(2500, retryHintMs + 1500, quotaWindowMs + 1500);
+              const waitMs = response.status === 503
+                ? Math.max(6000, retryHintMs)
+                : Math.max(2500, retryHintMs + 1500, quotaWindowMs + 1500);
               await new Promise(resolve => setTimeout(resolve, Math.min(90_000, waitMs)));
               continue;
             }
