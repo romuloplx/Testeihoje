@@ -134,3 +134,17 @@ test('Create rejects Pollinations quota/error pages instead of using them as sce
   assert.match(html, /vídeo foi interrompido para evitar incluir uma tela de limite\/erro como cenário/i);
   assert.doesNotMatch(html, /Promise\.any\(\[backendTask, directTask\]\)/);
 });
+
+test('AI maintainer only publishes small tested changes to the fixed preview branch', () => {
+  const workflow = fs.readFileSync(path.join(__dirname, '../.github/workflows/ai-maintainer.yml'), 'utf8');
+  const maintainer = fs.readFileSync(path.join(__dirname, '../scripts/ai-maintainer.js'), 'utf8');
+  assert.match(workflow, /UNOROUTER_API_KEY: \$\{\{ secrets\.UNOROUTER_API_KEY \}\}/);
+  assert.match(workflow, /npm test/);
+  assert.match(workflow, /git push origin HEAD:arena\/2cf1868f-testeihoje/);
+  assert.doesNotMatch(workflow, /git push origin HEAD:main/);
+  assert.match(maintainer, /MAX_PATCH_CHARS/);
+  assert.match(maintainer, /'apply'/);
+  assert.match(maintainer, /'--check'/);
+  assert.match(maintainer, /changedLines > 500/);
+  assert.match(maintainer, /\.github/);
+});

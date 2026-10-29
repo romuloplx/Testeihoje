@@ -1,0 +1,58 @@
+name: AI project maintainer
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '30 12 * * 1' # weekly Monday; scheduled workflows run from the repository default branch
+
+concurrency:
+  group: ai-maintainer-arena-2cf1868f-testeihoje
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  maintain:
+    if: github.repository == 'romuloplx/Testeihoje'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TARGET_BRANCH: arena/2cf1868f-testeihoje
+      UNOROUTER_API_KEY: ${{ secrets.UNOROUTER_API_KEY }}
+      UNOROUTER_BASE_URL: https://api.unorouter.com/v1
+    steps:
+      - name: Checkout the Arena preview branch
+        uses: actions/checkout@v4
+        with:
+          ref: arena/2cf1868f-testeihoje
+          fetch-depth: 0
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install project dependencies
+        run: npm ci
+      - name: Ask Cohere for one bounded improvement
+        run: node scripts/ai-maintainer.js
+      - name: Validate the proposed change
+        if: success()
+        run: |
+          if git diff --quiet; then
+            echo 'No safe improvement was proposed; nothing to publish.'
+            exit 0
+          fi
+          git diff --check
+          npm test
+      - name: Publish validated improvement to the preview branch
+        if: success()
+        run: |
+          if git diff --quiet; then
+            echo 'No changes to commit.'
+            exit 0
+          fi
+          git config user.name 'DubAI PRO AI Maintainer'
+          git config user.email 'dubai-pro-ai-maintainer@users.noreply.github.com'
+          git add -u
+          git commit -m 'AI maintenance: validated project improvement'
+          git push origin HEAD:arena/2cf1868f-testeihoje
