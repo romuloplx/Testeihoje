@@ -59,6 +59,14 @@ function parseModelResponse(text) {
   return result;
 }
 
+function textModelIds(payload) {
+  const list = Array.isArray(payload) ? payload : (payload && (payload.models || payload.data || payload.items)) || [];
+  const ids = list.map(item => typeof item === 'string' ? item : String(item && (item.id || item.name || item.model) || '')).filter(Boolean);
+  const textOnly = ids.filter(id => !/(image|vision|tts|audio|video|embedding|diffusion)/i.test(id));
+  const preferred = ['openai', 'openai-fast', 'gemini', 'mistral', 'searchgpt'];
+  return [...preferred.filter(id => textOnly.includes(id)), ...textOnly.filter(id => !preferred.includes(id))].slice(0, 5);
+}
+
 async function requestImprovement(context) {
   const key = String(process.env.UNOROUTER_API_KEY || '').trim();
   const base = String(process.env.UNOROUTER_BASE_URL || 'https://api.unorouter.com/v1').replace(/\/+$/, '');
@@ -75,7 +83,14 @@ async function requestImprovement(context) {
   // use the same unauthenticated text API already present in the application.
   const providers = key
     ? [{ name: 'Unorouter/Cohere', url: `${base}/chat/completions`, models: ['cohere-command-a:free'], includeModel: true, headers: { Authorization: `Bearer ${key}`, 'x-api-key': key, 'Content-Type': 'application/json' } }]
-    : [{ name: 'HackClub', url: 'https://ai.hackclub.com/chat/completions', models: ['default'], includeModel: false, headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 DubAI-PRO-AI-Maintainer/1.0' } }];
+    : [{ name: 'Pollinations', url: 'https://text.pollinations.ai/openai', models: [], includeModel: true, headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 DubAI-PRO-AI-Maintainer/1.0' } }];
+  if (!key) {
+    try {
+      const modelResponse = await fetch('https://text.pollinations.ai/models', { signal: AbortSignal.timeout(12000) });
+      if (modelResponse.ok) providers[0].models = textModelIds(await modelResponse.json());
+      if (!providers[0].models.length) providers[0].models = ['openai'];
+    } catch (_) { providers[0].models = ['openai']; }
+  }
   const errors = [];
   for (const provider of providers) {
     for (const model of provider.models) {

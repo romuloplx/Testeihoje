@@ -4,7 +4,7 @@ This repository includes a deliberately bounded GitHub Actions maintainer. It as
 
 ## Required GitHub setup
 
-- If a repository Actions secret named `UNOROUTER_API_KEY` is available, the maintainer prefers Cohere Command-A via Unorouter. The key stored only in Vercel is not automatically available to GitHub-hosted runners. Without that Actions secret, it uses the unauthenticated HackClub text endpoint already used by this application; that public fallback can be unavailable or rate-limited.
+- If a repository Actions secret named `UNOROUTER_API_KEY` is available, the maintainer prefers Cohere Command-A via Unorouter. The key stored only in Vercel is not automatically available to GitHub-hosted runners. Without that Actions secret, it discovers text models from the public Pollinations model catalog and tries an available text model; this public fallback can be unavailable or rate-limited.
 - The workflow needs Actions write permission for repository contents so it can push validated commits to the preview branch.
 - A human push to `arena/2cf1868f-testeihoje` starts one maintenance run automatically. Run it with **Actions → AI project maintainer → Run workflow** to test again. Scheduled runs are weekly on Monday at 12:30 UTC, but GitHub only runs scheduled workflows defined on the repository's default branch. Until this workflow is merged into the default branch, push-triggered/manual runs work, but the weekly schedule does not.
 
