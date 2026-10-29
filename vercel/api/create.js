@@ -39,9 +39,19 @@ module.exports = async (req, res) => {
       try {
         const taskId = String(body.taskId || '').trim();
         if (body.action === 'moneyprinter-status' && !/^[a-zA-Z0-9_-]{1,128}$/.test(taskId)) return send(res, 400, { error: 'ID de tarefa inválido.' });
+        const videoPayload = {
+          video_subject: String(body.subject || '').trim().slice(0, 500),
+          video_aspect: ['16:9','9:16','1:1'].includes(body.aspect) ? body.aspect : '9:16',
+          video_source: 'pexels',
+          video_count: 1,
+          subtitle_enabled: true
+        };
+        const script = String(body.script || '').trim().slice(0, 8000);
+        if (script) videoPayload.video_script = script;
+        if (body.action === 'moneyprinter-create' && !videoPayload.video_subject) return send(res, 400, { error: 'Informe o tema do vídeo.' });
         const upstream = await fetch(body.action === 'moneyprinter-create' ? `${baseUrl}/api/v1/videos` : `${baseUrl}/api/v1/tasks/${encodeURIComponent(taskId)}`, {
           method: body.action === 'moneyprinter-create' ? 'POST' : 'GET', headers,
-          ...(body.action === 'moneyprinter-create' ? { body: JSON.stringify({ video_subject: String(body.subject || '').slice(0, 500), video_script: String(body.script || '').slice(0, 8000), video_aspect: ['16:9','9:16','1:1'].includes(body.aspect) ? body.aspect : '9:16', video_source: 'pexels', video_count: 1, subtitle_enabled: true }) } : {})
+          ...(body.action === 'moneyprinter-create' ? { body: JSON.stringify(videoPayload) } : {})
         });
         const result = await upstream.json().catch(() => ({}));
         if (!upstream.ok) return send(res, upstream.status, { error: result.message || result.error || 'MoneyPrinterTurbo recusou a solicitação.' });

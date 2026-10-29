@@ -605,6 +605,8 @@ input[type="range"]{
     </div>
 
     <button class="primary" id="createFullVideoBtn" onclick="createAndBuildVideo()" style="font-size:15px;padding:15px">🎬 Criar História & Vídeo Completo (Personagens + Cenários Vivos)</button>
+    <button class="ghost" id="moneyPrinterQuickBtn" type="button" onclick="createWithMoneyPrinterTurboFromPrompt()" style="width:100%;margin-top:8px;border-color:#f59e0b;color:#fde68a">🖨️ Criar direto com MoneyPrinterTurbo (tema → vídeo)</button>
+    <div class="hint" style="margin:5px 0 8px">Envia seu tema ao renderizador externo sem gerar roteiro nesta etapa do DubAI PRO. Requer MONEYPRINTERTURBO_URL configurada no servidor; o MoneyPrinterTurbo pode usar os provedores configurados na própria instância.</div>
     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
       <button class="ghost" id="createBtn" onclick="createVideo(false)" style="flex:1;min-width:180px">📝 Gerar roteiro & personagens primeiro</button>
       <button class="ghost" onclick="fillExample()" style="flex:1;min-width:180px">💡 Usar exemplo de história com personagens</button>
@@ -2331,13 +2333,24 @@ async function createAndBuildVideo(){
 }
 
 async function createWithMoneyPrinterTurbo(){
-  const button = document.getElementById('moneyPrinterBtn');
-  const script = String(document.getElementById('createScript')?.innerText || '').trim();
-  if (!script) return showStatus('createStatus', '⚠️ Gere um roteiro primeiro.', 'warn');
-  button.disabled = true;
+  return runMoneyPrinterTurbo('moneyPrinterBtn', false);
+}
+
+async function createWithMoneyPrinterTurboFromPrompt(){
+  return runMoneyPrinterTurbo('moneyPrinterQuickBtn', true);
+}
+
+async function runMoneyPrinterTurbo(buttonId, topicOnly){
+  const button = document.getElementById(buttonId);
+  const prompt = String(document.getElementById('prompt')?.value || '').trim();
+  const script = topicOnly ? '' : String(document.getElementById('createScript')?.innerText || '').trim();
+  const subject = topicOnly ? prompt : (currentCreateData?.title || prompt || 'Vídeo DubAI PRO');
+  if (!subject) return showStatus('createStatus', '⚠️ Descreva o tema do vídeo primeiro.', 'warn');
+  if (!topicOnly && !script) return showStatus('createStatus', '⚠️ Gere um roteiro primeiro ou use a opção direta por tema.', 'warn');
+  if (button) button.disabled = true;
   try {
-    showStatus('createStatus', '🖨️ Enviando roteiro ao MoneyPrinterTurbo...', 'info');
-    const start = await fetch('/api/create', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ action:'moneyprinter-create', subject: currentCreateData?.title || document.getElementById('prompt')?.value || 'Vídeo DubAI PRO', script, aspect: document.getElementById('createFormat')?.value }) });
+    showStatus('createStatus', topicOnly ? '🖨️ Enviando o tema ao MoneyPrinterTurbo...' : '🖨️ Enviando roteiro ao MoneyPrinterTurbo...', 'info');
+    const start = await fetch('/api/create', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ action:'moneyprinter-create', subject, script, aspect: document.getElementById('createFormat')?.value }) });
     const started = await start.json();
     if (!start.ok) throw new Error(started.error || 'Não foi possível iniciar a renderização.');
     const taskId = started?.data?.task_id || started?.task_id;
@@ -2363,7 +2376,7 @@ async function createWithMoneyPrinterTurbo(){
     }
     throw new Error('A renderização excedeu 15 minutos. Consulte a tarefa no MoneyPrinterTurbo.');
   } catch (error) { showStatus('createStatus', `⚠️ ${error.message}`, 'warn'); }
-  finally { button.disabled = false; }
+  finally { if (button) button.disabled = false; }
 }
 
 // --- Create ---
