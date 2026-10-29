@@ -126,9 +126,12 @@ async function requestImprovement(context) {
               const quotaWindowMs = windowMatch
                 ? Number(windowMatch[1]) * (/^minute/i.test(windowMatch[2]) ? 60_000 : 1000)
                 : 0;
-              const waitMs = response.status === 503
-                ? Math.max(6000, retryHintMs)
-                : Math.max(2500, retryHintMs + 1500, quotaWindowMs + 1500);
+              const providerBusy = response.status === 503 && /all providers.*busy|hit their rate limit/i.test(detail);
+              const waitMs = providerBusy
+                ? Math.max(65_000, retryHintMs)
+                : response.status === 503
+                  ? Math.max(6000, retryHintMs)
+                  : Math.max(2500, retryHintMs + 1500, quotaWindowMs + 1500);
               await new Promise(resolve => setTimeout(resolve, Math.min(90_000, waitMs)));
               continue;
             }
