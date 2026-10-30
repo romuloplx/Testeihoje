@@ -79,11 +79,11 @@ async function requestImprovement(context) {
   ].join(' ');
   const user = `Repositório DubAI PRO. Branch de destino: ${process.env.TARGET_BRANCH || 'arena/2cf1868f-testeihoje'}.\n\nArquivos disponíveis (trechos):\n${context}`;
 
-  // Paid fallback is explicitly authorized by the project owner; it is first because
-  // Unorouter itself recommends this model when the free DeepSeek tier is rate-limited.
-  const paidFallbackModels = ['deepseek-r1-distill-qwen-32b'];
+  // The owner authorized paid fallbacks; discover exact supported IDs and prefer
+  // the lowest listed text-model prices instead of guessing a paid alias.
   const staticFreeModels = ['cohere-command-a:free', 'agnes-2.5-flash:free', 'deepseek-r1-distill-qwen-32b:free', 'gemini-3.1-flash-lite:free'];
-  let routerModels = [...paidFallbackModels, ...staticFreeModels];
+  let paidFallbackModels = [];
+  let routerModels = [...staticFreeModels];
   if (key) {
     try {
       const catalog = await fetch(`${base}/models`, {
@@ -92,10 +92,23 @@ async function requestImprovement(context) {
       });
       if (catalog.ok) {
         const data = await catalog.json();
-        const discovered = (Array.isArray(data.data) ? data.data : [])
-          .map(item => String(item && item.id || '').trim())
-          .filter(id => /^[A-Za-z0-9._:/+-]{1,160}$/.test(id) && /:free$/i.test(id)
-            && !/(image|vision|tts|audio|whisper|embedding|video|diffusion|sdxl|flux|veo|kling)/i.test(id));
+        const catalogModels = (Array.isArray(data.data) ? data.data : []).filter(item => {
+          const id = String(item && item.id || '').trim();
+          return /^[A-Za-z0-9._:/+-]{1,160}$/.test(id)
+            && !/(image|vision|tts|audio|whisper|embedding|video|diffusion|sdxl|flux|veo|kling|moderation|rerank)/i.test(id);
+        });
+        const discovered = catalogModels.map(item => String(item.id).trim()).filter(id => /:free$/i.test(id));
+        const priceScore = item => {
+          const prompt = Number.parseFloat(item.pricing?.prompt);
+          const completion = Number.parseFloat(item.pricing?.completion);
+          return Number.isFinite(prompt) && Number.isFinite(completion) ? prompt + completion * 2 : Number.POSITIVE_INFINITY;
+        };
+        paidFallbackModels = catalogModels
+          .filter(item => !/:free$/i.test(String(item.id)) && item.id !== 'openai')
+          .sort((a, b) => priceScore(a) - priceScore(b) || String(a.id).localeCompare(String(b.id)))
+          .slice(0, 5)
+          .map(item => String(item.id).trim());
+        if (paidFallbackModels.length) console.info(`Unorouter paid text candidates (lowest listed cost first): ${paidFallbackModels.join(', ')}`);
         routerModels = [...new Set([...paidFallbackModels, ...staticFreeModels, ...discovered])].slice(0, 10);
       }
     } catch (error) {

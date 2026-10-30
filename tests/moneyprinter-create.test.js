@@ -145,7 +145,9 @@ test('AI maintainer only publishes small tested changes to the fixed preview bra
   assert.match(maintainer, /MAX_PATCH_CHARS/);
   assert.match(maintainer, /text\.pollinations\.ai\/models/);
   assert.match(maintainer, /function textModelIds/);
-  assert.match(maintainer, /paidFallbackModels = \['deepseek-r1-distill-qwen-32b'\]/);
+  assert.match(maintainer, /paidFallbackModels = \[\]/);
+  assert.match(maintainer, /priceScore/);
+  assert.match(maintainer, /lowest listed cost first/);
   assert.match(maintainer, /'cohere-command-a:free', 'agnes-2.5-flash:free', 'deepseek-r1-distill-qwen-32b:free'/);
   assert.match(maintainer, /retry \(\?:after\|in\)/);
   assert.match(maintainer, /quotaWindowMs/);
