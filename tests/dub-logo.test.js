@@ -100,6 +100,19 @@ test('video export burns the freely positioned logo into every rendered frame be
   }
 });
 
+test('translated video export re-encodes media to omit source metadata', () => {
+  for (const html of [publicHtml, vercelHtml]) {
+    const start = html.indexOf('async function downloadDubVideo(opts = {})');
+    const end = html.indexOf('// --- Projects', start);
+    assert.ok(start >= 0 && end > start, 'downloadDubVideo source should be present');
+    const exportSource = html.slice(start, end);
+    assert.match(exportSource, /não copia os bytes nem os átomos MP4 do original/);
+    assert.match(exportSource, /recordCanvasVideo\(\{/);
+    assert.match(exportSource, /drawFn: draw/);
+    assert.match(exportSource, /audioBuffer: lastDubMasterBuffer/);
+  }
+});
+
 test('logo renderer preserves ratio, opacity, corner presets, and arbitrary dragged coordinates', () => {
   const { getDubLogoRenderMetrics, drawDubLogo } = extractLogoDrawingFunctions(publicHtml);
   const image = { naturalWidth: 400, naturalHeight: 200 };

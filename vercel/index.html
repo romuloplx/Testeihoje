@@ -6437,6 +6437,7 @@ async function downloadDubVideo(opts = {}){
       await new Promise(r => { audioEl.onloadedmetadata = r; setTimeout(r, 2500); });
     }
 
+    // Privacidade: o export redesenha cada frame e cria novas faixas de vídeo/áudio; não copia os bytes nem os átomos MP4 do original. Assim, metadados de origem (como GPS, câmera, autor e título embutidos) não passam para o vídeo dublado. O encoder ainda grava os metadados técnicos necessários, como codec e duração.
     const blob = await recordCanvasVideo({
       drawFn: draw,
       audioBuffer: lastDubMasterBuffer || null,
