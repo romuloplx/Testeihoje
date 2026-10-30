@@ -79,10 +79,11 @@ async function requestImprovement(context) {
   ].join(' ');
   const user = `Repositório DubAI PRO. Branch de destino: ${process.env.TARGET_BRANCH || 'arena/2cf1868f-testeihoje'}.\n\nArquivos disponíveis (trechos):\n${context}`;
 
-  // Prefer the configured Cohere route; if GitHub Actions has no router secret,
-  // use the same unauthenticated text API already present in the application.
+  // Paid fallback is explicitly authorized by the project owner; it is first because
+  // Unorouter itself recommends this model when the free DeepSeek tier is rate-limited.
+  const paidFallbackModels = ['deepseek-r1-distill-qwen-32b'];
   const staticFreeModels = ['cohere-command-a:free', 'agnes-2.5-flash:free', 'deepseek-r1-distill-qwen-32b:free', 'gemini-3.1-flash-lite:free'];
-  let routerModels = [...staticFreeModels];
+  let routerModels = [...paidFallbackModels, ...staticFreeModels];
   if (key) {
     try {
       const catalog = await fetch(`${base}/models`, {
@@ -95,7 +96,7 @@ async function requestImprovement(context) {
           .map(item => String(item && item.id || '').trim())
           .filter(id => /^[A-Za-z0-9._:/+-]{1,160}$/.test(id) && /:free$/i.test(id)
             && !/(image|vision|tts|audio|whisper|embedding|video|diffusion|sdxl|flux|veo|kling)/i.test(id));
-        routerModels = [...new Set([...staticFreeModels, ...discovered])].slice(0, 10);
+        routerModels = [...new Set([...paidFallbackModels, ...staticFreeModels, ...discovered])].slice(0, 10);
       }
     } catch (error) {
       console.warn(`Unorouter model catalog unavailable; using known free candidates: ${String(error.message || error).slice(0, 120)}`);
