@@ -110,6 +110,8 @@ test('translated video export re-encodes media to omit source metadata', () => {
     assert.match(exportSource, /recordCanvasVideo\(\{/);
     assert.match(exportSource, /drawFn: draw/);
     assert.match(exportSource, /audioBuffer: lastDubMasterBuffer/);
+    assert.match(exportSource, /video-dublado-\$\{languageSlug\}/);
+    assert.doesNotMatch(exportSource, /currentDubFile\.name/);
   }
 });
 

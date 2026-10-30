@@ -6458,8 +6458,9 @@ async function downloadDubVideo(opts = {}){
     }
 
     const isMp4 = blob.type.includes('mp4');
-    const slug = ((currentDubFile && currentDubFile.name) || 'video').replace(/\.[^.]+$/, '').replace(/[^a-z0-9_-]+/gi, '-').slice(0, 36) || 'video';
-    lastDubVideoFilename = `${slug}-dublado.${isMp4 ? 'mp4' : 'webm'}`;
+    // Não propaga o nome original (que também pode conter dados pessoais) para o arquivo exportado.
+    const languageSlug = String(targetLanguage || 'traduzido').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9_-]+/gi, '-').replace(/^-|-$/g, '').slice(0, 24) || 'traduzido';
+    lastDubVideoFilename = `video-dublado-${languageSlug}.${isMp4 ? 'mp4' : 'webm'}`;
     lastDubVideoBlob = blob;
 
     const expV = document.getElementById('dubExportedVideo');
