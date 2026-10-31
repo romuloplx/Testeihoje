@@ -104,9 +104,9 @@ async function requestImprovement(context) {
           return Number.isFinite(prompt) && Number.isFinite(completion) ? prompt + completion * 2 : Number.POSITIVE_INFINITY;
         };
         paidFallbackModels = catalogModels
-          .filter(item => !/:free$/i.test(String(item.id)) && item.id !== 'openai')
+          .filter(item => !/:free$/i.test(String(item.id)) && item.id !== 'openai' && Number.isFinite(priceScore(item)))
           .sort((a, b) => priceScore(a) - priceScore(b) || String(a.id).localeCompare(String(b.id)))
-          .slice(0, 5)
+          .slice(0, 3)
           .map(item => String(item.id).trim());
         if (paidFallbackModels.length) console.info(`Unorouter paid text candidates (lowest listed cost first): ${paidFallbackModels.join(', ')}`);
         routerModels = [...new Set([...paidFallbackModels, ...staticFreeModels, ...discovered])].slice(0, 10);
@@ -151,6 +151,9 @@ async function requestImprovement(context) {
           try { body = JSON.parse(raw); } catch (_) {}
           if (!response.ok) {
             const detail = String(body.error?.message || body.message || raw).slice(0, 220);
+            if (response.status === 403 && /balance is empty|billing problem/i.test(detail)) {
+              throw Object.assign(new Error('Unorouter is out of credit; add balance or configure another AI provider.'), { fatal: true });
+            }
             const providerBusy = response.status === 503 && /all providers.*busy|hit their rate limit/i.test(detail);
             if (providerBusy) throw new Error(`HTTP ${response.status}: ${detail}`);
             if ((response.status === 402 || response.status === 429 || response.status === 503) && attempt < 1) {
@@ -175,6 +178,7 @@ async function requestImprovement(context) {
           return parseModelResponse(text);
         } catch (error) {
           errors.push(`${provider.name}/${model}: ${String(error.message || error).slice(0, 220)}`);
+          if (error && error.fatal) throw error;
           break;
         }
       }

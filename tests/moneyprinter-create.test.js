@@ -148,6 +148,9 @@ test('AI maintainer only publishes small tested changes to the fixed preview bra
   assert.match(maintainer, /paidFallbackModels = \[\]/);
   assert.match(maintainer, /priceScore/);
   assert.match(maintainer, /lowest listed cost first/);
+  assert.match(maintainer, /Number\.isFinite\(priceScore\(item\)\)/);
+  assert.match(maintainer, /error && error\.fatal/);
+  assert.match(maintainer, /Unorouter is out of credit/);
   assert.match(maintainer, /'cohere-command-a:free', 'agnes-2.5-flash:free', 'deepseek-r1-distill-qwen-32b:free'/);
   assert.match(maintainer, /retry \(\?:after\|in\)/);
   assert.match(maintainer, /quotaWindowMs/);
