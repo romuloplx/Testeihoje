@@ -13,7 +13,7 @@
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
 <title>DubAI PRO — Estúdio de vídeos com IA</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Inter:wght@400;600;700;800&family=Montserrat:wght@600;700;800;900&family=Oswald:wght@500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box}
 :root{
@@ -962,6 +962,15 @@ input[type="range"]{
           <option value="yes" selected>💬 Incluir legendas traduzidas sincronizadas</option>
           <option value="no">🚫 Vídeo limpo (sem legenda queimada na tela)</option>
         </select>
+        <label for="dubCaptionFont" style="margin-top:10px">Fonte das legendas</label>
+        <select id="dubCaptionFont" aria-label="Escolha a fonte das legendas">
+          <option value="montserrat" selected>Montserrat ExtraBold — Premium</option>
+          <option value="anton">Anton — Impacto</option>
+          <option value="bebas">Bebas Neue — Editorial</option>
+          <option value="oswald">Oswald — Compacta</option>
+          <option value="inter">Inter ExtraBold — Moderna</option>
+        </select>
+        <div class="hint" style="margin-top:5px">A fonte escolhida é aplicada às legendas traduzidas no vídeo exportado. O SRT mantém o texto e a sincronização.</div>
       </div>
       <div>
         <label>Extensão do processamento</label>
@@ -6352,6 +6361,18 @@ async function downloadDubVideo(opts = {}){
     const outH = Math.max(2, Math.round((srcH * scale) / 2) * 2);
 
     const burnSubs = ((document.getElementById('dubBurnSubs')||{}).value || 'yes') === 'yes';
+    const captionFonts = {
+      montserrat: { family: 'Montserrat', weight: 900 },
+      anton: { family: 'Anton', weight: 400 },
+      bebas: { family: 'Bebas Neue', weight: 400 },
+      oswald: { family: 'Oswald', weight: 700 },
+      inter: { family: 'Inter', weight: 800 }
+    };
+    const selectedCaptionFont = captionFonts[((document.getElementById('dubCaptionFont')||{}).value || 'montserrat')] || captionFonts.montserrat;
+    const captionFontStack = `"${selectedCaptionFont.family}", Arial, sans-serif`;
+    if(burnSubs && document.fonts && document.fonts.load){
+      try{ await document.fonts.load(`${selectedCaptionFont.weight} 18px "${selectedCaptionFont.family}"`); }catch(e){}
+    }
     const subCues = [];
     if(burnSubs && lastDubChunksTimeline.length){
       for(const seg of lastDubChunksTimeline){
@@ -6393,7 +6414,7 @@ async function downloadDubVideo(opts = {}){
         const cue = subCues.find(c => t >= c.start && t < c.end);
         if(cue && cue.text){
           const fs = Math.max(18, Math.round(Math.min(cw, ch) * 0.036));
-          ctx.font = `800 ${fs}px system-ui, sans-serif`;
+          ctx.font = `${selectedCaptionFont.weight} ${fs}px ${captionFontStack}`;
           const maxW = cw * 0.88;
           const words = cue.text.split(/\s+/);
           const lines = [];
