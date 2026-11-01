@@ -12292,21 +12292,32 @@ async function gerarCortesFinaisEmLote(forcedIds){
   }
   try{
     const total = indices.length;
+    let downloaded = 0;
+    const failed = [];
     for(let k=0;k<indices.length;k++){
       const i=indices[k];
       const c = opusState.clips[i];
-      toast(`🎬 [6/6 FFmpeg] Renderizando corte_${i + 1}.mp4 MP4 normal (${fmtClockSec(c.startSec)}s até ${fmtClockSec(c.endSec)}s)...`);
+      toast(`🎬 Renderizando corte ${k + 1}/${total} (${fmtClockSec(c.startSec)}–${fmtClockSec(c.endSec)})...`);
       selectOpusClip(i, false);
       opusState.lastExportBlob = null; opusState.lastExportClipId = null;
       const blob = await exportSelectedOpusClipMp4({ silentExport: true });
-      if(blob){
-        const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
-        const nomeSaida = `corte_${i + 1}.${ext}`;
-        triggerBlobDownload(blob, nomeSaida);
+      if(blob && blob.size > 0){
+        const ext = /^video\/mp4(?:;|$)/i.test(String(blob.type || '')) ? 'mp4' : 'webm';
+        triggerBlobDownload(blob, `corte_${i + 1}.${ext}`);
+        downloaded++;
+        // Evita que navegadores móveis bloqueiem cliques de download consecutivos.
+        if(k < indices.length - 1) await new Promise(resolve => setTimeout(resolve, 900));
+      } else {
+        failed.push(k + 1);
       }
     }
-    showStatus('opusStatus', `🎉 Pipeline [4/4] Finalizado! Todos os ${total} cortes verticais 9:16 (corte_1.mp4 .. corte_${total}.mp4) foram gerados e baixados!`, 'success');
-    toast(`🎉 Todos os ${total} cortes (corte_1.mp4...) foram baixados!`);
+    if(failed.length){
+      showStatus('opusStatus', `⚠️ ${downloaded}/${total} cortes foram gerados. Falha ao exportar: ${failed.map(n => `#${n}`).join(', ')}. Tente baixar esses cortes individualmente.`, 'warn');
+      toast(`⚠️ ${downloaded}/${total} cortes baixados; confira os cortes que falharam.`, 'warn');
+    } else {
+      showStatus('opusStatus', `✅ ${downloaded} cortes renderizados e enviados para download. Verifique a pasta Downloads/Galeria do aparelho.`, 'success');
+      toast(`✅ ${downloaded} cortes enviados para download.`);
+    }
   }catch(e){
     toast('❌ Erro na exportação em lote: ' + e.message, 'error');
   }finally{
@@ -12558,8 +12569,8 @@ async function ttsNavegadorParaAudioBuffer(text, voice = 'nova'){
 
 function finalizarBlobGaleria(blob, clip){
   if(!blob) return;
-  let ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
-  if(ext === 'webm'){ try{ blob = new Blob([blob], { type: 'video/mp4' }); ext = 'mp4'; }catch(_){ ext = 'mp4'; } }
+  // MIME/extensão precisam refletir o codec de verdade; renomear WebM para MP4 corrompe o download.
+  const ext = /^video\/mp4(?:;|$)/i.test(String(blob.type || '')) ? 'mp4' : 'webm';
   const slug = String(clip.title || `corte-viral-${clip.rank}`).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 34) || `corte-${clip.rank}`;
   const filename = `opusclip-corte-${clip.rank}-${slug}.${ext}`;
   opusState.lastExportBlob = blob;
@@ -12980,13 +12991,11 @@ async function exportSelectedOpusClipMp4(opts = {}){
     if(!blob) throw new Error('Não foi possível finalizar o arquivo de vídeo.');
 
     if(exportVid){ try{ exportVid.pause(); exportVid.src = ''; }catch(_){} }
-    // Força SEMPRE .mp4 normal do YouTube (H.264+AAC) — mesmo se fallback webm, salva como .mp4 para Galeria Android/iPhone reconhecer!
-    let ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
-    // Se o navegador só gravou webm, vamos forçar extensão .mp4 e mime video/mp4 para o sistema abrir normal (compatível via fallback de conversão)
-    if(ext === 'webm'){
-      // Re-embala como .mp4 para Download/Salvar na Galeria funcionar (Chrome Android só cria .webm, mas Galeria espera .mp4)
-      // Mantém blob mas força tipo compatível
-      try{ blob = new Blob([blob], { type: 'video/mp4' }); ext = 'mp4'; }catch(_){ ext='mp4'; }
+    // Nunca disfarça WebM como MP4: mudar apenas MIME/extensão não converte o codec e impede a reprodução em muitos celulares.
+    const isMp4 = /^video\/mp4(?:;|$)/i.test(String(blob.type || ''));
+    const ext = isMp4 ? 'mp4' : 'webm';
+    if(!isMp4){
+      showStatus('opusStatus', 'ℹ️ Este navegador exportou WebM (não MP4). O arquivo será baixado com a extensão correta para não corromper o vídeo.', 'warn');
     }
     const slug = String(clip.title || `corte-viral-${clip.rank}`).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 34) || `corte-${clip.rank}`;
     opusState.lastExportBlob = blob;
