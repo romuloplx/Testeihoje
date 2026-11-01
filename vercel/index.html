@@ -1550,10 +1550,8 @@ input[type="range"]{
               <label style="margin-top:8px;font-size:11px">🏷️ Auto Hook Banner (Topo do Vídeo)</label>
               <input type="text" id="opusEditHookBanner" oninput="onEditSelectedOpusClip()" style="padding:8px 10px;font-size:12.5px;margin-top:4px;width:100%;border-radius:8px;border:1px solid #282e46;background:#070a14;color:#fff">
               <label style="margin-top:8px;font-size:11px">💬 Legendas automáticas da fala (estilo CapCut)</label>
-              <button type="button" id="opusAutoCaptionBtn" onclick="generateSelectedOpusClipCaptionsFromAudio()" style="width:100%;margin-top:5px;padding:9px 12px;border:1px solid #22c55e;border-radius:9px;font-size:12px;font-weight:900;cursor:pointer;color:#dcfce7;background:linear-gradient(135deg,#064e3b,#052e16)" title="Ouve o áudio do corte selecionado, transcreve a fala e sincroniza as palavras no vídeo">🎙️ Gerar legenda automaticamente pelo áudio</button>
-              <div style="font-size:10.5px;color:#94a3b8;margin:5px 0 2px">Transcreve o que é falado no corte selecionado e atualiza a prévia e o MP4. O texto atual pode ser substituído.</div>
-              <label style="margin-top:6px;font-size:11px">✍️ Texto da Legenda (edite se quiser; a mudança aparece no vídeo na hora)</label>
-              <textarea id="opusEditCaption" rows="3" oninput="onEditSelectedOpusClip()" style="padding:8px 10px;font-size:12.5px;margin-top:4px;min-height:68px"></textarea>
+              <button type="button" id="opusAutoCaptionBtn" onclick="generateSelectedOpusClipCaptionsFromAudio()" style="width:100%;margin-top:5px;padding:9px 12px;border:1px solid #22c55e;border-radius:9px;font-size:12px;font-weight:900;cursor:pointer;color:#dcfce7;background:linear-gradient(135deg,#064e3b,#052e16)" title="Ouve o áudio do corte selecionado e legenda somente a fala reconhecida no vídeo">🎙️ Transcrever a fala deste corte</button>
+              <div style="font-size:10.5px;color:#94a3b8;margin:5px 0 2px">A legenda vem da fala reconhecida no áudio original. Se não houver fala clara, não inventamos texto.</div>
             </div>
 
             <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
@@ -11505,7 +11503,6 @@ function selectOpusClip(idx, autoPlay = false){
   document.getElementById('opusEditStart').value = clip.startSec;
   document.getElementById('opusEditEnd').value = clip.endSec;
   document.getElementById('opusEditHookBanner').value = clip.hookBanner || clip.title;
-  document.getElementById('opusEditCaption').value = clip.captionText || '';
   syncOpusCaptionUiFromClip(clip);
 
   // Se os cards ainda não foram montados no DOM, monta-os agora
@@ -11675,16 +11672,7 @@ function onEditSelectedOpusClip(){
   if(isFinite(e) && e > clip.startSec + 2) clip.endSec = Number(Math.min(opusState.durationSec || 3600, e).toFixed(1));
   clip.durationSec = Number(Math.max(2, clip.endSec - clip.startSec).toFixed(1));
   clip.hookBanner = document.getElementById('opusEditHookBanner').value;
-  const editedCaption = String(document.getElementById('opusEditCaption').value || '');
-  if(editedCaption !== String(clip.captionText || '')){
-    clip.captionManuallyEdited = true;
-    if(!opusCaptionTextMatches(clip.captionText, editedCaption)){
-      clip.subSegments = [];
-      clip.captionTimingGranularity = 'none';
-    }
-  }
-  clip.captionText = editedCaption;
-  clip.captionAudioMismatch = false;
+  // O texto da legenda não é editável: preserva apenas o que foi reconhecido na fala do vídeo.
   clip._cues = null;
   opusState.lastExportBlob = null; opusState.lastExportClipId = null;
   renderOpusClipsListUI();
@@ -11839,10 +11827,6 @@ function renderOpusClipsListUI(){
       +         `<button type="button" class="ghost" onclick="nudgeOpusCaptionScale(8,${idx})" style="padding:2px 6px;font-size:10px">A+</button>`
       +       `</div>`
       +     `</div>`
-      +     `<details style="margin-top:6px">`
-      +       `<summary style="cursor:pointer;font-size:10.5px;font-weight:800;color:#93c5fd">✏️ Editar texto da legenda deste corte</summary>`
-      +       `<textarea rows="2" oninput="onInlineEditCardCaptionText(${idx}, this.value)" style="margin-top:5px;font-size:11.5px;width:100%">${escapeHtml(c.captionText || '')}</textarea>`
-      +     `</details>`
       +   `</div>`
 
       +   `<div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:#0b0d16;border:1px solid #1e2438">`

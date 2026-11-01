@@ -3973,9 +3973,8 @@ async function analyzeViralClips({
 
   const getClipTranscriptSegments = (startSec, endSec) => allTimedSegments.filter(sg => {
     if (sg.fim <= startSec || sg.inicio >= endSec) return false;
-    const wordCount = String(sg.texto || '').trim().split(/\s+/).filter(Boolean).length;
-    // Segmentos de frase sem timestamps por palavra só entram se couberem inteiros no corte.
-    return wordCount <= 1 || (sg.inicio >= startSec && sg.fim <= endSec);
+    // Nunca inclui uma frase cujo timestamp atravessa a borda do corte: evita palavras fora do trecho exportado.
+    return sg.inicio >= startSec && sg.fim <= endSec;
   });
 
   const attachSubSegmentsAndSchema = (clipList) => {
@@ -3985,9 +3984,9 @@ async function analyzeViralClips({
       const matchingSegs = getClipTranscriptSegments(s, e);
 
       const subSegments = matchingSegs;
-      // Não empresta timestamps de outro trecho; quando há tempo real, o texto exibido vem desses mesmos segmentos.
+      // Só usa fala transcrita com timestamps reais dentro do corte. Ignora captionText do LLM para não inventar falas.
       const timedCaptionText = matchingSegs.map(sg => sg.texto).join(' ').trim();
-      const fullCaptionText = timedCaptionText || String(c.captionText || '').trim();
+      const fullCaptionText = timedCaptionText;
 
       return {
         ...c,
