@@ -2920,7 +2920,32 @@ async function extractSingleChunkStreaming(mediaEl, startSec, endSec, includeBac
     if(!seekFinished) seekTimer = setTimeout(finishSeek, 1800);
   });
 
-  const rawStream = (mediaEl.captureStream || mediaEl.mozCaptureStream).call(mediaEl);
+  // Chromium expõe captureStream() no elemento; Safari/iOS frequentemente não. Nesses navegadores,
+  // roteia o áudio do elemento por WebAudio para uma MediaStreamDestination em vez de abortar a dublagem.
+  let rawStream = null;
+  const captureMethod = mediaEl.captureStream || mediaEl.mozCaptureStream || mediaEl.webkitCaptureStream;
+  if(typeof captureMethod === 'function'){
+    rawStream = captureMethod.call(mediaEl);
+  } else {
+    let capture = mediaEl.__dubAudioCapture;
+    if(!capture){
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if(!AC) throw new Error('Este navegador não oferece captura de áudio para vídeos grandes. Tente um arquivo menor ou use Chrome/Edge.');
+      const ctx = new AC();
+      const source = ctx.createMediaElementSource(mediaEl);
+      const destination = ctx.createMediaStreamDestination();
+      const silentMonitor = ctx.createGain();
+      silentMonitor.gain.value = 0;
+      source.connect(destination);
+      source.connect(silentMonitor);
+      silentMonitor.connect(ctx.destination);
+      capture = { ctx, destination };
+      mediaEl.__dubAudioCapture = capture;
+    }
+    if(capture.ctx.state === 'suspended') await capture.ctx.resume().catch(()=>{});
+    rawStream = capture.destination.stream;
+  }
+  if(!rawStream) throw new Error('O navegador não conseguiu capturar o áudio do vídeo. Tente MP4 H.264/AAC ou Chrome/Edge.');
   const audioOnly = new MediaStream(rawStream.getAudioTracks());
   if(!audioOnly.getAudioTracks().length){
     throw new Error('Este arquivo não possui faixa de áudio detectável.');
@@ -3115,7 +3140,11 @@ async function prepareAudioExtractionPlan(file, rangeStart, rangeEnd, onMsg, inc
       return extracted;
     },
     cleanup(){
-      if(streamEl){ try{ streamEl.pause(); streamEl.src = ''; }catch(e){} }
+      if(streamEl){
+        try{ streamEl.pause(); streamEl.src = ''; }catch(e){}
+        const audioCapture = streamEl.__dubAudioCapture;
+        if(audioCapture && audioCapture.ctx){ audioCapture.ctx.close().catch(()=>{}); delete streamEl.__dubAudioCapture; }
+      }
       if(streamUrl){ try{ URL.revokeObjectURL(streamUrl); }catch(e){} }
     }
   };
@@ -9211,8 +9240,33 @@ async function importOpusVideoFromUrl(autoRunAnalysis = true){
       }
     }
 
-    // 3) MODO PODCAST & YOUTUBE STREAM 9:16 AO VIVO COM LEGENDAS (Zero aviso amarelo — extrai automaticamente as melhores partes de 2 minutos com o vídeo real do YouTube em movimento + legendas dinâmicas!)
+    // 3) Fallback robusto: yt-dlp no endpoint próprio baixa um MP4 progressivo se o extrator direto falhar.
+    // Assim o arquivo real entra no editor e pode ser recortado/exportado; o iframe sozinho não permite cortar por CORS.
     if(info.candidateStreamUrls) opusState.ytCandidateUrls = Array.isArray(info.candidateStreamUrls) ? [...info.candidateStreamUrls] : [];
+    if(!finalVideoBlob && ytId){
+      showStatus('opusStatus', '📥 A extração direta não respondeu. Tentando carregar o MP4 original pelo servidor seguro…', 'info');
+      try{
+        const dlResp = await fetch('/api/clips', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'video_download', url: `https://www.youtube.com/watch?v=${encodeURIComponent(ytId)}` }),
+          signal: AbortSignal.timeout(270000)
+        });
+        const dlType = String(dlResp.headers.get('content-type') || '').toLowerCase();
+        if(dlResp.ok && dlType.startsWith('video/')){
+          const downloaded = await dlResp.blob();
+          if(downloaded.size > 25000){
+            finalVideoBlob = downloaded;
+            totalStreamBytes = downloaded.size;
+          }
+        } else {
+          const errPayload = await dlResp.json().catch(()=>({}));
+          if(errPayload.error) showStatus('opusStatus', `⚠️ Não foi possível obter o vídeo pelo link: ${errPayload.error}. Você ainda pode enviar o arquivo MP4 diretamente.`, 'warn');
+        }
+      }catch(downloadError){
+        console.warn('Fallback yt-dlp do OpusClip falhou:', downloadError);
+      }
+    }
     if(!finalVideoBlob && ytId){
       stopOpusPreviewPlayback();
       if(opusState.fileUrl) URL.revokeObjectURL(opusState.fileUrl);
@@ -9241,11 +9295,10 @@ async function importOpusVideoFromUrl(autoRunAnalysis = true){
       const ytMon = document.getElementById('opusSourceYtEmbed');
       if(ytMon){
         ytMon.classList.remove('hidden');
-        ytMon.innerHTML =
-          `<img src="${thumbSrc}" style="width:100%;height:100%;object-fit:cover;filter:brightness(0.75)" alt="Podcast">` +
-          `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:rgba(4,6,14,0.38)">` +
-            `<span style="font-size:12px;font-weight:900;padding:5px 12px;border-radius:999px;background:#16a34a;color:#fff;box-shadow:0 6px 18px rgba(0,0,0,.5)">🎬 Cortes Verticais 9:16 de 2 Minutos Prontos Abaixo</span>` +
-          `</div>`;
+        // Quando o YouTube bloqueia a extração do arquivo, não deixe só uma miniatura estática:
+        // mantenha o vídeo original reproduzível no monitor para a pessoa conferir o link carregado.
+        const embedSrc = `https://www.youtube.com/embed/${encodeURIComponent(ytId)}?playsinline=1&controls=1&autoplay=0&rel=0`;
+        ytMon.innerHTML = `<iframe src="${embedSrc}" title="Vídeo original do YouTube" style="position:absolute;inset:0;width:100%;height:100%;border:0;background:#000" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen loading="eager"></iframe>`;
       }
 
       const meta = document.getElementById('opusFileMeta');
