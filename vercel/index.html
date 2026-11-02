@@ -973,6 +973,20 @@ input[type="range"]{
         <div class="hint" style="margin-top:5px">A fonte escolhida é aplicada às legendas traduzidas no vídeo exportado. O SRT mantém o texto e a sincronização.</div>
       </div>
       <div>
+        <label for="dubOutputFormat">Formato visual de saída</label>
+        <select id="dubOutputFormat" onchange="invalidateDubVideoExport()">
+          <option value="original" selected>🎞️ Manter formato original</option>
+          <option value="9:16">📱 Vertical 9:16 — TikTok / Reels / Shorts</option>
+          <option value="16:9">🖥️ Horizontal 16:9 — YouTube</option>
+        </select>
+        <label for="dubFrameMode" style="margin-top:10px">Enquadramento</label>
+        <select id="dubFrameMode" onchange="invalidateDubVideoExport()">
+          <option value="fit" selected>✨ Encaixar tudo com fundo desfocado</option>
+          <option value="fill">✂️ Preencher tela cortando as bordas</option>
+        </select>
+        <div class="hint" style="margin-top:5px">Converta TikTok ↔ YouTube sem alterar a dublagem. O modo “encaixar” preserva o quadro inteiro.</div>
+      </div>
+      <div>
         <label>Extensão do processamento</label>
         <select id="dubRangeMode" onchange="document.getElementById('dubTrimRow').classList.toggle('hidden', this.value!=='trim')">
           <option value="full" selected>🎬 Vídeo INTEIRO (do início ao fim, sem cortes)</option>
@@ -6351,14 +6365,16 @@ async function downloadDubVideo(opts = {}){
       setTimeout(ok, 2500);
     });
 
-    // Escala inteligente de resolução: preserva 100% da proporção (16:9, 9:16, 1:1, 4:3) com fluidez máxima!
+    // Converte o formato para publicação vertical ou horizontal; "original" conserva a proporção da fonte.
     const srcW = exportVid.videoWidth || v.videoWidth || 1280;
     const srcH = exportVid.videoHeight || v.videoHeight || 720;
     const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
     const maxEdge = isMobile ? 960 : 1280;
-    const scale = Math.min(1, maxEdge / Math.max(srcW, srcH));
-    const outW = Math.max(2, Math.round((srcW * scale) / 2) * 2);
-    const outH = Math.max(2, Math.round((srcH * scale) / 2) * 2);
+    const outputFormat = (document.getElementById('dubOutputFormat')||{}).value || 'original';
+    const targetAspect = outputFormat === '9:16' ? 9/16 : outputFormat === '16:9' ? 16/9 : srcW/srcH;
+    const outW = Math.max(2, Math.round((targetAspect >= 1 ? maxEdge : maxEdge * targetAspect) / 2) * 2);
+    const outH = Math.max(2, Math.round((targetAspect >= 1 ? maxEdge / targetAspect : maxEdge) / 2) * 2);
+    const frameMode = (document.getElementById('dubFrameMode')||{}).value || 'fit';
 
     const burnSubs = ((document.getElementById('dubBurnSubs')||{}).value || 'yes') === 'yes';
     const captionFonts = {
@@ -6405,7 +6421,25 @@ async function downloadDubVideo(opts = {}){
       // NUNCA altera playbackRate nem currentTime durante o draw — o decodificador roda 100% livre em 1.0x sem engasgos!
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, cw, ch);
-      try{ ctx.drawImage(exportVid, 0, 0, cw, ch); }catch(e){}
+      try{
+        const sourceAspect = srcW / srcH;
+        if(frameMode === 'fill'){
+          // Cover: recorta o excesso para ocupar todo o quadro de destino.
+          let sx=0, sy=0, sw=srcW, sh=srcH;
+          if(sourceAspect > targetAspect){ sw=srcH*targetAspect; sx=(srcW-sw)/2; }
+          else { sh=srcW/targetAspect; sy=(srcH-sh)/2; }
+          ctx.drawImage(exportVid,sx,sy,sw,sh,0,0,cw,ch);
+        }else{
+          // Fit: fundo ampliado e suavemente desfocado, com o vídeo inteiro sobreposto sem cortes.
+          const coverScale=Math.max(cw/srcW,ch/srcH), bgW=srcW*coverScale, bgH=srcH*coverScale;
+          const previousFilter=ctx.filter;
+          ctx.save(); ctx.filter='blur(24px)';
+          ctx.drawImage(exportVid,(cw-bgW)/2,(ch-bgH)/2,bgW,bgH);
+          ctx.restore(); ctx.filter=previousFilter || 'none';
+          const fitScale=Math.min(cw/srcW,ch/srcH), fitW=srcW*fitScale, fitH=srcH*fitScale;
+          ctx.drawImage(exportVid,(cw-fitW)/2,(ch-fitH)/2,fitW,fitH);
+        }
+      }catch(e){}
       if(dubLogoForExport){
         drawDubLogo(ctx, dubLogoForExport, dubLogoSettings);
       }
