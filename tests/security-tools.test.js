@@ -38,7 +38,8 @@ test('Wi-Fi helper creates a local strong password and summarizes only the manua
   context.summarizeWifiChecklist();
   assert.match(statuses.wifiChecklistStatus.message, /2 de 5 itens marcados/);
   assert.match(statuses.wifiChecklistStatus.message, /não verifica a rede automaticamente/);
-  assert.match(html, /não detecta, varre nem acessa redes Wi-Fi/);
+  assert.match(html, /não escaneia redes Wi-Fi, não captura tráfego e não tenta descobrir, quebrar ou testar senhas/);
+  assert.match(html, /não informe aqui uma senha Wi-Fi existente/);
 });
 
 test('security and mining helper make clear what stays local and what cannot run in the web page', () => {

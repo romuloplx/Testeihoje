@@ -1691,7 +1691,8 @@ input[type="range"]{
 
   <div class="card" style="border-color:#38bdf866;background:linear-gradient(145deg,#102438,#101324)">
     <h2>📶 Segurança do Wi-Fi</h2>
-    <p>Ferramentas defensivas para sua própria rede: gere uma senha forte e revise as configurações do roteador. Tudo é processado localmente; esta página não detecta, varre nem acessa redes Wi-Fi.</p>
+    <p>Ferramentas defensivas para sua própria rede: gere uma senha forte e revise as configurações do roteador. Tudo é processado localmente.</p>
+    <div class="hint" role="note" style="padding:10px 12px;border:1px solid #f59e0b88;border-radius:10px;background:#21180b;color:#fde68a"><strong>Limites desta ferramenta:</strong> ela não escaneia redes Wi-Fi, não captura tráfego e não tenta descobrir, quebrar ou testar senhas. Apenas gera uma senha nova e apresenta um checklist manual; não informe aqui uma senha Wi-Fi existente.</div>
     <label for="wifiPasswordLength">Tamanho da nova senha: <strong id="wifiPasswordLengthValue">20</strong> caracteres</label>
     <input id="wifiPasswordLength" type="range" min="16" max="32" value="20" oninput="document.getElementById('wifiPasswordLengthValue').textContent=this.value">
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
