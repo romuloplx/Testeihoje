@@ -1738,7 +1738,8 @@ input[type="range"]{
     <div class="hint" style="padding:10px 12px;border:1px solid #f59e0b55;border-radius:10px;background:#21180b">Mineração pode aquecer o telefone, acelerar o desgaste da bateria e reduzir seu desempenho. Comece com 2 threads, use somente enquanto estiver supervisionando e pare se aquecer. Pagamentos dependem do pool, da dificuldade e do limite mínimo; não há garantia de lucro. Não informe chave privada ou frase-semente.</div>
     <p class="hint">Usa o projeto de código aberto <a href="https://github.com/xmrig/xmrig" target="_blank" rel="noopener noreferrer" style="color:#7dd3fc">XMRig oficial (GPL-3.0)</a>, sem copiar ou embutir o minerador no site. XMRig/Monero é uma sugestão para CPU ARM; confira se o pool escolhido aceita RandomX e pagamentos na rede principal.</p>
     <label for="androidMinerPool">Pool Monero · host:porta</label>
-    <input id="androidMinerPool" type="text" inputmode="url" autocomplete="off" value="pool.supportxmr.com:443" placeholder="host:porta do pool Monero">\n    <div class="hint">Endpoint pré-preenchido com TLS como ponto de partida; confirme endereço, porta, taxa e limite de pagamento nas instruções atuais do pool antes de conectar. O pool pode ser trocado.</div>
+    <input id="androidMinerPool" type="text" inputmode="url" autocomplete="off" value="pool.supportxmr.com:443" placeholder="host:porta do pool Monero">
+    <div class="hint">Endpoint pré-preenchido com TLS como ponto de partida; confirme endereço, porta, taxa e limite de pagamento nas instruções atuais do pool antes de conectar. O pool pode ser trocado.</div>
     <label for="androidMinerWallet">Endereço público Monero mainnet</label>
     <input id="androidMinerWallet" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Cole somente seu endereço público (começa com 4 ou 8)">
     <label style="display:flex;align-items:center;gap:8px"><input id="androidMinerTls" type="checkbox" checked style="width:auto;margin:0"> O pool informa que esta porta usa TLS</label>
@@ -1747,25 +1748,21 @@ input[type="range"]{
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
       <button class="primary" type="button" onclick="buildAndroidMinerConfig()">Gerar configuração no dispositivo</button>
       <button class="ghost" type="button" onclick="downloadAndroidMinerConfig()">Baixar config.json</button>
+      <button class="ghost" type="button" onclick="downloadAndroidMinerSetupScript()">Baixar instalador + execução</button>
+      <button class="ghost" type="button" onclick="copyAndroidMinerRunCommand()">Copiar comando único do Termux</button>
     </div>
     <div class="status" id="androidMinerStatus" role="status" aria-live="polite"></div>
+    <label for="androidMinerRunCommand">Comando único para colar no Termux depois de baixar o script</label>
+    <input id="androidMinerRunCommand" readonly placeholder="Gere e baixe o script para mostrar o comando" style="font-family:monospace;font-size:12px">
+    <div class="hint">O navegador não pode executar comandos nativos do Termux. Na primeira vez, baixe o script, abra o Termux, rode <code>termux-setup-storage</code> e autorize o acesso; depois cole o comando. O script compila o código oficial e inicia a mineração localmente. Para iniciar com um toque nas próximas vezes, instale o Termux:Widget e adicione o atalho DubAI-XMRig à tela inicial.</div>
     <label for="androidMinerConfigOutput">Configuração XMRig (fica só nesta página)</label>
     <textarea id="androidMinerConfigOutput" readonly placeholder="Preencha pool e endereço público, depois gere a configuração." style="min-height:180px;font-family:monospace;font-size:12px"></textarea>
     <label for="androidMinerCommandOutput">Comando para iniciar no Termux, após compilar o XMRig</label>
     <input id="androidMinerCommandOutput" readonly placeholder="O comando aparecerá aqui" style="font-family:monospace;font-size:12px">
     <details style="margin-top:14px;padding:12px;border:1px solid var(--border);border-radius:10px;background:#0b1020">
       <summary style="cursor:pointer;font-weight:800;color:#bae6fd">Passos experimentais para compilar o código oficial no Termux</summary>
-      <p>Instale o <a href="https://github.com/termux/termux-app" target="_blank" rel="noopener noreferrer" style="color:#7dd3fc">Termux oficial</a>, atualize os pacotes, clone o repositório oficial e compile sem executar scripts remotos de terceiros. O build pode precisar de ajustes e não foi testado neste aparelho.</p>
-      <pre style="white-space:pre-wrap;overflow-wrap:anywhere;background:#080b16;padding:12px;border-radius:8px;color:#dbeafe;font-size:12px">pkg update
-pkg install git cmake clang make libuv openssl
-git clone --depth 1 https://github.com/xmrig/xmrig.git
-cd xmrig
-mkdir build && cd build
-cmake .. -DWITH_HWLOC=OFF -DWITH_HTTPD=OFF
-cmake --build . --parallel 2
-# Copie o config.json baixado para esta pasta e só então rode:
-./xmrig -c config.json --threads=2</pre>
-      <p class="hint">O número em <code>--threads</code> deve corresponder ao escolhido acima. O pool pode exigir campos ou opções TLS diferentes; siga as instruções oficiais dele. Não exponha a API de controle do minerador à internet.</p>
+      <p>Instale o <a href="https://github.com/termux/termux-app" target="_blank" rel="noopener noreferrer" style="color:#7dd3fc">Termux oficial</a>. Gere e baixe o script acima: ele instala dependências, compila XMRig do repositório oficial na primeira execução, grava a configuração escolhida e inicia com o limite de threads definido. O build é experimental e não foi testado fisicamente neste aparelho.</p>
+      <p class="hint">O script guarda uma cópia em <code>~/.shortcuts/DubAI-XMRig.sh</code> para uso com Termux:Widget após a instalação. Pressione Ctrl+C no Termux para parar. O pool pode exigir opções diferentes; confira a documentação dele. Não exponha a API do minerador à internet.</p>
     </details>
   </div>
 
@@ -1899,7 +1896,7 @@ function buildAndroidMinerConfig() {
     if(!rawPool)throw new Error('Informe o host e a porta do pool Monero escolhido.');
     const normalized=/^[a-z][a-z0-9+.-]*:\/\//i.test(rawPool)?rawPool:'stratum+tcp://'+rawPool;
     const parsed=new URL(normalized);
-    if(!['stratum+tcp:','stratum+ssl:','stratum+tls:'].includes(parsed.protocol)||!parsed.hostname||!parsed.port||parsed.username||parsed.password||parsed.pathname!=='/'||parsed.search||parsed.hash)throw new Error('Pool inválido. Use somente host:porta, conforme a documentação do pool.');
+    if(!['stratum+tcp:','stratum+ssl:','stratum+tls:'].includes(parsed.protocol)||!parsed.hostname||!parsed.port||parsed.username||parsed.password||!['','/'].includes(parsed.pathname)||parsed.search||parsed.hash)throw new Error('Pool inválido. Use somente host:porta, conforme a documentação do pool.');
     const port=Number(parsed.port);
     if(port<1||port>65535)throw new Error('Porta do pool inválida.');
     if(!/^[1-9A-HJ-NP-Za-km-z]{80,110}$/.test(wallet))throw new Error('O endereço Monero parece inválido. Cole apenas o endereço público mainnet (sem espaços).');
@@ -1910,8 +1907,69 @@ function buildAndroidMinerConfig() {
     output.value=JSON.stringify(config,null,2);
     command.value='./xmrig -c config.json --threads='+threads;
     setSecurityStatus(statusId,'Configuração criada localmente. Revise host, porta, TLS e regras de pagamento do pool antes de usar.','success');
-  } catch(error) {output.value='';command.value='';setSecurityStatus(statusId,error.message||'Não foi possível gerar a configuração.','error');}
+    return true;
+  } catch(error) {output.value='';command.value='';setSecurityStatus(statusId,error.message||'Não foi possível gerar a configuração.','error');return false;}
 }
+function makeAndroidMinerSetupScript() {
+  const configText=document.getElementById('androidMinerConfigOutput').value;
+  const threads=Number(document.getElementById('androidMinerThreads').value);
+  if(!configText||!Number.isInteger(threads)||threads<1||threads>8)throw new Error('Gere primeiro uma configuração válida.');
+  const encodedConfig=btoa(configText);
+  return `#!/data/data/com.termux/files/usr/bin/bash
+set -euo pipefail
+
+# DubAI PRO helper: builds official XMRig source and runs only with this explicit config.
+SHORTCUT="$HOME/.shortcuts/DubAI-XMRig.sh"
+mkdir -p "$HOME/.shortcuts"
+case "$0" in
+  "$HOME/.shortcuts/"*) ;;
+  *) cp "$0" "$SHORTCUT" && chmod 700 "$SHORTCUT" || true ;;
+esac
+
+if [ ! -x "$HOME/xmrig/build/xmrig" ]; then
+  pkg update -y
+  pkg install -y git cmake clang make libuv openssl
+  if [ ! -d "$HOME/xmrig" ]; then
+    git clone --depth 1 https://github.com/xmrig/xmrig.git "$HOME/xmrig"
+  elif [ ! -e "$HOME/xmrig/.git" ]; then
+    echo "Pasta ~/xmrig já existe e não é um clone Git; mova-a ou renomeie-a e tente de novo." >&2
+    exit 1
+  fi
+  mkdir -p "$HOME/xmrig/build"
+  cd "$HOME/xmrig/build"
+  cmake .. -DWITH_HWLOC=OFF -DWITH_HTTPD=OFF
+  cmake --build . --parallel 2
+fi
+
+cd "$HOME/xmrig/build"
+printf '%s' '${encodedConfig}' | base64 -d > config.json
+printf '\nXMRig vai iniciar com ${threads} threads. Supervisione a temperatura do celular.\nPressione Ctrl+C para parar.\n\n'
+exec ./xmrig -c config.json --threads=${threads}
+`;
+}
+function triggerAndroidMinerScriptDownload() {
+  const script=makeAndroidMinerSetupScript();
+  const blob=new Blob([script],{type:'text/x-shellscript'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='dubai-xmrig-setup.sh';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  return true;
+}
+function downloadAndroidMinerSetupScript() {
+  if(!buildAndroidMinerConfig())return;
+  try {triggerAndroidMinerScriptDownload();setSecurityStatus('androidMinerStatus','Script de setup baixado. Abra o Termux e use o comando exibido; o código-fonte será compilado e executado no próprio telefone.','success');}
+  catch(error){setSecurityStatus('androidMinerStatus',error.message||'Não foi possível gerar o script.','error');}
+}
+async function copyAndroidMinerRunCommand() {
+  if(!buildAndroidMinerConfig())return;
+  try {
+    triggerAndroidMinerScriptDownload();
+    const command='bash ~/storage/downloads/dubai-xmrig-setup.sh';
+    document.getElementById('androidMinerRunCommand').value=command;
+    await navigator.clipboard.writeText(command);
+    setSecurityStatus('androidMinerStatus','Script baixado e comando copiado. No Termux, conceda acesso ao armazenamento uma vez e cole o comando.','success');
+  } catch(error) {setSecurityStatus('androidMinerStatus','O script foi preparado; copie manualmente: bash ~/storage/downloads/dubai-xmrig-setup.sh','warn');}
+}
+
 function downloadAndroidMinerConfig() {
   const text=document.getElementById('androidMinerConfigOutput').value;
   if(!text){setSecurityStatus('androidMinerStatus','Gere e revise a configuração antes de baixar.','warn');return;}
