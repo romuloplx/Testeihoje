@@ -1689,6 +1689,31 @@ input[type="range"]{
     <div class="status" id="secPassStatus" role="status" aria-live="polite"></div>
   </div>
 
+  <div class="card" style="border-color:#38bdf866;background:linear-gradient(145deg,#102438,#101324)">
+    <h2>📶 Segurança do Wi-Fi</h2>
+    <p>Ferramentas defensivas para sua própria rede: gere uma senha forte e revise as configurações do roteador. Tudo é processado localmente; esta página não detecta, varre nem acessa redes Wi-Fi.</p>
+    <label for="wifiPasswordLength">Tamanho da nova senha: <strong id="wifiPasswordLengthValue">20</strong> caracteres</label>
+    <input id="wifiPasswordLength" type="range" min="16" max="32" value="20" oninput="document.getElementById('wifiPasswordLengthValue').textContent=this.value">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+      <button class="primary" type="button" onclick="generateWifiPassword()">🔐 Gerar senha do Wi-Fi</button>
+      <button class="ghost" type="button" onclick="copySecurityValue('wifiPasswordOutput')">Copiar senha</button>
+    </div>
+    <label for="wifiPasswordOutput">Senha gerada neste dispositivo</label>
+    <input id="wifiPasswordOutput" readonly autocomplete="off" placeholder="A senha aparecerá aqui" style="font-family:monospace">
+    <div class="status" id="wifiPasswordStatus" role="status" aria-live="polite"></div>
+    <h3>Checklist de segurança do roteador</h3>
+    <p class="hint">Marque os itens que você confirmou nas configurações do seu roteador. Isto é um checklist manual, não uma análise automática da rede.</p>
+    <div style="display:grid;gap:8px">
+      <label style="display:flex;gap:8px;align-items:flex-start"><input id="wifiCheckEncryption" type="checkbox" style="width:auto;margin:3px 0 0"> Segurança WPA3-Personal ou WPA2-AES ativada (evite WEP e WPA antigo)</label>
+      <label style="display:flex;gap:8px;align-items:flex-start"><input id="wifiCheckWps" type="checkbox" style="width:auto;margin:3px 0 0"> WPS desativado</label>
+      <label style="display:flex;gap:8px;align-items:flex-start"><input id="wifiCheckAdminPassword" type="checkbox" style="width:auto;margin:3px 0 0"> Senha de administração do roteador alterada da senha padrão</label>
+      <label style="display:flex;gap:8px;align-items:flex-start"><input id="wifiCheckFirmware" type="checkbox" style="width:auto;margin:3px 0 0"> Firmware do roteador atualizado</label>
+      <label style="display:flex;gap:8px;align-items:flex-start"><input id="wifiCheckRemoteAdmin" type="checkbox" style="width:auto;margin:3px 0 0"> Administração remota desativada, se não for necessária</label>
+    </div>
+    <button class="ghost" type="button" onclick="summarizeWifiChecklist()" style="margin-top:10px">Ver resumo do checklist</button>
+    <div class="status" id="wifiChecklistStatus" role="status" aria-live="polite"></div>
+  </div>
+
   <div class="card">
     <h2>🧾 Codificador Base64</h2>
     <p>Codifica e decodifica texto em Base64 com suporte a UTF-8. Base64 é apenas uma codificação, não criptografia.</p>
@@ -1828,6 +1853,23 @@ function generateSecurePassword() {
     output.value=chars.join('');
     setSecurityStatus('secPassStatus','Senha gerada neste dispositivo. Salve-a em um gerenciador de senhas.','success');
   } catch(error) { output.value=''; setSecurityStatus('secPassStatus',error.message||'Este navegador não oferece geração criptográfica segura.','error'); }
+}
+function generateWifiPassword() {
+  const output=document.getElementById('wifiPasswordOutput');
+  try {
+    const length=Number(document.getElementById('wifiPasswordLength').value);
+    if(!Number.isInteger(length)||length<16||length>32)throw new Error('Escolha um tamanho entre 16 e 32 caracteres.');
+    const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%*-_=+';
+    let password='';
+    for(let i=0;i<length;i++)password+=alphabet[secureRandomIndex(alphabet.length)];
+    output.value=password;
+    setSecurityStatus('wifiPasswordStatus','Senha criada com aleatoriedade criptográfica neste dispositivo. Guarde-a em local seguro e configure-a no seu roteador.','success');
+  } catch(error) {output.value='';setSecurityStatus('wifiPasswordStatus',error.message||'Este navegador não oferece geração criptográfica segura.','error');}
+}
+function summarizeWifiChecklist() {
+  const checks=['wifiCheckEncryption','wifiCheckWps','wifiCheckAdminPassword','wifiCheckFirmware','wifiCheckRemoteAdmin'];
+  const completed=checks.filter(id=>document.getElementById(id).checked).length;
+  setSecurityStatus('wifiChecklistStatus',`${completed} de ${checks.length} itens marcados. Confirme cada ajuste no painel do seu roteador; este checklist não verifica a rede automaticamente.`,'info');
 }
 async function copySecurityValue(id) {
   const el=document.getElementById(id);

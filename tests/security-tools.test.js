@@ -9,12 +9,36 @@ const html = fs.readFileSync(path.join(root, 'public/index.html'), 'utf8');
 
 test('ethical security utilities are available in both app deployments', () => {
   assert.equal(html, fs.readFileSync(path.join(root, 'vercel/index.html'), 'utf8'));
-  for (const id of ['security-tools', 'secPassOutput', 'secBaseInput', 'secHashInput', 'secJwtInput', 'secUrlInput', 'secJsonInput', 'secFileInput', 'androidMinerPool', 'androidMinerWallet', 'androidMinerConfigOutput']) {
+  for (const id of ['security-tools', 'secPassOutput', 'wifiPasswordOutput', 'wifiChecklistStatus', 'wifiCheckEncryption', 'wifiCheckWps', 'wifiCheckAdminPassword', 'wifiCheckFirmware', 'wifiCheckRemoteAdmin', 'secBaseInput', 'secHashInput', 'secJwtInput', 'secUrlInput', 'secJsonInput', 'secFileInput', 'androidMinerPool', 'androidMinerWallet', 'androidMinerConfigOutput']) {
     assert.match(html, new RegExp(`id="${id}"`));
   }
-  for (const fn of ['generateSecurePassword', 'transformBase64', 'calculateSha256', 'decodeJwtPayload', 'inspectSecurityUrl', 'formatSecurityJson', 'transformUrlComponent', 'calculateFileSha256', 'buildAndroidMinerConfig', 'downloadAndroidMinerConfig', 'makeAndroidMinerSetupScript', 'downloadAndroidMinerSetupScript', 'copyAndroidMinerRunCommand']) {
+  for (const fn of ['generateSecurePassword', 'generateWifiPassword', 'summarizeWifiChecklist', 'transformBase64', 'calculateSha256', 'decodeJwtPayload', 'inspectSecurityUrl', 'formatSecurityJson', 'transformUrlComponent', 'calculateFileSha256', 'buildAndroidMinerConfig', 'downloadAndroidMinerConfig', 'makeAndroidMinerSetupScript', 'downloadAndroidMinerSetupScript', 'copyAndroidMinerRunCommand']) {
     assert.match(html, new RegExp(`function ${fn}\\(`));
   }
+});
+
+test('Wi-Fi helper creates a local strong password and summarizes only the manual router checklist', () => {
+  const ids = ['wifiPasswordLength', 'wifiPasswordOutput', 'wifiPasswordStatus', 'wifiChecklistStatus', 'wifiCheckEncryption', 'wifiCheckWps', 'wifiCheckAdminPassword', 'wifiCheckFirmware', 'wifiCheckRemoteAdmin'];
+  const elements = Object.fromEntries(ids.map(id => [id, { value: id === 'wifiPasswordLength' ? '24' : '', checked: id === 'wifiCheckEncryption' || id === 'wifiCheckFirmware' }]));
+  const statuses = {};
+  const start = html.indexOf('function generateWifiPassword(');
+  const end = html.indexOf('async function copySecurityValue(', start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  const context = {
+    document: { getElementById: id => elements[id] },
+    secureRandomIndex: max => max - 1,
+    setSecurityStatus: (id, message, kind) => { statuses[id] = { message, kind }; }
+  };
+  vm.runInNewContext(html.slice(start, end), context);
+  context.generateWifiPassword();
+  assert.equal(elements.wifiPasswordOutput.value.length, 24);
+  assert.match(elements.wifiPasswordOutput.value, /^[A-Za-z0-9!@#$%*\\-_+=]+$/);
+  assert.equal(statuses.wifiPasswordStatus.kind, 'success');
+  context.summarizeWifiChecklist();
+  assert.match(statuses.wifiChecklistStatus.message, /2 de 5 itens marcados/);
+  assert.match(statuses.wifiChecklistStatus.message, /não verifica a rede automaticamente/);
+  assert.match(html, /não detecta, varre nem acessa redes Wi-Fi/);
 });
 
 test('security and mining helper make clear what stays local and what cannot run in the web page', () => {
