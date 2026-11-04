@@ -24,6 +24,7 @@ test('security tools clearly disclaim token verification and remote scans', () =
   assert.match(html, /CyberChef \(GCHQ, Apache-2\.0\)/);
   assert.match(html, /não inicia mineração/);
   assert.match(html, /XMRig oficial \(GPL-3\.0\)/);
+  assert.match(html, /value="pool\.supportxmr\.com:3333"/);
   assert.match(html, /github\.com\/termux\/termux-app/);
   assert.match(html, /nem envia dados/);
 });
